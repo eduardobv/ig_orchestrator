@@ -16,6 +16,7 @@ CHANGELOG.md
 requirements.txt
 .env.example
 .gitignore
+.vscode/launch.json
 config/
 data/
 logs/
@@ -30,6 +31,7 @@ tests/
 
 * Se puede ejecutar `python -m ig_orchestrator`.
 * `.env`, `*.session`, bases SQLite y logs sensibles estan en `.gitignore`.
+* Existe `.vscode/launch.json` para depurar la aplicacion y ejecutar tests desde VS Code.
 * Existen carpetas base para config, data, logs y reports.
 * No se implementa Telegram real en esta tarea.
 * Actualizar `CHANGELOG.md`.
@@ -38,3 +40,4 @@ tests/
 
 * Ejecutar import basico del paquete.
 * Verificar que `python -m ig_orchestrator` muestra una salida minima o ayuda.
+* Verificar que `launch.json` apunta al modulo `ig_orchestrator` y a `pytest`.

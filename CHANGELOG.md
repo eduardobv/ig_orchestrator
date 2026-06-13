@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.1.0 - Tarea 1 - Estructura base del proyecto
+
+Fecha: 2026-06-13
+
+### Creado
+
+* `pyproject.toml` para empaquetar el proyecto con layout `src`.
+* `.env.example` con las variables previstas para la serie `v1.x`.
+* `src/ig_orchestrator/__init__.py`.
+* `src/ig_orchestrator/__main__.py`.
+* `src/ig_orchestrator/main.py`.
+* `tests/test_package_smoke.py`.
+* `data/.gitkeep`, `logs/.gitkeep` y `reports/.gitkeep`.
+* `.vscode/launch.json` con configuraciones para depurar `ig_orchestrator` y ejecutar `pytest`.
+
+### Modificado
+
+* `README.md` con uso inicial.
+* `requirements.txt` con dependencias base documentadas en el plan.
+* `.gitignore` para proteger `.env`, sesiones de Telethon, SQLite y logs sin bloquear carpetas base.
+* `tasks/Tarea1.md` para incluir `launch.json` en el alcance de la tarea.
+
+### Resumen
+
+El paquete se puede importar y ejecutar con `python -m ig_orchestrator`, mostrando
+una salida minima sin implementar todavia logica de Telegram ni negocio. Tambien
+queda disponible una configuracion compartida de VS Code para ejecutar y depurar
+la aplicacion o los tests.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+* `python -m json.tool .vscode\launch.json`
+
 ## Planificacion - Versionado por tarea
 
 Fecha: 2026-06-13

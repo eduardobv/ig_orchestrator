@@ -1,4 +1,4 @@
-# Configuración y variables de entorno
+# Configuracion y variables de entorno
 .env
 .env.local
 .env.*.local
@@ -38,15 +38,17 @@ wheels/
 .installed.cfg
 *.egg
 
-# Caché y logs
+# Cache y logs
 .pytest_cache/
 .coverage
 *.log
-logs/
+logs/*.log
 .cache
 
 # IDEs
 .vscode/
+!.vscode/
+!.vscode/launch.json
 .idea/
 *.swp
 *.swo
@@ -58,11 +60,14 @@ logs/
 datos.txt
 *.pickle
 *.pkl
+data/*.db
+data/*.sqlite
+data/*.sqlite3
 *.db
 *.sqlite
 *.sqlite3
 
-# Reportes
+# Reportes y herramientas de test
 htmlcov/
 .tox/
 .hypothesis/
