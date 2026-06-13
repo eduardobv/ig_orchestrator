@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "settings": {
+    "telegram_desktop_download_folder": "C:\\Users\\eduba\\Downloads\\DW\\Telegram_Desktop",
+    "working_folder": "C:\\Users\\eduba\\Downloads\\DW\\Telegram_Desktop",
+    "reports_folder": "reports",
+    "max_retries": 5,
+    "retry_base_seconds": 90,
+    "retry_max_seconds": 900,
+    "download_wait_timeout_seconds": 300,
+    "download_stable_seconds": 10
+  }
+}

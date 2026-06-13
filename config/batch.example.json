@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "batch_name": "descargas_junio_2026",
+  "defaults": {
+    "download_stories": false,
+    "start_now_date": "2026-06-04"
+  },
+  "accounts": [
+    {
+      "username": "example_user",
+      "start_now_date": "2026-06-04",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZPjwEjitxx/?img_index=1",
+        "https://www.instagram.com/reel/ABC123xyz/",
+        "https://www.instagram.com/stories/highlights/17851330941375169/"
+      ]
+    },
+    {
+      "username": "another_user",
+      "download_stories": false,
+      "urls": [
+        "https://www.instagram.com/p/XYZ789abc/"
+      ]
+    }
+  ]
+}
