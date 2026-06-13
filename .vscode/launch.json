@@ -5,7 +5,7 @@
       "name": "Ejecutar: ig_orchestrator",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/src/ig_orchestrator/main.py",
+      "module": "ig_orchestrator",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true,
@@ -18,10 +18,7 @@
       "name": "Depurar: ig_orchestrator",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/src/ig_orchestrator/main.py",
-      "args": [
-        "tests"
-      ],
+      "module": "ig_orchestrator",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": true,

@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.2.0 - Tarea 2 - Settings y configuracion
+
+Fecha: 2026-06-13
+
+### Creado
+
+* `src/ig_orchestrator/settings.py` con `Settings`, `SettingsError` y `load_settings`.
+* `tests/test_settings.py` con pruebas unitarias de carga, variables faltantes y variables reservadas opcionales.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.2.0`.
+* `pyproject.toml` para actualizar la version y declarar dependencias runtime de configuracion.
+* `tests/test_package_smoke.py` para esperar la version `1.2.0`.
+
+### Resumen
+
+La aplicacion puede cargar configuracion desde `.env` y variables de entorno,
+validando campos obligatorios con mensajes claros, convirtiendo rutas a
+`pathlib.Path` y manteniendo la configuracion futura de renombrado/movimiento
+final como opcional.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.1.0 - Tarea 1 - Estructura base del proyecto
 
 Fecha: 2026-06-13
