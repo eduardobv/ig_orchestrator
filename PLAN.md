@@ -18,7 +18,7 @@ El objetivo es automatizar todo lo posterior:
 2. Registrar URLs en una cola persistente.
 3. Enviar URLs al bot de Telegram usando la cuenta personal del usuario.
 4. Detectar respuestas del bot.
-5. Detectar archivos descargados en la carpeta de Telegram Desktop.
+5. Detectar archivos descargados en la carpeta de Telegram_Desktop.
 6. Asociar archivos descargados con cada URL.
 7. Clasificar archivos en `reels`, `posts` o `story`.
 8. Ejecutar el proceso actual de renombrado.
@@ -94,7 +94,7 @@ El proyecto está pensado para Windows 11.
 Debe soportar rutas como:
 
 ```text
-C:\Users\eduba\Downloads\DW\Telegram Desktop
+C:\Users\eduba\Downloads\DW\Telegram_Desktop
 G:\4K Stogram\00.FAVORITES
 ```
 
@@ -269,8 +269,8 @@ TELETHON_SESSION_NAME=telegram_user_session
 TELEGRAM_DOWNLOAD_BOT_USERNAME=@example_bot
 
 # Carpetas locales
-TELEGRAM_DESKTOP_DOWNLOAD_FOLDER=C:\Users\eduba\Downloads\DW\Telegram Desktop
-WORKING_FOLDER=C:\Users\eduba\Downloads\DW\Telegram Desktop
+TELEGRAM_DESKTOP_DOWNLOAD_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
+WORKING_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
 FINAL_BASE_FOLDER=G:\4K Stogram\00.FAVORITES
 
 # Script actual de renombrado
@@ -293,6 +293,7 @@ DOWNLOAD_STABLE_SECONDS=10
 ---
 
 ## 7. `requirements.txt`
+Actualizar este archivo en caso de que ya exista.
 
 ```txt
 telethon>=1.34.0
@@ -365,6 +366,8 @@ Valores posibles de `publication_type`:
 ```text
 POST
 REEL
+STORY
+HIGHLIGHTS
 UNKNOWN
 ```
 
@@ -496,7 +499,7 @@ REEL
 Si descarga mezcla de vídeos e imágenes, se mantiene como:
 
 ```text
-REEL
+POST para imagenes y REEL para el video
 ```
 
 ---
@@ -515,6 +518,7 @@ El sistema debe crear:
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\story\
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\reels\
+C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\highlights\
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\_duplicated\
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\_errors\
 C:\Users\eduba\Downloads\DW\Telegram Desktop\example_user\_logs\
@@ -524,6 +528,7 @@ Reglas:
 
 * Los vídeos de reels deben ir a `reels`.
 * Las stories deben ir a `story`.
+* Las highlights deben ir a `highlights`.
 * Las fotos de posts deben quedar en la carpeta raíz del usuario.
 * Los duplicados deben moverse a `_duplicated`, salvo que la configuración indique eliminación automática.
 * Los errores deben registrarse en `_errors`.
@@ -665,7 +670,7 @@ download_start_time = now()
 
 Después de enviar la URL:
 
-1. Observar la carpeta `Telegram Desktop`.
+1. Observar la carpeta `Telegram_Desktop`.
 2. Detectar archivos creados después de `download_start_time`.
 3. Esperar hasta que no aparezcan archivos nuevos durante `DOWNLOAD_STABLE_SECONDS`.
 4. Asociar esos archivos al `url_job`.
@@ -744,6 +749,12 @@ Si son stories:
 example_user\story\
 ```
 
+Si son hightlights:
+
+```text
+example_user\highlights\
+```
+
 En la primera versión, las stories pueden quedar fuera del flujo principal y procesarse manualmente o como tarea separada.
 
 ---
@@ -757,7 +768,7 @@ Actualmente existe un `config.json` con esta estructura aproximada:
 ```json
 {
   "renameProcess": {
-    "manualFolder": "C:\\Users\\eduba\\Downloads\\DW\\Telegram Desktop",
+    "manualFolder": "C:\\Users\\eduba\\Downloads\\DW\\Telegram_Desktop",
     "consultFolders": [
       "G:\\4K Stogram\\00.FAVORITES",
       "G:\\4K Stogram\\00.MODELS-A",
@@ -948,7 +959,7 @@ python -m ig_orchestrator move-final \
 
 Las siguientes tareas deben implementarse una a una.
 
-Cada tarea debe ser independiente y tener tests.
+Cada tarea debe ser independiente.
 
 ---
 
