@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.7.0 - Tarea 7 - Clasificador de URLs
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/input/url_classifier.py` con clasificacion inicial de URLs de Instagram y error explicito para entradas invalidas.
+* `tests/test_url_classifier.py` con pruebas unitarias para posts, reels, stories, highlights, URLs desconocidas de Instagram y URLs no Instagram.
+
+### Modificado
+
+* `src/ig_orchestrator/input/batch_importer.py` para usar el clasificador dedicado.
+* `src/ig_orchestrator/input/__init__.py` para exponer `UrlClassifierError` y `classify_instagram_url`.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.7.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.7.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.7.0`.
+
+### Resumen
+
+La clasificacion inicial de URLs queda aislada en un modulo testeable. Las URLs
+de highlights, stories, reels y posts se clasifican segun las reglas de la
+tarea, los posts sin `img_index` siguen entrando inicialmente como `REEL`, las
+rutas desconocidas de Instagram se mantienen como `UNKNOWN` y las URLs fuera
+del dominio de Instagram fallan con `UrlClassifierError`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.6.0 - Tarea 6 - Importador JSON a SQLite
 
 Fecha: 2026-06-14

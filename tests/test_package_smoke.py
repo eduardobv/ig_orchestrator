@@ -7,7 +7,7 @@ import ig_orchestrator
 
 
 def test_package_imports() -> None:
-    assert ig_orchestrator.__version__ == "1.6.0"
+    assert ig_orchestrator.__version__ == "1.7.0"
 
 
 def test_module_entrypoint_runs() -> None:
@@ -23,4 +23,4 @@ def test_module_entrypoint_runs() -> None:
         text=True,
     )
 
-    assert "ig_orchestrator v1.6.0" in result.stdout
+    assert "ig_orchestrator v1.7.0" in result.stdout

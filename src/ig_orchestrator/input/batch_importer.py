@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from sqlite3 import Connection, Row
-from urllib.parse import parse_qs, urlparse
 
 from ig_orchestrator.db import (
     AccountRepository,
@@ -12,6 +11,7 @@ from ig_orchestrator.db import (
     UrlJobRepository,
 )
 from ig_orchestrator.input.batch_json_parser import ParsedBatch, parse_batch_json
+from ig_orchestrator.input.url_classifier import classify_instagram_url
 from ig_orchestrator.models import (
     Account,
     AccountStatus,
@@ -120,22 +120,6 @@ def import_parsed_batch(
 
 def build_story_url(username: str) -> str:
     return f"https://www.instagram.com/stories/{username}/"
-
-
-def classify_instagram_url(url: str) -> PublicationType:
-    parsed = urlparse(url)
-    path = parsed.path.rstrip("/") + "/"
-
-    if path.startswith("/stories/highlights/"):
-        return PublicationType.HIGHLIGHTS
-    if path.startswith("/stories/"):
-        return PublicationType.STORY
-    if "/reel/" in path:
-        return PublicationType.REEL
-    if "/p/" in path:
-        query = parse_qs(parsed.query, keep_blank_values=True)
-        return PublicationType.POST if "img_index" in query else PublicationType.REEL
-    return PublicationType.UNKNOWN
 
 
 def _upsert_operational_config(
