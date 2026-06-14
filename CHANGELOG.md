@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.6.0 - Tarea 6 - Importador JSON a SQLite
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/input/batch_importer.py` con importacion de JSON validado a `input_batches`, `accounts` y `url_jobs`.
+* `tests/test_batch_importer.py` con pruebas de importacion, stories generadas, clasificacion inicial e idempotencia.
+
+### Modificado
+
+* `src/ig_orchestrator/input/__init__.py` para exponer el importador.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.6.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.6.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.6.0`.
+
+### Resumen
+
+La aplicacion puede importar un lote parseado o un JSON directamente a SQLite,
+reutilizando el batch y las cuentas existentes al reimportar el mismo lote para
+evitar duplicados razonables. Si `download_stories` es verdadero, se genera la
+URL de stories y se guarda como `url_job` con `source = GENERATED_STORY`. Las
+URLs manuales se guardan con `source = INPUT_URL` y clasificacion inicial de
+stories, highlights, reels y posts. Cuando el importador recibe `Settings`,
+persiste configuracion operativa no sensible en `app_config`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.5.0 - Tarea 5 - Parser de JSON por lotes
 
 Fecha: 2026-06-14
