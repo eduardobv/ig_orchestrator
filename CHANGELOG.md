@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.3.0 - Tarea 3 - Modelos de dominio
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/models/account.py` con `Account` y `AccountStatus`.
+* `src/ig_orchestrator/models/app_config.py` con `AppConfig` y `ConfigValueType`.
+* `src/ig_orchestrator/models/input_batch.py` con `InputBatch` y `InputBatchStatus`.
+* `src/ig_orchestrator/models/url_job.py` con `UrlJob`, `PublicationType`, `UrlSource` y `UrlJobStatus`.
+* `src/ig_orchestrator/models/download_file.py` con `DownloadFile`, `MediaType` y `DownloadFileStatus`.
+* `src/ig_orchestrator/models/run_summary.py` con `RunSummary` y `RunStatus`.
+* `src/ig_orchestrator/models/__init__.py` para exponer los modelos de dominio.
+* `tests/test_models.py` con pruebas unitarias de creacion y validaciones minimas.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.3.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.3.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.3.0`.
+
+### Resumen
+
+La aplicacion cuenta con modelos de dominio ligeros basados en `dataclasses`,
+enums para estados y tipos definidos en el plan, y validaciones minimas para
+identificadores, textos obligatorios, fechas, rutas, contadores y metadatos de
+archivos.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.2.0 - Tarea 2 - Settings y configuracion
 
 Fecha: 2026-06-13
