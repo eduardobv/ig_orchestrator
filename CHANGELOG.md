@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.4.0 - Tarea 4 - SQLite schema, migraciones y repositorios
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/db/schema.sql` con las tablas `app_config`, `input_batches`, `accounts`, `runs`, `url_jobs` y `download_files`.
+* `src/ig_orchestrator/db/connection.py` para abrir conexiones SQLite con `row_factory` y claves foraneas activas.
+* `src/ig_orchestrator/db/migrations.py` con inicializacion idempotente de la base de datos.
+* `src/ig_orchestrator/db/config_repository.py` para persistir configuracion operativa.
+* `src/ig_orchestrator/db/batch_repository.py` para crear, consultar y actualizar lotes.
+* `src/ig_orchestrator/db/account_repository.py` para crear, consultar y actualizar cuentas.
+* `src/ig_orchestrator/db/url_job_repository.py` para crear, consultar y actualizar trabajos de URL.
+* `src/ig_orchestrator/db/download_repository.py` para crear, consultar y actualizar archivos descargados.
+* `src/ig_orchestrator/db/run_repository.py` para crear y actualizar ejecuciones.
+* `tests/test_db_repositories.py` con pruebas de integracion usando SQLite temporal.
+
+### Modificado
+
+* `src/ig_orchestrator/db/__init__.py` para exponer conexion, migraciones y repositorios.
+* `src/ig_orchestrator/main.py` con un comando minimo `init-db`.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.4.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.4.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.4.0`.
+
+### Resumen
+
+La aplicacion puede inicializar SQLite sin borrar datos existentes, crear las
+tablas de persistencia definidas en el plan y operar sobre batches, cuentas,
+URL jobs, archivos descargados, runs y configuracion mediante repositorios
+testeables.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+* `python -m ig_orchestrator init-db --db-path <sqlite-temporal>`
+
 ## v1.3.0 - Tarea 3 - Modelos de dominio
 
 Fecha: 2026-06-14
