@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.11.0 - Tarea 11 - Politica de reintentos por ronda
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/orchestration/__init__.py` para exponer la politica de reintentos.
+* `src/ig_orchestrator/orchestration/retry_policy.py` con decisiones explicitas de retry, fallo final y no reintento, calculo de backoff y cola FIFO.
+* `tests/test_retry_policy.py` con pruebas unitarias de backoff, errores no reintentables, max retries, cola FIFO y validaciones.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.11.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.11.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.11.0`.
+
+### Resumen
+
+La aplicacion puede calcular la siguiente accion para una URL fallida sin dormir
+ni tocar Telegram: reintentar con backoff exponencial limitado, marcar fallo
+final al agotar reintentos o por error no reintentable, y mantener una cola FIFO
+para reintentos al final de la pasada principal.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.10.0 - Tarea 10 - Parser de respuestas del bot
 
 Fecha: 2026-06-14
