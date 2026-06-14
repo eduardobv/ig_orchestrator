@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.13.0 - Tarea 13 - Clasificador de archivos
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/file_classifier.py` con clasificacion de archivos descargados por extension.
+* `tests/test_file_classifier.py` con pruebas unitarias para imagenes, videos, extensiones en mayusculas y tipos desconocidos.
+
+### Modificado
+
+* `src/ig_orchestrator/filesystem/__init__.py` para exponer el clasificador y los conjuntos de extensiones.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.13.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.13.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.13.0`.
+
+### Resumen
+
+La aplicacion puede clasificar archivos descargados como `IMAGE`, `VIDEO` o
+`UNKNOWN` a partir de su extension, sin distinguir mayusculas/minusculas y sin
+tocar el sistema de archivos real.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.12.0 - Tarea 12 - Watcher de descargas
 
 Fecha: 2026-06-14
