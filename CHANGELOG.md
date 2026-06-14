@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.12.0 - Tarea 12 - Watcher de descargas
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/file_watcher.py` con un watcher pasivo para detectar archivos nuevos o modificados tras un instante de inicio, ignorar temporales y directorios, y esperar estabilidad de tamano.
+* `tests/test_file_watcher.py` con pruebas usando carpeta temporal para archivos nuevos, temporales, directorios, timeout y estabilizacion de tamano.
+
+### Modificado
+
+* `src/ig_orchestrator/filesystem/__init__.py` para exponer `watch_downloaded_files`.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.12.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.12.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.12.0`.
+
+### Resumen
+
+La aplicacion puede observar una carpeta de descargas y devolver solo archivos
+creados o modificados despues de `start_time`, sin moverlos ni depender de
+Telegram real. El watcher espera a que no haya cambios durante
+`stable_seconds`, filtra extensiones temporales comunes y devuelve una lista de
+`Path` ordenada.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.11.0 - Tarea 11 - Politica de reintentos por ronda
 
 Fecha: 2026-06-14
