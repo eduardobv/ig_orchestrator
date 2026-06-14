@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.14.0 - Tarea 14 - Movimiento de archivos por tipo
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/file_mover.py` con movimiento de archivos descargados a carpetas de cuenta segun tipo de publicacion y medio.
+* `tests/test_file_mover.py` con pruebas usando carpeta temporal para reels, posts, stories, highlights, sufijos seguros y reclasificacion de reels con solo imagenes.
+
+### Modificado
+
+* `src/ig_orchestrator/filesystem/__init__.py` para exponer el movimiento de archivos y la resolucion de tipo final.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.14.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.14.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.14.0`.
+
+### Resumen
+
+La aplicacion puede mover archivos descargados a la estructura temporal de la
+cuenta: reels a `reels`, stories a `story`, highlights a `highlights` y posts a
+la raiz del usuario. El movimiento devuelve modelos `DownloadFile` actualizados
+con `working_path`, estado clasificable para SQLite y tamano final. Si el
+destino ya existe, se conserva el archivo previo y se usa un sufijo numerico
+seguro. Los reels que descargan solo imagenes se resuelven como posts.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.13.0 - Tarea 13 - Clasificador de archivos
 
 Fecha: 2026-06-14

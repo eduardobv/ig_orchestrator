@@ -11,6 +11,10 @@ from ig_orchestrator.filesystem.file_classifier import (
     VIDEO_EXTENSIONS,
     classify_file_media_type,
 )
+from ig_orchestrator.filesystem.file_mover import (
+    move_downloaded_files,
+    resolve_publication_type_after_download,
+)
 
 __all__ = [
     "AccountFolderPaths",
@@ -19,5 +23,7 @@ __all__ = [
     "VIDEO_EXTENSIONS",
     "classify_file_media_type",
     "ensure_account_folders",
+    "move_downloaded_files",
+    "resolve_publication_type_after_download",
     "watch_downloaded_files",
 ]
