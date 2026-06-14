@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.15.0 - Tarea 15 - Servicio de conversacion con bot
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/telegram/bot_conversation_service.py` con el flujo de conversacion para procesar una URL contra el bot de Telegram.
+* `tests/test_bot_conversation_service.py` con pruebas usando mocks de Telegram y watcher, mas SQLite temporal para persistencia.
+
+### Modificado
+
+* `src/ig_orchestrator/db/url_job_repository.py` para guardar `sent_message_id`.
+* `src/ig_orchestrator/telegram/__init__.py` para exponer el servicio de conversacion.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.15.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.15.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.15.0`.
+
+### Resumen
+
+La aplicacion puede procesar un `UrlJob` completo contra el bot: marcarlo como
+enviado, enviar la URL, guardar el mensaje enviado, leer respuestas del bot,
+clasificar errores reintentables y definitivos, activar el watcher si no hay
+error, asociar archivos detectados en SQLite y terminar como `DOWNLOADED` o
+`RETRY_PENDING` cuando no aparecen archivos. El servicio usa un lock asincrono
+por instancia para evitar procesar dos URLs simultaneamente en `v1.0.1`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_bot_conversation_service.py`
+* `python -m pytest tests\test_db_repositories.py`
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.14.0 - Tarea 14 - Movimiento de archivos por tipo
 
 Fecha: 2026-06-14

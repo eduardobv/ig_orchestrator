@@ -99,6 +99,25 @@ class UrlJobRepository:
             raise ValueError(f"URL job not found: {job_id}")
         return stored
 
+    def update_sent_message_id(self, job_id: int, sent_message_id: int) -> UrlJob:
+        if sent_message_id <= 0:
+            raise ValueError("sent_message_id must be positive")
+
+        self.connection.execute(
+            """
+            UPDATE url_jobs
+            SET sent_message_id = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (sent_message_id, job_id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(job_id)
+        if stored is None:
+            raise ValueError(f"URL job not found: {job_id}")
+        return stored
+
     def update_error(
         self,
         job_id: int,
