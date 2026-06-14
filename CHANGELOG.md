@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.5.0 - Tarea 5 - Parser de JSON por lotes
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/input/__init__.py` para exponer el parser de lotes.
+* `src/ig_orchestrator/input/batch_json_parser.py` con `parse_batch_json`, DTOs de lote parseado y errores de validacion claros.
+* `tests/test_batch_json_parser.py` con pruebas unitarias del contrato de entrada JSON.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.5.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.5.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.5.0`.
+
+### Resumen
+
+La aplicacion puede leer un JSON de lotes, validar campos obligatorios,
+heredar defaults por cuenta, limpiar espacios, deduplicar URLs dentro de la
+misma cuenta, validar fechas `YYYY-MM-DD` y restringir URLs al dominio de
+Instagram. Los errores incluyen contexto de cuenta y campo problematico.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+* `parse_batch_json("config/batch.example.json")`
+
 ## v1.4.0 - Tarea 4 - SQLite schema, migraciones y repositorios
 
 Fecha: 2026-06-14
