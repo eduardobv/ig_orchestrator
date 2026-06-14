@@ -82,6 +82,43 @@ class DownloadRepository:
             raise ValueError(f"Download file not found: {file_id}")
         return stored
 
+    def update(self, download_file: DownloadFile) -> DownloadFile:
+        if download_file.id is None:
+            raise ValueError("DownloadFile.id is required for update")
+
+        self.connection.execute(
+            """
+            UPDATE download_files
+            SET original_path = ?,
+                working_path = ?,
+                final_path = ?,
+                media_type = ?,
+                file_extension = ?,
+                file_size = ?,
+                sha256 = ?,
+                status = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                dump_path(download_file.original_path),
+                dump_path(download_file.working_path),
+                dump_path(download_file.final_path),
+                download_file.media_type.value,
+                download_file.file_extension,
+                download_file.file_size,
+                download_file.sha256,
+                download_file.status.value,
+                dump_datetime(download_file.updated_at),
+                download_file.id,
+            ),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(download_file.id)
+        if stored is None:
+            raise ValueError(f"Download file not found: {download_file.id}")
+        return stored
+
 
 def _row_to_download_file(row: Row | None) -> DownloadFile | None:
     if row is None:

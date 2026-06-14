@@ -118,6 +118,26 @@ class UrlJobRepository:
             raise ValueError(f"URL job not found: {job_id}")
         return stored
 
+    def update_publication_type(
+        self,
+        job_id: int,
+        publication_type: PublicationType,
+    ) -> UrlJob:
+        self.connection.execute(
+            """
+            UPDATE url_jobs
+            SET publication_type = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (publication_type.value, job_id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(job_id)
+        if stored is None:
+            raise ValueError(f"URL job not found: {job_id}")
+        return stored
+
     def update_error(
         self,
         job_id: int,

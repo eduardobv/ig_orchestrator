@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.16.0 - Tarea 16 - Procesador de URL job
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/orchestration/url_job_processor.py` con la capa de aplicacion para procesar un `url_job_id`, delegar en Telegram, mover archivos descargados y persistir el resultado.
+* `tests/test_url_job_processor.py` con pruebas usando conversacion falsa, SQLite temporal y movimiento real en carpetas temporales.
+
+### Modificado
+
+* `src/ig_orchestrator/db/download_repository.py` para actualizar metadatos completos de archivos movidos.
+* `src/ig_orchestrator/db/url_job_repository.py` para corregir `publication_type` tras inspeccionar archivos descargados.
+* `src/ig_orchestrator/orchestration/__init__.py` para exponer el procesador.
+* `.vscode/launch.json` para agregar una tercera configuracion `Tests: pytest`.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.16.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.16.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.16.0`.
+
+### Resumen
+
+La aplicacion puede procesar una URL por id desde SQLite: obtiene el job y la
+cuenta, usa el servicio de conversacion con el bot, conserva errores
+definitivos o temporales ya clasificados, mueve archivos descargados a la
+estructura de cuenta, actualiza los `DownloadFile` con `working_path` y estado,
+corrige reels con solo imagenes a `POST` y marca el job como `COMPLETED`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_url_job_processor.py tests\test_db_repositories.py`
+* `python -m json.tool .vscode\launch.json`
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.15.0 - Tarea 15 - Servicio de conversacion con bot
 
 Fecha: 2026-06-14
