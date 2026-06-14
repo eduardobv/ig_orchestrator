@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.10.0 - Tarea 10 - Parser de respuestas del bot
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/telegram/bot_response_parser.py` con clasificacion de respuestas del bot, errores reintentables y no reintentables.
+* `tests/test_bot_response_parser.py` con pruebas unitarias para cada error conocido, respuestas OK y respuestas vacias.
+
+### Modificado
+
+* `src/ig_orchestrator/telegram/__init__.py` para exponer el parser y sus enums.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.10.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.10.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.10.0`.
+
+### Resumen
+
+La aplicacion puede clasificar textos de respuesta del bot sin depender de
+Telegram real. Los errores conocidos se detectan sin distinguir
+mayusculas/minusculas, el mensaje original se conserva como `last_error` y el
+tipo de error queda disponible en `last_error_type` para la futura politica de
+reintentos y persistencia.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.9.0 - Tarea 9 - Cliente Telegram con Telethon
 
 Fecha: 2026-06-14
