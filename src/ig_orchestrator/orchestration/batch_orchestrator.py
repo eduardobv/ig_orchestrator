@@ -1,0 +1,203 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Protocol
+
+from ig_orchestrator.db import (
+    AccountRepository,
+    BatchRepository,
+    DownloadRepository,
+    RunRecord,
+    RunRepository,
+    UrlJobRepository,
+)
+from ig_orchestrator.models import (
+    AccountStatus,
+    InputBatch,
+    InputBatchStatus,
+    RunStatus,
+    RunSummary,
+    UrlJobStatus,
+)
+from ig_orchestrator.orchestration.account_orchestrator import (
+    AccountOrchestratorResult,
+)
+
+
+class BatchAccountOrchestrator(Protocol):
+    async def process_account(self, account_id: int) -> AccountOrchestratorResult:
+        """Process one account by id."""
+
+
+@dataclass(frozen=True, slots=True)
+class BatchOrchestratorResult:
+    batch: InputBatch
+    run: RunRecord
+    summary: RunSummary
+    account_results: tuple[AccountOrchestratorResult, ...] = ()
+    error: str | None = None
+
+
+class BatchOrchestrator:
+    """Coordinate all pending accounts for one imported batch."""
+
+    def __init__(
+        self,
+        *,
+        batch_repository: BatchRepository,
+        account_repository: AccountRepository,
+        url_job_repository: UrlJobRepository,
+        download_repository: DownloadRepository,
+        run_repository: RunRepository,
+        account_orchestrator: BatchAccountOrchestrator,
+    ) -> None:
+        self._batch_repository = batch_repository
+        self._account_repository = account_repository
+        self._url_job_repository = url_job_repository
+        self._download_repository = download_repository
+        self._run_repository = run_repository
+        self._account_orchestrator = account_orchestrator
+
+    async def process_batch(self, batch_id: int) -> BatchOrchestratorResult:
+        if batch_id <= 0:
+            raise ValueError("batch_id must be positive")
+
+        batch = self._batch_repository.get_by_id(batch_id)
+        if batch is None:
+            raise ValueError(f"Input batch not found: {batch_id}")
+
+        accounts = self._account_repository.list_by_batch(batch_id)
+        run = self._run_repository.create(
+            RunSummary(
+                status=RunStatus.PROCESSING,
+                total_urls=_count_batch_urls(
+                    self._url_job_repository,
+                    [account.id for account in accounts if account.id is not None],
+                ),
+                summary=f"Processing batch {batch.batch_name}",
+            ),
+            batch_id=batch_id,
+        )
+        account_results: list[AccountOrchestratorResult] = []
+
+        try:
+            batch = self._batch_repository.update_status(
+                batch_id,
+                InputBatchStatus.PROCESSING,
+            )
+            for account in accounts:
+                if account.id is None or account.status is not AccountStatus.PENDING:
+                    continue
+                account_results.append(
+                    await self._account_orchestrator.process_account(account.id)
+                )
+
+            summary = self._build_batch_summary(batch_id)
+            batch = self._batch_repository.update_status(
+                batch_id,
+                _batch_status_from_summary(summary),
+            )
+            run = self._run_repository.update_summary(
+                run.id,
+                summary,
+                finished_at=datetime.now(timezone.utc),
+            )
+            return BatchOrchestratorResult(
+                batch=batch,
+                run=run,
+                summary=summary,
+                account_results=tuple(account_results),
+            )
+        except Exception as exc:
+            failed_summary = RunSummary(
+                status=RunStatus.FAILED,
+                total_urls=run.total_urls,
+                summary=f"Infrastructure failure while processing batch {batch.batch_name}: {exc}",
+            )
+            batch = self._batch_repository.update_status(
+                batch_id,
+                InputBatchStatus.FAILED,
+            )
+            run = self._run_repository.update_summary(
+                run.id,
+                failed_summary,
+                finished_at=datetime.now(timezone.utc),
+            )
+            return BatchOrchestratorResult(
+                batch=batch,
+                run=run,
+                summary=failed_summary,
+                account_results=tuple(account_results),
+                error=str(exc),
+            )
+
+    async def process_batch_by_name(self, batch_name: str) -> BatchOrchestratorResult:
+        if not batch_name.strip():
+            raise ValueError("batch_name must not be blank")
+        batch = self._batch_repository.get_by_name(batch_name)
+        if batch is None or batch.id is None:
+            raise ValueError(f"Input batch not found: {batch_name}")
+        return await self.process_batch(batch.id)
+
+    def _build_batch_summary(self, batch_id: int) -> RunSummary:
+        accounts = self._account_repository.list_by_batch(batch_id)
+        account_ids = [account.id for account in accounts if account.id is not None]
+        jobs = [
+            job
+            for account_id in account_ids
+            for job in self._url_job_repository.list_by_account(account_id)
+        ]
+        completed = sum(1 for job in jobs if job.status is UrlJobStatus.COMPLETED)
+        failed = sum(1 for job in jobs if job.status is UrlJobStatus.FAILED_FINAL)
+        downloaded_files = sum(
+            len(self._download_repository.list_by_url_job(job.id))
+            for job in jobs
+            if job.id is not None
+        )
+        return RunSummary(
+            status=_run_status_from_counts(
+                total=len(jobs),
+                completed=completed,
+                failed=failed,
+            ),
+            total_urls=len(jobs),
+            completed_urls=completed,
+            failed_urls=failed,
+            downloaded_files=downloaded_files,
+            summary=(
+                f"Completed {completed}/{len(jobs)} URLs; "
+                f"failed final {failed}; files {downloaded_files}."
+            ),
+        )
+
+
+def _count_batch_urls(
+    url_job_repository: UrlJobRepository,
+    account_ids: list[int],
+) -> int:
+    return sum(
+        len(url_job_repository.list_by_account(account_id)) for account_id in account_ids
+    )
+
+
+def _batch_status_from_summary(summary: RunSummary) -> InputBatchStatus:
+    if summary.status is RunStatus.COMPLETED:
+        return InputBatchStatus.COMPLETED
+    if summary.status is RunStatus.PARTIAL:
+        return InputBatchStatus.PARTIAL
+    return InputBatchStatus.FAILED
+
+
+def _run_status_from_counts(*, total: int, completed: int, failed: int) -> RunStatus:
+    if total == 0 or completed == total:
+        return RunStatus.COMPLETED
+    if failed == total:
+        return RunStatus.FAILED
+    return RunStatus.PARTIAL
+
+
+__all__ = [
+    "BatchOrchestrator",
+    "BatchOrchestratorResult",
+]

@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.17.0 - Tarea 17 - Orquestador de cuenta y lote
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` con el flujo de cuenta: creacion de carpetas, procesamiento de stories generadas antes de URLs manuales, cola FIFO de reintentos y cierre de estado de cuenta/run.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` con el flujo de batch: carga del lote, procesamiento de cuentas pendientes y resumen final.
+* `tests/test_account_orchestrator.py` con pruebas de orden de URLs, reintentos FIFO, cuenta parcial e infraestructura fallida.
+* `tests/test_batch_orchestrator.py` con pruebas de procesamiento de cuentas pendientes y estado parcial de lote.
+
+### Modificado
+
+* `src/ig_orchestrator/orchestration/__init__.py` para exponer los orquestadores.
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.17.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.17.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.17.0`.
+* `CHANGELOG.md` para documentar la tarea.
+
+### Resumen
+
+La aplicacion puede coordinar una cuenta completa desde SQLite usando el
+procesador de URL existente, crear las carpetas de trabajo, ejecutar primero
+stories generadas, luego URLs manuales, enviar fallos temporales a una cola FIFO
+de reintentos y marcar la cuenta como `COMPLETED`, `PARTIAL` o `FAILED`. El
+orquestador de batch procesa solo cuentas pendientes y consolida el estado final
+del lote sin ejecutar renombrador, limpiar duplicados ni mover a destino final.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_account_orchestrator.py tests\test_batch_orchestrator.py`
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.16.0 - Tarea 16 - Procesador de URL job
 
 Fecha: 2026-06-14
