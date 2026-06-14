@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.9.0 - Tarea 9 - Cliente Telegram con Telethon
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/telegram/__init__.py` para exponer el wrapper de Telegram.
+* `src/ig_orchestrator/telegram/telegram_client.py` con configuracion segura, arranque de Telethon, envio al bot y lectura de mensajes.
+* `tests/test_telegram_client.py` con pruebas unitarias basadas en mocks sin conexion real a Telegram.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.9.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.9.0` y declarar Telethon como dependencia runtime.
+* `tests/test_package_smoke.py` para esperar la version `1.9.0`.
+
+### Resumen
+
+La aplicacion cuenta con un wrapper asincrono para Telethon que crea el cliente
+con la sesion configurada, reutiliza la instancia durante la ejecucion, permite
+enviar mensajes al bot configurado, leer mensajes recientes y filtrar mensajes
+nuevos posteriores a un timestamp. La configuracion oculta `api_hash` en su
+representacion y los tests no dependen de Telegram real.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.8.0 - Tarea 8 - Servicio de carpetas
 
 Fecha: 2026-06-14
