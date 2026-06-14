@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.8.0 - Tarea 8 - Servicio de carpetas
+
+Fecha: 2026-06-14
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/__init__.py` para exponer el servicio de carpetas.
+* `src/ig_orchestrator/filesystem/folder_service.py` con `ensure_account_folders` y la estructura `AccountFolderPaths`.
+* `tests/test_folder_service.py` con pruebas unitarias usando carpeta temporal.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.8.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.8.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.8.0`.
+
+### Resumen
+
+La aplicacion puede crear de forma idempotente la estructura temporal de una
+cuenta dentro de la carpeta de trabajo: raiz del usuario, `story`, `reels` y
+`highlights`. Si las carpetas ya existen, se conservan sus contenidos y solo se
+crean las subcarpetas faltantes.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+* `python -m ig_orchestrator`
+
 ## v1.7.0 - Tarea 7 - Clasificador de URLs
 
 Fecha: 2026-06-14

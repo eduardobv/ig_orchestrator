@@ -26,11 +26,7 @@ username/
 username/story/
 username/reels/
 username/highlights/
-username/_errors/
-username/_logs/
 ```
-
-`username/_duplicated/` queda reservado para versiones posteriores.
 
 ## Criterios de aceptacion
 
