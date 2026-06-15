@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.18.0 - Tarea 18 - Reporte Markdown
+
+Fecha: 2026-06-15
+
+### Creado
+
+* `src/ig_orchestrator/reports/__init__.py` para exponer el builder de reportes.
+* `src/ig_orchestrator/reports/markdown_report_builder.py` con construccion del reporte desde SQLite, render Markdown y escritura en disco.
+* `tests/test_markdown_report_builder.py` con pruebas del render y de reconstruccion desde SQLite con URLs sin archivos y con multiples archivos.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py` para actualizar la version del paquete a `1.18.0`.
+* `pyproject.toml` para actualizar la version del paquete a `1.18.0`.
+* `tests/test_package_smoke.py` para esperar la version `1.18.0`.
+* `CHANGELOG.md` para documentar la tarea.
+
+### Resumen
+
+La aplicacion puede reconstruir un reporte Markdown desde SQLite para un run de
+cuenta o batch, incluyendo fecha de ejecucion, tabla con username, tipo, URL,
+ficheros, estado y directorio. Las URLs sin descargas muestran `0 files`, las
+URLs con varios ficheros los agrupan en la misma celda y la ruta generada queda
+persistida en `runs.report_path`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_markdown_report_builder.py`
+* `python -m pytest`
+
 ## v1.17.0 - Tarea 17 - Orquestador de cuenta y lote
 
 Fecha: 2026-06-14
