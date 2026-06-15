@@ -13,6 +13,7 @@ from ig_orchestrator.db import (
     UrlJobRepository,
 )
 from ig_orchestrator.models import (
+    Account,
     AccountStatus,
     InputBatch,
     InputBatchStatus,
@@ -43,6 +44,11 @@ class BatchOrchestratorResult:
     error: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class BatchOrchestratorConfig:
+    dry_run: bool = False
+
+
 class BatchOrchestrator:
     """Coordinate all pending accounts for one imported batch."""
 
@@ -55,6 +61,7 @@ class BatchOrchestrator:
         download_repository: DownloadRepository,
         run_repository: RunRepository,
         account_orchestrator: BatchAccountOrchestrator,
+        config: BatchOrchestratorConfig | None = None,
     ) -> None:
         self._batch_repository = batch_repository
         self._account_repository = account_repository
@@ -62,6 +69,7 @@ class BatchOrchestrator:
         self._download_repository = download_repository
         self._run_repository = run_repository
         self._account_orchestrator = account_orchestrator
+        self._config = config or BatchOrchestratorConfig()
 
     async def process_batch(self, batch_id: int) -> BatchOrchestratorResult:
         if batch_id <= 0:
@@ -94,6 +102,14 @@ class BatchOrchestrator:
                 len(accounts),
                 run.total_urls,
             )
+            if self._config.dry_run:
+                return await self._process_batch_dry_run(
+                    batch=batch,
+                    batch_id=batch_id,
+                    accounts=accounts,
+                    run=run,
+                )
+
             batch = self._batch_repository.update_status(
                 batch_id,
                 InputBatchStatus.PROCESSING,
@@ -171,6 +187,65 @@ class BatchOrchestrator:
             raise ValueError(f"Input batch not found: {batch_name}")
         return await self.process_batch(batch.id)
 
+    async def _process_batch_dry_run(
+        self,
+        *,
+        batch: InputBatch,
+        batch_id: int,
+        accounts: list[Account],
+        run: RunRecord,
+    ) -> BatchOrchestratorResult:
+        account_results: list[AccountOrchestratorResult] = []
+        pending_accounts = [
+            account
+            for account in accounts
+            if account.id is not None and account.status is AccountStatus.PENDING
+        ]
+        for account in pending_accounts:
+            logger.info(
+                "Dry-run would process batch account: batch_id={} account_id={} username={}",
+                batch_id,
+                account.id,
+                account.username,
+            )
+            account_results.append(
+                await self._account_orchestrator.process_account(account.id)
+            )
+
+        total_urls = _count_batch_urls(
+            self._url_job_repository,
+            [account.id for account in accounts if account.id is not None],
+        )
+        summary = RunSummary(
+            status=RunStatus.COMPLETED,
+            total_urls=total_urls,
+            completed_urls=0,
+            failed_urls=0,
+            downloaded_files=0,
+            summary=(
+                f"Dry-run batch {batch.batch_name}: would process "
+                f"{len(pending_accounts)} pending account(s) and {total_urls} URL(s); "
+                "no Telegram messages sent and no files moved."
+            ),
+        )
+        run = self._run_repository.update_summary(
+            run.id,
+            summary,
+            finished_at=datetime.now(timezone.utc),
+        )
+        logger.info(
+            "Dry-run batch processing finished: batch_id={} accounts={} total_urls={}",
+            batch_id,
+            len(pending_accounts),
+            total_urls,
+        )
+        return BatchOrchestratorResult(
+            batch=batch,
+            run=run,
+            summary=summary,
+            account_results=tuple(account_results),
+        )
+
     def _build_batch_summary(self, batch_id: int) -> RunSummary:
         accounts = self._account_repository.list_by_batch(batch_id)
         account_ids = [account.id for account in accounts if account.id is not None]
@@ -229,6 +304,7 @@ def _run_status_from_counts(*, total: int, completed: int, failed: int) -> RunSt
 
 
 __all__ = [
+    "BatchOrchestratorConfig",
     "BatchOrchestrator",
     "BatchOrchestratorResult",
 ]

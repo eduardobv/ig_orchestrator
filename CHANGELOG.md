@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.20.0 - Tarea 20 - Modo dry-run
+
+Fecha: 2026-06-15
+
+### Creado
+
+* Tests de dry-run en `tests/test_account_orchestrator.py`, `tests/test_batch_orchestrator.py` y `tests/test_package_smoke.py`.
+
+### Modificado
+
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` para simular el procesamiento de una cuenta sin invocar Telegram, sin mover archivos y sin crear carpetas por defecto.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` para simular el procesamiento de un lote y crear un run/resumen claro de dry-run.
+* `src/ig_orchestrator/main.py` para aceptar `--input ... --dry-run`, inicializar SQLite, importar el JSON y procesar el lote en modo simulacion.
+* `src/ig_orchestrator/orchestration/__init__.py`, `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para exponer la configuracion de dry-run y actualizar la version a `1.20.0`.
+
+### Resumen
+
+El flujo principal puede ejecutarse como `python -m ig_orchestrator --input config\batch.example.json --dry-run`.
+El modo dry-run valida settings, rutas, JSON e importacion a SQLite, crea runs
+simulados con resumen explicito y lista lo que habria procesado sin enviar
+mensajes a Telegram, sin mover archivos y sin crear la estructura de carpetas
+real por defecto.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_account_orchestrator.py tests\test_batch_orchestrator.py tests\test_package_smoke.py -q`
+* `python -m compileall -q src`
+* `python -m pytest`
+
 ## v1.19.0 - Tarea 19 - Logs
 
 Fecha: 2026-06-15

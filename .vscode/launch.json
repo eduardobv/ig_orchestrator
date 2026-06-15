@@ -42,6 +42,23 @@
         "tests"
       ],
       "noDebug": true
+    },
+    {
+      "name": "Depurar: dry-run batch",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ig_orchestrator",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "args": [
+        "--input",
+        "config/batch.example.json",
+        "--dry-run"
+      ]
     }
   ]
 }

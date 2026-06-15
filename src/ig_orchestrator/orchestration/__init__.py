@@ -5,6 +5,7 @@ from ig_orchestrator.orchestration.account_orchestrator import (
 )
 from ig_orchestrator.orchestration.batch_orchestrator import (
     BatchOrchestrator,
+    BatchOrchestratorConfig,
     BatchOrchestratorResult,
 )
 from ig_orchestrator.orchestration.retry_policy import (
@@ -24,6 +25,7 @@ __all__ = [
     "AccountOrchestratorConfig",
     "AccountOrchestratorResult",
     "BatchOrchestrator",
+    "BatchOrchestratorConfig",
     "BatchOrchestratorResult",
     "RetryDecision",
     "RetryDecisionAction",

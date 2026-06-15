@@ -55,6 +55,8 @@ class AccountOrchestratorConfig:
     retry_max_seconds: int = 900
     wait_between_retries: bool = False
     retry_delay_handler: RetryDelayHandler | None = None
+    dry_run: bool = False
+    create_folders_in_dry_run: bool = False
 
     def __post_init__(self) -> None:
         if self.default_working_folder is not None and not isinstance(
@@ -135,6 +137,14 @@ class AccountOrchestrator:
                 run_id=run.id,
                 account_log_key=account_log_handle.account_log_key,
             ):
+                if self._config.dry_run:
+                    return self._process_account_dry_run(
+                        account=account,
+                        jobs=jobs,
+                        run=run,
+                        processed_job_ids=processed_job_ids,
+                        working_base=working_base,
+                    )
                 logger.info(
                     "Account processing started: account_id={} username={} total_urls={}",
                     account_id,
@@ -179,6 +189,67 @@ class AccountOrchestrator:
         finally:
             if account_log_handle is not None:
                 account_log_handle.close()
+
+    def _process_account_dry_run(
+        self,
+        *,
+        account: Account,
+        jobs: list[UrlJob],
+        run: RunRecord,
+        processed_job_ids: list[int],
+        working_base: Path,
+    ) -> AccountOrchestratorResult:
+        if account.id is None:
+            raise ValueError("Account.id is required")
+
+        target_folder = working_base / account.username
+        if self._config.create_folders_in_dry_run:
+            ensure_account_folders(account.username, working_base)
+            logger.info("Dry-run account folders created explicitly: {}", target_folder)
+        else:
+            logger.info("Dry-run would ensure account folders: {}", target_folder)
+
+        ordered_jobs = _ordered_main_pass_jobs(jobs)
+        retry_jobs = _existing_retry_jobs(jobs)
+        for job in [*ordered_jobs, *retry_jobs]:
+            logger.info(
+                "Dry-run would process URL job: job_id={} type={} source={} status={} url={}",
+                _require_job_id(job),
+                job.publication_type.value,
+                job.source.value,
+                job.status.value,
+                job.url,
+            )
+
+        summary = RunSummary(
+            status=RunStatus.COMPLETED,
+            total_urls=len(jobs),
+            completed_urls=0,
+            failed_urls=0,
+            downloaded_files=0,
+            summary=(
+                f"Dry-run account {account.username}: would process {len(ordered_jobs)} "
+                f"pending URL(s) and {len(retry_jobs)} retry URL(s); no Telegram "
+                "messages sent and no files moved."
+            ),
+        )
+        run = self._run_repository.update_summary(
+            run.id,
+            summary,
+            finished_at=datetime.now(timezone.utc),
+        )
+        logger.info(
+            "Dry-run account processing finished: account_id={} username={} total_urls={}",
+            account.id,
+            account.username,
+            len(jobs),
+        )
+        return AccountOrchestratorResult(
+            account=account,
+            run=run,
+            summary=summary,
+            processed_job_ids=tuple(processed_job_ids),
+        )
 
     async def _process_account_with_logging(
         self,

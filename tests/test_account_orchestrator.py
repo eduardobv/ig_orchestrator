@@ -193,6 +193,37 @@ def test_account_orchestrator_marks_failed_on_infrastructure_error(
     assert result.error == "No working folder is configured for the account"
 
 
+def test_account_orchestrator_dry_run_does_not_process_urls_or_create_folders(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    processor = FakeUrlJobProcessor(stored.job_repo, {})
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        config=AccountOrchestratorConfig(dry_run=True),
+    )
+
+    result = asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert processor.calls == []
+    assert result.account.status is AccountStatus.PENDING
+    assert result.summary.status is RunStatus.COMPLETED
+    assert result.summary.total_urls == 2
+    assert result.summary.completed_urls == 0
+    assert "Dry-run account example_user" in result.summary.summary
+    assert not (tmp_path / "working" / "example_user").exists()
+    assert all(
+        job.status is UrlJobStatus.PENDING
+        for job in stored.job_repo.list_by_account(stored.account.id)
+    )
+
+
 def _stored_account(
     tmp_path: Path,
     *,

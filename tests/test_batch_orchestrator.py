@@ -27,7 +27,7 @@ from ig_orchestrator.models import (
     UrlJobStatus,
     UrlSource,
 )
-from ig_orchestrator.orchestration import BatchOrchestrator
+from ig_orchestrator.orchestration import BatchOrchestrator, BatchOrchestratorConfig
 from ig_orchestrator.orchestration.account_orchestrator import (
     AccountOrchestratorResult,
 )
@@ -139,6 +139,37 @@ def test_batch_orchestrator_marks_partial_when_an_account_fails(
     assert result.summary.failed_urls == 1
 
 
+def test_batch_orchestrator_dry_run_processes_pending_accounts_without_status_changes(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_batch(tmp_path)
+    first = _create_account(stored, "first", AccountStatus.PENDING)
+    skipped = _create_account(stored, "skipped", AccountStatus.COMPLETED)
+    _create_job(stored.job_repo, first.id)
+    _create_job(stored.job_repo, skipped.id)
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {first.id: AccountStatus.COMPLETED},
+    )
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(dry_run=True),
+    )
+
+    result = asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert fake.calls == [first.id]
+    assert result.batch.status is InputBatchStatus.IMPORTED
+    assert stored.batch_repo.get_by_id(stored.batch.id).status is InputBatchStatus.IMPORTED
+    assert result.summary.status is RunStatus.COMPLETED
+    assert result.summary.total_urls == 2
+    assert result.summary.completed_urls == 0
+    assert "Dry-run batch batch" in result.summary.summary
+
+
 def _stored_batch(tmp_path: Path) -> StoredBatch:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)
@@ -165,6 +196,8 @@ def _stored_batch(tmp_path: Path) -> StoredBatch:
 def _batch_orchestrator(
     stored: StoredBatch,
     fake: FakeAccountOrchestrator,
+    *,
+    config: BatchOrchestratorConfig | None = None,
 ) -> BatchOrchestrator:
     return BatchOrchestrator(
         batch_repository=stored.batch_repo,
@@ -173,6 +206,7 @@ def _batch_orchestrator(
         download_repository=stored.download_repo,
         run_repository=stored.run_repo,
         account_orchestrator=fake,
+        config=config,
     )
 
 
