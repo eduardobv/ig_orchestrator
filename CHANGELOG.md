@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.21.0 - Tarea 21 - Tests minimos obligatorios
+
+Fecha: 2026-06-15
+
+### Creado
+
+* No se crearon modulos productivos nuevos; la suite obligatoria ya estaba cubierta por tests existentes.
+
+### Modificado
+
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.21.0`.
+* `CHANGELOG.md` para documentar el cierre de la cobertura minima obligatoria.
+
+### Resumen
+
+Se verifico que la suite minima obligatoria cubre `settings`, `batch_json_parser`,
+`batch_importer`, `url_classifier`, `retry_policy`, `bot_response_parser`,
+`file_watcher`, `file_classifier`, `folder_service`, `file_mover`, repositorios
+SQLite, `markdown_report_builder`, y los orquestadores de cuenta y lote en
+modo dry-run. La suite usa mocks, SQLite temporal y filesystem temporal, sin
+depender de Telegram real ni de rutas de produccion.
+
+### Pruebas ejecutadas
+
+* `pytest`
+
 ## v1.20.0 - Tarea 20 - Modo dry-run
 
 Fecha: 2026-06-15

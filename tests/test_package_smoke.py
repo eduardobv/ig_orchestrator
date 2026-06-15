@@ -8,7 +8,7 @@ import ig_orchestrator
 
 
 def test_package_imports() -> None:
-    assert ig_orchestrator.__version__ == "1.20.0"
+    assert ig_orchestrator.__version__ == "1.21.0"
 
 
 def test_module_entrypoint_runs() -> None:
@@ -24,7 +24,7 @@ def test_module_entrypoint_runs() -> None:
         text=True,
     )
 
-    assert "ig_orchestrator v1.20.0" in result.stdout
+    assert "ig_orchestrator v1.21.0" in result.stdout
 
 
 def test_module_entrypoint_dry_run_imports_batch_without_telegram(tmp_path: Path) -> None:
