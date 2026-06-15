@@ -141,8 +141,6 @@ telethon
 python-dotenv
 pydantic
 watchdog
-typer
-rich
 loguru
 pytest
 pytest-asyncio
@@ -335,8 +333,6 @@ telethon>=1.34.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 watchdog>=4.0.0
-typer>=0.12.0
-rich>=13.0.0
 loguru>=0.7.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
@@ -1075,72 +1071,41 @@ El reporte debe poder reconstruirse desde SQLite.
 
 ---
 
-## 17. CLI esperada para v1.0.1
+## 17. Punto de entrada esperado para v1.0.1
 
-El sistema debe exponer comandos mediante Typer.
+La version `v1.0.1` no necesita exponer una CLI completa con Typer.
 
-### 17.1 Inicializar base de datos
+El flujo previsto es ejecutar el punto de entrada principal desde un `.bat`, leyendo un JSON de entrada. Ese punto de entrada debe:
 
-```bash
-python -m ig_orchestrator init-db
+1. Inicializar SQLite si hace falta.
+2. Importar el JSON a SQLite.
+3. Leer configuracion y trabajos desde SQLite.
+4. Procesar el lote.
+5. Aplicar reintentos segun la politica.
+6. Generar reporte Markdown.
+
+Ejemplo de `.bat`:
+
+```bat
+@echo off
+python -m ig_orchestrator --input config\batch.example.json
 ```
 
-### 17.2 Importar lote desde JSON
+El modo dry-run debe poder activarse desde el mismo flujo principal, por argumento simple o por configuracion, sin obligar a crear comandos separados:
 
-```bash
-python -m ig_orchestrator import-batch --input config/batch.example.json
+```bat
+@echo off
+python -m ig_orchestrator --input config\batch.example.json --dry-run
 ```
 
-### 17.3 Procesar lote
-
-```bash
-python -m ig_orchestrator process-batch --batch-name descargas_junio_2026
-```
-
-### 17.4 Procesar cuenta
-
-```bash
-python -m ig_orchestrator process-account --username example_user
-```
-
-### 17.5 Reintentar errores
-
-```bash
-python -m ig_orchestrator retry-failed --username example_user
-```
-
-### 17.6 Ver estado
-
-```bash
-python -m ig_orchestrator inspect --username example_user
-```
-
-### 17.7 Generar reporte
-
-```bash
-python -m ig_orchestrator report --run-id 1
-```
-
-### 17.8 Modo dry-run
-
-```bash
-python -m ig_orchestrator process-batch --batch-name descargas_junio_2026 --dry-run
-```
-
-Comportamiento:
+Comportamiento dry-run:
 
 * No enviar mensajes a Telegram.
 * No mover archivos.
 * Si mostrar que habria hecho.
 * Si validar URLs, rutas y configuracion.
 
-Comandos reservados para versiones posteriores:
-
-```text
-rename
-clean-duplicates
-move-final
-```
+La CLI completa con comandos `init-db`, `import-batch`, `process-batch`, `process-account`, `retry-failed`, `inspect` y `report` queda como tarea opcional posterior en `tasks/Tarea_Post01.md`.
 
 ---
 
@@ -1288,7 +1253,7 @@ Tarea 1  => v1.1.0
 Tarea 2  => v1.2.0
 Tarea 3  => v1.3.0
 ...
-Tarea 24 => v1.24.0
+Tarea 23 => v1.23.0
 ```
 
 Si despues de implementar una tarea hay que corregir o mejorar algo dentro de esa misma tarea, se incrementa el patch:
@@ -1344,17 +1309,22 @@ git tag v1.1.1
 | 16 | `tasks/Tarea16.md` | v1.16.0 | Procesador de URL job |
 | 17 | `tasks/Tarea17.md` | v1.17.0 | Orquestador de cuenta y lote |
 | 18 | `tasks/Tarea18.md` | v1.18.0 | Reporte Markdown |
-| 19 | `tasks/Tarea19.md` | v1.19.0 | CLI |
-| 20 | `tasks/Tarea20.md` | v1.20.0 | Logs |
-| 21 | `tasks/Tarea21.md` | v1.21.0 | Modo dry-run |
-| 22 | `tasks/Tarea22.md` | v1.22.0 | Tests minimos obligatorios |
+| 19 | `tasks/Tarea19.md` | v1.19.0 | Logs |
+| 20 | `tasks/Tarea20.md` | v1.20.0 | Modo dry-run |
+| 21 | `tasks/Tarea21.md` | v1.21.0 | Tests minimos obligatorios |
 
 ### Backlog posterior a v1.0.1
 
 | Tarea | Archivo | Version objetivo | Objetivo |
 |---|---|---:|---|
-| 23 | `tasks/Tarea23.md` | v1.23.0 | Integracion con script actual de renombrado |
-| 24 | `tasks/Tarea24.md` | v1.24.0 | Duplicados del renombrador y movimiento final |
+| 22 | `tasks/Tarea22.md` | v1.22.0 | Integracion con script actual de renombrado |
+| 23 | `tasks/Tarea23.md` | v1.23.0 | Duplicados del renombrador y movimiento final |
+
+### Tareas opcionales posteriores
+
+| Tarea | Archivo | Objetivo |
+|---|---|---|
+| Post01 | `tasks/Tarea_Post01.md` | CLI completa con Typer |
 
 ---
 
@@ -1371,11 +1341,7 @@ copy .env.example .env
 
 Editar `.env`.
 
-Inicializar base de datos:
-
-```bash
-python -m ig_orchestrator init-db
-```
+La ejecucion principal inicializa la base de datos si hace falta.
 
 ### 20.2 Crear archivo de lote
 
@@ -1407,31 +1373,27 @@ Contenido:
 }
 ```
 
-### 20.3 Importar lote
+### 20.3 Crear BAT de ejecucion
 
-```bash
-python -m ig_orchestrator import-batch --input config/batch.example.json
+```bat
+@echo off
+cd /d d:\Archivos\Scripts\IG\Automatitation\ig_orchestrator
+python -m ig_orchestrator --input config\batch.example.json
 ```
 
-### 20.4 Procesar lote
+### 20.4 Ejecutar lote
 
-```bash
-python -m ig_orchestrator process-batch --batch-name descargas_junio_2026
-```
+Al ejecutar el `.bat`, la aplicacion importa el JSON a SQLite y procesa el lote leyendo desde SQLite.
 
 ### 20.5 Reintentar fallos
 
-```bash
-python -m ig_orchestrator retry-failed --username example_user
-```
+Los errores temporales se reintentan dentro del mismo flujo, al final de cada ronda y respetando `MAX_RETRIES`.
 
-### 20.6 Inspeccionar estado
+### 20.6 Revisar estado
 
-```bash
-python -m ig_orchestrator inspect --username example_user
-```
+El estado final debe poder revisarse desde SQLite, logs y el ultimo reporte Markdown.
 
-Salida esperada:
+Resumen esperado:
 
 ```text
 Account: example_user

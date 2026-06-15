@@ -1,5 +1,31 @@
 # Changelog
 
+## Planificacion - CLI opcional y renumeracion de tareas
+
+Fecha: 2026-06-15
+
+### Creado
+
+* `tasks/Tarea_Post01.md` para conservar la CLI completa con Typer como tarea opcional posterior.
+
+### Modificado
+
+* `tasks/Tarea19.md` a `tasks/Tarea23.md` para compactar la secuencia principal tras sacar la CLI.
+* `PLAN.md` para reemplazar la CLI obligatoria por ejecucion desde `.bat` llamando al punto de entrada principal con JSON.
+* `Agents.md` para ajustar la convencion principal hasta `Tarea 23 => v1.23.0`.
+* `requirements.txt` para retirar `typer` y `rich` del camino principal.
+
+### Resumen
+
+La CLI completa deja de bloquear `v1.0.1`. El flujo principal queda orientado a
+ejecutar `python -m ig_orchestrator --input config\batch.example.json` desde un
+`.bat`, inicializando SQLite, importando el JSON, procesando desde SQLite y
+generando reportes.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_package_smoke.py`
+
 ## v1.18.0 - Tarea 18 - Reporte Markdown
 
 Fecha: 2026-06-15

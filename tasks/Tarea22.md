@@ -1,38 +1,31 @@
-﻿# Tarea 22 - Tests minimos obligatorios
+﻿# Tarea 22 - Integracion con script actual de renombrado
 
 Version objetivo: `v1.22.0`
 
-## Objetivo
+## Estado
 
-Asegurar cobertura minima antes de considerar cerrada la version `v1.0.1`.
+No implementar en `v1.0.1`.
 
-## Tests obligatorios
+## Objetivo futuro
+
+Crear o actualizar `config.json` para el script actual y ejecutar `ManualRenameFiles.bat`.
+
+## Archivos futuros
 
 ```text
-settings
-batch_json_parser
-batch_importer
-url_classifier
-retry_policy
-bot_response_parser
-file_watcher
-file_classifier
-folder_service
-file_mover
-sqlite repositories
-markdown_report_builder
-account_orchestrator dry-run
-batch_orchestrator dry-run
+src/ig_orchestrator/rename/rename_config_builder.py
+src/ig_orchestrator/rename/manual_rename_runner.py
+src/ig_orchestrator/rename/rename_result_parser.py
 ```
 
-## Criterios de aceptacion
+## Criterios futuros
 
-* La suite se ejecuta con `pytest`.
-* No requiere Telegram real.
-* No requiere rutas reales de produccion.
-* Usa temporales para SQLite y filesystem.
+* Mantener formato JSON valido.
+* No perder otras claves existentes.
+* Capturar stdout, stderr y exit code.
+* Marcar proceso como `FAILED` si falla.
 * Actualizar `CHANGELOG.md`.
 
-## Pruebas
+## Nota
 
-* Ejecutar `pytest`.
+Esta tarea queda documentada para mantener el plan completo, pero la primera version solo quiere observar el sistema de descarga.

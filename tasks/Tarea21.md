@@ -1,32 +1,38 @@
-﻿# Tarea 21 - Modo dry-run
+﻿# Tarea 21 - Tests minimos obligatorios
 
 Version objetivo: `v1.21.0`
 
 ## Objetivo
 
-Permitir probar sin enviar mensajes reales al bot ni mover archivos.
+Asegurar cobertura minima antes de considerar cerrada la version `v1.0.1`.
 
-## Flag CLI
+## Tests obligatorios
 
-```bash
---dry-run
+```text
+settings
+batch_json_parser
+batch_importer
+url_classifier
+retry_policy
+bot_response_parser
+file_watcher
+file_classifier
+folder_service
+file_mover
+sqlite repositories
+markdown_report_builder
+account_orchestrator dry-run
+batch_orchestrator dry-run
 ```
-
-## Comportamiento
-
-* No enviar mensajes a Telegram.
-* No mover archivos.
-* No ejecutar BAT.
-* Si mostrar que habria hecho.
-* Si validar URLs, rutas y configuracion.
-* Si puede crear run simulado o resumen, dejando claro que es dry-run.
 
 ## Criterios de aceptacion
 
-* Funciona en `process-batch` y `process-account`.
-* No toca carpetas reales salvo que se decida crear estructura temporal explicitamente.
+* La suite se ejecuta con `pytest`.
+* No requiere Telegram real.
+* No requiere rutas reales de produccion.
+* Usa temporales para SQLite y filesystem.
 * Actualizar `CHANGELOG.md`.
 
 ## Pruebas
 
-* Tests de orquestador dry-run.
+* Ejecutar `pytest`.

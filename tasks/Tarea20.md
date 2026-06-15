@@ -1,46 +1,30 @@
-﻿# Tarea 20 - Logs
+﻿# Tarea 20 - Modo dry-run
 
 Version objetivo: `v1.20.0`
 
 ## Objetivo
 
-Crear logs por ejecucion y por cuenta.
+Permitir probar sin enviar mensajes reales al bot ni mover archivos.
 
-## Archivo
+## Modo de ejecucion
 
-```text
-src/ig_orchestrator/logging_config.py
-```
+El punto de entrada debe poder activar dry-run desde el flujo principal, incluido el uso desde un `.bat`.
 
-## Salidas
+## Comportamiento
 
-```text
-logs/app.log
-username/_logs/run_YYYYMMDD_HHMMSS.log
-```
-
-## Debe registrar
-
-* cuenta procesada;
-* URL procesada;
-* mensaje enviado al bot;
-* respuesta del bot;
-* archivos detectados;
-* errores;
-* reintentos;
-* reporte generado.
-
-No registrar:
-
-* `api_hash`;
-* codigos de login;
-* contenido sensible de `.env`.
+* No enviar mensajes a Telegram.
+* No mover archivos.
+* No ejecutar BAT.
+* Si mostrar que habria hecho.
+* Si validar URLs, rutas y configuracion.
+* Si puede crear run simulado o resumen, dejando claro que es dry-run.
 
 ## Criterios de aceptacion
 
-* Logs claros y utiles para depurar.
+* Funciona al procesar un lote y al procesar una cuenta.
+* No toca carpetas reales salvo que se decida crear estructura temporal explicitamente.
 * Actualizar `CHANGELOG.md`.
 
 ## Pruebas
 
-* Tests unitarios donde aplique o verificacion manual documentada.
+* Tests de orquestador dry-run.

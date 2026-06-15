@@ -23,7 +23,7 @@ Cada tarea principal genera un minor:
 Tarea 1  => v1.1.0
 Tarea 2  => v1.2.0
 ...
-Tarea 24 => v1.24.0
+Tarea 23 => v1.23.0
 ```
 
 Los arreglos de una tarea incrementan el patch:

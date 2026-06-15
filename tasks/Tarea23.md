@@ -1,4 +1,4 @@
-﻿# Tarea 23 - Integracion con script actual de renombrado
+﻿# Tarea 23 - Duplicados del renombrador y movimiento final
 
 Version objetivo: `v1.23.0`
 
@@ -8,24 +8,67 @@ No implementar en `v1.0.1`.
 
 ## Objetivo futuro
 
-Crear o actualizar `config.json` para el script actual y ejecutar `ManualRenameFiles.bat`.
+Detectar archivos renombrados como duplicados y mover la carpeta procesada al destino final.
 
 ## Archivos futuros
 
 ```text
-src/ig_orchestrator/rename/rename_config_builder.py
-src/ig_orchestrator/rename/manual_rename_runner.py
-src/ig_orchestrator/rename/rename_result_parser.py
+src/ig_orchestrator/filesystem/duplicate_cleaner.py
+src/ig_orchestrator/filesystem/final_move_service.py
+```
+
+## Duplicados
+
+Buscar archivos cuyo nombre contenga:
+
+```text
+_duplicated
+```
+
+Estrategias:
+
+```text
+MOVE_TO_DUPLICATED_FOLDER
+DELETE
+KEEP
+```
+
+Estrategia inicial futura:
+
+```text
+MOVE_TO_DUPLICATED_FOLDER
+```
+
+## Movimiento final
+
+Mover:
+
+```text
+C:\Users\eduba\Downloads\DW\Telegram_Desktop\example_user
+```
+
+a:
+
+```text
+G:\4K Stogram\00.FAVORITES\Jhon Lennon\example_user
+```
+
+Si destino existe:
+
+```text
+FAIL
+MERGE
+RENAME_WITH_TIMESTAMP
+```
+
+Recomendacion inicial:
+
+```text
+FAIL
 ```
 
 ## Criterios futuros
 
-* Mantener formato JSON valido.
-* No perder otras claves existentes.
-* Capturar stdout, stderr y exit code.
-* Marcar proceso como `FAILED` si falla.
+* No borrar nada salvo configuracion explicita.
+* No mezclar carpetas automaticamente al inicio.
 * Actualizar `CHANGELOG.md`.
-
-## Nota
-
-Esta tarea queda documentada para mantener el plan completo, pero la primera version solo quiere observar el sistema de descarga.
