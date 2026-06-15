@@ -10,8 +10,12 @@ from ig_orchestrator.filesystem import (
     move_downloaded_files,
     resolve_publication_type_after_download,
 )
+from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.models import DownloadFile, PublicationType, UrlJob, UrlJobStatus
 from ig_orchestrator.telegram import BotConversationResult
+
+
+logger = get_logger()
 
 
 class UrlJobConversationService(Protocol):
@@ -74,14 +78,29 @@ class UrlJobProcessor:
         if account is None:
             raise ValueError(f"Account not found for URL job: {job.account_id}")
 
+        logger.info(
+            "URL job processor started: job_id={} account_id={} type={} status={} url={}",
+            url_job_id,
+            job.account_id,
+            job.publication_type.value,
+            job.status.value,
+            job.url,
+        )
         conversation_result = await self._conversation_service.process_url_job(job)
         processed_job = conversation_result.job
         detected_files = list(conversation_result.files)
 
         if processed_job.status is not UrlJobStatus.DOWNLOADED:
+            logger.info(
+                "URL job processor finished without download: job_id={} status={} error_type={}",
+                url_job_id,
+                processed_job.status.value,
+                processed_job.last_error_type or "-",
+            )
             return UrlJobProcessorResult(job=processed_job, files=tuple(detected_files))
 
         if not detected_files:
+            logger.warning("URL job downloaded but returned no files: job_id={}", url_job_id)
             failed_job = self._url_job_repository.update_error(
                 _require_job_id(processed_job),
                 status=UrlJobStatus.RETRY_PENDING,
@@ -101,6 +120,12 @@ class UrlJobProcessor:
             detected_files,
         )
         if final_publication_type is not processed_job.publication_type:
+            logger.info(
+                "URL job publication type corrected: job_id={} from={} to={}",
+                url_job_id,
+                processed_job.publication_type.value,
+                final_publication_type.value,
+            )
             processed_job = self._url_job_repository.update_publication_type(
                 _require_job_id(processed_job),
                 final_publication_type,
@@ -114,6 +139,11 @@ class UrlJobProcessor:
                 detected_files,
             )
         except Exception as exc:
+            logger.exception(
+                "Moving downloaded files failed: job_id={} error={}",
+                url_job_id,
+                exc,
+            )
             failed_job = self._url_job_repository.update_error(
                 _require_job_id(processed_job),
                 status=UrlJobStatus.RETRY_PENDING,
@@ -126,10 +156,21 @@ class UrlJobProcessor:
         stored_files = tuple(
             self._download_repository.update(moved_file) for moved_file in moved_files
         )
+        logger.info(
+            "Downloaded files moved: job_id={} count={} destinations={}",
+            url_job_id,
+            len(stored_files),
+            [str(file.working_path or file.final_path or file.original_path) for file in stored_files],
+        )
         completed_job = self._url_job_repository.update_status(
             _require_job_id(processed_job),
             UrlJobStatus.COMPLETED,
             finished_at=processed_job.finished_at,
+        )
+        logger.info(
+            "URL job processor completed: job_id={} status={}",
+            url_job_id,
+            completed_job.status.value,
         )
         return UrlJobProcessorResult(job=completed_job, files=stored_files)
 

@@ -6,6 +6,8 @@ Version objetivo: `v1.19.0`
 
 Crear logs por ejecucion y por cuenta.
 
+Toda la trazabilidad debe vivir bajo la carpeta `logs`.
+
 ## Archivo
 
 ```text
@@ -16,8 +18,14 @@ src/ig_orchestrator/logging_config.py
 
 ```text
 logs/app.log
-username/_logs/run_YYYYMMDD_HHMMSS.log
+logs/YYYYMMDD_HHMMSS/username.log
 ```
+
+`logs/app.log` debe contener trazas generales de aplicacion, warnings y errores.
+
+`logs/YYYYMMDD_HHMMSS/username.log` debe contener las trazas relacionadas con
+los ficheros, URLs, posts, Telegram, errores y reintentos de ese username dentro
+de esa ejecucion.
 
 ## Debe registrar
 

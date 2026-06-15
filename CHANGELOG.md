@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.19.0 - Tarea 19 - Logs
+
+Fecha: 2026-06-15
+
+### Creado
+
+* `src/ig_orchestrator/logging_config.py` con configuracion de `logs/app.log`, logs por ejecucion/cuenta en `logs/YYYYMMDD_HHMMSS/username.log`, contexto de ejecucion y redaccion basica de secretos.
+* `tests/test_logging_config.py` con pruebas de escritura de logs globales, logs por cuenta/run y redaccion de valores sensibles.
+
+### Modificado
+
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` para registrar inicio/cierre de cuenta, carpetas, URLs procesadas, decisiones de reintento y fallos de infraestructura.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` para registrar inicio/cierre de lote y cuentas procesadas.
+* `src/ig_orchestrator/orchestration/url_job_processor.py` para registrar procesamiento de URL, correcciones de tipo, movimiento de archivos y errores de movimiento.
+* `src/ig_orchestrator/telegram/bot_conversation_service.py` para registrar mensaje enviado al bot, respuesta del bot, errores clasificados y archivos detectados.
+* `src/ig_orchestrator/reports/markdown_report_builder.py` para registrar el reporte Markdown generado.
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.19.0`.
+
+### Resumen
+
+La aplicacion genera un log global en `logs/app.log` para trazas generales,
+warnings y errores, y un log por username dentro de la carpeta de ejecucion
+`logs/YYYYMMDD_HHMMSS/username.log`. Los eventos principales de lote, cuenta,
+URL, Telegram, archivos, errores, reintentos y reportes quedan trazados con
+`run_id` y `account_username`, sin registrar claves sensibles ni valores
+evidentes de secretos.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_logging_config.py -q`
+* `python -m compileall -q src`
+* `python -m pytest`
+
 ## Planificacion - CLI opcional y renumeracion de tareas
 
 Fecha: 2026-06-15

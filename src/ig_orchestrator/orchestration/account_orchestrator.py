@@ -14,6 +14,12 @@ from ig_orchestrator.db import (
     UrlJobRepository,
 )
 from ig_orchestrator.filesystem import ensure_account_folders
+from ig_orchestrator.logging_config import (
+    configure_account_run_logging,
+    configure_app_logging,
+    get_logger,
+    logging_context,
+)
 from ig_orchestrator.models import (
     Account,
     AccountStatus,
@@ -28,6 +34,9 @@ from ig_orchestrator.orchestration.retry_policy import (
     calculate_retry_decision,
 )
 from ig_orchestrator.orchestration.url_job_processor import UrlJobProcessorResult
+
+
+logger = get_logger()
 
 
 class AccountUrlJobProcessor(Protocol):
@@ -108,70 +117,44 @@ class AccountOrchestrator:
             account_id=account_id,
         )
         processed_job_ids: list[int] = []
+        account_log_handle = None
 
         try:
-            account = self._account_repository.update_status(
-                account_id,
-                AccountStatus.PROCESSING,
+            configure_app_logging()
+            working_base = _working_base_folder(
+                account,
+                self._config.default_working_folder,
             )
-            ensure_account_folders(
-                account.username,
-                _working_base_folder(account, self._config.default_working_folder),
+            account_log_handle = configure_account_run_logging(
+                username=account.username,
+                run_id=run.id,
+                started_at=run.started_at,
             )
-
-            retry_queue: RetryQueue[int] = RetryQueue()
-            for job in _ordered_main_pass_jobs(jobs):
-                result = await self._url_job_processor.process(_require_job_id(job))
-                processed_job_ids.append(_require_job_id(result.job))
-                self._enqueue_or_finalize_retry(result.job, retry_queue)
-
-            for job in _existing_retry_jobs(jobs):
-                self._enqueue_or_finalize_retry(job, retry_queue)
-
-            while retry_queue:
-                job_id = retry_queue.pop_next()
-                if job_id is None:
-                    break
-                job = self._url_job_repository.get_by_id(job_id)
-                if job is None or job.status in _TERMINAL_URL_STATUSES:
-                    continue
-
-                decision = self._retry_decision(job)
-                if decision.is_final_failure:
-                    self._mark_failed_final(job, reason=decision.reason)
-                    continue
-
-                if self._config.wait_between_retries and decision.delay_seconds:
-                    await self._wait_retry_delay(decision.delay_seconds)
-
-                result = await self._url_job_processor.process(job_id)
-                processed_job_ids.append(_require_job_id(result.job))
-                if result.job.status in _RETRYABLE_URL_STATUSES:
-                    failed_retry = self._increment_retry_failure(result.job)
-                    retry_decision = self._retry_decision(failed_retry)
-                    if retry_decision.is_final_failure:
-                        self._mark_failed_final(
-                            failed_retry,
-                            reason=retry_decision.reason,
-                        )
-                    else:
-                        retry_queue.requeue(_require_job_id(failed_retry))
-
-            summary = self._build_account_summary(account_id)
-            account_status = _account_status_from_summary(summary)
-            account = self._account_repository.update_status(account_id, account_status)
-            run = self._run_repository.update_summary(
-                run.id,
-                summary,
-                finished_at=datetime.now(timezone.utc),
-            )
-            return AccountOrchestratorResult(
-                account=account,
-                run=run,
-                summary=summary,
-                processed_job_ids=tuple(processed_job_ids),
-            )
+            with logging_context(
+                account_username=account.username,
+                run_id=run.id,
+                account_log_key=account_log_handle.account_log_key,
+            ):
+                logger.info(
+                    "Account processing started: account_id={} username={} total_urls={}",
+                    account_id,
+                    account.username,
+                    len(jobs),
+                )
+                return await self._process_account_with_logging(
+                    account=account,
+                    account_id=account_id,
+                    jobs=jobs,
+                    run=run,
+                    processed_job_ids=processed_job_ids,
+                    working_base=working_base,
+                )
         except Exception as exc:
+            logger.exception(
+                "Infrastructure failure while processing account {}: {}",
+                account.username,
+                exc,
+            )
             failed_summary = RunSummary(
                 status=RunStatus.FAILED,
                 total_urls=len(jobs),
@@ -193,6 +176,126 @@ class AccountOrchestrator:
                 processed_job_ids=tuple(processed_job_ids),
                 error=str(exc),
             )
+        finally:
+            if account_log_handle is not None:
+                account_log_handle.close()
+
+    async def _process_account_with_logging(
+        self,
+        *,
+        account: Account,
+        account_id: int,
+        jobs: list[UrlJob],
+        run: RunRecord,
+        processed_job_ids: list[int],
+        working_base: Path,
+    ) -> AccountOrchestratorResult:
+        try:
+            account = self._account_repository.update_status(
+                account_id,
+                AccountStatus.PROCESSING,
+            )
+            ensure_account_folders(account.username, working_base)
+            logger.info("Account folders ready: {}", working_base / account.username)
+
+            retry_queue: RetryQueue[int] = RetryQueue()
+            for job in _ordered_main_pass_jobs(jobs):
+                logger.info(
+                    "Processing URL job: job_id={} type={} source={} url={}",
+                    _require_job_id(job),
+                    job.publication_type.value,
+                    job.source.value,
+                    job.url,
+                )
+                result = await self._url_job_processor.process(_require_job_id(job))
+                processed_job_ids.append(_require_job_id(result.job))
+                self._enqueue_or_finalize_retry(result.job, retry_queue)
+
+            for job in _existing_retry_jobs(jobs):
+                self._enqueue_or_finalize_retry(job, retry_queue)
+
+            while retry_queue:
+                job_id = retry_queue.pop_next()
+                if job_id is None:
+                    break
+                job = self._url_job_repository.get_by_id(job_id)
+                if job is None or job.status in _TERMINAL_URL_STATUSES:
+                    continue
+
+                decision = self._retry_decision(job)
+                if decision.is_final_failure:
+                    logger.warning(
+                        "Retry decision reached final failure: job_id={} retries={} reason={}",
+                        job_id,
+                        job.retries,
+                        decision.reason,
+                    )
+                    self._mark_failed_final(job, reason=decision.reason)
+                    continue
+
+                if self._config.wait_between_retries and decision.delay_seconds:
+                    logger.info(
+                        "Waiting before retry: job_id={} delay_seconds={}",
+                        job_id,
+                        decision.delay_seconds,
+                    )
+                    await self._wait_retry_delay(decision.delay_seconds)
+
+                logger.info(
+                    "Retrying URL job: job_id={} retries={} url={}",
+                    job_id,
+                    job.retries,
+                    job.url,
+                )
+                result = await self._url_job_processor.process(job_id)
+                processed_job_ids.append(_require_job_id(result.job))
+                if result.job.status in _RETRYABLE_URL_STATUSES:
+                    failed_retry = self._increment_retry_failure(result.job)
+                    retry_decision = self._retry_decision(failed_retry)
+                    if retry_decision.is_final_failure:
+                        logger.warning(
+                            "Retry exhausted: job_id={} retries={} reason={}",
+                            _require_job_id(failed_retry),
+                            failed_retry.retries,
+                            retry_decision.reason,
+                        )
+                        self._mark_failed_final(
+                            failed_retry,
+                            reason=retry_decision.reason,
+                        )
+                    else:
+                        logger.info(
+                            "URL job requeued for retry: job_id={} retries={} next_delay_seconds={}",
+                            _require_job_id(failed_retry),
+                            failed_retry.retries,
+                            retry_decision.delay_seconds,
+                        )
+                        retry_queue.requeue(_require_job_id(failed_retry))
+
+            summary = self._build_account_summary(account_id)
+            account_status = _account_status_from_summary(summary)
+            account = self._account_repository.update_status(account_id, account_status)
+            run = self._run_repository.update_summary(
+                run.id,
+                summary,
+                finished_at=datetime.now(timezone.utc),
+            )
+            logger.info(
+                "Account processing finished: status={} completed_urls={} failed_urls={} downloaded_files={}",
+                summary.status.value,
+                summary.completed_urls,
+                summary.failed_urls,
+                summary.downloaded_files,
+            )
+            return AccountOrchestratorResult(
+                account=account,
+                run=run,
+                summary=summary,
+                processed_job_ids=tuple(processed_job_ids),
+            )
+        except Exception:
+            logger.exception("Account processing failed")
+            raise
 
     def _enqueue_or_finalize_retry(
         self,
@@ -204,6 +307,12 @@ class AccountOrchestrator:
 
         decision = self._retry_decision(job)
         if decision.is_final_failure:
+            logger.warning(
+                "URL job marked final failure instead of retry: job_id={} retries={} reason={}",
+                _require_job_id(job),
+                job.retries,
+                decision.reason,
+            )
             self._mark_failed_final(job, reason=decision.reason)
             return
 
@@ -220,6 +329,12 @@ class AccountOrchestrator:
             non_retryable=job.non_retryable,
             retries=job.retries,
             next_retry_at=next_retry_at,
+        )
+        logger.info(
+            "URL job scheduled for retry: job_id={} retries={} next_retry_at={}",
+            _require_job_id(updated),
+            updated.retries,
+            updated.next_retry_at,
         )
         retry_queue.enqueue(_require_job_id(updated))
 

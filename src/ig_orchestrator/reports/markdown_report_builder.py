@@ -7,7 +7,11 @@ from sqlite3 import Connection, Row
 
 from ig_orchestrator.db import RunRepository
 from ig_orchestrator.db._mapping import dump_path, load_datetime
+from ig_orchestrator.logging_config import configure_app_logging, get_logger
 from ig_orchestrator.models import PublicationType
+
+
+logger = get_logger()
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +72,8 @@ class MarkdownReportBuilder:
             (dump_path(report_path), run_id),
         )
         self.connection.commit()
+        configure_app_logging()
+        logger.info("Markdown report generated: run_id={} path={}", run_id, report_path)
         return report_path
 
 

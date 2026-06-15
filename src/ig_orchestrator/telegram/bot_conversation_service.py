@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from ig_orchestrator.db import DownloadRepository, UrlJobRepository
 from ig_orchestrator.filesystem.file_classifier import classify_file_media_type
 from ig_orchestrator.filesystem.file_watcher import watch_downloaded_files
+from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.models import (
     DownloadFile,
     DownloadFileStatus,
@@ -20,6 +21,9 @@ from ig_orchestrator.telegram.bot_response_parser import (
     BotResponseStatus,
     parse_bot_response,
 )
+
+
+logger = get_logger()
 
 
 class TelegramBotClient(Protocol):
@@ -108,10 +112,20 @@ class BotConversationService:
             UrlJobStatus.SENT_TO_BOT,
             started_at=started_at,
         )
+        logger.info(
+            "Sending message to Telegram bot: job_id={} url={}",
+            job_id,
+            job.url,
+        )
 
         try:
             sent_message = await self._telegram_client.send_message_to_bot(job.url)
         except Exception as exc:
+            logger.exception(
+                "Telegram send failed: job_id={} error={}",
+                job_id,
+                exc,
+            )
             failed_job = self._url_job_repository.update_error(
                 job_id,
                 status=UrlJobStatus.RETRY_PENDING,
@@ -127,14 +141,30 @@ class BotConversationService:
                 job_id,
                 sent_message_id,
             )
+        logger.info(
+            "Message sent to Telegram bot: job_id={} sent_message_id={}",
+            job_id,
+            sent_message_id or "-",
+        )
 
         bot_message = await self._wait_for_bot_text_response(
             since=started_at,
             sent_message_id=sent_message_id,
         )
+        logger.info(
+            "Bot response received: job_id={} response={}",
+            job_id,
+            bot_message or "<no text response>",
+        )
         response = parse_bot_response(bot_message)
 
         if response.status is BotResponseStatus.NON_RETRYABLE_ERROR:
+            logger.warning(
+                "Bot returned non-retryable error: job_id={} error_type={} error={}",
+                job_id,
+                _error_type_value(response.last_error_type),
+                response.last_error or "",
+            )
             failed_job = self._url_job_repository.update_error(
                 job_id,
                 status=UrlJobStatus.FAILED_FINAL,
@@ -145,6 +175,12 @@ class BotConversationService:
             return BotConversationResult(job=failed_job, bot_message=bot_message)
 
         if response.status is BotResponseStatus.RETRYABLE_ERROR:
+            logger.warning(
+                "Bot returned retryable error: job_id={} error_type={} error={}",
+                job_id,
+                _error_type_value(response.last_error_type),
+                response.last_error or "",
+            )
             retry_job = self._url_job_repository.update_error(
                 job_id,
                 status=UrlJobStatus.RETRY_PENDING,
@@ -164,8 +200,15 @@ class BotConversationService:
             self._config.download_wait_timeout_seconds,
             self._config.download_stable_seconds,
         )
+        logger.info(
+            "Downloaded files detected: job_id={} count={} files={}",
+            job_id,
+            len(detected_paths),
+            [str(path) for path in detected_paths],
+        )
 
         if not detected_paths:
+            logger.warning("No downloaded files detected: job_id={}", job_id)
             failed_job = self._url_job_repository.update_error(
                 job_id,
                 status=UrlJobStatus.RETRY_PENDING,
@@ -180,6 +223,11 @@ class BotConversationService:
             job_id,
             UrlJobStatus.DOWNLOADED,
             finished_at=_utc_now(),
+        )
+        logger.info(
+            "URL job downloaded: job_id={} stored_files={}",
+            job_id,
+            len(files),
         )
         return BotConversationResult(
             job=downloaded_job,
@@ -229,7 +277,7 @@ class BotConversationService:
     def _store_detected_file(self, job_id: int, path: Path) -> DownloadFile:
         media_type = classify_file_media_type(path)
         file_size = path.stat().st_size if path.exists() else None
-        return self._download_repository.create(
+        stored_file = self._download_repository.create(
             DownloadFile(
                 url_job_id=job_id,
                 original_path=path,
@@ -239,6 +287,15 @@ class BotConversationService:
                 status=DownloadFileStatus.DETECTED,
             )
         )
+        logger.info(
+            "Detected file stored: job_id={} file_id={} path={} media_type={} size={}",
+            job_id,
+            stored_file.id,
+            stored_file.original_path,
+            stored_file.media_type.value,
+            stored_file.file_size,
+        )
+        return stored_file
 
 
 def _require_job_id(job: UrlJob) -> int:

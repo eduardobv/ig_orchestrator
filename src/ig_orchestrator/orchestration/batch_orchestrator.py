@@ -20,9 +20,13 @@ from ig_orchestrator.models import (
     RunSummary,
     UrlJobStatus,
 )
+from ig_orchestrator.logging_config import configure_app_logging, get_logger
 from ig_orchestrator.orchestration.account_orchestrator import (
     AccountOrchestratorResult,
 )
+
+
+logger = get_logger()
 
 
 class BatchAccountOrchestrator(Protocol):
@@ -82,6 +86,14 @@ class BatchOrchestrator:
         account_results: list[AccountOrchestratorResult] = []
 
         try:
+            configure_app_logging()
+            logger.info(
+                "Batch processing started: batch_id={} batch_name={} accounts={} total_urls={}",
+                batch_id,
+                batch.batch_name,
+                len(accounts),
+                run.total_urls,
+            )
             batch = self._batch_repository.update_status(
                 batch_id,
                 InputBatchStatus.PROCESSING,
@@ -89,6 +101,12 @@ class BatchOrchestrator:
             for account in accounts:
                 if account.id is None or account.status is not AccountStatus.PENDING:
                     continue
+                logger.info(
+                    "Processing batch account: batch_id={} account_id={} username={}",
+                    batch_id,
+                    account.id,
+                    account.username,
+                )
                 account_results.append(
                     await self._account_orchestrator.process_account(account.id)
                 )
@@ -103,6 +121,14 @@ class BatchOrchestrator:
                 summary,
                 finished_at=datetime.now(timezone.utc),
             )
+            logger.info(
+                "Batch processing finished: batch_id={} status={} completed_urls={} failed_urls={} downloaded_files={}",
+                batch_id,
+                summary.status.value,
+                summary.completed_urls,
+                summary.failed_urls,
+                summary.downloaded_files,
+            )
             return BatchOrchestratorResult(
                 batch=batch,
                 run=run,
@@ -110,6 +136,11 @@ class BatchOrchestrator:
                 account_results=tuple(account_results),
             )
         except Exception as exc:
+            logger.exception(
+                "Infrastructure failure while processing batch {}: {}",
+                batch.batch_name,
+                exc,
+            )
             failed_summary = RunSummary(
                 status=RunStatus.FAILED,
                 total_urls=run.total_urls,
