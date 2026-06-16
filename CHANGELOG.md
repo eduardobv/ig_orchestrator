@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.21.1 - Ejecucion real con Telegram
+
+Fecha: 2026-06-16
+
+### Creado
+
+* Test de smoke para el modo real usando servicio de Telegram simulado, archivo descargado falso, movimiento a carpeta de cuenta y reporte Markdown.
+
+### Modificado
+
+* `src/ig_orchestrator/main.py` para conectar el flujo real de `--input`: inicializa SQLite, importa JSON, arranca Telethon, procesa el batch con `BotConversationService`, mueve archivos con `UrlJobProcessor` y genera reporte Markdown.
+* `.vscode/launch.json` para que `Ejecutar: ig_orchestrator` y `Depurar: ig_orchestrator` usen `config/batch.json --run` en lugar de `--dry-run`.
+* `README.md` para documentar la ejecucion real, el modo `--run`, el uso de Telegram/Telethon y las salidas esperadas.
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.21.1`.
+
+### Resumen
+
+La aplicacion ya puede lanzarse con datos reales desde CLI o VS Code usando `config/batch.json`: crea o reutiliza SQLite, importa el lote, conecta con Telegram mediante Telethon, envia cada URL al bot, detecta descargas, mueve archivos a las carpetas correspondientes de la cuenta, aplica reintentos y escribe reporte Markdown. El modo `--dry-run` queda como validacion sin efectos externos.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q`
+* `python -m ig_orchestrator --input config\batch.json --dry-run`
+
 ## Documentacion README operativa
 
 Fecha: 2026-06-16

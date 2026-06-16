@@ -21,9 +21,19 @@ from ig_orchestrator.orchestration import (
     AccountOrchestratorConfig,
     BatchOrchestrator,
     BatchOrchestratorConfig,
+    UrlJobProcessor,
+    UrlJobProcessorConfig,
     UrlJobProcessorResult,
 )
+from ig_orchestrator.reports import MarkdownReportBuilder
 from ig_orchestrator.settings import SettingsError, load_settings
+from ig_orchestrator.telegram import (
+    BotConversationConfig,
+    BotConversationService,
+    TelegramClientConfig,
+    TelegramClientError,
+    TelethonTelegramClient,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -32,6 +42,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ig_orchestrator")
     parser.add_argument("--input", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--run",
+        action="store_true",
+        help="Process the input batch for real. This is the default when --input is used without --dry-run.",
+    )
     subparsers = parser.add_subparsers(dest="command")
     init_db_parser = subparsers.add_parser("init-db")
     init_db_parser.add_argument("--db-path", type=Path, default=None)
@@ -44,9 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.input is not None:
         if args.dry_run:
             return _dry_run_batch(args.input)
-        print("Processing a real batch is not wired in this minimal entrypoint yet.")
-        print("Use --dry-run to validate the batch without Telegram or file moves.")
-        return 2
+        return _run_batch(args.input)
 
     print(f"ig_orchestrator v{__version__}")
     print("Base project structure ready. Business logic is not implemented yet.")
@@ -124,4 +137,96 @@ def _dry_run_batch(input_path: Path) -> int:
     print(result.summary.summary)
     print(f"SQLite database: {settings.sqlite_db_path}")
     print("No Telegram messages were sent and no files were moved.")
+    return 0
+
+
+def _run_batch(input_path: Path) -> int:
+    try:
+        settings = load_settings()
+    except SettingsError as exc:
+        print(f"Cannot run batch: {exc}")
+        return 2
+
+    init_database(settings.sqlite_db_path)
+    connection = connect(settings.sqlite_db_path)
+    report_path: Path | None = None
+    telegram_client = TelethonTelegramClient(
+        TelegramClientConfig.from_settings(settings)
+    )
+
+    try:
+        imported = import_batch_json(input_path, connection, settings=settings)
+        account_repository = AccountRepository(connection)
+        url_job_repository = UrlJobRepository(connection)
+        download_repository = DownloadRepository(connection)
+        run_repository = RunRepository(connection)
+
+        conversation_service = BotConversationService(
+            telegram_client=telegram_client,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            config=BotConversationConfig(
+                download_folder=settings.telegram_desktop_download_folder,
+                download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
+                download_stable_seconds=settings.download_stable_seconds,
+            ),
+        )
+        url_job_processor = UrlJobProcessor(
+            url_job_repository=url_job_repository,
+            account_repository=account_repository,
+            download_repository=download_repository,
+            conversation_service=conversation_service,
+            config=UrlJobProcessorConfig(
+                default_working_folder=settings.working_folder,
+            ),
+        )
+        account_orchestrator = AccountOrchestrator(
+            account_repository=account_repository,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            run_repository=run_repository,
+            url_job_processor=url_job_processor,
+            config=AccountOrchestratorConfig(
+                default_working_folder=settings.working_folder,
+                max_retries=settings.max_retries,
+                retry_base_seconds=settings.retry_base_seconds,
+                retry_max_seconds=settings.retry_max_seconds,
+                wait_between_retries=True,
+            ),
+        )
+        batch_orchestrator = BatchOrchestrator(
+            batch_repository=BatchRepository(connection),
+            account_repository=account_repository,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            run_repository=run_repository,
+            account_orchestrator=account_orchestrator,
+        )
+        if imported.batch.id is None:
+            raise RuntimeError("Imported batch has no id")
+
+        async def _process():
+            async with telegram_client:
+                return await batch_orchestrator.process_batch(imported.batch.id)
+
+        result = asyncio.run(_process())
+        if result.run.id is not None:
+            report_path = MarkdownReportBuilder(connection).write(
+                result.run.id,
+                settings.reports_folder,
+            )
+    except TelegramClientError as exc:
+        print(f"Telegram client failed: {exc}")
+        return 1
+    except Exception as exc:
+        print(f"Batch failed: {exc}")
+        return 1
+    finally:
+        connection.close()
+
+    print(f"Batch processed: {result.batch.batch_name}")
+    print(result.summary.summary)
+    print(f"SQLite database: {settings.sqlite_db_path}")
+    if report_path is not None:
+        print(f"Markdown report: {report_path}")
     return 0

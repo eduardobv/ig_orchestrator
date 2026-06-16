@@ -15,7 +15,7 @@
       "args": [
         "--input",
         "config/batch.json",
-        "--dry-run"
+        "--run"
       ],
       "noDebug": true
     },
@@ -33,7 +33,7 @@
       "args": [
         "--input",
         "config/batch.json",
-        "--dry-run"
+        "--run"
       ]
     },
     {

@@ -6,10 +6,10 @@ El objetivo del proyecto es que el usuario escriba un lote de cuentas y URLs en 
 
 Estado actual importante:
 
-- El flujo disponible desde linea de comando es `--dry-run`.
-- `--dry-run` valida `.env`, lee/importa el JSON, inicializa SQLite y simula la orquestacion sin Telegram y sin mover archivos.
-- Los modulos de Telegram, watcher, movimiento, reintentos, logs y reportes existen y tienen tests, pero el entrypoint `python -m ig_orchestrator --input ...` sin `--dry-run` todavia no ejecuta el flujo real completo.
-- Si ejecutas sin `--dry-run`, hoy veras un mensaje indicando que el procesamiento real aun no esta cableado en el punto de entrada minimo.
+- El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o con `--run`.
+- El flujo real inicializa SQLite, importa el JSON, arranca Telethon, envia URLs al bot, espera descargas, mueve archivos y genera reporte Markdown.
+- `--dry-run` sigue disponible para validar `.env`, JSON, SQLite y orquestacion sin Telegram y sin mover archivos.
+- La integracion con renombrador, duplicados y movimiento final a `G:\4K Stogram` sigue fuera de alcance.
 
 ## Que problema resuelve
 
@@ -271,20 +271,40 @@ En dry-run:
 - No se mueven archivos.
 - No se crean carpetas de cuenta por defecto.
 
-### Ejecutar sin dry-run
+### Ejecutar descarga real
 
 ```bash
 python -m ig_orchestrator --input config\batch.json
 ```
 
-Estado actual:
+Tambien puedes usar el modo explicito:
 
-```text
-Processing a real batch is not wired in this minimal entrypoint yet.
-Use --dry-run to validate the batch without Telegram or file moves.
+```bash
+python -m ig_orchestrator --input config\batch.json --run
 ```
 
-Esto es esperado en la version actual del entrypoint. La ejecucion real esta preparada por modulos, pero falta conectarla en `main.py`.
+Este modo:
+
+- Inicializa SQLite si hace falta.
+- Importa o reutiliza el batch del JSON.
+- Arranca Telethon con la sesion indicada por `TELETHON_SESSION_NAME`.
+- Procesa cuentas pendientes.
+- Procesa primero stories generadas.
+- Envia despues las URLs manuales al bot.
+- Detecta archivos nuevos en `TELEGRAM_DESKTOP_DOWNLOAD_FOLDER`.
+- Mueve archivos a `WORKING_FOLDER\username\...`.
+- Aplica reintentos FIFO para errores temporales.
+- Guarda estados, errores y archivos en SQLite.
+- Genera un reporte Markdown en `REPORTS_FOLDER`.
+
+Salida orientativa:
+
+```text
+Batch processed: descargas_16_junio_2026
+Completed 6/6 URLs; failed final 0; files 12.
+SQLite database: data\orchestrator.db
+Markdown report: reports\run_20260616_101530.md
+```
 
 ### Ejecutar desde VS Code
 
@@ -292,8 +312,8 @@ Abre `.vscode/launch.json`.
 
 Configuraciones disponibles:
 
-- `Ejecutar: ig_orchestrator`: ejecuta el dry-run sin depurador.
-- `Depurar: ig_orchestrator`: ejecuta el dry-run con breakpoints.
+- `Ejecutar: ig_orchestrator`: ejecuta el modo real sin depurador.
+- `Depurar: ig_orchestrator`: ejecuta el modo real con breakpoints.
 - `Tests: pytest`: ejecuta tests.
 - `Depurar: dry-run batch`: dry-run con depurador.
 
@@ -303,7 +323,7 @@ Las configuraciones principales usan:
 "args": [
   "--input",
   "config/batch.json",
-  "--dry-run"
+  "--run"
 ]
 ```
 
@@ -330,12 +350,18 @@ flowchart TD
     J --> K[Registrar que URLs se procesarian]
     K --> L[Actualizar runs simulados]
     L --> M[Mostrar resumen en consola]
-    B -->|--input sin --dry-run| N[Mostrar aviso: ejecucion real no cableada]
+    B -->|--input o --input + --run| N[Cargar .env]
+    N --> O[Inicializar SQLite]
+    O --> P[Importar batch JSON]
+    P --> Q[Arrancar Telethon]
+    Q --> R[Procesar batch real]
+    R --> S[Mover archivos y guardar estados]
+    S --> T[Generar reporte Markdown]
 ```
 
-## Flujo real previsto entre modulos
+## Flujo real entre modulos
 
-Este diagrama describe como interactuan los modulos cuando se conecte el procesamiento real desde `main.py`.
+Este diagrama describe como interactuan los modulos en una ejecucion real.
 
 ```mermaid
 sequenceDiagram
@@ -381,7 +407,7 @@ sequenceDiagram
 
 ## Que hace cada modulo
 
-- `main.py`: punto de entrada. Hoy soporta `init-db` y `--input ... --dry-run`.
+- `main.py`: punto de entrada. Soporta `init-db`, `--input ... --run` y `--input ... --dry-run`.
 - `settings.py`: lee `.env`, valida variables obligatorias y convierte rutas/numeros.
 - `input/batch_json_parser.py`: valida el JSON de entrada.
 - `input/batch_importer.py`: guarda batch, cuentas, settings no sensibles y URLs en SQLite.
@@ -506,7 +532,7 @@ El reporte contiene una tabla:
 Username | Tipo | Urls | Fichero | Estado | Directory
 ```
 
-Nota actual: el builder existe, pero el entrypoint dry-run no lo invoca automaticamente.
+En ejecucion real el entrypoint genera el reporte al terminar el batch. En dry-run no se genera automaticamente.
 
 ## Reintentos y errores esperados
 
@@ -591,7 +617,5 @@ El `.gitignore` ya cubre estos archivos.
 
 ## Limitaciones actuales
 
-- La ejecucion real completa no esta conectada desde `main.py`.
-- El modo soportado para probar desde CLI/VS Code es `--dry-run`.
 - El reporte Markdown no se genera automaticamente en el dry-run actual.
 - La integracion con renombrador, limpieza de duplicados y movimiento final a `G:\4K Stogram` estan fuera del alcance actual.
