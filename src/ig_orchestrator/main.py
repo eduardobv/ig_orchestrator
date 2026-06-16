@@ -50,11 +50,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command")
     init_db_parser = subparsers.add_parser("init-db")
     init_db_parser.add_argument("--db-path", type=Path, default=None)
+    run_continue_parser = subparsers.add_parser(
+        "run_continue",
+        help="Continue resumable work from SQLite without importing batch.json.",
+    )
+    run_continue_parser.add_argument("--batch-id", type=int, default=None)
+    run_continue_parser.add_argument("--batch-name", type=str, default=None)
 
     args = parser.parse_args(argv)
 
     if args.command == "init-db":
         return _init_db(args.db_path)
+    if args.command == "run_continue":
+        return _run_continue(
+            batch_id=args.batch_id,
+            batch_name=args.batch_name,
+        )
 
     if args.input is not None:
         if args.dry_run:
@@ -230,3 +241,136 @@ def _run_batch(input_path: Path) -> int:
     if report_path is not None:
         print(f"Markdown report: {report_path}")
     return 0
+
+
+def _run_continue(
+    *,
+    batch_id: int | None = None,
+    batch_name: str | None = None,
+) -> int:
+    if batch_id is not None and batch_name is not None:
+        print("Cannot continue: use only one of --batch-id or --batch-name.")
+        return 2
+
+    try:
+        settings = load_settings()
+    except SettingsError as exc:
+        print(f"Cannot continue run: {exc}")
+        return 2
+
+    init_database(settings.sqlite_db_path)
+    connection = connect(settings.sqlite_db_path)
+    telegram_client = TelethonTelegramClient(
+        TelegramClientConfig.from_settings(settings)
+    )
+    report_paths: list[Path] = []
+
+    try:
+        account_repository = AccountRepository(connection)
+        url_job_repository = UrlJobRepository(connection)
+        download_repository = DownloadRepository(connection)
+        run_repository = RunRepository(connection)
+        batch_repository = BatchRepository(connection)
+
+        batches = _select_continue_batches(
+            batch_repository=batch_repository,
+            batch_id=batch_id,
+            batch_name=batch_name,
+        )
+        if not batches:
+            print("No resumable batches found in SQLite.")
+            return 0
+
+        conversation_service = BotConversationService(
+            telegram_client=telegram_client,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            config=BotConversationConfig(
+                download_folder=settings.telegram_desktop_download_folder,
+                download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
+                download_stable_seconds=settings.download_stable_seconds,
+            ),
+        )
+        url_job_processor = UrlJobProcessor(
+            url_job_repository=url_job_repository,
+            account_repository=account_repository,
+            download_repository=download_repository,
+            conversation_service=conversation_service,
+            config=UrlJobProcessorConfig(
+                default_working_folder=settings.working_folder,
+            ),
+        )
+        account_orchestrator = AccountOrchestrator(
+            account_repository=account_repository,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            run_repository=run_repository,
+            url_job_processor=url_job_processor,
+            config=AccountOrchestratorConfig(
+                default_working_folder=settings.working_folder,
+                max_retries=settings.max_retries,
+                retry_base_seconds=settings.retry_base_seconds,
+                retry_max_seconds=settings.retry_max_seconds,
+                wait_between_retries=True,
+            ),
+        )
+        batch_orchestrator = BatchOrchestrator(
+            batch_repository=batch_repository,
+            account_repository=account_repository,
+            url_job_repository=url_job_repository,
+            download_repository=download_repository,
+            run_repository=run_repository,
+            account_orchestrator=account_orchestrator,
+        )
+
+        async def _process_all():
+            results = []
+            async with telegram_client:
+                for batch in batches:
+                    if batch.id is None:
+                        continue
+                    results.append(await batch_orchestrator.process_batch(batch.id))
+            return results
+
+        results = asyncio.run(_process_all())
+        report_builder = MarkdownReportBuilder(connection)
+        for result in results:
+            if result.run.id is not None:
+                report_paths.append(
+                    report_builder.write(result.run.id, settings.reports_folder)
+                )
+    except TelegramClientError as exc:
+        print(f"Telegram client failed: {exc}")
+        return 1
+    except Exception as exc:
+        print(f"Run continue failed: {exc}")
+        return 1
+    finally:
+        connection.close()
+
+    print(f"Run continue processed {len(results)} batch(es).")
+    for result in results:
+        print(f"- {result.batch.batch_name}: {result.summary.summary}")
+    print(f"SQLite database: {settings.sqlite_db_path}")
+    for report_path in report_paths:
+        print(f"Markdown report: {report_path}")
+    return 1 if any(result.error for result in results) else 0
+
+
+def _select_continue_batches(
+    *,
+    batch_repository: BatchRepository,
+    batch_id: int | None,
+    batch_name: str | None,
+):
+    if batch_id is not None:
+        batch = batch_repository.get_by_id(batch_id)
+        if batch is None:
+            raise ValueError(f"Input batch not found: {batch_id}")
+        return [batch]
+    if batch_name is not None:
+        batch = batch_repository.get_by_name(batch_name)
+        if batch is None:
+            raise ValueError(f"Input batch not found: {batch_name}")
+        return [batch]
+    return batch_repository.list_with_resumable_work()

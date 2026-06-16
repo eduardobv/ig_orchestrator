@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.21.3 - Patch - Modo run_continue y deduplicacion de descargas
+
+Fecha: 2026-06-16
+
+### Creado
+
+* Test para localizar batches con trabajo reanudable desde SQLite.
+* Test de `run_continue` sin importar JSON.
+* Test para descartar descargas duplicadas exactas tipo `archivo.mp4` y `archivo_1.mp4`.
+
+### Modificado
+
+* `src/ig_orchestrator/main.py` para agregar el subcomando `run_continue`, que procesa batches existentes desde SQLite sin leer `batch.json`.
+* `src/ig_orchestrator/db/batch_repository.py` para listar batches con cuentas y URLs en estados reanudables.
+* `src/ig_orchestrator/telegram/bot_conversation_service.py` para eliminar duplicados exactos antes de crear registros `download_files`.
+* `.vscode/launch.json` para agregar `Ejecutar: run_continue` y `Depurar: run_continue`.
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.21.3`.
+
+### Resumen
+
+El proceso puede reanudarse con `python -m ig_orchestrator run_continue`, leyendo
+solo SQLite y procesando batches que tengan cuentas `PENDING`, `PROCESSING` o
+`PARTIAL` con URLs en `PENDING`, `SENT_TO_BOT`, `WAITING_DOWNLOAD`,
+`RETRY_PENDING` o `FAILED_TEMPORARY`. Las descargas duplicadas exactas con
+sufijo numerico se filtran antes de persistir y mover archivos.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_db_repositories.py tests\test_bot_conversation_service.py tests\test_package_smoke.py -q`
+* `python -m json.tool .vscode\launch.json`
+* `python -m pytest -q`
+
 ## v1.21.2 - Patch - Descarga directa de media de Telegram
 
 Fecha: 2026-06-16

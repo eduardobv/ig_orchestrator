@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 import shutil
 from collections.abc import Callable
@@ -227,6 +228,7 @@ class BotConversationService:
             len(detected_paths),
             [str(path) for path in detected_paths],
         )
+        detected_paths = _remove_duplicate_download_paths(detected_paths)
 
         if not detected_paths:
             logger.warning("No downloaded files detected: job_id={}", job_id)
@@ -516,6 +518,81 @@ def _finalize_media_downloads(
 
     _cleanup_empty_temp_folders(download_folder)
     return promoted_paths
+
+
+def _remove_duplicate_download_paths(paths: list[Path]) -> list[Path]:
+    kept: list[Path] = []
+    groups: dict[tuple[str, str, int | None, str | None], Path] = {}
+
+    for path in paths:
+        key = _duplicate_path_key(path)
+        if key is None:
+            kept.append(path)
+            continue
+
+        existing = groups.get(key)
+        if existing is None:
+            groups[key] = path
+            kept.append(path)
+            continue
+
+        winner, duplicate = _preferred_duplicate_path(existing, path)
+        if winner != existing:
+            groups[key] = winner
+            kept[kept.index(existing)] = winner
+        _delete_duplicate_path(duplicate)
+        logger.warning(
+            "Duplicate downloaded file ignored: kept={} removed={}",
+            winner,
+            duplicate,
+        )
+
+    return kept
+
+
+def _duplicate_path_key(path: Path) -> tuple[str, str, int | None, str | None] | None:
+    if not path.exists() or not path.is_file():
+        return None
+    return (
+        _base_stem_without_numeric_suffix(path),
+        path.suffix.lower(),
+        path.stat().st_size,
+        _sha256(path),
+    )
+
+
+def _base_stem_without_numeric_suffix(path: Path) -> str:
+    return re.sub(r"_\d+$", "", path.stem)
+
+
+def _preferred_duplicate_path(first: Path, second: Path) -> tuple[Path, Path]:
+    first_size = first.stat().st_size if first.exists() else -1
+    second_size = second.stat().st_size if second.exists() else -1
+    if second_size > first_size:
+        return second, first
+    if first_size > second_size:
+        return first, second
+    if re.search(r"_\d+$", first.stem) and not re.search(r"_\d+$", second.stem):
+        return second, first
+    return first, second
+
+
+def _delete_duplicate_path(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning("Could not remove duplicate downloaded file: path={} error={}", path, exc)
+
+
+def _sha256(path: Path) -> str | None:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as file:
+            for chunk in iter(lambda: file.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return digest.hexdigest()
 
 
 def _cleanup_empty_temp_folders(download_folder: Path) -> None:

@@ -110,6 +110,36 @@ def test_process_url_job_marks_downloaded_and_stores_detected_files(
     assert download_repo.list_by_url_job(job.id) == list(result.files)
 
 
+def test_process_url_job_discards_exact_duplicate_downloaded_files(
+    tmp_path: Path,
+) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(job_repo)
+    downloads = tmp_path / "downloads"
+    original = downloads / "3705629594894863521.mp4"
+    duplicate = downloads / "3705629594894863521_1.mp4"
+    downloads.mkdir()
+    original.write_bytes(b"same video bytes")
+    duplicate.write_bytes(b"same video bytes")
+    service = _service(
+        tmp_path,
+        job_repo,
+        download_repo,
+        messages=[_incoming("Download completed successfully")],
+        watcher=lambda *_args: [original, duplicate],
+    )
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.DOWNLOADED
+    assert [file.original_path for file in result.files] == [original]
+    assert download_repo.list_by_url_job(job.id) == list(result.files)
+    assert original.exists()
+    assert not duplicate.exists()
+
+
 def test_process_url_job_downloads_document_media_without_desktop_watcher(
     tmp_path: Path,
 ) -> None:

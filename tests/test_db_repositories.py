@@ -179,3 +179,67 @@ def test_init_db_command_creates_schema_with_explicit_path(tmp_path: Path) -> No
         "download_files",
         "runs",
     }.issubset(table_names)
+
+
+def test_batch_repository_lists_batches_with_resumable_work(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        batch_repo = BatchRepository(connection)
+        account_repo = AccountRepository(connection)
+        url_job_repo = UrlJobRepository(connection)
+
+        resumable_batch = batch_repo.create(
+            InputBatch(
+                batch_name="resumable",
+                schema_version="1.0",
+                status=InputBatchStatus.PROCESSING,
+            )
+        )
+        resumable_account = account_repo.create(
+            Account(
+                batch_id=resumable_batch.id,
+                username="resumable_user",
+                start_now_date=date(2026, 6, 16),
+                download_stories=False,
+                status=AccountStatus.PROCESSING,
+            )
+        )
+        url_job_repo.create(
+            UrlJob(
+                account_id=resumable_account.id,
+                url="https://www.instagram.com/reel/ABC123xyz/",
+                publication_type=PublicationType.REEL,
+                source=UrlSource.INPUT_URL,
+                status=UrlJobStatus.WAITING_DOWNLOAD,
+            )
+        )
+
+        completed_batch = batch_repo.create(
+            InputBatch(
+                batch_name="completed",
+                schema_version="1.0",
+                status=InputBatchStatus.COMPLETED,
+            )
+        )
+        completed_account = account_repo.create(
+            Account(
+                batch_id=completed_batch.id,
+                username="completed_user",
+                start_now_date=date(2026, 6, 16),
+                download_stories=False,
+                status=AccountStatus.COMPLETED,
+            )
+        )
+        url_job_repo.create(
+            UrlJob(
+                account_id=completed_account.id,
+                url="https://www.instagram.com/reel/XYZ123xyz/",
+                publication_type=PublicationType.REEL,
+                source=UrlSource.INPUT_URL,
+                status=UrlJobStatus.COMPLETED,
+            )
+        )
+
+        assert batch_repo.list_with_resumable_work() == [resumable_batch]
