@@ -373,7 +373,7 @@ class AccountOrchestrator:
         job: UrlJob,
         retry_queue: RetryQueue[int],
     ) -> None:
-        if job.status not in _RETRYABLE_URL_STATUSES:
+        if job.status not in _RESUMABLE_RETRY_URL_STATUSES:
             return
 
         decision = self._retry_decision(job)
@@ -478,6 +478,11 @@ _RETRYABLE_URL_STATUSES = {
     UrlJobStatus.RETRY_PENDING,
     UrlJobStatus.FAILED_TEMPORARY,
 }
+_RESUMABLE_RETRY_URL_STATUSES = {
+    *_RETRYABLE_URL_STATUSES,
+    UrlJobStatus.SENT_TO_BOT,
+    UrlJobStatus.WAITING_DOWNLOAD,
+}
 _TERMINAL_URL_STATUSES = {
     UrlJobStatus.COMPLETED,
     UrlJobStatus.FAILED_FINAL,
@@ -494,7 +499,7 @@ def _ordered_main_pass_jobs(jobs: list[UrlJob]) -> list[UrlJob]:
 
 
 def _existing_retry_jobs(jobs: list[UrlJob]) -> list[UrlJob]:
-    return [job for job in jobs if job.status in _RETRYABLE_URL_STATUSES]
+    return [job for job in jobs if job.status in _RESUMABLE_RETRY_URL_STATUSES]
 
 
 def _working_base_folder(account: Account, default_working_folder: Path | None) -> Path:

@@ -111,6 +111,26 @@ def test_batch_orchestrator_processes_pending_accounts_and_marks_completed(
     assert result.summary.completed_urls == 2
 
 
+def test_batch_orchestrator_resumes_processing_accounts(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_batch(tmp_path)
+    processing = _create_account(stored, "processing", AccountStatus.PROCESSING)
+    _create_job(stored.job_repo, processing.id)
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {processing.id: AccountStatus.COMPLETED},
+    )
+    orchestrator = _batch_orchestrator(stored, fake)
+
+    result = asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert fake.calls == [processing.id]
+    assert result.batch.status is InputBatchStatus.COMPLETED
+
+
 def test_batch_orchestrator_marks_partial_when_an_account_fails(
     tmp_path: Path,
 ) -> None:

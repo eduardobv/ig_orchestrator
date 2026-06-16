@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.21.2 - Patch - Descarga directa de media de Telegram
+
+Fecha: 2026-06-16
+
+### Creado
+
+* Tests para descarga directa desde mensajes del bot con documento y para previews sin nombre original.
+* Tests para reanudar cuentas `PROCESSING` y URLs interrumpidas en `WAITING_DOWNLOAD`.
+
+### Modificado
+
+* `src/ig_orchestrator/telegram/telegram_client.py` para exponer `download_message_media` usando Telethon.
+* `src/ig_orchestrator/telegram/bot_conversation_service.py` para descargar media del bot directamente con Telethon, conservar documentos con nombre original y promover previews solo cuando no hay documentos finales.
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` para reintentar URLs interrumpidas en `SENT_TO_BOT` o `WAITING_DOWNLOAD`.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` para reanudar cuentas `PROCESSING` o `PARTIAL`.
+* `src/ig_orchestrator/reports/markdown_report_builder.py` para agregar la columna `Cantidad`.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y `tests/test_package_smoke.py` para actualizar la version a `1.21.2`.
+
+### Resumen
+
+La descarga ya no depende de tener Telegram Desktop abierto: Telethon descarga
+directamente los media recibidos desde el bot. Los posts/reels con documentos
+usan el nombre original enviado por el bot, mientras que las stories que solo
+llegan como previews se guardan con nombre fallback por id de mensaje. Las
+ejecuciones cortadas pueden retomarse procesando cuentas y URLs que quedaron a
+medio camino.
+
+### Pruebas ejecutadas
+
+* `pytest tests\test_account_orchestrator.py tests\test_batch_orchestrator.py tests\test_bot_conversation_service.py tests\test_markdown_report_builder.py`
+* `pytest`
+
 ## v1.21.1 - Ejecucion real con Telegram
 
 Fecha: 2026-06-16

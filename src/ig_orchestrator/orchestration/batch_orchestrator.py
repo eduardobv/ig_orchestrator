@@ -115,7 +115,7 @@ class BatchOrchestrator:
                 InputBatchStatus.PROCESSING,
             )
             for account in accounts:
-                if account.id is None or account.status is not AccountStatus.PENDING:
+                if account.id is None or account.status not in _PROCESSABLE_ACCOUNT_STATUSES:
                     continue
                 logger.info(
                     "Processing batch account: batch_id={} account_id={} username={}",
@@ -199,7 +199,7 @@ class BatchOrchestrator:
         pending_accounts = [
             account
             for account in accounts
-            if account.id is not None and account.status is AccountStatus.PENDING
+            if account.id is not None and account.status in _PROCESSABLE_ACCOUNT_STATUSES
         ]
         for account in pending_accounts:
             logger.info(
@@ -301,6 +301,13 @@ def _run_status_from_counts(*, total: int, completed: int, failed: int) -> RunSt
     if failed == total:
         return RunStatus.FAILED
     return RunStatus.PARTIAL
+
+
+_PROCESSABLE_ACCOUNT_STATUSES = {
+    AccountStatus.PENDING,
+    AccountStatus.PROCESSING,
+    AccountStatus.PARTIAL,
+}
 
 
 __all__ = [

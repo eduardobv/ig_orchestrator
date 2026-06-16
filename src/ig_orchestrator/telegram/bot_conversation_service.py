@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import re
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -38,6 +40,9 @@ class TelegramBotClient(Protocol):
     ) -> list[Any]:
         """Return conversation messages after timestamp."""
 
+    async def download_message_media(self, message: Any, destination: str) -> str | None:
+        """Download media from a bot message to destination."""
+
 
 Watcher = Callable[[Path, datetime, float, float], list[Path]]
 
@@ -72,6 +77,15 @@ class BotConversationResult:
     job: UrlJob
     files: tuple[DownloadFile, ...] = ()
     bot_message: str | None = None
+
+
+@dataclass(slots=True)
+class _MediaDownload:
+    message_id: int
+    path: Path | None
+    provisional_path: Path | None
+    original_file_name: str | None
+    error: str | None = None
 
 
 class BotConversationService:
@@ -147,7 +161,13 @@ class BotConversationService:
             sent_message_id or "-",
         )
 
-        bot_message = await self._wait_for_bot_text_response(
+        current_job = self._url_job_repository.update_status(
+            job_id,
+            UrlJobStatus.WAITING_DOWNLOAD,
+        )
+
+        bot_message, direct_paths = await self._wait_for_bot_response_and_downloads(
+            job_id=job_id,
             since=started_at,
             sent_message_id=sent_message_id,
         )
@@ -158,7 +178,10 @@ class BotConversationService:
         )
         response = parse_bot_response(bot_message)
 
-        if response.status is BotResponseStatus.NON_RETRYABLE_ERROR:
+        if (
+            response.status is BotResponseStatus.NON_RETRYABLE_ERROR
+            and not direct_paths
+        ):
             logger.warning(
                 "Bot returned non-retryable error: job_id={} error_type={} error={}",
                 job_id,
@@ -174,7 +197,7 @@ class BotConversationService:
             )
             return BotConversationResult(job=failed_job, bot_message=bot_message)
 
-        if response.status is BotResponseStatus.RETRYABLE_ERROR:
+        if response.status is BotResponseStatus.RETRYABLE_ERROR and not direct_paths:
             logger.warning(
                 "Bot returned retryable error: job_id={} error_type={} error={}",
                 job_id,
@@ -190,16 +213,14 @@ class BotConversationService:
             )
             return BotConversationResult(job=retry_job, bot_message=bot_message)
 
-        current_job = self._url_job_repository.update_status(
-            job_id,
-            UrlJobStatus.WAITING_DOWNLOAD,
-        )
-        detected_paths = self._watcher(
-            self._config.download_folder,
-            started_at,
-            self._config.download_wait_timeout_seconds,
-            self._config.download_stable_seconds,
-        )
+        detected_paths = direct_paths
+        if not detected_paths:
+            detected_paths = self._watcher(
+                self._config.download_folder,
+                started_at,
+                self._config.download_wait_timeout_seconds,
+                self._config.download_stable_seconds,
+            )
         logger.info(
             "Downloaded files detected: job_id={} count={} files={}",
             job_id,
@@ -235,16 +256,21 @@ class BotConversationService:
             bot_message=bot_message,
         )
 
-    async def _wait_for_bot_text_response(
+    async def _wait_for_bot_response_and_downloads(
         self,
         *,
+        job_id: int,
         since: datetime,
         sent_message_id: int | None,
-    ) -> str | None:
-        deadline = asyncio.get_running_loop().time() + (
-            self._config.response_wait_timeout_seconds
+    ) -> tuple[str | None, list[Path]]:
+        deadline = asyncio.get_running_loop().time() + max(
+            self._config.response_wait_timeout_seconds,
+            self._config.download_wait_timeout_seconds,
         )
         seen_message_ids: set[int] = set()
+        bot_texts: list[str] = []
+        downloads: list[_MediaDownload] = []
+        last_media_at: float | None = None
 
         while True:
             messages = await self._telegram_client.get_bot_messages_after(
@@ -264,14 +290,101 @@ class BotConversationService:
 
                 text = _message_text(message)
                 if text is not None and text.strip():
-                    return text
+                    bot_texts.append(text.strip())
+                    if parse_bot_response(text).status is not BotResponseStatus.OK:
+                        return _join_bot_texts(bot_texts), _finalize_media_downloads(
+                            self._config.download_folder,
+                            downloads,
+                        )
+
+                if _message_has_media(message) and _can_download_media(
+                    self._telegram_client
+                ):
+                    download = await self._download_bot_message_media(job_id, message)
+                    downloads.append(download)
+                    if download.path or download.provisional_path:
+                        last_media_at = asyncio.get_running_loop().time()
 
             now = asyncio.get_running_loop().time()
+            if downloads and last_media_at is not None:
+                quiet_seconds = now - last_media_at
+                if quiet_seconds >= self._config.download_stable_seconds:
+                    return _join_bot_texts(bot_texts), _finalize_media_downloads(
+                        self._config.download_folder,
+                        downloads,
+                    )
+
             if now >= deadline:
-                return None
+                return _join_bot_texts(bot_texts), _finalize_media_downloads(
+                    self._config.download_folder,
+                    downloads,
+                )
 
             await asyncio.sleep(
                 min(self._config.response_poll_interval_seconds, deadline - now)
+            )
+
+    async def _download_bot_message_media(
+        self,
+        job_id: int,
+        message: Any,
+    ) -> _MediaDownload:
+        message_id = _message_id(message) or 0
+        original_file_name = _original_file_name(message)
+        extension = _message_file_extension(message, original_file_name)
+        temp_folder = self._config.download_folder / "_tmp_telethon_downloads"
+        provisional_folder = temp_folder / "_provisional_no_original_name"
+        temp_folder.mkdir(parents=True, exist_ok=True)
+        provisional_folder.mkdir(parents=True, exist_ok=True)
+
+        target_folder = temp_folder if original_file_name else provisional_folder
+        temp_path = target_folder / f"job_{job_id}_msg_{message_id}{extension}"
+        temp_path.unlink(missing_ok=True)
+
+        try:
+            downloaded_path_text = await self._telegram_client.download_message_media(
+                message,
+                str(temp_path),
+            )
+            if not downloaded_path_text:
+                raise RuntimeError("Telethon returned empty downloaded path.")
+            downloaded_path = Path(downloaded_path_text)
+            if not downloaded_path.exists():
+                raise RuntimeError(f"Downloaded file does not exist: {downloaded_path}")
+
+            if not original_file_name:
+                return _MediaDownload(
+                    message_id=message_id,
+                    path=None,
+                    provisional_path=downloaded_path,
+                    original_file_name=None,
+                )
+
+            final_path = _unique_path(
+                self._config.download_folder,
+                original_file_name,
+            )
+            shutil.move(str(downloaded_path), str(final_path))
+            return _MediaDownload(
+                message_id=message_id,
+                path=final_path,
+                provisional_path=None,
+                original_file_name=original_file_name,
+            )
+        except Exception as exc:
+            temp_path.unlink(missing_ok=True)
+            logger.warning(
+                "Direct Telegram media download failed: job_id={} message_id={} error={}",
+                job_id,
+                message_id or "-",
+                exc,
+            )
+            return _MediaDownload(
+                message_id=message_id,
+                path=None,
+                provisional_path=None,
+                original_file_name=original_file_name,
+                error=str(exc),
             )
 
     def _store_detected_file(self, job_id: int, path: Path) -> DownloadFile:
@@ -315,6 +428,131 @@ def _message_text(message: Any) -> str | None:
         if isinstance(value, str):
             return value
     return None
+
+
+def _join_bot_texts(texts: list[str]) -> str | None:
+    if not texts:
+        return None
+    return "\n\n".join(texts)
+
+
+def _message_has_media(message: Any) -> bool:
+    return bool(
+        getattr(message, "media", None)
+        or getattr(message, "document", None)
+        or getattr(message, "photo", None)
+    )
+
+
+def _can_download_media(client: TelegramBotClient) -> bool:
+    return callable(getattr(client, "download_message_media", None))
+
+
+def _original_file_name(message: Any) -> str | None:
+    document = getattr(message, "document", None)
+    for attribute in getattr(document, "attributes", []) or []:
+        file_name = getattr(attribute, "file_name", None)
+        if isinstance(file_name, str) and file_name.strip():
+            return _sanitize_windows_filename(file_name)
+    return None
+
+
+def _message_file_extension(message: Any, original_file_name: str | None) -> str:
+    if original_file_name:
+        extension = Path(original_file_name).suffix.lower()
+        if extension:
+            return extension
+
+    document = getattr(message, "document", None)
+    mime_type = (getattr(document, "mime_type", "") or "").lower()
+    if mime_type == "video/mp4":
+        return ".mp4"
+    if mime_type == "image/jpeg":
+        return ".jpg"
+    if mime_type == "image/png":
+        return ".png"
+    if mime_type == "image/webp":
+        return ".webp"
+    if getattr(message, "photo", None):
+        return ".jpg"
+    return ".bin"
+
+
+def _finalize_media_downloads(
+    download_folder: Path,
+    downloads: list[_MediaDownload],
+) -> list[Path]:
+    final_paths = [
+        download.path
+        for download in downloads
+        if download.path is not None and download.path.exists()
+    ]
+    provisional_paths = [
+        download
+        for download in downloads
+        if download.provisional_path is not None and download.provisional_path.exists()
+    ]
+
+    if final_paths:
+        for download in provisional_paths:
+            if download.provisional_path is not None:
+                download.provisional_path.unlink(missing_ok=True)
+        _cleanup_empty_temp_folders(download_folder)
+        return final_paths
+
+    promoted_paths: list[Path] = []
+    for download in provisional_paths:
+        if download.provisional_path is None:
+            continue
+        suffix = download.provisional_path.suffix or ".bin"
+        final_path = _unique_path(
+            download_folder,
+            f"{download.message_id or 'telegram_media'}{suffix}",
+        )
+        shutil.move(str(download.provisional_path), str(final_path))
+        download.path = final_path
+        download.provisional_path = None
+        promoted_paths.append(final_path)
+
+    _cleanup_empty_temp_folders(download_folder)
+    return promoted_paths
+
+
+def _cleanup_empty_temp_folders(download_folder: Path) -> None:
+    temp_folder = download_folder / "_tmp_telethon_downloads"
+    provisional_folder = temp_folder / "_provisional_no_original_name"
+    for folder in (provisional_folder, temp_folder):
+        try:
+            if folder.exists() and not any(folder.iterdir()):
+                folder.rmdir()
+        except OSError:
+            pass
+
+
+def _unique_path(folder: Path, filename: str) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    safe_name = _sanitize_windows_filename(filename)
+    candidate = folder / safe_name
+    if not candidate.exists():
+        return candidate
+
+    stem = candidate.stem
+    suffix = candidate.suffix
+    counter = 1
+    while True:
+        candidate = folder / f"{stem}_{counter}{suffix}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
+def _sanitize_windows_filename(filename: str) -> str:
+    clean_name = filename.strip()
+    for char in r'<>:"/\|?*':
+        clean_name = clean_name.replace(char, "_")
+    clean_name = re.sub(r"[\r\n\t]", "_", clean_name)
+    clean_name = clean_name.rstrip(" .")
+    return clean_name or "telegram_media"
 
 
 def _is_outgoing_message(message: Any) -> bool:

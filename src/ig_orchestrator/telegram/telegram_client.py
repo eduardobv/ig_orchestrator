@@ -126,6 +126,13 @@ class TelethonTelegramClient:
         messages.reverse()
         return messages
 
+    async def download_message_media(self, message: Any, destination: str) -> str | None:
+        """Download media from a bot message using Telethon."""
+
+        client = self._require_started_client()
+        downloaded_path = await client.download_media(message, file=destination)
+        return str(downloaded_path) if downloaded_path else None
+
     def _require_started_client(self) -> Any:
         if self._client is None:
             raise TelegramClientError("Telegram client is not started")

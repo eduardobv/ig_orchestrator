@@ -83,8 +83,8 @@ def render_markdown_report(report: MarkdownReport) -> str:
         "",
         f"Fecha y hora de ejecucion: {_format_datetime(report.executed_at)}",
         "",
-        "| Username | Tipo | Urls | Fichero | Estado | Directory |",
-        "|---|---|---|---|---|---|",
+        "| Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |",
+        "|---|---|---|---|---:|---|---|",
     ]
     for row in report.rows:
         lines.append(
@@ -95,6 +95,7 @@ def render_markdown_report(report: MarkdownReport) -> str:
                     _escape_cell(_format_publication_type(row.publication_type)),
                     _escape_cell(row.url),
                     _format_files_cell(row.files),
+                    str(len(row.files)),
                     _escape_cell(row.status),
                     _format_directories_cell(row.files),
                 )

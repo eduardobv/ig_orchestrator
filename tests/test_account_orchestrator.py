@@ -143,6 +143,36 @@ def test_account_orchestrator_retries_temporary_failures_fifo(
     assert stored.job_repo.get_by_id(second.id).retries == 0
 
 
+def test_account_orchestrator_retries_interrupted_waiting_download_job(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    interrupted = _create_job(
+        stored.job_repo,
+        stored.account.id,
+        UrlSource.INPUT_URL,
+        status=UrlJobStatus.WAITING_DOWNLOAD,
+    )
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {interrupted.id: [UrlJobStatus.COMPLETED]},
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        config=AccountOrchestratorConfig(max_retries=5),
+    )
+
+    result = asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert processor.calls == [interrupted.id]
+    assert result.account.status is AccountStatus.COMPLETED
+    assert stored.job_repo.get_by_id(interrupted.id).status is UrlJobStatus.COMPLETED
+
+
 def test_account_orchestrator_marks_partial_when_some_urls_fail_final(
     tmp_path: Path,
 ) -> None:
@@ -268,6 +298,8 @@ def _create_job(
     job_repo: UrlJobRepository,
     account_id: int,
     source: UrlSource,
+    *,
+    status: UrlJobStatus = UrlJobStatus.PENDING,
 ) -> UrlJob:
     return job_repo.create(
         UrlJob(
@@ -283,7 +315,7 @@ def _create_job(
                 else PublicationType.REEL
             ),
             source=source,
-            status=UrlJobStatus.PENDING,
+            status=status,
             max_retries=5,
         )
     )

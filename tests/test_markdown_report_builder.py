@@ -64,10 +64,10 @@ def test_render_markdown_report_formats_zero_and_multiple_files() -> None:
     markdown = render_markdown_report(report)
 
     assert "Fecha y hora de ejecucion: 2026-06-15T10:30:00+00:00" in markdown
-    assert "| Username | Tipo | Urls | Fichero | Estado | Directory |" in markdown
+    assert "| Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |" in markdown
     assert (
         "| example_user | Story | https://www.instagram.com/stories/example_user/ "
-        "| 0 files | FAILED_FINAL |  |"
+        "| 0 files | 0 | FAILED_FINAL |  |"
     ) in markdown
     assert "<br>- video.mp4<br>- cover.jpg" in markdown
     assert "<br>- working/example_user/reels<br>- working/example_user" in markdown
@@ -166,9 +166,9 @@ def test_markdown_report_builder_reads_sqlite_writes_file_and_updates_run(
     assert "Fecha y hora de ejecucion: 2026-06-15T12:00:00+00:00" in markdown
     assert (
         "| example_user | Story | https://www.instagram.com/stories/example_user/ "
-        "| 0 files | COMPLETED |  |"
+        "| 0 files | 0 | COMPLETED |  |"
     ) in markdown
     assert (
         "| example_user | Reel | https://www.instagram.com/reel/ABC123xyz/ "
-        "| <br>- video.mp4<br>- cover.jpg | COMPLETED "
+        "| <br>- video.mp4<br>- cover.jpg | 2 | COMPLETED "
     ) in markdown
