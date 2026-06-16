@@ -1,5 +1,22 @@
 # Changelog
 
+## Documentacion README operativa
+
+Fecha: 2026-06-16
+
+### Modificado
+
+* `README.md` para documentar configuracion, entorno, ejecucion por CLI y VS Code, flujo dry-run, flujo real previsto, SQLite, logs, descargas, reportes, errores, reintentos y responsabilidades por modulo.
+
+### Resumen
+
+El README ahora explica como preparar `.venv`, `.env`, `pyproject.toml`, batches JSON y sesiones Telethon, ademas de aclarar que el entrypoint actual soporta `--dry-run` y que la ejecucion real completa aun no esta cableada desde `main.py`.
+
+### Pruebas ejecutadas
+
+* `python -m ig_orchestrator --input config\batch.json --dry-run`
+* `python -m pytest -q`
+
 ## v1.21.0 - Tarea 21 - Tests minimos obligatorios
 
 Fecha: 2026-06-15

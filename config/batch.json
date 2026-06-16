@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "batch_name": "descargas_16_junio_2026",
+  "defaults": {
+    "download_stories": false,
+    "start_now_date": "2026-06-16"
+  },
+  "accounts": [
+    {
+      "username": "missess91",
+      "start_now_date": "2026-06-16",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZnUzdJAtiV/?img_index=1",
+        "https://www.instagram.com/p/DZkvEv7giQW/?img_index=1",
+        "https://www.instagram.com/p/DZiKAlNijMV/",
+        "https://www.instagram.com/p/DZflXg2gq2h/?img_index=1",
+        "https://www.instagram.com/p/DZdDDSHjjQl/?img_index=1"
+      ]
+    }
+  ]
+}
