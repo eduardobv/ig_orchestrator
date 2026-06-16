@@ -7,7 +7,7 @@
       "request": "launch",
       "module": "ig_orchestrator",
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
+      "console": "externalTerminal",
       "justMyCode": true,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src",
@@ -26,7 +26,7 @@
       "request": "launch",
       "module": "ig_orchestrator",
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
+      "console": "externalTerminal",
       "justMyCode": true,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src",
@@ -45,7 +45,7 @@
       "module": "pytest",
       "python": "${workspaceFolder}/.venv/Scripts/python.exe",
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
+      "console": "externalTerminal",
       "justMyCode": true,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src",
@@ -62,7 +62,7 @@
       "request": "launch",
       "module": "ig_orchestrator",
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
+      "console": "externalTerminal",
       "justMyCode": true,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src",
