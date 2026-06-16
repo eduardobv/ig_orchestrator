@@ -340,24 +340,28 @@ Para depurar:
 flowchart TD
     A[Usuario ejecuta python -m ig_orchestrator] --> B{Argumentos}
     B -->|init-db| C[Inicializar SQLite]
-    B -->|--input + --dry-run| D[Cargar .env]
+    B -->|--input| D[Cargar .env]
     D --> E[Inicializar SQLite]
-    E --> F[Parsear batch JSON]
+    E --> F[Parsear y validar batch JSON]
     F --> G[Importar batch a SQLite]
-    G --> H[Crear repositorios]
-    H --> I[BatchOrchestrator dry-run]
-    I --> J[AccountOrchestrator dry-run]
-    J --> K[Registrar que URLs se procesarian]
+    G --> H[Crear repositorios SQLite]
+    H --> I{Modo}
+    I -->|--dry-run| J[Crear orquestadores en modo simulacion]
+    J --> K[Registrar que cuentas y URLs se procesarian]
     K --> L[Actualizar runs simulados]
-    L --> M[Mostrar resumen en consola]
-    B -->|--input o --input + --run| N[Cargar .env]
-    N --> O[Inicializar SQLite]
-    O --> P[Importar batch JSON]
-    P --> Q[Arrancar Telethon]
-    Q --> R[Procesar batch real]
+    L --> M[Mostrar resumen dry-run en consola]
+    I -->|--run o sin --dry-run| N[Crear cliente Telethon y servicios reales]
+    N --> O[Arrancar sesion Telegram]
+    O --> P[Procesar batch real]
+    P --> Q[Enviar URLs al bot]
+    Q --> R[Esperar respuestas y descargas]
     R --> S[Mover archivos y guardar estados]
-    S --> T[Generar reporte Markdown]
+    S --> T[Aplicar reintentos si corresponde]
+    T --> U[Generar reporte Markdown]
+    U --> V[Mostrar resumen real en consola]
 ```
+
+Los dos modos comparten carga de `.env`, inicializacion de SQLite, validacion del JSON, importacion a SQLite y repositorios. La diferencia es que `--dry-run` se detiene en una simulacion trazable; `--run` arranca Telethon, habla con el bot, observa descargas, mueve archivos y escribe reporte.
 
 ## Flujo real entre modulos
 

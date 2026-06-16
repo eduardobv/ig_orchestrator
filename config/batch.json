@@ -7,15 +7,15 @@
   },
   "accounts": [
     {
-      "username": "missess91",
+      "username": "missess91_",
       "start_now_date": "2026-06-16",
-      "download_stories": true,
+      "download_stories": false,
       "urls": [
-        "https://www.instagram.com/p/DZnUzdJAtiV/?img_index=1",
-        "https://www.instagram.com/p/DZkvEv7giQW/?img_index=1",
-        "https://www.instagram.com/p/DZiKAlNijMV/",
-        "https://www.instagram.com/p/DZflXg2gq2h/?img_index=1",
-        "https://www.instagram.com/p/DZdDDSHjjQl/?img_index=1"
+        "https://www.instagram.com/p/DZpTgCLiIAt/?img_index=1",
+        "https://www.instagram.com/p/DZnd6jZIWR2/",
+        "https://www.instagram.com/p/DZmulbJIPyE/",
+        "https://www.instagram.com/p/DZe_eIViCw2/?img_index=1",
+        "https://www.instagram.com/p/DZccI9wInXQ/"
       ]
     }
   ]
