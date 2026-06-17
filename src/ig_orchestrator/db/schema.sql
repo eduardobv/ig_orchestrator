@@ -89,6 +89,24 @@ CREATE TABLE IF NOT EXISTS download_files (
     FOREIGN KEY(url_job_id) REFERENCES url_jobs(id)
 );
 
+CREATE TABLE IF NOT EXISTS duplicate_url_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER,
+    account_id INTEGER NOT NULL,
+    run_id INTEGER,
+    duplicate_of_url_job_id INTEGER,
+    url TEXT NOT NULL,
+    publication_type TEXT NOT NULL,
+    source TEXT NOT NULL,
+    occurrence_index INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(batch_id) REFERENCES input_batches(id),
+    FOREIGN KEY(account_id) REFERENCES accounts(id),
+    FOREIGN KEY(run_id) REFERENCES runs(id),
+    FOREIGN KEY(duplicate_of_url_job_id) REFERENCES url_jobs(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_input_batches_status ON input_batches(status);
 CREATE INDEX IF NOT EXISTS idx_accounts_batch_id ON accounts(batch_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status);
@@ -97,6 +115,10 @@ CREATE INDEX IF NOT EXISTS idx_url_jobs_run_id ON url_jobs(run_id);
 CREATE INDEX IF NOT EXISTS idx_url_jobs_status ON url_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_download_files_url_job_id ON download_files(url_job_id);
 CREATE INDEX IF NOT EXISTS idx_download_files_status ON download_files(status);
+CREATE INDEX IF NOT EXISTS idx_duplicate_url_jobs_batch_id ON duplicate_url_jobs(batch_id);
+CREATE INDEX IF NOT EXISTS idx_duplicate_url_jobs_account_id ON duplicate_url_jobs(account_id);
+CREATE INDEX IF NOT EXISTS idx_duplicate_url_jobs_run_id ON duplicate_url_jobs(run_id);
+CREATE INDEX IF NOT EXISTS idx_duplicate_url_jobs_duplicate_of ON duplicate_url_jobs(duplicate_of_url_job_id);
 CREATE INDEX IF NOT EXISTS idx_runs_batch_id ON runs(batch_id);
 CREATE INDEX IF NOT EXISTS idx_runs_account_id ON runs(account_id);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);

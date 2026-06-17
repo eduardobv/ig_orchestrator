@@ -25,8 +25,10 @@ from ig_orchestrator.models import (
 from ig_orchestrator.reports import (
     MarkdownReport,
     MarkdownReportBuilder,
+    MarkdownReportDuplicateRow,
     MarkdownReportFile,
     MarkdownReportRow,
+    MarkdownReportSummaryRow,
     render_markdown_report,
 )
 
@@ -35,14 +37,25 @@ def test_render_markdown_report_formats_zero_and_multiple_files() -> None:
     report = MarkdownReport(
         run_id=7,
         executed_at=datetime(2026, 6, 15, 10, 30, tzinfo=timezone.utc),
+        summary_rows=(
+            MarkdownReportSummaryRow(
+                username="example_user",
+                analyzed_urls=2,
+                unprocessed_urls=1,
+                duplicate_urls=1,
+                downloaded_files=2,
+            ),
+        ),
         rows=(
             MarkdownReportRow(
+                url_job_id=10,
                 username="example_user",
                 publication_type=PublicationType.STORY,
                 url="https://www.instagram.com/stories/example_user/",
                 status=UrlJobStatus.FAILED_FINAL.value,
             ),
             MarkdownReportRow(
+                url_job_id=11,
                 username="example_user",
                 publication_type=PublicationType.REEL,
                 url="https://www.instagram.com/reel/ABC123xyz/",
@@ -59,18 +72,35 @@ def test_render_markdown_report_formats_zero_and_multiple_files() -> None:
                 ),
             ),
         ),
+        duplicate_rows=(
+            MarkdownReportDuplicateRow(
+                username="example_user",
+                publication_type=PublicationType.REEL,
+                url="https://www.instagram.com/reel/ABC123xyz/",
+            ),
+        ),
     )
 
     markdown = render_markdown_report(report)
 
     assert "Fecha y hora de ejecucion: 2026-06-15T10:30:00+00:00" in markdown
-    assert "| Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |" in markdown
     assert (
-        "| example_user | Story | https://www.instagram.com/stories/example_user/ "
+        "| Numero | Username | Urls Analizadas | Urls no procesadas | "
+        "Urls duplicadas | Files descargados |"
+    ) in markdown
+    assert "| 1 | example_user | 2 | 1 | 1 | 2 |" in markdown
+    assert (
+        "| N | Id Job | Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |"
+        in markdown
+    )
+    assert (
+        "| 1 | 10 | example_user | Story | https://www.instagram.com/stories/example_user/ "
         "| 0 files | 0 | FAILED_FINAL |  |"
     ) in markdown
     assert "<br>- video.mp4<br>- cover.jpg" in markdown
     assert "<br>- working/example_user/reels<br>- working/example_user" in markdown
+    assert "## URLs duplicadas" in markdown
+    assert "| example_user | Reel | https://www.instagram.com/reel/ABC123xyz/ |" in markdown
 
 
 def test_markdown_report_builder_reads_sqlite_writes_file_and_updates_run(
@@ -153,6 +183,28 @@ def test_markdown_report_builder_reads_sqlite_writes_file_and_updates_run(
                 status=DownloadFileStatus.FINALIZED,
             )
         )
+        connection.execute(
+            """
+            INSERT INTO duplicate_url_jobs (
+                batch_id, account_id, run_id, duplicate_of_url_job_id, url,
+                publication_type, source, occurrence_index, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                account.batch_id,
+                account.id,
+                run.id,
+                reel_job.id,
+                "https://www.instagram.com/reel/ABC123xyz/",
+                PublicationType.REEL.value,
+                UrlSource.INPUT_URL.value,
+                3,
+                started_at.isoformat(),
+                started_at.isoformat(),
+            ),
+        )
+        connection.commit()
 
         report_path = MarkdownReportBuilder(connection).write(run.id, reports_folder)
         stored_run = run_repo.get_by_id(run.id)
@@ -164,11 +216,13 @@ def test_markdown_report_builder_reads_sqlite_writes_file_and_updates_run(
 
     markdown = report_path.read_text(encoding="utf-8")
     assert "Fecha y hora de ejecucion: 2026-06-15T12:00:00+00:00" in markdown
+    assert "| 1 | example_user | 2 | 0 | 1 | 2 |" in markdown
     assert (
-        "| example_user | Story | https://www.instagram.com/stories/example_user/ "
+        f"| 1 | {story_job.id} | example_user | Story | https://www.instagram.com/stories/example_user/ "
         "| 0 files | 0 | COMPLETED |  |"
     ) in markdown
     assert (
-        "| example_user | Reel | https://www.instagram.com/reel/ABC123xyz/ "
+        f"| 2 | {reel_job.id} | example_user | Reel | https://www.instagram.com/reel/ABC123xyz/ "
         "| <br>- video.mp4<br>- cover.jpg | 2 | COMPLETED "
     ) in markdown
+    assert "| example_user | Reel | https://www.instagram.com/reel/ABC123xyz/ |" in markdown

@@ -118,6 +118,10 @@ class AccountOrchestrator:
             batch_id=account.batch_id,
             account_id=account_id,
         )
+        jobs = self._url_job_repository.assign_unassigned_to_run_by_account(
+            account_id=account_id,
+            run_id=run.id,
+        )
         processed_job_ids: list[int] = []
         account_log_handle = None
 

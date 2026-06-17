@@ -176,9 +176,31 @@ def test_init_db_command_creates_schema_with_explicit_path(tmp_path: Path) -> No
         "input_batches",
         "accounts",
         "url_jobs",
+        "duplicate_url_jobs",
         "download_files",
         "runs",
     }.issubset(table_names)
+
+
+def test_init_database_adds_duplicate_url_jobs_table_to_existing_db(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "old.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("CREATE TABLE app_config (key TEXT PRIMARY KEY)")
+        connection.commit()
+
+    init_database(db_path)
+
+    with sqlite3.connect(db_path) as connection:
+        table_names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+
+    assert "duplicate_url_jobs" in table_names
 
 
 def test_batch_repository_lists_batches_with_resumable_work(tmp_path: Path) -> None:

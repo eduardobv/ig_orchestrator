@@ -22,6 +22,7 @@ class MarkdownReportFile:
 
 @dataclass(frozen=True, slots=True)
 class MarkdownReportRow:
+    url_job_id: int
     username: str
     publication_type: PublicationType
     url: str
@@ -30,10 +31,28 @@ class MarkdownReportRow:
 
 
 @dataclass(frozen=True, slots=True)
+class MarkdownReportSummaryRow:
+    username: str
+    analyzed_urls: int
+    unprocessed_urls: int
+    duplicate_urls: int
+    downloaded_files: int
+
+
+@dataclass(frozen=True, slots=True)
+class MarkdownReportDuplicateRow:
+    username: str
+    publication_type: PublicationType
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
 class MarkdownReport:
     run_id: int
     executed_at: datetime
     rows: tuple[MarkdownReportRow, ...]
+    summary_rows: tuple[MarkdownReportSummaryRow, ...] = ()
+    duplicate_rows: tuple[MarkdownReportDuplicateRow, ...] = ()
 
 
 class MarkdownReportBuilder:
@@ -50,10 +69,14 @@ class MarkdownReportBuilder:
             raise ValueError(f"Run not found: {run_id}")
 
         rows = _fetch_report_rows(self.connection, run_id)
+        summary_rows = _fetch_summary_rows(self.connection, run_id)
+        duplicate_rows = _fetch_duplicate_rows(self.connection, run_id)
         return MarkdownReport(
             run_id=run.id,
             executed_at=run.started_at,
             rows=tuple(rows),
+            summary_rows=tuple(summary_rows),
+            duplicate_rows=tuple(duplicate_rows),
         )
 
     def render(self, run_id: int) -> str:
@@ -83,14 +106,43 @@ def render_markdown_report(report: MarkdownReport) -> str:
         "",
         f"Fecha y hora de ejecucion: {_format_datetime(report.executed_at)}",
         "",
-        "| Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |",
-        "|---|---|---|---|---:|---|---|",
+        "## Resumen por username",
+        "",
+        "| Numero | Username | Urls Analizadas | Urls no procesadas | Urls duplicadas | Files descargados |",
+        "|---:|---|---:|---:|---:|---:|",
     ]
-    for row in report.rows:
+    for index, row in enumerate(report.summary_rows, start=1):
         lines.append(
             "| "
             + " | ".join(
                 (
+                    str(index),
+                    _escape_cell(row.username),
+                    str(row.analyzed_urls),
+                    str(row.unprocessed_urls),
+                    str(row.duplicate_urls),
+                    str(row.downloaded_files),
+                )
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Detalle",
+            "",
+        "| N | Id Job | Username | Tipo | Urls | Fichero | Cantidad | Estado | Directory |",
+        "|---:|---:|---|---|---|---|---:|---|---|",
+        ]
+    )
+    for index, row in enumerate(report.rows, start=1):
+        lines.append(
+            "| "
+            + " | ".join(
+                (
+                    str(index),
+                    str(row.url_job_id),
                     _escape_cell(row.username),
                     _escape_cell(_format_publication_type(row.publication_type)),
                     _escape_cell(row.url),
@@ -102,6 +154,31 @@ def render_markdown_report(report: MarkdownReport) -> str:
             )
             + " |"
         )
+
+    lines.extend(
+        [
+            "",
+            "## URLs duplicadas",
+            "",
+            "| Username | Tipo | Urls |",
+            "|---|---|---|",
+        ]
+    )
+    if report.duplicate_rows:
+        for row in report.duplicate_rows:
+            lines.append(
+                "| "
+                + " | ".join(
+                    (
+                        _escape_cell(row.username),
+                        _escape_cell(_format_publication_type(row.publication_type)),
+                        _escape_cell(row.url),
+                    )
+                )
+                + " |"
+            )
+    else:
+        lines.append("| 0 duplicates |  |  |")
     return "\n".join(lines) + "\n"
 
 
@@ -145,6 +222,7 @@ def _fetch_report_rows(
         job_id = row["url_job_id"]
         if job_id not in grouped:
             grouped[job_id] = MarkdownReportRow(
+                url_job_id=job_id,
                 username=row["username"],
                 publication_type=PublicationType(row["publication_type"]),
                 url=row["url"],
@@ -157,6 +235,7 @@ def _fetch_report_rows(
 
     return [
         MarkdownReportRow(
+            url_job_id=row.url_job_id,
             username=row.username,
             publication_type=row.publication_type,
             url=row.url,
@@ -165,6 +244,125 @@ def _fetch_report_rows(
         )
         for job_id, row in grouped.items()
     ]
+
+
+def _fetch_summary_rows(
+    connection: Connection,
+    run_id: int,
+) -> list[MarkdownReportSummaryRow]:
+    account_rows = _fetch_run_accounts(connection, run_id)
+    summary_rows: list[MarkdownReportSummaryRow] = []
+    for account_row in account_rows:
+        account_id = account_row["account_id"]
+        analyzed_urls = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM url_jobs
+            WHERE account_id = ?
+              AND (run_id IS NULL OR run_id = ?)
+            """,
+            (account_id, run_id),
+        ).fetchone()["count"]
+        unprocessed_urls = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM url_jobs
+            WHERE account_id = ?
+              AND (run_id IS NULL OR run_id = ?)
+              AND status NOT IN ('COMPLETED', 'FAILED_FINAL')
+            """,
+            (account_id, run_id),
+        ).fetchone()["count"]
+        duplicate_urls = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM duplicate_url_jobs
+            WHERE account_id = ?
+              AND (run_id IS NULL OR run_id = ?)
+            """,
+            (account_id, run_id),
+        ).fetchone()["count"]
+        downloaded_files = connection.execute(
+            """
+            SELECT COUNT(download_files.id) AS count
+            FROM url_jobs
+            JOIN download_files ON download_files.url_job_id = url_jobs.id
+            WHERE url_jobs.account_id = ?
+              AND (url_jobs.run_id IS NULL OR url_jobs.run_id = ?)
+            """,
+            (account_id, run_id),
+        ).fetchone()["count"]
+        summary_rows.append(
+            MarkdownReportSummaryRow(
+                username=account_row["username"],
+                analyzed_urls=analyzed_urls,
+                unprocessed_urls=unprocessed_urls,
+                duplicate_urls=duplicate_urls,
+                downloaded_files=downloaded_files,
+            )
+        )
+    return summary_rows
+
+
+def _fetch_duplicate_rows(
+    connection: Connection,
+    run_id: int,
+) -> list[MarkdownReportDuplicateRow]:
+    rows = connection.execute(
+        """
+        SELECT
+            accounts.username AS username,
+            duplicate_url_jobs.publication_type AS publication_type,
+            duplicate_url_jobs.url AS url
+        FROM duplicate_url_jobs
+        JOIN accounts ON accounts.id = duplicate_url_jobs.account_id
+        JOIN runs
+            ON (
+                (runs.account_id IS NOT NULL AND accounts.id = runs.account_id)
+                OR (
+                    runs.account_id IS NULL
+                    AND runs.batch_id IS NOT NULL
+                    AND accounts.batch_id = runs.batch_id
+                )
+            )
+        WHERE runs.id = ?
+          AND (
+              duplicate_url_jobs.run_id IS NULL
+              OR duplicate_url_jobs.run_id = runs.id
+          )
+        ORDER BY accounts.id, duplicate_url_jobs.id
+        """,
+        (run_id,),
+    ).fetchall()
+    return [
+        MarkdownReportDuplicateRow(
+            username=row["username"],
+            publication_type=PublicationType(row["publication_type"]),
+            url=row["url"],
+        )
+        for row in rows
+    ]
+
+
+def _fetch_run_accounts(connection: Connection, run_id: int) -> list[Row]:
+    return connection.execute(
+        """
+        SELECT accounts.id AS account_id, accounts.username AS username
+        FROM runs
+        JOIN accounts
+            ON (
+                (runs.account_id IS NOT NULL AND accounts.id = runs.account_id)
+                OR (
+                    runs.account_id IS NULL
+                    AND runs.batch_id IS NOT NULL
+                    AND accounts.batch_id = runs.batch_id
+                )
+            )
+        WHERE runs.id = ?
+        ORDER BY accounts.id
+        """,
+        (run_id,),
+    ).fetchall()
 
 
 def _row_to_report_file(row: Row) -> MarkdownReportFile | None:
@@ -222,7 +420,9 @@ def _unique_report_path(reports_folder: Path, report: MarkdownReport) -> Path:
 __all__ = [
     "MarkdownReport",
     "MarkdownReportBuilder",
+    "MarkdownReportDuplicateRow",
     "MarkdownReportFile",
     "MarkdownReportRow",
+    "MarkdownReportSummaryRow",
     "render_markdown_report",
 ]

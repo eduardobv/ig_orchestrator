@@ -1,5 +1,63 @@
 # Changelog
 
+## v1.21.5 - Patch - Resumen de reporte y duplicados persistidos
+
+Fecha: 2026-06-17
+
+### Creado
+
+* Tabla `duplicate_url_jobs` para persistir URLs duplicadas detectadas durante la importacion.
+* Tests para migracion/creacion de la tabla de duplicados en SQLite.
+* Tests para importar duplicados de forma idempotente y reconstruirlos en reportes.
+
+### Modificado
+
+* `src/ig_orchestrator/db/schema.sql` para crear `duplicate_url_jobs` e indices relacionados con `batch_id`, `account_id`, `run_id` y `duplicate_of_url_job_id`.
+* `src/ig_orchestrator/input/batch_json_parser.py` para conservar ocurrencias duplicadas ademas de las URLs unicas procesables.
+* `src/ig_orchestrator/input/batch_importer.py` para guardar duplicados y enlazarlos al `url_job` original.
+* `src/ig_orchestrator/db/url_job_repository.py` para asociar duplicados sin `run_id` a la ejecucion actual.
+* `src/ig_orchestrator/reports/markdown_report_builder.py` para agregar resumen por username y tabla final de URLs duplicadas.
+* `src/ig_orchestrator/reports/__init__.py` y `src/ig_orchestrator/input/__init__.py` para exponer los nuevos DTOs.
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.21.5`.
+
+### Resumen
+
+El reporte de ejecucion incluye ahora un resumen superior por username con URLs
+analizadas, URLs no procesadas, URLs duplicadas y archivos descargados. Las
+URLs duplicadas quedan persistidas en SQLite y se muestran al final del reporte
+en una tabla separada, de forma reconstruible aunque una ejecucion se corte y se
+reanude.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_markdown_report_builder.py tests\test_batch_importer.py tests\test_batch_json_parser.py tests\test_db_repositories.py tests\test_account_orchestrator.py tests\test_batch_orchestrator.py`
+
+## v1.21.4 - Patch - Trazabilidad de run_id y reporte con id de job
+
+Fecha: 2026-06-17
+
+### Creado
+
+* Tests para verificar que los `url_jobs` quedan asociados al run de cuenta y al run de batch.
+
+### Modificado
+
+* `src/ig_orchestrator/reports/markdown_report_builder.py` para agregar las columnas `N` e `Id Job` al reporte Markdown.
+* `src/ig_orchestrator/db/url_job_repository.py` para asociar jobs sin `run_id` a una ejecucion.
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` y `src/ig_orchestrator/orchestration/batch_orchestrator.py` para registrar `run_id` al iniciar una ejecucion sin sobrescribir jobs ya asociados.
+* `src/ig_orchestrator/__init__.py`, `pyproject.toml` y `tests/test_package_smoke.py` para actualizar la version a `1.21.4`.
+
+### Resumen
+
+Los reportes de ejecucion incluyen ahora una correlacion secuencial `N` y el
+identificador real de `url_jobs.id`. Al iniciar un run, los `url_jobs` que aun
+no tienen `run_id` quedan vinculados a la ejecucion actual, preservando
+asociaciones previas.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests\test_markdown_report_builder.py tests\test_account_orchestrator.py tests\test_batch_orchestrator.py tests\test_batch_importer.py tests\test_batch_json_parser.py`
+
 ## v1.21.3 - Patch - Modo run_continue y deduplicacion de descargas
 
 Fecha: 2026-06-16

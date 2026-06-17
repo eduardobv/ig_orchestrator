@@ -1,6 +1,7 @@
 from ig_orchestrator.input.batch_json_parser import (
     ParsedBatch,
     ParsedBatchAccount,
+    ParsedDuplicateUrl,
     BatchJsonParserError,
     parse_batch_json,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "BatchImportResult",
     "ParsedBatch",
     "ParsedBatchAccount",
+    "ParsedDuplicateUrl",
     "UrlClassifierError",
     "build_story_url",
     "classify_instagram_url",

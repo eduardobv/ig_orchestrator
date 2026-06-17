@@ -106,6 +106,8 @@ def test_account_orchestrator_processes_generated_story_before_manual_urls(
     assert result.account.status is AccountStatus.COMPLETED
     assert result.summary.status is RunStatus.COMPLETED
     assert (tmp_path / "working" / "example_user" / "story").is_dir()
+    assert stored.job_repo.get_by_id(story.id).run_id == result.run.id
+    assert stored.job_repo.get_by_id(manual.id).run_id == result.run.id
 
 
 def test_account_orchestrator_retries_temporary_failures_fifo(

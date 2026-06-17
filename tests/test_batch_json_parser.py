@@ -103,6 +103,10 @@ def test_parse_removes_duplicate_urls_within_same_account(tmp_path: Path) -> Non
         "https://www.instagram.com/reel/ABC123xyz/",
         "https://www.instagram.com/p/XYZ789abc/",
     )
+    assert [
+        (duplicate.url, duplicate.occurrence_index)
+        for duplicate in parsed.accounts[0].duplicate_urls
+    ] == [("https://www.instagram.com/reel/ABC123xyz/", 2)]
 
 
 def test_parse_rejects_invalid_date_with_account_context(tmp_path: Path) -> None:

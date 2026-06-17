@@ -16,11 +16,18 @@ class BatchJsonParserError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedDuplicateUrl:
+    url: str
+    occurrence_index: int
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedBatchAccount:
     username: str
     start_now_date: date
     download_stories: bool
     urls: tuple[str, ...]
+    duplicate_urls: tuple[ParsedDuplicateUrl, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +95,7 @@ def _parse_account(
         context,
         default=False,
     )
-    urls = _parse_urls(raw_account.get("urls", []), context, username)
+    urls, duplicate_urls = _parse_urls(raw_account.get("urls", []), context, username)
 
     if not urls and not download_stories:
         raise BatchJsonParserError(
@@ -100,6 +107,7 @@ def _parse_account(
         start_now_date=start_now_date,
         download_stories=download_stories,
         urls=tuple(urls),
+        duplicate_urls=tuple(duplicate_urls),
     )
 
 
@@ -161,11 +169,16 @@ def _parse_inherited_bool(
     return value
 
 
-def _parse_urls(value: Any, context: str, username: str) -> list[str]:
+def _parse_urls(
+    value: Any,
+    context: str,
+    username: str,
+) -> tuple[list[str], list[ParsedDuplicateUrl]]:
     if not isinstance(value, list):
         raise BatchJsonParserError(f"{context}.urls must be a list")
 
     urls: list[str] = []
+    duplicate_urls: list[ParsedDuplicateUrl] = []
     seen: set[str] = set()
     for index, raw_url in enumerate(value, start=1):
         url_context = f"{context}.urls[{index}]"
@@ -178,7 +191,11 @@ def _parse_urls(value: Any, context: str, username: str) -> list[str]:
         if normalized not in seen:
             urls.append(normalized)
             seen.add(normalized)
-    return urls
+        else:
+            duplicate_urls.append(
+                ParsedDuplicateUrl(url=normalized, occurrence_index=index)
+            )
+    return urls, duplicate_urls
 
 
 def _validate_instagram_url(url: str, context: str, username: str) -> None:

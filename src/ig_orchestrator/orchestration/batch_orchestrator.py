@@ -91,6 +91,12 @@ class BatchOrchestrator:
             ),
             batch_id=batch_id,
         )
+        for account in accounts:
+            if account.id is not None:
+                self._url_job_repository.assign_unassigned_to_run_by_account(
+                    account_id=account.id,
+                    run_id=run.id,
+                )
         account_results: list[AccountOrchestratorResult] = []
 
         try:

@@ -92,7 +92,7 @@ def test_batch_orchestrator_processes_pending_accounts_and_marks_completed(
     stored = _stored_batch(tmp_path)
     first = _create_account(stored, "first", AccountStatus.PENDING)
     skipped = _create_account(stored, "skipped", AccountStatus.COMPLETED)
-    _create_job(stored.job_repo, first.id)
+    first_job = _create_job(stored.job_repo, first.id)
     skipped_job = _create_job(stored.job_repo, skipped.id)
     stored.job_repo.update_status(skipped_job.id, UrlJobStatus.COMPLETED)
     fake = FakeAccountOrchestrator(
@@ -109,6 +109,8 @@ def test_batch_orchestrator_processes_pending_accounts_and_marks_completed(
     assert result.batch.status is InputBatchStatus.COMPLETED
     assert result.summary.status is RunStatus.COMPLETED
     assert result.summary.completed_urls == 2
+    assert stored.job_repo.get_by_id(first_job.id).run_id == result.run.id
+    assert stored.job_repo.get_by_id(skipped_job.id).run_id == result.run.id
 
 
 def test_batch_orchestrator_resumes_processing_accounts(

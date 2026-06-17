@@ -69,6 +69,40 @@ class UrlJobRepository:
         ).fetchall()
         return [_row_to_url_job(row) for row in rows]
 
+    def assign_unassigned_to_run_by_account(
+        self,
+        *,
+        account_id: int,
+        run_id: int,
+    ) -> list[UrlJob]:
+        if account_id <= 0:
+            raise ValueError("account_id must be positive")
+        if run_id <= 0:
+            raise ValueError("run_id must be positive")
+
+        self.connection.execute(
+            """
+            UPDATE url_jobs
+            SET run_id = ?,
+                updated_at = datetime('now')
+            WHERE account_id = ?
+              AND run_id IS NULL
+            """,
+            (run_id, account_id),
+        )
+        self.connection.execute(
+            """
+            UPDATE duplicate_url_jobs
+            SET run_id = ?,
+                updated_at = datetime('now')
+            WHERE account_id = ?
+              AND run_id IS NULL
+            """,
+            (run_id, account_id),
+        )
+        self.connection.commit()
+        return self.list_by_account(account_id)
+
     def update_status(
         self,
         job_id: int,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from sqlite3 import Connection, Row
 
@@ -109,6 +110,27 @@ def import_parsed_batch(
                     source=UrlSource.INPUT_URL,
                     max_retries=settings.max_retries if settings is not None else None,
                 )
+            )
+
+        for duplicate_url in parsed_account.duplicate_urls:
+            original_job = _get_or_create_url_job(
+                connection,
+                url_job_repo,
+                account_id=_required_id("account", account.id),
+                url=duplicate_url.url,
+                publication_type=classify_instagram_url(duplicate_url.url),
+                source=UrlSource.INPUT_URL,
+                max_retries=settings.max_retries if settings is not None else None,
+            )
+            _get_or_create_duplicate_url_job(
+                connection,
+                batch_id=_required_id("batch", batch.id),
+                account_id=_required_id("account", account.id),
+                duplicate_of_url_job_id=_required_id("url_job", original_job.id),
+                url=duplicate_url.url,
+                publication_type=original_job.publication_type,
+                source=UrlSource.INPUT_URL,
+                occurrence_index=duplicate_url.occurrence_index,
             )
 
     return BatchImportResult(
@@ -267,6 +289,73 @@ def _get_or_create_url_job(
             max_retries=max_retries,
         )
     )
+
+
+def _get_or_create_duplicate_url_job(
+    connection: Connection,
+    *,
+    batch_id: int,
+    account_id: int,
+    duplicate_of_url_job_id: int,
+    url: str,
+    publication_type: PublicationType,
+    source: UrlSource,
+    occurrence_index: int,
+) -> None:
+    row = connection.execute(
+        """
+        SELECT id FROM duplicate_url_jobs
+        WHERE account_id = ?
+          AND url = ?
+          AND source = ?
+          AND occurrence_index = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (account_id, url, source.value, occurrence_index),
+    ).fetchone()
+    if row is not None:
+        connection.execute(
+            """
+            UPDATE duplicate_url_jobs
+            SET batch_id = ?,
+                duplicate_of_url_job_id = ?,
+                publication_type = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                batch_id,
+                duplicate_of_url_job_id,
+                publication_type.value,
+                _row_id(row),
+            ),
+        )
+        connection.commit()
+        return
+
+    now = datetime.now(timezone.utc).isoformat()
+    connection.execute(
+        """
+        INSERT INTO duplicate_url_jobs (
+            batch_id, account_id, duplicate_of_url_job_id, url,
+            publication_type, source, occurrence_index, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            batch_id,
+            account_id,
+            duplicate_of_url_job_id,
+            url,
+            publication_type.value,
+            source.value,
+            occurrence_index,
+            now,
+            now,
+        ),
+    )
+    connection.commit()
 
 
 def _required_id(entity_name: str, value: int | None) -> int:

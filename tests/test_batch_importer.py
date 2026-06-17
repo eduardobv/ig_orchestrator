@@ -88,6 +88,55 @@ def test_reimporting_same_batch_does_not_duplicate_accounts_or_urls(
         assert len(jobs) == 5
 
 
+def test_import_batch_persists_duplicate_urls_idempotently(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    batch_path = tmp_path / "batch.json"
+    batch_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "batch_name": "duplicated_urls",
+                "defaults": {
+                    "download_stories": False,
+                    "start_now_date": "2026-06-04",
+                },
+                "accounts": [
+                    {
+                        "username": "example_user",
+                        "urls": [
+                            "https://www.instagram.com/reel/ABC123xyz/",
+                            "https://www.instagram.com/reel/ABC123xyz/",
+                            "https://www.instagram.com/p/XYZ789abc/",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        first_result = import_batch_json(batch_path, connection)
+        second_result = import_batch_json(batch_path, connection)
+
+        account = first_result.accounts[0]
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+        duplicate_rows = connection.execute(
+            "SELECT * FROM duplicate_url_jobs ORDER BY id"
+        ).fetchall()
+
+        assert first_result.batch.id == second_result.batch.id
+        assert len(jobs) == 2
+        assert len(duplicate_rows) == 1
+        assert duplicate_rows[0]["account_id"] == account.id
+        assert duplicate_rows[0]["duplicate_of_url_job_id"] == jobs[0].id
+        assert duplicate_rows[0]["url"] == "https://www.instagram.com/reel/ABC123xyz/"
+        assert duplicate_rows[0]["occurrence_index"] == 2
+
+
 def test_import_batch_stores_operational_config_when_settings_are_provided(
     tmp_path: Path,
 ) -> None:
