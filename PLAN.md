@@ -1319,6 +1319,7 @@ git tag v1.1.1
 |---|---|---:|---|
 | 22 | `tasks/Tarea22.md` | v1.22.0 | Integracion con script actual de renombrado |
 | 23 | `tasks/Tarea23.md` | v1.23.0 | Duplicados del renombrador y movimiento final |
+| 24 | `tasks/Tarea24.md` | v1.24.0 | Identidad de lotes, join de pendientes, historico y JSON reutilizable |
 
 ### Tareas opcionales posteriores
 

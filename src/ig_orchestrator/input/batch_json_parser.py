@@ -31,11 +31,19 @@ class ParsedBatchAccount:
 
 
 @dataclass(frozen=True, slots=True)
+class IgnoredBatchAccount:
+    username: str
+    reason: str
+    account_index: int
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedBatch:
     schema_version: str
     batch_name: str
     accounts: tuple[ParsedBatchAccount, ...]
     source_file: Path
+    ignored_accounts: tuple[IgnoredBatchAccount, ...] = ()
 
 
 def parse_batch_json(path: str | Path) -> ParsedBatch:
@@ -64,27 +72,42 @@ def parse_batch_json(path: str | Path) -> ParsedBatch:
     if not raw_accounts:
         raise BatchJsonParserError("batch.accounts must contain at least one account")
 
-    parsed_accounts = tuple(
-        _parse_account(account, index, defaults)
-        for index, account in enumerate(raw_accounts, start=1)
-    )
+    parsed_accounts: list[ParsedBatchAccount] = []
+    ignored_accounts: list[IgnoredBatchAccount] = []
+    for index, raw_account in enumerate(raw_accounts, start=1):
+        parsed_account, ignored_account = _parse_account(raw_account, index, defaults)
+        if parsed_account is not None:
+            parsed_accounts.append(parsed_account)
+        if ignored_account is not None:
+            ignored_accounts.append(ignored_account)
 
     return ParsedBatch(
         schema_version=schema_version,
         batch_name=batch_name,
-        accounts=parsed_accounts,
+        accounts=tuple(parsed_accounts),
         source_file=source_file,
+        ignored_accounts=tuple(ignored_accounts),
     )
 
 
 def _parse_account(
     raw_account: Any, index: int, defaults: dict[str, Any]
-) -> ParsedBatchAccount:
+) -> tuple[ParsedBatchAccount | None, IgnoredBatchAccount | None]:
     context = f"accounts[{index}]"
     if not isinstance(raw_account, dict):
         raise BatchJsonParserError(f"{context} must be an object")
 
-    username = _required_non_blank_string(raw_account, "username", context)
+    raw_username = raw_account.get("username")
+    if not isinstance(raw_username, str):
+        raise BatchJsonParserError(f"{context}.username must be a string")
+    username = raw_username.strip()
+    if not username:
+        return None, IgnoredBatchAccount(
+            username="",
+            reason="blank username",
+            account_index=index,
+        )
+
     start_now_date = _parse_inherited_date(
         raw_account, defaults, "start_now_date", context
     )
@@ -98,16 +121,21 @@ def _parse_account(
     urls, duplicate_urls = _parse_urls(raw_account.get("urls", []), context, username)
 
     if not urls and not download_stories:
-        raise BatchJsonParserError(
-            f"{context}.urls must contain at least one URL when download_stories is false"
+        return None, IgnoredBatchAccount(
+            username=username,
+            reason="download_stories is false and there are no URLs",
+            account_index=index,
         )
 
-    return ParsedBatchAccount(
-        username=username,
-        start_now_date=start_now_date,
-        download_stories=download_stories,
-        urls=tuple(urls),
-        duplicate_urls=tuple(duplicate_urls),
+    return (
+        ParsedBatchAccount(
+            username=username,
+            start_now_date=start_now_date,
+            download_stories=download_stories,
+            urls=tuple(urls),
+            duplicate_urls=tuple(duplicate_urls),
+        ),
+        None,
     )
 
 
@@ -186,7 +214,7 @@ def _parse_urls(
             raise BatchJsonParserError(f"{url_context} must be a string")
         normalized = raw_url.strip()
         if not normalized:
-            raise BatchJsonParserError(f"{url_context} must not be blank")
+            continue
         _validate_instagram_url(normalized, url_context, username)
         if normalized not in seen:
             urls.append(normalized)

@@ -1,0 +1,365 @@
+{
+  "schema_version": "1.0",
+  "batch_name": "descargas_21_junio_2026",
+  "defaults": {
+    "download_stories": false,
+    "start_now_date": "2026-06-21"
+  },
+  "accounts": [
+    {
+      "username": "lerabuns",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0U6OqR2EH/"
+      ]
+    },
+    {
+      "username": "lera.berry",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0Rt0xR5W4/"
+      ]
+    },
+    {
+      "username": "leraferal",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": [
+        "https://www.instagram.com/p/DZ0bTNjGA62/?img_index=1"
+      ]
+    },
+    {
+      "username": "lerochkaferal",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": [
+        "https://www.instagram.com/p/DZ0XjZxJheY/"
+      ]
+    },
+    {
+      "username": "christin__blck",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0YcTHjdpB/?img_index=1",
+        "https://www.instagram.com/p/DZxvncJNOlD/"
+      ]
+    },
+    {
+      "username": "lady__christin",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": [
+        "https://www.instagram.com/p/DZ0OVx6ilMI/?img_index=1",
+        "https://www.instagram.com/p/DZxybAZDsZp/?img_index=1",
+        "https://www.instagram.com/p/DZvkb9guCvC/"
+      ]
+    },
+    {
+      "username": "lera_sky_teacher",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0QGuQjJR0/?img_index=1",
+        "https://www.instagram.com/p/DZxYZHgM6L8/",
+        "https://www.instagram.com/p/DZkVRFVDEWn/?img_index=1"
+      ]
+    },
+    {
+      "username": "lau.barreirooo",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "iarabroinn",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0KOsPRe7m/"
+      ]
+    },
+    {
+      "username": "superlisha",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "irene_fit14",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "fainka.mini",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZzwW24sPP-/",
+        "https://www.instagram.com/p/DZzPXFnMoLk/"
+      ]
+    },
+    {
+      "username": "annakonda_fit",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "lilyylanes",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0DT2Wplv_/"
+      ]
+    },
+    {
+      "username": "cutielanes",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0MDWZB1E5/",
+        "https://www.instagram.com/p/DZ0Bjo7OvPd/"
+      ]
+    },
+    {
+      "username": "eliolive__",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0ctgftnqD/",
+        "https://www.instagram.com/p/DZz9LsKNkw2/"
+      ]
+    },
+    {
+      "username": "eliretos21",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": [
+        "https://www.instagram.com/p/DZxTR8moD7D/"
+      ]
+    },
+    {
+      "username": "adriannaeves",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0QBTyunoj/",
+        "https://www.instagram.com/p/DZNo0Z5OBCj/"
+      ]
+    },
+    {
+      "username": "alfredoalcarazz",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ0hSYhBHtt/",
+        "https://www.instagram.com/p/DZ0hJg-Bur0/"
+      ]
+    },
+    {
+      "username": "salahova",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DZ1_6-fDIma/?img_index=1"
+      ]
+    },
+    {
+      "username": "_patriba",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "kristina.smekhovich",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "dasha.angel",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/reel/C9wtjHGRXwX/",
+        "https://www.instagram.com/reel/DDUktVHvSJt/",
+        "https://www.instagram.com/reel/DE7ZS9EppVM/",
+        "https://www.instagram.com/reel/DFiLKeXyK5h/",
+        "https://www.instagram.com/reel/DGEAYisSLNq/",
+        "https://www.instagram.com/reel/DGYnqaZS3Mm/",
+        "https://www.instagram.com/reel/DJhY7XaSyaf/",
+        "https://www.instagram.com/reel/DJnJerAx5BI/",
+        "https://www.instagram.com/reel/DJwxInZyeN7/",
+        "https://www.instagram.com/reel/DKo5g7xR6sz/",
+        "https://www.instagram.com/reel/DK8EDW9zvJP/",
+        "https://www.instagram.com/reel/DLAGYt5SrnM/",
+        "https://www.instagram.com/reel/DLAQiuES4d9/",
+        "https://www.instagram.com/reel/DLETehpxEvm/",
+        "https://www.instagram.com/reel/DLEYdfVxfjX/",
+        "https://www.instagram.com/reel/DLIVYdIRdLL/",
+        "https://www.instagram.com/reel/DLjIBeKIMrA/",
+        "https://www.instagram.com/reel/DLqIqaWIiKe/",
+        "https://www.instagram.com/reel/DLsLexzokhg/",
+        "https://www.instagram.com/reel/DLvQv0GI9oB/",
+        "https://www.instagram.com/reel/DMBGQ_ZINwk/",
+        "https://www.instagram.com/reel/DMBbbWIoV8J/",
+        "https://www.instagram.com/reel/DMWNGDPI7IU/",
+        "https://www.instagram.com/reel/DMh4kvNIvjA/",
+        "https://www.instagram.com/reel/DMiUDtuI0n8/",
+        "https://www.instagram.com/reel/DNQideIS6UW/",
+        "https://www.instagram.com/reel/DNQi8gySnCe/",
+        "https://www.instagram.com/reel/DNTWfZDy3uT/",
+        "https://www.instagram.com/reel/DNXu7oeRkUE/",
+        "https://www.instagram.com/reel/DNm2SmwxrNB/",
+        "https://www.instagram.com/reel/DNvXCd5YpCM/",
+        "https://www.instagram.com/reel/DOL4-TXEZkJ/",
+        "https://www.instagram.com/reel/DOtTqjREQgT/",
+        "https://www.instagram.com/reel/DO6hsBzE0n4/",
+        "https://www.instagram.com/reel/DPCE2W3E5fe/",
+        "https://www.instagram.com/reel/DQHhz0zE-8e/",
+        "https://www.instagram.com/reel/DQebdb1k91y/",
+        "https://www.instagram.com/reel/DQ-k2evk_kr/",
+        "https://www.instagram.com/reel/DRBSH6IEY6-/",
+        "https://www.instagram.com/reel/DR-TTBRE4Na/",
+        "https://www.instagram.com/reel/DSVMSamEwqe/",
+        "https://www.instagram.com/reel/DUHMF2rk29-/",
+        "https://www.instagram.com/reel/DUgSZwvk6ti/",
+        "https://www.instagram.com/reel/DUgSyAYkwGO/",
+        "https://www.instagram.com/reel/DV9rD5tk3_1/",
+        "https://www.instagram.com/reel/DV9te2kE2Xt/",
+        "https://www.instagram.com/reel/DWkTioNE23H/",
+        "https://www.instagram.com/reel/DWIKCXfghTG/",
+        "https://www.instagram.com/reel/DWKnufrE2L6/",
+        "https://www.instagram.com/reel/DWU0B7Yk1vN/",
+        "https://www.instagram.com/reel/DWecyVjgqwV/",
+        "https://www.instagram.com/reel/DWkTIKtE4Hx/",
+        "https://www.instagram.com/reel/DWC9reCk2hz/",
+        "https://www.instagram.com/reel/DWpHzUXk-SI/",
+        "https://www.instagram.com/reel/DXR2vdWEaGh/",
+        "https://www.instagram.com/reel/DXUc_lZAqcq/",
+        "https://www.instagram.com/reel/DXXHU4cAnjj/",
+        "https://www.instagram.com/reel/DXdEnSvE-ox/",
+        "https://www.instagram.com/reel/DXex6i6EUo5/",
+        "https://www.instagram.com/reel/DXhUZjCkUvv/",
+        "https://www.instagram.com/reel/DXiDuNeExVm/",
+        "https://www.instagram.com/reel/DXj0zhbkeWo/",
+        "https://www.instagram.com/reel/DXo7I3jEd0J/",
+        "https://www.instagram.com/reel/DXp5TCNE9hm/",
+        "https://www.instagram.com/reel/DXw1hUXRL8X/",
+        "https://www.instagram.com/reel/DXzYYrFR9lr/",
+        "https://www.instagram.com/reel/DX2Ru51z8-K/",
+        "https://www.instagram.com/reel/DX5HcauTRz0/",
+        "https://www.instagram.com/reel/DX7Rgi4z0KU/",
+        "https://www.instagram.com/reel/DYBIPAiCX82/",
+        "https://www.instagram.com/reel/DYKtXeiTnjr/",
+        "https://www.instagram.com/reel/DYM5CuQRGUu/",
+        "https://www.instagram.com/reel/DYTCWt3zWVz/",
+        "https://www.instagram.com/reel/DYXV1eVRwZg/",
+        "https://www.instagram.com/reel/DYfQ-m-ChvQ/",
+        "https://www.instagram.com/reel/DZIwoUKTOB-/",
+        "https://www.instagram.com/reel/DZTEtuZxSOA/",
+        "https://www.instagram.com/reel/DZVmorvxE0H/",
+        "https://www.instagram.com/reel/DZlYhveK7YQ/",
+        "https://www.instagram.com/reel/DZs-O9jCadk/",
+        "https://www.instagram.com/reel/DZyDvJdRCf_/",
+        "https://www.instagram.com/p/C-f2XRnxPE5/?img_index=1",
+        "https://www.instagram.com/p/C-ne0-sxAnB/?img_index=1",
+        "https://www.instagram.com/p/C-vFgMzxLIe/?img_index=1",
+        "https://www.instagram.com/p/C-3DVXcxVDa/?img_index=1",
+        "https://www.instagram.com/p/C--7K_iSS5k/?img_index=1",
+        "https://www.instagram.com/p/C_D27i7PB-b/?img_index=1",
+        "https://www.instagram.com/p/C_Ixh-dSOCp/?img_index=1",
+        "https://www.instagram.com/p/DAbMY1iybMK/?img_index=1",
+        "https://www.instagram.com/p/DAisLIFyc_x/",
+        "https://www.instagram.com/p/DCwuzWOSgpR/?img_index=1",
+        "https://www.instagram.com/p/DDsAgbfyzm4/",
+        "https://www.instagram.com/p/DE7aS_HJgRj/?img_index=1",
+        "https://www.instagram.com/p/DFAw9n1vtDo/?img_index=1",
+        "https://www.instagram.com/p/DFVJ2B-prKq/?img_index=1",
+        "https://www.instagram.com/p/DFX5_OfoVZW/?img_index=1",
+        "https://www.instagram.com/p/DFnk3OUyfNx/?img_index=1",
+        "https://www.instagram.com/p/DF3LmC-yNRW/?img_index=1",
+        "https://www.instagram.com/p/DGDuO1xSIre/?img_index=1",
+        "https://www.instagram.com/p/DGNvPJOSPuG/?img_index=1",
+        "https://www.instagram.com/p/DGTVXCnSE6o/?img_index=1",
+        "https://www.instagram.com/p/DGgBQpUS7ui/?img_index=1",
+        "https://www.instagram.com/p/DGns3x9iCxZ/?img_index=1",
+        "https://www.instagram.com/p/DG0oOHYyAKv/?img_index=1",
+        "https://www.instagram.com/p/DG3RJOxSZso/?img_index=1",
+        "https://www.instagram.com/p/DHBcGjmSe-j/?img_index=1",
+        "https://www.instagram.com/p/DHFcCU-yeL0/?img_index=1",
+        "https://www.instagram.com/p/DHKWLo9S9nC/?img_index=1",
+        "https://www.instagram.com/p/DHOXmzEiTH-/?img_index=1",
+        "https://www.instagram.com/p/DHdSWqKCfcD/?img_index=1",
+        "https://www.instagram.com/p/DHx8cQ8ia0l/?img_index=1",
+        "https://www.instagram.com/p/DH1Lx38ChgB/?img_index=1",
+        "https://www.instagram.com/p/DIGyXGtin6I/?img_index=1",
+        "https://www.instagram.com/p/DIYDuc4iQYJ/?img_index=1",
+        "https://www.instagram.com/p/DItSWr-i7w-/?img_index=1",
+        "https://www.instagram.com/p/DI65rbIiR3m/?img_index=1",
+        "https://www.instagram.com/p/DJHYvbNi7pc/?img_index=1",
+        "https://www.instagram.com/p/DKW34SQR0c6/?img_index=1",
+        "https://www.instagram.com/p/DKZcsQ_xGw1/?img_index=1",
+        "https://www.instagram.com/p/DKpGtN3yZRL/?img_index=1",
+        "https://www.instagram.com/p/DLASrE2S0Ws/",
+        "https://www.instagram.com/p/DNp-DTMR4OQ/?img_index=1",
+        "https://www.instagram.com/p/DNspJNgYvXS/?img_index=1",
+        "https://www.instagram.com/p/DOTV9eaEdsb/?img_index=1",
+        "https://www.instagram.com/p/DOVZuaREeQz/?img_index=1",
+        "https://www.instagram.com/p/DOY9yPZkzkw/?img_index=1",
+        "https://www.instagram.com/p/DOyoguDk_sf/?img_index=1",
+        "https://www.instagram.com/p/DO3Rn5jkYrO/?img_index=1",
+        "https://www.instagram.com/p/DO6KS3wEQPR/?img_index=1",
+        "https://www.instagram.com/p/DPBxojdkfpE/?img_index=1",
+        "https://www.instagram.com/p/DPedJRrE1E3/?img_index=1",
+        "https://www.instagram.com/p/DPhDbcREaCr/?img_index=1",
+        "https://www.instagram.com/p/DPjlV-fEcHf/?img_index=1",
+        "https://www.instagram.com/p/DPluVNnkXud/?img_index=1",
+        "https://www.instagram.com/p/DPmA9J2kXmb/?img_index=1",
+        "https://www.instagram.com/p/DPwdvsyk1ww/?img_index=1",
+        "https://www.instagram.com/p/DQABEeiE6aC/?img_index=1",
+        "https://www.instagram.com/p/DQZft7Qk0FN/?img_index=1",
+        "https://www.instagram.com/p/DQkYKEJDyce/?img_index=1",
+        "https://www.instagram.com/p/DQpvDS5E0ld/?img_index=1",
+        "https://www.instagram.com/p/DRVHCEME3Zi/?img_index=1",
+        "https://www.instagram.com/p/DRh9FHlk5TZ/?img_index=1",
+        "https://www.instagram.com/p/DR2gXhFk79p/?img_index=1",
+        "https://www.instagram.com/p/DR-Q5gIE9Se/?img_index=1",
+        "https://www.instagram.com/p/DTLJYrTkZY8/?img_index=1",
+        "https://www.instagram.com/p/DUBSqAIk9nS/?img_index=1",
+        "https://www.instagram.com/p/DUGfkjdk89C/?img_index=1",
+        "https://www.instagram.com/p/DUL0OWLE8rd/?img_index=1",
+        "https://www.instagram.com/p/DUOf4jDk7rk/?img_index=1",
+        "https://www.instagram.com/p/DWJwnxOEYVk/?img_index=1",
+        "https://www.instagram.com/p/DWehyAPmA4O/?img_index=1",
+        "https://www.instagram.com/p/DW_4uhCETfc/?img_index=1",
+        "https://www.instagram.com/p/DXR32wSkbI6/?img_index=1",
+        "https://www.instagram.com/p/DXW1k0_kYzC/?img_index=1",
+        "https://www.instagram.com/p/DX4p0NrGDEa/?img_index=1",
+        "https://www.instagram.com/p/DYcbvKFEdjw/?img_index=1",
+        "https://www.instagram.com/p/DZdFCmmiiMy/?img_index=1",
+        "https://www.instagram.com/p/DZqLMcEERmn/?img_index=1",
+        "https://www.instagram.com/p/DZx8hQsEYRg/?img_index=1",
+        "https://www.instagram.com/p/DD-XY1QzYfo/?img_index=1",
+        "https://www.instagram.com/p/DPrPkuok8e2/?img_index=1",
+        "https://www.instagram.com/p/DEIHjxAxKSv/?img_index=1"
+      ]
+    },
+    {
+      "username": "",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    },
+    {
+      "username": "",
+      "start_now_date": "2026-06-21",
+      "download_stories": true,
+      "urls": []
+    }
+  ]
+}

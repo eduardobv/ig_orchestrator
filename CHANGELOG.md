@@ -1,5 +1,83 @@
 # Changelog
 
+## v1.24.2 - Patch - Stories sin reintento y media mixta completa
+
+Fecha: 2026-06-21
+
+### Modificado
+
+* El parser reconoce mediante expresion regular
+  `Stories for {username} not found` como error definitivo
+  `STORIES_NOT_FOUND`.
+* Las respuestas mixtas de stories conservan simultaneamente documentos con
+  nombre, videos y fotos sin nombre original.
+* Las fotos de stories se renombran como
+  `username-YYYYMMDD_HHMMSS.jpg`, usando sufijo numerico si coinciden.
+* Se agregaron pruebas para el caso real de username dinamico y una respuesta
+  de cinco stories formada por un video y cuatro fotos.
+* Version actualizada a `1.24.2`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest` (`132 passed`)
+* `python -m compileall -q src tests`
+* `git diff --check`
+
+## v1.24.1 - Patch - Carpeta de logs unica por ejecucion
+
+Fecha: 2026-06-21
+
+### Modificado
+
+* `main.py` fija un unico timestamp al inicio de `--run`, `run_continue` y
+  `--dry-run`.
+* `AccountOrchestratorConfig` transporta el inicio y la carpeta de logs de la
+  ejecucion completa.
+* Los logs de todas las cuentas, batches unidos y reintentos se escriben bajo
+  una sola carpeta `logs/YYYYMMDD_HHMMSS`.
+* Si un username se procesa mas de una vez en la misma ejecucion, se agrega
+  contenido al mismo archivo en lugar de crear otra carpeta.
+* `README.md` y `Agents.md` documentan la regla.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`
+
+## v1.24.0 - Tarea 24 - Lotes unicos, join e historico de cuentas
+
+Fecha: 2026-06-21
+
+### Creado
+
+* `tasks/Tarea24.md`.
+* `src/ig_orchestrator/models/account_history.py`.
+* `src/ig_orchestrator/db/account_history_repository.py`.
+* `src/ig_orchestrator/input/batch_file_service.py`.
+* Tests de backup/limpieza, modos join, historico global, unicidad y progreso.
+
+### Modificado
+
+* Parser e importador para ignorar entradas vacias, rechazar `batch_name`
+  repetidos y poblar `account_history`.
+* Schema/migracion SQLite con `account_history` e indice unico para
+  `input_batches.batch_name`.
+* CLI para `--join-after-pending-batch-id` y
+  `--join-before-pending-batch-id`.
+* Orquestador de batch para mostrar avance por cuenta.
+* `README.md`, `PLAN.md` y `Agents.md` con el nuevo contrato operativo.
+* Version de paquete actualizada a `1.24.0`.
+
+### Resumen
+
+Cada lote tiene ahora una identidad unica. Un lote interrumpido se continua
+desde SQLite y un lote nuevo puede encadenarse antes o despues de pendientes de
+otro batch. La importacion real crea un backup, limpia el JSON reutilizable,
+mantiene un historico global de usernames y muestra progreso compacto.
+
+### Pruebas ejecutadas
+
+* `python -m pytest` (`125 passed`)
+
 ## v1.21.5 - Patch - Resumen de reporte y duplicados persistidos
 
 Fecha: 2026-06-17

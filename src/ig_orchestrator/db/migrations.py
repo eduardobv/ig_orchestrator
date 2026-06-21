@@ -23,6 +23,27 @@ def apply_migrations(connection: Connection) -> None:
 
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     connection.executescript(schema)
+    duplicates = connection.execute(
+        """
+        SELECT batch_name, COUNT(*) AS total
+        FROM input_batches
+        GROUP BY batch_name
+        HAVING COUNT(*) > 1
+        ORDER BY batch_name
+        """
+    ).fetchall()
+    if duplicates:
+        names = ", ".join(str(row["batch_name"]) for row in duplicates)
+        raise RuntimeError(
+            "Cannot enforce unique batch names because duplicates already exist: "
+            f"{names}. Resolve those rows before running init-db again."
+        )
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_input_batches_batch_name
+        ON input_batches(batch_name)
+        """
+    )
     connection.commit()
 
 

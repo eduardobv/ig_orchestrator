@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from collections.abc import Callable
 from typing import Protocol
 
 from ig_orchestrator.db import (
@@ -47,6 +48,7 @@ class BatchOrchestratorResult:
 @dataclass(frozen=True, slots=True)
 class BatchOrchestratorConfig:
     dry_run: bool = False
+    progress_callback: Callable[[int, int, Account], None] | None = None
 
 
 class BatchOrchestrator:
@@ -120,9 +122,19 @@ class BatchOrchestrator:
                 batch_id,
                 InputBatchStatus.PROCESSING,
             )
-            for account in accounts:
-                if account.id is None or account.status not in _PROCESSABLE_ACCOUNT_STATUSES:
-                    continue
+            processable_accounts = [
+                account
+                for account in accounts
+                if account.id is not None
+                and account.status in _PROCESSABLE_ACCOUNT_STATUSES
+            ]
+            for account_index, account in enumerate(processable_accounts, start=1):
+                if self._config.progress_callback is not None:
+                    self._config.progress_callback(
+                        account_index,
+                        len(processable_accounts),
+                        account,
+                    )
                 logger.info(
                     "Processing batch account: batch_id={} account_id={} username={}",
                     batch_id,

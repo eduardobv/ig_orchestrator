@@ -63,6 +63,18 @@ No implementar en `v1.0.1`:
 
 ## Persistencia y trazabilidad
 
+* Cada invocacion del programa usa una sola carpeta
+  `logs/YYYYMMDD_HHMMSS`, fijada al inicio de la ejecucion.
+* Todas las cuentas, batches unidos y reintentos de esa invocacion escriben
+  dentro de esa misma carpeta; nunca calcular otra carpeta desde el inicio de
+  un run de cuenta.
+* `input_batches.batch_name` es unico y no se reutiliza.
+* `--run` siempre importa un lote nuevo; para continuar uno existente se usa
+  `run_continue` o los modos join con un `batch_id` pendiente.
+* Tras importar correctamente un lote real, respaldar el JSON en `config/bkp`
+  y limpiar sus URLs sin perder `username` ni `start_now_date`.
+* `account_history` conserva usernames globales sin repetir entre lotes.
+
 Cada URL debe guardar:
 
 * URL original;
@@ -98,11 +110,16 @@ No reintentar:
 
 ```text
 We're sorry, we couldn't find that.
-Stories for user_name not found
+Stories for {username} not found
 We can't get stories from a private account (instagram limit)
 ```
 
 Guardar siempre el texto original.
+
+El error de stories debe detectarse por patron, porque `{username}` cambia en
+cada respuesta. En respuestas mixtas de stories se deben conservar todos los
+videos y todas las fotos; la presencia de un documento con nombre no invalida
+las fotos sin nombre original.
 
 ## Reintentos
 

@@ -3,14 +3,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ig_orchestrator.db import (
+    AccountHistoryRepository,
     AccountRepository,
     ConfigRepository,
     UrlJobRepository,
     connect,
     init_database,
 )
-from ig_orchestrator.input import import_batch_json
+from ig_orchestrator.input import DuplicateBatchNameError, import_batch_json
 from ig_orchestrator.models import ConfigValueType, PublicationType, UrlSource
 from ig_orchestrator.settings import Settings
 
@@ -61,7 +64,7 @@ def test_import_batch_with_two_accounts_and_generated_story(tmp_path: Path) -> N
         ]
 
 
-def test_reimporting_same_batch_does_not_duplicate_accounts_or_urls(
+def test_reimporting_same_batch_name_is_rejected(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "orchestrator.db"
@@ -70,25 +73,17 @@ def test_reimporting_same_batch_does_not_duplicate_accounts_or_urls(
 
     with connect(db_path) as connection:
         first_result = import_batch_json(batch_path, connection)
-        second_result = import_batch_json(batch_path, connection)
 
-        assert first_result.batch.id == second_result.batch.id
-        assert [account.id for account in first_result.accounts] == [
-            account.id for account in second_result.accounts
-        ]
+        with pytest.raises(DuplicateBatchNameError, match="run_continue"):
+            import_batch_json(batch_path, connection)
 
-        accounts = AccountRepository(connection).list_by_batch(first_result.batch.id)
-        jobs = [
-            job
-            for account in accounts
-            for job in UrlJobRepository(connection).list_by_account(account.id)
-        ]
-
-        assert len(accounts) == 2
-        assert len(jobs) == 5
+        assert (
+            len(AccountRepository(connection).list_by_batch(first_result.batch.id))
+            == 2
+        )
 
 
-def test_import_batch_persists_duplicate_urls_idempotently(
+def test_import_batch_persists_duplicate_urls(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "orchestrator.db"
@@ -120,7 +115,6 @@ def test_import_batch_persists_duplicate_urls_idempotently(
 
     with connect(db_path) as connection:
         first_result = import_batch_json(batch_path, connection)
-        second_result = import_batch_json(batch_path, connection)
 
         account = first_result.accounts[0]
         jobs = UrlJobRepository(connection).list_by_account(account.id)
@@ -128,13 +122,36 @@ def test_import_batch_persists_duplicate_urls_idempotently(
             "SELECT * FROM duplicate_url_jobs ORDER BY id"
         ).fetchall()
 
-        assert first_result.batch.id == second_result.batch.id
         assert len(jobs) == 2
         assert len(duplicate_rows) == 1
         assert duplicate_rows[0]["account_id"] == account.id
         assert duplicate_rows[0]["duplicate_of_url_job_id"] == jobs[0].id
         assert duplicate_rows[0]["url"] == "https://www.instagram.com/reel/ABC123xyz/"
         assert duplicate_rows[0]["occurrence_index"] == 2
+
+
+def test_import_batch_populates_global_account_history_without_repeating_usernames(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    first_batch_path = _write_batch(tmp_path)
+    second_batch_path = tmp_path / "second.json"
+    payload = json.loads(first_batch_path.read_text(encoding="utf-8"))
+    payload["batch_name"] = "descargas_junio_2026_second"
+    second_batch_path.write_text(json.dumps(payload), encoding="utf-8")
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        import_batch_json(first_batch_path, connection)
+        import_batch_json(second_batch_path, connection)
+
+        history = AccountHistoryRepository(connection).list_all()
+
+    assert [record.user_name for record in history] == [
+        "example_user",
+        "another_user",
+    ]
+    assert all(record.status.value == "ENABLED" for record in history)
 
 
 def test_import_batch_stores_operational_config_when_settings_are_provided(

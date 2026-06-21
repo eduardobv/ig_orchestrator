@@ -192,6 +192,37 @@ def test_batch_orchestrator_dry_run_processes_pending_accounts_without_status_ch
     assert "Dry-run batch batch" in result.summary.summary
 
 
+def test_batch_orchestrator_reports_compact_account_progress(tmp_path: Path) -> None:
+    stored = _stored_batch(tmp_path)
+    first = _create_account(stored, "first", AccountStatus.PENDING)
+    second = _create_account(stored, "second", AccountStatus.PENDING)
+    _create_job(stored.job_repo, first.id)
+    _create_job(stored.job_repo, second.id)
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {
+            first.id: AccountStatus.COMPLETED,
+            second.id: AccountStatus.COMPLETED,
+        },
+    )
+    progress: list[tuple[int, int, str]] = []
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(
+            progress_callback=lambda current, total, account: progress.append(
+                (current, total, account.username)
+            )
+        ),
+    )
+
+    asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert progress == [(1, 2, "first"), (2, 2, "second")]
+
+
 def _stored_batch(tmp_path: Path) -> StoredBatch:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)

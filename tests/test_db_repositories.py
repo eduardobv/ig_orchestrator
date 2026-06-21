@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
 import sqlite3
+import pytest
 
 from ig_orchestrator.db import (
     AccountRepository,
@@ -175,6 +176,7 @@ def test_init_db_command_creates_schema_with_explicit_path(tmp_path: Path) -> No
         "app_config",
         "input_batches",
         "accounts",
+        "account_history",
         "url_jobs",
         "duplicate_url_jobs",
         "download_files",
@@ -265,3 +267,27 @@ def test_batch_repository_lists_batches_with_resumable_work(tmp_path: Path) -> N
         )
 
         assert batch_repo.list_with_resumable_work() == [resumable_batch]
+
+
+def test_input_batch_name_is_unique_in_sqlite(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        repo = BatchRepository(connection)
+        repo.create(
+            InputBatch(
+                batch_name="unique_batch",
+                schema_version="1.0",
+                status=InputBatchStatus.IMPORTED,
+            )
+        )
+
+        with pytest.raises(sqlite3.IntegrityError):
+            repo.create(
+                InputBatch(
+                    batch_name="unique_batch",
+                    schema_version="1.0",
+                    status=InputBatchStatus.IMPORTED,
+                )
+            )

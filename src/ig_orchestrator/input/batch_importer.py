@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlite3 import Connection, Row
 
 from ig_orchestrator.db import (
+    AccountHistoryRepository,
     AccountRepository,
     BatchRepository,
     ConfigRepository,
@@ -35,6 +36,10 @@ class BatchImportResult:
     url_jobs: tuple[UrlJob, ...]
 
 
+class DuplicateBatchNameError(ValueError):
+    """Raised when a new import reuses a batch_name already stored in SQLite."""
+
+
 def import_batch_json(
     path: str | Path,
     connection: Connection,
@@ -54,17 +59,18 @@ def import_parsed_batch(
 ) -> BatchImportResult:
     """Persist a parsed batch as batch, account and URL job rows."""
 
+    batch = _create_unique_batch(parsed_batch, BatchRepository(connection))
     if settings is not None:
         _upsert_operational_config(ConfigRepository(connection), settings)
-
-    batch = _get_or_create_batch(parsed_batch, BatchRepository(connection))
     account_repo = AccountRepository(connection)
+    account_history_repo = AccountHistoryRepository(connection)
     url_job_repo = UrlJobRepository(connection)
 
     imported_accounts: list[Account] = []
     imported_jobs: list[UrlJob] = []
 
     for parsed_account in parsed_batch.accounts:
+        account_history_repo.create_or_get(parsed_account.username)
         generated_story_url = (
             build_story_url(parsed_account.username)
             if parsed_account.download_stories
@@ -177,13 +183,17 @@ def _upsert_operational_config(
         repository.upsert(AppConfig(key=key, value=value, value_type=value_type))
 
 
-def _get_or_create_batch(
+def _create_unique_batch(
     parsed_batch: ParsedBatch,
     repository: BatchRepository,
 ) -> InputBatch:
     existing = repository.get_by_name(parsed_batch.batch_name)
     if existing is not None:
-        return existing
+        raise DuplicateBatchNameError(
+            f"Batch name '{parsed_batch.batch_name}' already exists with id "
+            f"{existing.id} and status {existing.status.value}. Use run_continue "
+            "with --batch-id or --batch-name to resume it."
+        )
 
     return repository.create(
         InputBatch(
@@ -370,6 +380,7 @@ def _row_id(row: Row) -> int:
 
 __all__ = [
     "BatchImportResult",
+    "DuplicateBatchNameError",
     "build_story_url",
     "classify_instagram_url",
     "import_batch_json",

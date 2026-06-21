@@ -51,7 +51,9 @@
         "PYDEVD_USE_SYS_MONITORING": "false"
       },
       "args": [
-        "run_continue"
+        "run_continue",
+        "--batch-id",
+        "2"
       ],
       "noDebug": true
     },

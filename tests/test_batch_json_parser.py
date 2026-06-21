@@ -156,7 +156,7 @@ def test_parse_rejects_non_instagram_url_with_account_context(tmp_path: Path) ->
         parse_batch_json(batch_path)
 
 
-def test_parse_rejects_empty_urls_when_stories_are_disabled(tmp_path: Path) -> None:
+def test_parse_ignores_account_without_urls_or_stories(tmp_path: Path) -> None:
     batch_path = _write_batch(
         tmp_path,
         {
@@ -170,8 +170,42 @@ def test_parse_rejects_empty_urls_when_stories_are_disabled(tmp_path: Path) -> N
         },
     )
 
-    with pytest.raises(BatchJsonParserError, match=r"accounts\[1\]\.urls"):
-        parse_batch_json(batch_path)
+    parsed = parse_batch_json(batch_path)
+
+    assert parsed.accounts == ()
+    assert parsed.ignored_accounts[0].username == "example_user"
+    assert "no URLs" in parsed.ignored_accounts[0].reason
+
+
+def test_parse_ignores_blank_username_and_blank_urls(tmp_path: Path) -> None:
+    batch_path = _write_batch(
+        tmp_path,
+        {
+            "schema_version": "1.0",
+            "batch_name": "reusable",
+            "defaults": {"start_now_date": "2026-06-21"},
+            "accounts": [
+                {
+                    "username": "",
+                    "start_now_date": "2026-06-21",
+                    "download_stories": True,
+                    "urls": [""],
+                },
+                {
+                    "username": "stories_user",
+                    "start_now_date": "2026-06-21",
+                    "download_stories": True,
+                    "urls": [""],
+                },
+            ],
+        },
+    )
+
+    parsed = parse_batch_json(batch_path)
+
+    assert [account.username for account in parsed.accounts] == ["stories_user"]
+    assert parsed.accounts[0].urls == ()
+    assert parsed.ignored_accounts[0].reason == "blank username"
 
 
 def _write_batch(tmp_path: Path, payload: dict[str, object]) -> Path:

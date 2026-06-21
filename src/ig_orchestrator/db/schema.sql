@@ -33,6 +33,17 @@ CREATE TABLE IF NOT EXISTS accounts (
     FOREIGN KEY(batch_id) REFERENCES input_batches(id)
 );
 
+CREATE TABLE IF NOT EXISTS account_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_ig_id TEXT,
+    user_name TEXT NOT NULL COLLATE NOCASE,
+    status TEXT NOT NULL DEFAULT 'ENABLED',
+    field1 TEXT,
+    field2 TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id INTEGER,
@@ -110,6 +121,12 @@ CREATE TABLE IF NOT EXISTS duplicate_url_jobs (
 CREATE INDEX IF NOT EXISTS idx_input_batches_status ON input_batches(status);
 CREATE INDEX IF NOT EXISTS idx_accounts_batch_id ON accounts(batch_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts(status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_account_history_user_name
+    ON account_history(user_name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_account_history_user_ig_id
+    ON account_history(user_ig_id);
+CREATE INDEX IF NOT EXISTS idx_account_history_status
+    ON account_history(status);
 CREATE INDEX IF NOT EXISTS idx_url_jobs_account_id ON url_jobs(account_id);
 CREATE INDEX IF NOT EXISTS idx_url_jobs_run_id ON url_jobs(run_id);
 CREATE INDEX IF NOT EXISTS idx_url_jobs_status ON url_jobs(status);
@@ -123,4 +140,4 @@ CREATE INDEX IF NOT EXISTS idx_runs_batch_id ON runs(batch_id);
 CREATE INDEX IF NOT EXISTS idx_runs_account_id ON runs(account_id);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

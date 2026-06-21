@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+import re
+from re import Pattern
 
 
 class BotResponseStatus(StrEnum):
@@ -42,10 +44,15 @@ _RETRYABLE_ERRORS: tuple[tuple[str, BotErrorType], ...] = (
 
 _NON_RETRYABLE_ERRORS: tuple[tuple[str, BotErrorType], ...] = (
     ("We're sorry, we couldn't find that.", BotErrorType.NOT_FOUND),
-    ("Stories for user_name not found", BotErrorType.STORIES_NOT_FOUND),
     (
         "We can't get stories from a private account (instagram limit)",
         BotErrorType.PRIVATE_ACCOUNT_STORIES,
+    ),
+)
+_NON_RETRYABLE_ERROR_PATTERNS: tuple[tuple[Pattern[str], BotErrorType], ...] = (
+    (
+        re.compile(r"\bstories\s+for\s+[^\r\n]+?\s+not\s+found\b", re.IGNORECASE),
+        BotErrorType.STORIES_NOT_FOUND,
     ),
 )
 
@@ -74,6 +81,11 @@ def parse_bot_response(message: str | None) -> BotResponse:
         normalized_message,
         _NON_RETRYABLE_ERRORS,
     )
+    if non_retryable_error_type is None:
+        non_retryable_error_type = _find_pattern_error_type(
+            message,
+            _NON_RETRYABLE_ERROR_PATTERNS,
+        )
     if non_retryable_error_type is not None:
         return BotResponse(
             status=BotResponseStatus.NON_RETRYABLE_ERROR,
@@ -94,6 +106,16 @@ def _find_error_type(
 ) -> BotErrorType | None:
     for error_text, error_type in known_errors:
         if error_text.casefold() in normalized_message:
+            return error_type
+    return None
+
+
+def _find_pattern_error_type(
+    message: str,
+    known_patterns: tuple[tuple[Pattern[str], BotErrorType], ...],
+) -> BotErrorType | None:
+    for pattern, error_type in known_patterns:
+        if pattern.search(message):
             return error_type
     return None
 

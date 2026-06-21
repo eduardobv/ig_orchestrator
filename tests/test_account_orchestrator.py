@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from sqlite3 import Connection
 
@@ -254,6 +254,43 @@ def test_account_orchestrator_dry_run_does_not_process_urls_or_create_folders(
         job.status is UrlJobStatus.PENDING
         for job in stored.job_repo.list_by_account(stored.account.id)
     )
+
+
+def test_account_orchestrator_uses_execution_start_for_log_folder(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    job = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {job.id: [UrlJobStatus.COMPLETED]},
+    )
+    execution_started_at = datetime(
+        2026,
+        6,
+        21,
+        11,
+        15,
+        19,
+        tzinfo=timezone.utc,
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        config=AccountOrchestratorConfig(
+            logs_folder=tmp_path / "logs",
+            execution_started_at=execution_started_at,
+        ),
+    )
+
+    asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert (
+        tmp_path / "logs" / "20260621_111519" / "example_user.log"
+    ).is_file()
 
 
 def _stored_account(

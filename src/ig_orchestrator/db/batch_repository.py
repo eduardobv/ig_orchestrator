@@ -84,6 +84,27 @@ class BatchRepository:
         ).fetchall()
         return [_row_to_batch(row) for row in rows]
 
+    def has_resumable_work(self, batch_id: int) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT 1
+            FROM accounts
+            JOIN url_jobs ON url_jobs.account_id = accounts.id
+            WHERE accounts.batch_id = ?
+              AND accounts.status IN ('PENDING', 'PROCESSING', 'PARTIAL')
+              AND url_jobs.status IN (
+                  'PENDING',
+                  'SENT_TO_BOT',
+                  'WAITING_DOWNLOAD',
+                  'RETRY_PENDING',
+                  'FAILED_TEMPORARY'
+              )
+            LIMIT 1
+            """,
+            (batch_id,),
+        ).fetchone()
+        return row is not None
+
     def update_status(self, batch_id: int, status: InputBatchStatus) -> InputBatch:
         self.connection.execute(
             """

@@ -83,6 +83,7 @@ class BotConversationResult:
 @dataclass(slots=True)
 class _MediaDownload:
     message_id: int
+    message_date: datetime | None
     path: Path | None
     provisional_path: Path | None
     original_file_name: str | None
@@ -169,6 +170,7 @@ class BotConversationService:
 
         bot_message, direct_paths = await self._wait_for_bot_response_and_downloads(
             job_id=job_id,
+            media_filename_prefix=_media_filename_prefix(job),
             since=started_at,
             sent_message_id=sent_message_id,
         )
@@ -262,6 +264,7 @@ class BotConversationService:
         self,
         *,
         job_id: int,
+        media_filename_prefix: str,
         since: datetime,
         sent_message_id: int | None,
     ) -> tuple[str | None, list[Path]]:
@@ -297,6 +300,7 @@ class BotConversationService:
                         return _join_bot_texts(bot_texts), _finalize_media_downloads(
                             self._config.download_folder,
                             downloads,
+                            media_filename_prefix,
                         )
 
                 if _message_has_media(message) and _can_download_media(
@@ -314,12 +318,14 @@ class BotConversationService:
                     return _join_bot_texts(bot_texts), _finalize_media_downloads(
                         self._config.download_folder,
                         downloads,
+                        media_filename_prefix,
                     )
 
             if now >= deadline:
                 return _join_bot_texts(bot_texts), _finalize_media_downloads(
                     self._config.download_folder,
                     downloads,
+                    media_filename_prefix,
                 )
 
             await asyncio.sleep(
@@ -332,6 +338,7 @@ class BotConversationService:
         message: Any,
     ) -> _MediaDownload:
         message_id = _message_id(message) or 0
+        message_date = _message_date(message)
         original_file_name = _original_file_name(message)
         extension = _message_file_extension(message, original_file_name)
         temp_folder = self._config.download_folder / "_tmp_telethon_downloads"
@@ -357,6 +364,7 @@ class BotConversationService:
             if not original_file_name:
                 return _MediaDownload(
                     message_id=message_id,
+                    message_date=message_date,
                     path=None,
                     provisional_path=downloaded_path,
                     original_file_name=None,
@@ -369,6 +377,7 @@ class BotConversationService:
             shutil.move(str(downloaded_path), str(final_path))
             return _MediaDownload(
                 message_id=message_id,
+                message_date=message_date,
                 path=final_path,
                 provisional_path=None,
                 original_file_name=original_file_name,
@@ -383,6 +392,7 @@ class BotConversationService:
             )
             return _MediaDownload(
                 message_id=message_id,
+                message_date=message_date,
                 path=None,
                 provisional_path=None,
                 original_file_name=original_file_name,
@@ -422,6 +432,11 @@ def _require_job_id(job: UrlJob) -> int:
 def _message_id(message: Any) -> int | None:
     value = getattr(message, "id", None)
     return value if isinstance(value, int) and value > 0 else None
+
+
+def _message_date(message: Any) -> datetime | None:
+    value = getattr(message, "date", None)
+    return value if isinstance(value, datetime) else None
 
 
 def _message_text(message: Any) -> str | None:
@@ -483,6 +498,7 @@ def _message_file_extension(message: Any, original_file_name: str | None) -> str
 def _finalize_media_downloads(
     download_folder: Path,
     downloads: list[_MediaDownload],
+    media_filename_prefix: str,
 ) -> list[Path]:
     final_paths = [
         download.path
@@ -495,21 +511,15 @@ def _finalize_media_downloads(
         if download.provisional_path is not None and download.provisional_path.exists()
     ]
 
-    if final_paths:
-        for download in provisional_paths:
-            if download.provisional_path is not None:
-                download.provisional_path.unlink(missing_ok=True)
-        _cleanup_empty_temp_folders(download_folder)
-        return final_paths
-
     promoted_paths: list[Path] = []
     for download in provisional_paths:
         if download.provisional_path is None:
             continue
         suffix = download.provisional_path.suffix or ".bin"
+        timestamp = _media_timestamp(download.message_date)
         final_path = _unique_path(
             download_folder,
-            f"{download.message_id or 'telegram_media'}{suffix}",
+            f"{media_filename_prefix}-{timestamp}{suffix}",
         )
         shutil.move(str(download.provisional_path), str(final_path))
         download.path = final_path
@@ -517,7 +527,25 @@ def _finalize_media_downloads(
         promoted_paths.append(final_path)
 
     _cleanup_empty_temp_folders(download_folder)
-    return promoted_paths
+    return [*final_paths, *promoted_paths]
+
+
+def _media_filename_prefix(job: UrlJob) -> str:
+    story_match = re.search(
+        r"/stories/([^/?#]+)/?",
+        job.url,
+        flags=re.IGNORECASE,
+    )
+    if story_match and story_match.group(1).casefold() != "highlights":
+        return _sanitize_windows_filename(story_match.group(1))
+    return f"telegram_media_{_require_job_id(job)}"
+
+
+def _media_timestamp(message_date: datetime | None) -> str:
+    value = message_date or _utc_now()
+    if value.tzinfo is not None:
+        value = value.astimezone()
+    return value.strftime("%Y%m%d_%H%M%S")
 
 
 def _remove_duplicate_download_paths(paths: list[Path]) -> list[Path]:

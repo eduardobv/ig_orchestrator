@@ -50,6 +50,8 @@ RetryDelayHandler = Callable[[int], Awaitable[None]]
 @dataclass(frozen=True, slots=True)
 class AccountOrchestratorConfig:
     default_working_folder: Path | None = None
+    logs_folder: Path = Path("logs")
+    execution_started_at: datetime | None = None
     max_retries: int = 5
     retry_base_seconds: int = 90
     retry_max_seconds: int = 900
@@ -63,6 +65,12 @@ class AccountOrchestratorConfig:
             self.default_working_folder, Path
         ):
             raise ValueError("default_working_folder must be a pathlib.Path")
+        if not isinstance(self.logs_folder, Path):
+            raise ValueError("logs_folder must be a pathlib.Path")
+        if self.execution_started_at is not None and not isinstance(
+            self.execution_started_at, datetime
+        ):
+            raise ValueError("execution_started_at must be a datetime")
         if self.max_retries < 0:
             raise ValueError("max_retries must not be negative")
         if self.retry_base_seconds <= 0:
@@ -126,7 +134,7 @@ class AccountOrchestrator:
         account_log_handle = None
 
         try:
-            configure_app_logging()
+            configure_app_logging(self._config.logs_folder)
             working_base = _working_base_folder(
                 account,
                 self._config.default_working_folder,
@@ -134,7 +142,8 @@ class AccountOrchestrator:
             account_log_handle = configure_account_run_logging(
                 username=account.username,
                 run_id=run.id,
-                started_at=run.started_at,
+                started_at=self._config.execution_started_at or run.started_at,
+                logs_folder=self._config.logs_folder,
             )
             with logging_context(
                 account_username=account.username,

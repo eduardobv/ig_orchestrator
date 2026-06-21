@@ -188,8 +188,61 @@ def test_process_url_job_promotes_preview_media_when_no_document_arrives(
     result = asyncio.run(service.process_url_job(job))
 
     assert result.job.status == UrlJobStatus.DOWNLOADED
-    assert [file.original_path.name for file in result.files] == ["101.jpg", "102.jpg"]
+    assert [file.original_path.name for file in result.files] == [
+        f"telegram_media_{job.id}-20260614_150000.jpg",
+        f"telegram_media_{job.id}-20260614_150000_1.jpg",
+    ]
     assert all(file.original_path.exists() for file in result.files)
+
+
+def test_process_story_job_keeps_video_document_and_photo_previews(
+    tmp_path: Path,
+) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(
+        job_repo,
+        url="https://www.instagram.com/stories/iarabroinn/",
+        publication_type=PublicationType.STORY,
+        source=UrlSource.GENERATED_STORY,
+        username="iarabroinn",
+    )
+    service = _service(
+        tmp_path,
+        job_repo,
+        download_repo,
+        messages=[
+            _incoming_media(
+                101,
+                document=_document("3924073435592992042.mp4", "video/mp4"),
+            ),
+            _incoming_media(102, photo=object()),
+            _incoming_media(103, photo=object()),
+            _incoming_media(104, photo=object()),
+            _incoming_media(105, photo=object()),
+        ],
+        watcher=lambda *_args: [],
+        enable_direct_download=True,
+    )
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.DOWNLOADED
+    assert [file.original_path.name for file in result.files] == [
+        "3924073435592992042.mp4",
+        "iarabroinn-20260614_150000.jpg",
+        "iarabroinn-20260614_150000_1.jpg",
+        "iarabroinn-20260614_150000_2.jpg",
+        "iarabroinn-20260614_150000_3.jpg",
+    ]
+    assert [file.media_type for file in result.files] == [
+        MediaType.VIDEO,
+        MediaType.IMAGE,
+        MediaType.IMAGE,
+        MediaType.IMAGE,
+        MediaType.IMAGE,
+    ]
 
 
 def test_process_url_job_marks_non_retryable_error_as_failed_final(
@@ -214,6 +267,34 @@ def test_process_url_job_marks_non_retryable_error_as_failed_final(
     assert result.job.last_error == "We're sorry, we couldn't find that."
     assert result.job.last_error_type == "NOT_FOUND"
     assert download_repo.list_by_url_job(job.id) == []
+
+
+def test_process_story_not_found_with_dynamic_username_is_failed_final(
+    tmp_path: Path,
+) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(
+        job_repo,
+        url="https://www.instagram.com/stories/superlisha/",
+        publication_type=PublicationType.STORY,
+        source=UrlSource.GENERATED_STORY,
+        username="superlisha",
+    )
+    service = _service(
+        tmp_path,
+        job_repo,
+        download_repo,
+        messages=[_incoming("Stories for superlisha not found")],
+        watcher=lambda *_args: [],
+    )
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.FAILED_FINAL
+    assert result.job.non_retryable is True
+    assert result.job.last_error_type == "STORIES_NOT_FOUND"
 
 
 def test_process_url_job_marks_retryable_error_as_retry_pending(
@@ -265,7 +346,14 @@ def _connection(tmp_path: Path) -> Connection:
     return connect(db_path)
 
 
-def _stored_job(job_repo: UrlJobRepository) -> UrlJob:
+def _stored_job(
+    job_repo: UrlJobRepository,
+    *,
+    url: str = "https://www.instagram.com/reel/ABC123xyz/",
+    publication_type: PublicationType = PublicationType.REEL,
+    source: UrlSource = UrlSource.INPUT_URL,
+    username: str = "example_user",
+) -> UrlJob:
     batch = BatchRepository(job_repo.connection).create(
         InputBatch(
             batch_name="batch",
@@ -276,7 +364,7 @@ def _stored_job(job_repo: UrlJobRepository) -> UrlJob:
     account = AccountRepository(job_repo.connection).create(
         Account(
             batch_id=batch.id,
-            username="example_user",
+            username=username,
             start_now_date=date(2026, 6, 14),
             download_stories=False,
             status=AccountStatus.PENDING,
@@ -285,9 +373,9 @@ def _stored_job(job_repo: UrlJobRepository) -> UrlJob:
     return job_repo.create(
         UrlJob(
             account_id=account.id,
-            url="https://www.instagram.com/reel/ABC123xyz/",
-            publication_type=PublicationType.REEL,
-            source=UrlSource.INPUT_URL,
+            url=url,
+            publication_type=publication_type,
+            source=source,
             status=UrlJobStatus.PENDING,
             max_retries=5,
         )

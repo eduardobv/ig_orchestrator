@@ -8,6 +8,9 @@ Estado actual importante:
 
 - El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o con `--run`.
 - El flujo real inicializa SQLite, importa el JSON, arranca Telethon, envia URLs al bot, espera descargas, mueve archivos y genera reporte Markdown.
+- Cada `batch_name` se puede importar una sola vez. Una ejecucion interrumpida se retoma desde SQLite, nunca reimportando el mismo JSON.
+- Un `--run` puede encadenar un lote nuevo con un lote pendiente, antes o despues.
+- Tras importar un lote real se crea un backup en `config\bkp` y `batch.json` queda limpio para reutilizar sus cuentas.
 - `--dry-run` sigue disponible para validar `.env`, JSON, SQLite y orquestacion sin Telegram y sin mover archivos.
 - La integracion con renombrador, duplicados y movimiento final a `G:\4K Stogram` sigue fuera de alcance.
 
@@ -211,12 +214,14 @@ Reglas de validacion:
 - El JSON raiz debe ser un objeto.
 - `batch_name` no puede estar vacio.
 - Debe existir al menos una cuenta.
-- `username` es obligatorio.
+- Un `username` vacio se ignora.
 - `start_now_date` debe ser `YYYY-MM-DD`.
 - `download_stories` debe ser booleano.
 - Las URLs deben usar dominio de Instagram.
-- Se eliminan duplicados dentro de la misma cuenta.
-- Si `download_stories` es `false`, la cuenta debe tener al menos una URL manual.
+- Las URLs vacias se ignoran y los duplicados se registran sin procesarse dos veces.
+- Una cuenta con `download_stories = true` puede tener `urls: []`.
+- Una cuenta con `download_stories = false` y sin URLs se ignora y se informa en consola/log.
+- `batch_name` debe ser nuevo. Si ya existe en SQLite, `--run` termina con error y sugiere `run_continue`.
 
 ## Como ejecutarlo
 
@@ -286,7 +291,10 @@ python -m ig_orchestrator --input config\batch.json --run
 Este modo:
 
 - Inicializa SQLite si hace falta.
-- Importa o reutiliza el batch del JSON.
+- Rechaza el JSON si su `batch_name` ya existe.
+- Importa un batch nuevo y registra sus usernames en `account_history`.
+- Crea `config\bkp\{batch_name}_batch.json`.
+- Limpia cada cuenta del JSON original dejando `username`, `start_now_date`, `download_stories: false` y `urls: []`.
 - Arranca Telethon con la sesion indicada por `TELETHON_SESSION_NAME`.
 - Procesa cuentas pendientes.
 - Procesa primero stories generadas.
@@ -305,6 +313,32 @@ Completed 6/6 URLs; failed final 0; files 12.
 SQLite database: data\orchestrator.db
 Markdown report: reports\run_20260616_101530.md
 ```
+
+### Continuar un lote interrumpido
+
+```bash
+python -m ig_orchestrator run_continue --batch-id 10
+python -m ig_orchestrator run_continue --batch-name descargas_21_junio_2026
+```
+
+Sin selector, `run_continue` procesa todos los lotes con trabajo reanudable.
+
+### Combinar pendientes con un lote nuevo
+
+Primero termina el lote pendiente 10 y despues procesa el lote nuevo:
+
+```bash
+python -m ig_orchestrator --input config\batch.json --run --join-after-pending-batch-id 10
+```
+
+Primero procesa el lote nuevo y despues termina el lote pendiente 10:
+
+```bash
+python -m ig_orchestrator --input config\batch.json --run --join-before-pending-batch-id 10
+```
+
+Los lotes permanecen separados en SQLite y generan runs/reportes separados. El
+id indicado debe existir y contener cuentas/URLs en estado reanudable.
 
 ### Ejecutar desde VS Code
 
@@ -443,9 +477,33 @@ Tablas principales:
 - `app_config`: configuracion operativa no sensible importada desde settings.
 - `input_batches`: lotes importados.
 - `accounts`: cuentas dentro de cada lote.
+- `account_history`: usernames conocidos globalmente, sin repetir entre lotes.
 - `url_jobs`: una fila por URL, incluida la story generada.
 - `download_files`: archivos detectados/movidos.
 - `runs`: ejecuciones y resumen.
+
+La migracion se aplica automaticamente con `init-db` y tambien al iniciar una
+ejecucion. La sentencia de creacion es:
+
+```sql
+CREATE TABLE IF NOT EXISTS account_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_ig_id TEXT,
+    user_name TEXT NOT NULL COLLATE NOCASE,
+    status TEXT NOT NULL DEFAULT 'ENABLED',
+    field1 TEXT,
+    field2 TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_account_history_user_name
+ON account_history(user_name COLLATE NOCASE);
+```
+
+`status` admite `ENABLED`, `DISABLED` y `CHANGED`. `user_ig_id`, `status`,
+`field1` y `field2` quedan disponibles para actualizacion manual o para otro
+proceso futuro. Un mismo `user_ig_id` puede aparecer con usernames distintos.
 
 Puedes inspeccionarla con cualquier visor SQLite o con la CLI de SQLite si la tienes instalada.
 
@@ -492,6 +550,11 @@ Log por cuenta/run:
 ```text
 logs\YYYYMMDD_HHMMSS\username.log
 ```
+
+`YYYYMMDD_HHMMSS` se fija una sola vez al arrancar el comando. Una ejecucion
+con varias cuentas, varios batches unidos o reintentos conserva siempre esa
+misma carpeta. Si el mismo username vuelve a procesarse dentro de la ejecucion,
+su contenido se agrega al mismo `username.log`.
 
 Los logs incluyen `run_id` y `account_username`. El logger intenta redactar claves sensibles como `api_hash`, `token`, `session`, `phone`, `code`, etc.
 
@@ -552,7 +615,7 @@ Errores definitivos, sin reintento:
 
 ```text
 We're sorry, we couldn't find that.
-Stories for user_name not found
+Stories for {username} not found
 We can't get stories from a private account (instagram limit)
 ```
 
@@ -575,6 +638,19 @@ Politica:
 - Al final se procesa la cola FIFO de reintentos.
 - Tras `MAX_RETRIES`, se marca `FAILED_FINAL`.
 - Backoff por defecto: 90, 180, 360, 720, 900 segundos.
+
+`Stories for {username} not found` se reconoce como patron dinamico. Por
+ejemplo, `Stories for superlisha not found` termina directamente como
+`FAILED_FINAL`, con `last_error_type = STORIES_NOT_FOUND`.
+
+En stories mixtas se descargan tanto videos como fotos. Los videos conservan el
+nombre entregado por Telegram cuando existe. Las fotos sin nombre original se
+guardan con:
+
+```text
+username-YYYYMMDD_HHMMSS.jpg
+username-YYYYMMDD_HHMMSS_1.jpg
+```
 
 ## Como saber que termino
 

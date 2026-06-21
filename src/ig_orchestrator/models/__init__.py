@@ -1,4 +1,5 @@
 from ig_orchestrator.models.account import Account, AccountStatus
+from ig_orchestrator.models.account_history import AccountHistory, AccountHistoryStatus
 from ig_orchestrator.models.app_config import AppConfig, ConfigValueType
 from ig_orchestrator.models.download_file import (
     DownloadFile,
@@ -16,6 +17,8 @@ from ig_orchestrator.models.url_job import (
 
 __all__ = [
     "Account",
+    "AccountHistory",
+    "AccountHistoryStatus",
     "AccountStatus",
     "AppConfig",
     "ConfigValueType",

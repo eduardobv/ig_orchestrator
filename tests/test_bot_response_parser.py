@@ -44,7 +44,7 @@ def test_detects_retryable_errors_case_insensitively(
             BotErrorType.NOT_FOUND,
         ),
         (
-            "Stories for user_name not found",
+            "Stories for superlisha not found",
             BotErrorType.STORIES_NOT_FOUND,
         ),
         (
@@ -64,6 +64,21 @@ def test_detects_non_retryable_errors_case_insensitively(
     assert response.status == BotResponseStatus.NON_RETRYABLE_ERROR
     assert response.last_error == original_message
     assert response.last_error_type == expected_error_type
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Stories for superlisha not found",
+        "Stories for iarabroinn not found",
+        "STORIES FOR user.with-dots NOT FOUND",
+    ],
+)
+def test_detects_dynamic_story_username_as_non_retryable(text: str) -> None:
+    response = parse_bot_response(text)
+
+    assert response.status == BotResponseStatus.NON_RETRYABLE_ERROR
+    assert response.last_error_type == BotErrorType.STORIES_NOT_FOUND
 
 
 def test_non_error_text_is_ok() -> None:
