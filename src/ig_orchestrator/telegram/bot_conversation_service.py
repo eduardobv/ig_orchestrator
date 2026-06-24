@@ -511,6 +511,22 @@ def _finalize_media_downloads(
         if download.provisional_path is not None and download.provisional_path.exists()
     ]
 
+    if final_paths and all(_is_image_path(path) for path in final_paths):
+        for download in provisional_paths:
+            if download.provisional_path is None:
+                continue
+            download.provisional_path.unlink(missing_ok=True)
+            download.provisional_path = None
+        if provisional_paths:
+            logger.info(
+                "Telegram image previews discarded because original image documents exist: "
+                "originals={} previews={}",
+                len(final_paths),
+                len(provisional_paths),
+            )
+        _cleanup_empty_temp_folders(download_folder)
+        return final_paths
+
     promoted_paths: list[Path] = []
     for download in provisional_paths:
         if download.provisional_path is None:
@@ -528,6 +544,10 @@ def _finalize_media_downloads(
 
     _cleanup_empty_temp_folders(download_folder)
     return [*final_paths, *promoted_paths]
+
+
+def _is_image_path(path: Path) -> bool:
+    return path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
 
 
 def _media_filename_prefix(job: UrlJob) -> str:

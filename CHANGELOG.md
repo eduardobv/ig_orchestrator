@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.24.3 - Patch - Previews duplicados en posts de fotos
+
+Fecha: 2026-06-24
+
+### Modificado
+
+* Las respuestas que contienen exclusivamente documentos de imagen con nombre
+  original descartan los previews comprimidos sin nombre antes de persistirlos.
+* Los previews siguen conservandose cuando son la unica media disponible.
+* Las respuestas mixtas con video y fotos sin nombre mantienen todas las fotos,
+  preservando el comportamiento requerido para stories.
+* Se agrego una prueba de regresion basada en el caso real que generaba archivos
+  `telegram_media_*` junto a los JPG numericos.
+* Version actualizada a `1.24.3`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest` (`133 passed`)
+* `python -m compileall -q src tests`
+* `git diff --check`
+
 ## v1.24.2 - Patch - Stories sin reintento y media mixta completa
 
 Fecha: 2026-06-21

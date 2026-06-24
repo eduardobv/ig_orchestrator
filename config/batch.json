@@ -1,10 +1,4 @@
 {
-  "schema_version": "1.0",
-  "batch_name": "descargas_21_junio_2026",
-  "defaults": {
-    "download_stories": false,
-    "start_now_date": "2026-06-21"
-  },
   "accounts": [
     {
       "username": "lerabuns",
@@ -115,6 +109,18 @@
       "urls": []
     },
     {
+      "username": "anabelleworld",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "adrieves19",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
       "username": "alfredoalcarazz",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -145,6 +151,66 @@
       "urls": []
     },
     {
+      "username": "vinskawy",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "veronicaperasso",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "verofozzy",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "missess91",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "missess91_",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "missess91daily",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "flight_anastais",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "christi.walks",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "uchi_english_please",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
+      "username": "bela4ka_star",
+      "start_now_date": "2026-06-21",
+      "download_stories": false,
+      "urls": []
+    },
+    {
       "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -156,5 +222,11 @@
       "download_stories": false,
       "urls": []
     }
-  ]
+  ],
+  "batch_name": "descargas_24_junio_2026",
+  "defaults": {
+    "download_stories": false,
+    "start_now_date": "2026-06-24"
+  },
+  "schema_version": "1.0"
 }

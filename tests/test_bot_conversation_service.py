@@ -195,6 +195,49 @@ def test_process_url_job_promotes_preview_media_when_no_document_arrives(
     assert all(file.original_path.exists() for file in result.files)
 
 
+def test_process_photo_post_discards_previews_when_original_documents_arrive(
+    tmp_path: Path,
+) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(
+        job_repo,
+        url="https://www.instagram.com/p/DZ2161yFvGK/?img_index=1",
+        publication_type=PublicationType.POST,
+    )
+    service = _service(
+        tmp_path,
+        job_repo,
+        download_repo,
+        messages=[
+            _incoming_media(
+                101,
+                document=_document("3924561065093328270.jpg", "image/jpeg"),
+            ),
+            _incoming_media(102, photo=object()),
+            _incoming_media(
+                103,
+                document=_document("3924561073456629396.jpg", "image/jpeg"),
+            ),
+            _incoming_media(104, photo=object()),
+        ],
+        watcher=lambda *_args: [],
+        enable_direct_download=True,
+    )
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.DOWNLOADED
+    assert [file.original_path.name for file in result.files] == [
+        "3924561065093328270.jpg",
+        "3924561073456629396.jpg",
+    ]
+    assert download_repo.list_by_url_job(job.id) == list(result.files)
+    assert not list((tmp_path / "downloads").glob("telegram_media_*"))
+    assert not (tmp_path / "downloads" / "_tmp_telethon_downloads").exists()
+
+
 def test_process_story_job_keeps_video_document_and_photo_previews(
     tmp_path: Path,
 ) -> None:
