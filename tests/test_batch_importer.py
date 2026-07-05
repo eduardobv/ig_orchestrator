@@ -64,6 +64,79 @@ def test_import_batch_with_two_accounts_and_generated_story(tmp_path: Path) -> N
         ]
 
 
+def test_import_orders_story_only_accounts_then_by_processable_url_count(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    batch_path = tmp_path / "ordered_batch.json"
+    batch_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "batch_name": "ordered_accounts",
+                "defaults": {
+                    "download_stories": False,
+                    "start_now_date": "2026-06-24",
+                },
+                "accounts": [
+                    {
+                        "username": "three_urls",
+                        "urls": [
+                            "https://www.instagram.com/reel/THREE1/",
+                            "https://www.instagram.com/reel/THREE2/",
+                            "https://www.instagram.com/reel/THREE3/",
+                        ],
+                    },
+                    {
+                        "username": "one_url_first",
+                        "urls": ["https://www.instagram.com/reel/ONE1/"],
+                    },
+                    {
+                        "username": "stories_only_first",
+                        "download_stories": True,
+                        "urls": [],
+                    },
+                    {
+                        "username": "one_url_second",
+                        "download_stories": True,
+                        "urls": ["https://www.instagram.com/reel/ONE2/"],
+                    },
+                    {
+                        "username": "stories_only_second",
+                        "download_stories": True,
+                        "urls": [],
+                    },
+                    {
+                        "username": "two_unique_urls",
+                        "urls": [
+                            "https://www.instagram.com/reel/TWO1/",
+                            "https://www.instagram.com/reel/TWO1/",
+                            "https://www.instagram.com/reel/TWO2/",
+                        ],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        result = import_batch_json(batch_path, connection)
+        stored_accounts = AccountRepository(connection).list_by_batch(result.batch.id)
+
+    expected_order = [
+        "stories_only_first",
+        "stories_only_second",
+        "one_url_first",
+        "one_url_second",
+        "two_unique_urls",
+        "three_urls",
+    ]
+    assert [account.username for account in result.accounts] == expected_order
+    assert [account.username for account in stored_accounts] == expected_order
+
+
 def test_reimporting_same_batch_name_is_rejected(
     tmp_path: Path,
 ) -> None:

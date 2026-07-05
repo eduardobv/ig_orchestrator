@@ -12,7 +12,11 @@ from ig_orchestrator.db import (
     ConfigRepository,
     UrlJobRepository,
 )
-from ig_orchestrator.input.batch_json_parser import ParsedBatch, parse_batch_json
+from ig_orchestrator.input.batch_json_parser import (
+    ParsedBatch,
+    ParsedBatchAccount,
+    parse_batch_json,
+)
 from ig_orchestrator.input.url_classifier import classify_instagram_url
 from ig_orchestrator.models import (
     Account,
@@ -69,7 +73,7 @@ def import_parsed_batch(
     imported_accounts: list[Account] = []
     imported_jobs: list[UrlJob] = []
 
-    for parsed_account in parsed_batch.accounts:
+    for parsed_account in _ordered_accounts_for_import(parsed_batch):
         account_history_repo.create_or_get(parsed_account.username)
         generated_story_url = (
             build_story_url(parsed_account.username)
@@ -148,6 +152,18 @@ def import_parsed_batch(
 
 def build_story_url(username: str) -> str:
     return f"https://www.instagram.com/stories/{username}/"
+
+
+def _ordered_accounts_for_import(
+    parsed_batch: ParsedBatch,
+) -> list[ParsedBatchAccount]:
+    return sorted(
+        parsed_batch.accounts,
+        key=lambda account: (
+            not (account.download_stories and not account.urls),
+            len(account.urls),
+        ),
+    )
 
 
 def _upsert_operational_config(

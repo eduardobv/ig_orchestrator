@@ -393,6 +393,9 @@ La ejecucion posterior debe leer desde SQLite.
 * Validar fecha en formato `YYYY-MM-DD`.
 * Validar dominio de Instagram.
 * La importacion debe ser idempotente tanto como sea razonable: no duplicar cuentas/URLs iguales dentro del mismo batch si se reimporta.
+* Antes de insertar las cuentas, ordenarlas en memoria: primero las que tienen
+  `download_stories = true` y ninguna URL; despues por cantidad ascendente de
+  URLs procesables, manteniendo el orden original cuando haya empate.
 
 ### 8.4 Relacion con UI futura
 

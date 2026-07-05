@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.24.4 - Patch - Prioridad de cuentas por stories y volumen
+
+Fecha: 2026-06-24
+
+### Modificado
+
+* La importacion ordena las cuentas en memoria antes de persistirlas.
+* Las cuentas con `download_stories = true` y sin URLs se insertan y procesan
+  primero para anticiparse a la desaparicion de stories.
+* Las cuentas restantes se ordenan de menor a mayor numero de URLs procesables;
+  los empates conservan el orden original del JSON.
+* No se agregaron campos, consultas de orden especiales ni migraciones SQLite.
+* `README.md`, `PLAN.md`, `Agents.md` y `tasks/Tarea6.md` documentan el orden.
+* Se agrego una prueba de importacion que verifica prioridad, orden estable y
+  conteo de URLs deduplicadas.
+* Version actualizada a `1.24.4`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_batch_importer.py tests/test_batch_json_parser.py tests/test_batch_orchestrator.py tests/test_main_batch_modes.py -q` (`19 passed`)
+* `python -m pytest -q` (`134 passed`)
+* `python -m compileall -q src tests`
+* `git diff --check`
+
 ## v1.24.3 - Patch - Previews duplicados en posts de fotos
 
 Fecha: 2026-06-24

@@ -71,6 +71,8 @@ data/*.sqlite3
 htmlcov/
 .tox/
 .hypothesis/
+reports/*.md
+reports/old/*.md
 
 # Otros archivos temporales
 .ipynb_checkpoints/

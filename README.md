@@ -222,6 +222,10 @@ Reglas de validacion:
 - Una cuenta con `download_stories = true` puede tener `urls: []`.
 - Una cuenta con `download_stories = false` y sin URLs se ignora y se informa en consola/log.
 - `batch_name` debe ser nuevo. Si ya existe en SQLite, `--run` termina con error y sugiere `run_continue`.
+- Antes de insertar el lote, las cuentas se ordenan en memoria: primero las que
+  solo descargan stories (`download_stories = true` y `urls: []`) y despues
+  por numero ascendente de URLs procesables. Los empates mantienen el orden
+  original del JSON.
 
 ## Como ejecutarlo
 
@@ -293,6 +297,8 @@ Este modo:
 - Inicializa SQLite si hace falta.
 - Rechaza el JSON si su `batch_name` ya existe.
 - Importa un batch nuevo y registra sus usernames en `account_history`.
+- Inserta y procesa primero las cuentas de solo stories; las demas se ordenan
+  de menos a mas URLs para dejar al final las cuentas con mas descargas.
 - Crea `config\bkp\{batch_name}_batch.json`.
 - Limpia cada cuenta del JSON original dejando `username`, `start_now_date`, `download_stories: false` y `urls: []`.
 - Arranca Telethon con la sesion indicada por `TELETHON_SESSION_NAME`.

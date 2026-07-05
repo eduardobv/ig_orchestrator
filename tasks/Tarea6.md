@@ -21,6 +21,10 @@ src/ig_orchestrator/input/batch_importer.py
 * Insertar story generada como `url_job` tipo `STORY`, `source = GENERATED_STORY`.
 * Insertar URLs manuales como `source = INPUT_URL`.
 * Clasificar cada URL con el clasificador.
+* Ordenar las cuentas en memoria antes de insertarlas: primero las que solo
+  descargan stories y despues por numero ascendente de URLs procesables.
+* Mantener el orden original del JSON cuando dos cuentas tengan la misma
+  prioridad y cantidad de URLs.
 * Evitar duplicados razonables al reimportar el mismo batch.
 * Guardar configuracion operativa en `app_config` cuando aplique.
 

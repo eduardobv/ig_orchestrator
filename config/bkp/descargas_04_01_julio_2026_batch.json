@@ -3,14 +3,16 @@
     {
       "username": "lerabuns",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
       "username": "lera.berry",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaWKKIFTgGz/"
+      ]
     },
     {
       "username": "leraferal",
@@ -28,13 +30,17 @@
       "username": "christin__blck",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaV7fqBRKAG/"
+      ]
     },
     {
       "username": "lady__christin",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaJKeIJux3S/"
+      ]
     },
     {
       "username": "lera_sky_teacher",
@@ -70,12 +76,14 @@
       "username": "fainka.mini",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaUzditDOtA/?img_index=1"
+      ]
     },
     {
       "username": "annakonda_fit",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
@@ -87,32 +95,44 @@
     {
       "username": "lilyylanes",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaVeB2ZpgrH/"
+      ]
     },
     {
       "username": "cutielanes",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaVnAcEmkoM/",
+        "https://www.instagram.com/p/DaVdSYKu9Yc/"
+      ]
     },
     {
       "username": "lilxlanes",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaWCUw4SJl8/"
+      ]
     },
     {
       "username": "eliolive__",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaVbylLKM8F/"
+      ]
     },
     {
       "username": "eliretos21",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaWU8Kuoywf/",
+        "https://www.instagram.com/p/DaU9Hkto_kp/"
+      ]
     },
     {
       "username": "sweetolive.tv",
@@ -141,7 +161,7 @@
     {
       "username": "alfredoalcarazz",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
@@ -160,7 +180,10 @@
       "username": "kristina.smekhovich",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaTRQGKObll/",
+        "https://www.instagram.com/p/DaQoWfjuuj1/"
+      ]
     },
     {
       "username": "dasha.angel",
@@ -208,25 +231,27 @@
       "username": "christi.walks",
       "start_now_date": "2026-06-21",
       "download_stories": false,
-      "urls": []
+      "urls": ["https://www.instagram.com/p/DaWI-omkcUD/?img_index=1"]
     },
     {
       "username": "uchi_english_please",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": ["https://www.instagram.com/p/DaXQgB1CjRk/",
+"https://www.instagram.com/p/DaUzKQUOy8X/"]
     },
     {
       "username": "bela4ka_star",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": ["https://www.instagram.com/p/DaVJm0LobYF/"]
     },
     {
       "username": "genya_cuba",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": ["https://www.instagram.com/p/DaXQsH6DNz_/?img_index=1",
+"https://www.instagram.com/p/DaSe4SNMMug/"]
     },
     {
       "username": "koshkaleva",
@@ -547,7 +572,7 @@
       "urls": []
     },
     {
-      "username": "sweet_1anaa",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -595,10 +620,10 @@
       "urls": []
     }
   ],
-  "batch_name": "descargas_05_02_julio_2026",
+  "batch_name": "descargas_04_01_julio_2026",
   "defaults": {
     "download_stories": false,
-    "start_now_date": "2026-07-05"
+    "start_now_date": "2026-07-02"
   },
   "schema_version": "1.0"
 }

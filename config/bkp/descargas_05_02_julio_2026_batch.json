@@ -111,8 +111,11 @@
     {
       "username": "eliretos21",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DabC5IlIDt8/",
+        "https://www.instagram.com/p/Daarr49oRfF/"
+      ]
     },
     {
       "username": "sweetolive.tv",

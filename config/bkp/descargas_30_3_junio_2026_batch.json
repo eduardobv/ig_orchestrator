@@ -57,7 +57,7 @@
     {
       "username": "superlisha",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
@@ -97,26 +97,14 @@
       "urls": []
     },
     {
-      "username": "lilxlanes",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
       "username": "eliolive__",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
       "username": "eliretos21",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "sweetolive.tv",
-      "start_now_date": "2026-07-01",
       "download_stories": false,
       "urls": []
     },
@@ -147,8 +135,10 @@
     {
       "username": "salahova",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaNH16tjOgL/?img_index=1"
+      ]
     },
     {
       "username": "_patriba",
@@ -213,17 +203,13 @@
     {
       "username": "uchi_english_please",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaNXwSnC_aX/"
+      ]
     },
     {
       "username": "bela4ka_star",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "genya_cuba",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -313,18 +299,6 @@
       "urls": []
     },
     {
-      "username": "tely_first",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "wow.spider007",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
       "username": "chranabanana",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -393,8 +367,10 @@
     {
       "username": "mdeehotwife",
       "start_now_date": "2026-06-20",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": [
+        "https://www.instagram.com/p/DaNh6-Rxe79/"
+      ]
     },
     {
       "username": "maria.delrey69",
@@ -424,7 +400,9 @@
       "username": "urfav.mariedee",
       "start_now_date": "2026-06-08",
       "download_stories": false,
-      "urls": []
+      "urls": [
+        "https://www.instagram.com/p/DaNlIJozssJ/"
+      ]
     },
     {
       "username": "maries.files",
@@ -493,12 +471,6 @@
       "urls": []
     },
     {
-      "username": "sofiavideo01",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
       "username": "iness_vel",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -523,31 +495,31 @@
       "urls": []
     },
     {
-      "username": "amber.exclusive",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "astiwic",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "exkeysi",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "eva_fashioneva",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "sweet_1anaa",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -595,10 +567,10 @@
       "urls": []
     }
   ],
-  "batch_name": "descargas_05_02_julio_2026",
+  "batch_name": "descargas_30_3_junio_2026",
   "defaults": {
     "download_stories": false,
-    "start_now_date": "2026-07-05"
+    "start_now_date": "2026-06-28"
   },
   "schema_version": "1.0"
 }

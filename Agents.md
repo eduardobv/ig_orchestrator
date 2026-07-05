@@ -93,16 +93,19 @@ Cada ejecucion debe poder reconstruirse desde SQLite y generar un reporte Markdo
 ## Flujo v1.0.1
 
 1. Inicializar SQLite si hace falta.
-2. Importar JSON a SQLite.
-3. Leer configuracion desde SQLite.
-4. Para cada cuenta, crear carpetas.
-5. Si `download_stories = true`, generar `https://www.instagram.com/stories/{username}/`.
-6. Procesar primero stories.
-7. Procesar despues las URLs manuales en orden.
-8. Si una URL falla temporalmente, pasar a la siguiente y reintentar al final.
-9. Si una URL falla con error definitivo, guardar error y no reintentar.
-10. Mover archivos a carpeta correcta.
-11. Generar reporte Markdown.
+2. Leer y validar el JSON.
+3. Antes de importar, ordenar las cuentas en memoria: primero las que solo
+   descargan stories y despues de menos a mas URLs, conservando los empates.
+4. Importar el lote ordenado a SQLite.
+5. Leer configuracion desde SQLite.
+6. Para cada cuenta, crear carpetas.
+7. Si `download_stories = true`, generar `https://www.instagram.com/stories/{username}/`.
+8. Procesar primero stories.
+9. Procesar despues las URLs manuales en orden.
+10. Si una URL falla temporalmente, pasar a la siguiente y reintentar al final.
+11. Si una URL falla con error definitivo, guardar error y no reintentar.
+12. Mover archivos a carpeta correcta.
+13. Generar reporte Markdown.
 
 ## Errores definitivos conocidos
 

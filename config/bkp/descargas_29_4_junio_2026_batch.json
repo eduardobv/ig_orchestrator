@@ -75,13 +75,7 @@
     {
       "username": "annakonda_fit",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "anna_isachenko.fit",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
+      "download_stories": true,
       "urls": []
     },
     {
@@ -97,12 +91,6 @@
       "urls": []
     },
     {
-      "username": "lilxlanes",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
       "username": "eliolive__",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -111,12 +99,6 @@
     {
       "username": "eliretos21",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "sweetolive.tv",
-      "start_now_date": "2026-07-01",
       "download_stories": false,
       "urls": []
     },
@@ -219,14 +201,8 @@
     {
       "username": "bela4ka_star",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "genya_cuba",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": ["https://www.instagram.com/p/DaK95NFoEYv/"]
     },
     {
       "username": "koshkaleva",
@@ -308,18 +284,6 @@
     },
     {
       "username": "aria_in_sky",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "tely_first",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "wow.spider007",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -493,12 +457,6 @@
       "urls": []
     },
     {
-      "username": "sofiavideo01",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
       "username": "iness_vel",
       "start_now_date": "2026-06-21",
       "download_stories": false,
@@ -523,31 +481,31 @@
       "urls": []
     },
     {
-      "username": "amber.exclusive",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "astiwic",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "exkeysi",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "eva_fashioneva",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
     },
     {
-      "username": "sweet_1anaa",
+      "username": "",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -595,10 +553,10 @@
       "urls": []
     }
   ],
-  "batch_name": "descargas_05_02_julio_2026",
+  "batch_name": "descargas_29_4_junio_2026",
   "defaults": {
     "download_stories": false,
-    "start_now_date": "2026-07-05"
+    "start_now_date": "2026-06-28"
   },
   "schema_version": "1.0"
 }
