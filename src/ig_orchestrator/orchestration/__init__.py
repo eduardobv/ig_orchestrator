@@ -8,6 +8,11 @@ from ig_orchestrator.orchestration.batch_orchestrator import (
     BatchOrchestratorConfig,
     BatchOrchestratorResult,
 )
+from ig_orchestrator.orchestration.post_processing import (
+    PostProcessConfig,
+    PostProcessResult,
+    PostProcessRunner,
+)
 from ig_orchestrator.orchestration.retry_policy import (
     RetryDecision,
     RetryDecisionAction,
@@ -27,6 +32,9 @@ __all__ = [
     "BatchOrchestrator",
     "BatchOrchestratorConfig",
     "BatchOrchestratorResult",
+    "PostProcessConfig",
+    "PostProcessResult",
+    "PostProcessRunner",
     "RetryDecision",
     "RetryDecisionAction",
     "RetryQueue",

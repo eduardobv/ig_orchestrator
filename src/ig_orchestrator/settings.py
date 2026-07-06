@@ -28,6 +28,8 @@ class Settings:
     retry_max_seconds: int
     download_wait_timeout_seconds: int
     download_stable_seconds: int
+    post_process_enabled: bool = False
+    post_process_command: Path | None = None
     final_base_folder: Path | None = None
     manual_rename_bat_path: Path | None = None
     manual_rename_config_path: Path | None = None
@@ -47,6 +49,8 @@ _ENV_TO_FIELD = {
     "RETRY_MAX_SECONDS": "retry_max_seconds",
     "DOWNLOAD_WAIT_TIMEOUT_SECONDS": "download_wait_timeout_seconds",
     "DOWNLOAD_STABLE_SECONDS": "download_stable_seconds",
+    "POST_PROCESS_ENABLED": "post_process_enabled",
+    "POST_PROCESS_COMMAND": "post_process_command",
     "FINAL_BASE_FOLDER": "final_base_folder",
     "MANUAL_RENAME_BAT_PATH": "manual_rename_bat_path",
     "MANUAL_RENAME_CONFIG_PATH": "manual_rename_config_path",
@@ -58,6 +62,8 @@ _REQUIRED_ENV_VARS = tuple(
     if env_name
     not in {
         "FINAL_BASE_FOLDER",
+        "POST_PROCESS_ENABLED",
+        "POST_PROCESS_COMMAND",
         "MANUAL_RENAME_BAT_PATH",
         "MANUAL_RENAME_CONFIG_PATH",
     }
@@ -109,6 +115,12 @@ def load_settings(env_file: str | Path = ".env") -> Settings:
                 raw_values, "DOWNLOAD_WAIT_TIMEOUT_SECONDS"
             ),
             download_stable_seconds=_parse_int(raw_values, "DOWNLOAD_STABLE_SECONDS"),
+            post_process_enabled=_parse_optional_bool(
+                raw_values, "POST_PROCESS_ENABLED", default=False
+            ),
+            post_process_command=_parse_optional_path(
+                raw_values, "POST_PROCESS_COMMAND"
+            ),
             final_base_folder=_parse_optional_path(raw_values, "FINAL_BASE_FOLDER"),
             manual_rename_bat_path=_parse_optional_path(
                 raw_values, "MANUAL_RENAME_BAT_PATH"
@@ -145,6 +157,23 @@ def _parse_optional_path(raw_values: dict[str, str], env_name: str) -> Path | No
     if value is None or not value.strip():
         return None
     return Path(value)
+
+
+def _parse_optional_bool(
+    raw_values: dict[str, str],
+    env_name: str,
+    *,
+    default: bool,
+) -> bool:
+    value = raw_values.get(env_name)
+    if value is None or not value.strip():
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    raise ValueError(f"{env_name} must be a boolean")
 
 
 __all__ = ["Settings", "SettingsError", "load_settings"]

@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.24.5 - Patch - Post-proceso Manual Rename Files
+
+Fecha: 2026-07-05
+
+### Creado
+
+* `src/ig_orchestrator/orchestration/post_processing.py` para ejecutar un
+  comando externo opcional tras batch y reporte correctos.
+* `D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat` como wrapper externo
+  de automatizacion equivalente a `MRF.bat`, pero sin `pause`.
+* `tests/test_post_processing.py` con pruebas de comando deshabilitado,
+  configuracion incompleta, exito y fallo de `.cmd`.
+
+### Modificado
+
+* `src/ig_orchestrator/main.py` ejecuta el post-proceso solo despues de generar
+  los reportes y solo si no hubo fallo de infraestructura en el batch.
+* `src/ig_orchestrator/settings.py`, `.env.example` y `config/app.example.json`
+  agregan `POST_PROCESS_ENABLED` y `POST_PROCESS_COMMAND`.
+* `README.md` documenta que el wrapper recomendado es
+  `D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat` y que `batch.json`
+  no recibe parametros especificos del renombrador.
+* Version actualizada a `1.24.5`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_settings.py tests/test_post_processing.py tests/test_package_smoke.py tests/test_main_batch_modes.py -q` (`14 passed`)
+* `python -m pytest -q` (`139 passed`)
+* `python -m compileall -q src tests`
+
 ## v1.24.4 - Patch - Prioridad de cuentas por stories y volumen
 
 Fecha: 2026-06-24

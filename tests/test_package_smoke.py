@@ -14,7 +14,7 @@ from ig_orchestrator.telegram import BotConversationResult
 
 
 def test_package_imports() -> None:
-    assert ig_orchestrator.__version__ == "1.24.4"
+    assert ig_orchestrator.__version__ == "1.24.5"
 
 
 def test_module_entrypoint_runs() -> None:
@@ -30,7 +30,7 @@ def test_module_entrypoint_runs() -> None:
         text=True,
     )
 
-    assert "ig_orchestrator v1.24.4" in result.stdout
+    assert "ig_orchestrator v1.24.5" in result.stdout
 
 
 def test_module_entrypoint_dry_run_imports_batch_without_telegram(tmp_path: Path) -> None:
@@ -124,6 +124,9 @@ def test_main_real_run_processes_batch_with_telegram_service(tmp_path: Path, mon
     monkeypatch.setenv("RETRY_MAX_SECONDS", "1")
     monkeypatch.setenv("DOWNLOAD_WAIT_TIMEOUT_SECONDS", "1")
     monkeypatch.setenv("DOWNLOAD_STABLE_SECONDS", "0")
+    monkeypatch.setenv("POST_PROCESS_ENABLED", "true")
+    monkeypatch.setenv("POST_PROCESS_COMMAND", str(tmp_path / "MRF_auto.cmd"))
+    post_process_calls = []
 
     class FakeTelegramClient:
         def __init__(self, _config):
@@ -162,14 +165,30 @@ def test_main_real_run_processes_batch_with_telegram_service(tmp_path: Path, mon
             )
             return BotConversationResult(job=updated_job, files=(stored_file,))
 
+    class FakePostProcessRunner:
+        def __init__(self, config):
+            self.config = config
+
+        def run(self):
+            post_process_calls.append(self.config.command)
+            assert list((tmp_path / "reports").glob("run_*.md"))
+            return app_main.PostProcessResult(
+                skipped=False,
+                success=True,
+                command=self.config.command,
+                exit_code=0,
+            )
+
     monkeypatch.setattr(app_main, "TelethonTelegramClient", FakeTelegramClient)
     monkeypatch.setattr(app_main, "BotConversationService", FakeBotConversationService)
+    monkeypatch.setattr(app_main, "PostProcessRunner", FakePostProcessRunner)
 
     exit_code = app_main.main(["--input", str(input_path), "--run"])
 
     assert exit_code == 0
     assert (tmp_path / "working" / "real_user" / "downloaded_1.jpg").is_file()
     assert list((tmp_path / "reports").glob("run_*.md"))
+    assert post_process_calls == [tmp_path / "MRF_auto.cmd"]
 
 
 def test_run_continue_processes_sqlite_batch_without_importing_json(

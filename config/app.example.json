@@ -8,6 +8,8 @@
     "retry_base_seconds": 90,
     "retry_max_seconds": 900,
     "download_wait_timeout_seconds": 300,
-    "download_stable_seconds": 10
+    "download_stable_seconds": 10,
+    "post_process_enabled": false,
+    "post_process_command": "D:\\Archivos\\Scripts\\IG\\ManualRenameFiles\\MRF_auto.bat"
   }
 }

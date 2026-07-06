@@ -29,6 +29,10 @@ from ig_orchestrator.orchestration import (
     AccountOrchestratorConfig,
     BatchOrchestrator,
     BatchOrchestratorConfig,
+    BatchOrchestratorResult,
+    PostProcessConfig,
+    PostProcessResult,
+    PostProcessRunner,
     UrlJobProcessor,
     UrlJobProcessorConfig,
     UrlJobProcessorResult,
@@ -321,7 +325,16 @@ def _run_batch(
     print(f"SQLite database: {settings.sqlite_db_path}")
     for report_path in report_paths:
         print(f"Markdown report: {report_path}")
-    return 1 if any(result.error for result in results) else 0
+    post_process_result = _run_post_process_if_ready(
+        settings=settings,
+        results=results,
+        report_paths=report_paths,
+    )
+    if any(result.error for result in results):
+        return 1
+    if post_process_result is not None and not post_process_result.success:
+        return 1
+    return 0
 
 
 def _run_continue(
@@ -441,7 +454,62 @@ def _run_continue(
     print(f"SQLite database: {settings.sqlite_db_path}")
     for report_path in report_paths:
         print(f"Markdown report: {report_path}")
-    return 1 if any(result.error for result in results) else 0
+    post_process_result = _run_post_process_if_ready(
+        settings=settings,
+        results=results,
+        report_paths=report_paths,
+    )
+    if any(result.error for result in results):
+        return 1
+    if post_process_result is not None and not post_process_result.success:
+        return 1
+    return 0
+
+
+def _run_post_process_if_ready(
+    *,
+    settings,
+    results: list[BatchOrchestratorResult],
+    report_paths: list[Path],
+) -> PostProcessResult | None:
+    if not settings.post_process_enabled:
+        return None
+
+    if any(result.error for result in results):
+        print("Manual rename post-processing: skipped because batch processing failed.")
+        return None
+
+    expected_reports = sum(1 for result in results if result.run.id is not None)
+    if len(report_paths) != expected_reports:
+        print("Manual rename post-processing: skipped because report generation was incomplete.")
+        return PostProcessResult(
+            skipped=True,
+            success=False,
+            error="Report generation was incomplete.",
+        )
+
+    command = settings.post_process_command
+    print("Manual rename post-processing: starting.")
+    if command is not None:
+        print(f"Manual rename post-processing command: {command}")
+
+    result = PostProcessRunner(
+        PostProcessConfig(
+            enabled=settings.post_process_enabled,
+            command=command,
+        )
+    ).run()
+    if result.success:
+        print("Manual rename post-processing: success")
+    else:
+        print("Manual rename post-processing: failed")
+        if result.exit_code is not None:
+            print(f"Manual rename post-processing exit code: {result.exit_code}")
+        if result.error:
+            print(result.error)
+        if result.stderr:
+            print(result.stderr)
+    return result
 
 
 def _select_continue_batches(

@@ -105,8 +105,9 @@
     {
       "username": "eliolive__",
       "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
+      "download_stories": true,
+      "urls": ["https://www.instagram.com/p/DabDc6AtGlf/",
+"https://www.instagram.com/p/Daav-akNiGy/"]
     },
     {
       "username": "eliretos21",
@@ -320,12 +321,6 @@
     },
     {
       "username": "wow.spider007",
-      "start_now_date": "2026-06-21",
-      "download_stories": false,
-      "urls": []
-    },
-    {
-      "username": "ariavivian_love",
       "start_now_date": "2026-06-21",
       "download_stories": false,
       "urls": []
@@ -601,7 +596,7 @@
       "urls": []
     }
   ],
-  "batch_name": "descargas_06_01_julio_2026",
+  "batch_name": "descargas_05_03_julio_2026",
   "defaults": {
     "download_stories": false,
     "start_now_date": "2026-07-05"

@@ -12,7 +12,9 @@ Estado actual importante:
 - Un `--run` puede encadenar un lote nuevo con un lote pendiente, antes o despues.
 - Tras importar un lote real se crea un backup en `config\bkp` y `batch.json` queda limpio para reutilizar sus cuentas.
 - `--dry-run` sigue disponible para validar `.env`, JSON, SQLite y orquestacion sin Telegram y sin mover archivos.
-- La integracion con renombrador, duplicados y movimiento final a `G:\4K Stogram` sigue fuera de alcance.
+- El orquestador puede ejecutar un post-proceso opcional despues del reporte.
+  La configuracion interna de renombrado, duplicados y movimiento final sigue
+  perteneciendo al script externo de Manual Rename Files.
 
 ## Que problema resuelve
 
@@ -117,7 +119,20 @@ DOWNLOAD_WAIT_TIMEOUT_SECONDS=300
 DOWNLOAD_STABLE_SECONDS=10
 ```
 
-Variables opcionales reservadas para versiones posteriores:
+Variables opcionales de post-proceso:
+
+```env
+POST_PROCESS_ENABLED=false
+POST_PROCESS_COMMAND=D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat
+```
+
+`POST_PROCESS_COMMAND` debe apuntar a un comando generico, normalmente un
+`.bat` o `.cmd`. Para Manual Rename Files se recomienda usar `MRF_auto.bat`,
+sin `pause`, y dejar `MRF.bat` para lanzamientos manuales. El orquestador no
+anade parametros de renombrado al `batch.json`: esos valores siguen viviendo
+dentro del script externo o su wrapper.
+
+Variables opcionales reservadas:
 
 ```env
 FINAL_BASE_FOLDER=G:\4K Stogram\00.FAVORITES
@@ -310,6 +325,10 @@ Este modo:
 - Aplica reintentos FIFO para errores temporales.
 - Guarda estados, errores y archivos en SQLite.
 - Genera un reporte Markdown en `REPORTS_FOLDER`.
+- Si `POST_PROCESS_ENABLED=true`, y el batch no tuvo fallo de infraestructura,
+  ejecuta `POST_PROCESS_COMMAND` despues de generar correctamente el reporte.
+  Si ese comando falla, el batch y el reporte quedan informados como correctos,
+  pero el proceso termina con fallo de post-proceso.
 
 Salida orientativa:
 
@@ -398,7 +417,10 @@ flowchart TD
     R --> S[Mover archivos y guardar estados]
     S --> T[Aplicar reintentos si corresponde]
     T --> U[Generar reporte Markdown]
-    U --> V[Mostrar resumen real en consola]
+    U --> V{Post-proceso habilitado}
+    V -->|no| W[Mostrar resumen real en consola]
+    V -->|si| X[Ejecutar comando configurado]
+    X --> W
 ```
 
 Los dos modos comparten carga de `.env`, inicializacion de SQLite, validacion del JSON, importacion a SQLite y repositorios. La diferencia es que `--dry-run` se detiene en una simulacion trazable; `--run` arranca Telethon, habla con el bot, observa descargas, mueve archivos y escribe reporte.
@@ -458,6 +480,7 @@ sequenceDiagram
 - `input/url_classifier.py`: clasifica URLs como `POST`, `REEL`, `STORY`, `HIGHLIGHTS` o `UNKNOWN`.
 - `db/*_repository.py`: encapsula lecturas/escrituras SQLite.
 - `orchestration/batch_orchestrator.py`: procesa cuentas pendientes de un lote.
+- `orchestration/post_processing.py`: ejecuta el comando opcional posterior al reporte.
 - `orchestration/account_orchestrator.py`: ordena URLs, crea carpetas en modo real y aplica reintentos FIFO.
 - `orchestration/retry_policy.py`: calcula si reintentar, cuanto esperar o marcar fallo final.
 - `orchestration/url_job_processor.py`: procesa una URL, invoca Telegram, mueve archivos y actualiza estados.
@@ -674,6 +697,8 @@ En ejecucion real prevista:
 - La consola/log muestra resumen final.
 - Cada URL queda en estado terminal, normalmente `COMPLETED` o `FAILED_FINAL`.
 - El reporte Markdown queda escrito en `reports`.
+- Si el post-proceso esta habilitado, la consola indica `Manual rename post-processing: success`
+  o muestra el codigo de salida/error del comando externo.
 
 ## Tests
 
@@ -704,4 +729,6 @@ El `.gitignore` ya cubre estos archivos.
 ## Limitaciones actuales
 
 - El reporte Markdown no se genera automaticamente en el dry-run actual.
-- La integracion con renombrador, limpieza de duplicados y movimiento final a `G:\4K Stogram` estan fuera del alcance actual.
+- El orquestador solo invoca un comando externo de post-proceso. La logica de
+  renombrado, limpieza de duplicados y movimiento final a `G:\4K Stogram` sigue
+  fuera de este proyecto y pertenece a Manual Rename Files.

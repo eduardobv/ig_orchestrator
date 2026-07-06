@@ -19,6 +19,8 @@ ENV_NAMES = (
     "RETRY_MAX_SECONDS",
     "DOWNLOAD_WAIT_TIMEOUT_SECONDS",
     "DOWNLOAD_STABLE_SECONDS",
+    "POST_PROCESS_ENABLED",
+    "POST_PROCESS_COMMAND",
     "FINAL_BASE_FOLDER",
     "MANUAL_RENAME_BAT_PATH",
     "MANUAL_RENAME_CONFIG_PATH",
@@ -44,6 +46,8 @@ def write_env_file(path: Path, *, include_api_hash: bool = True) -> None:
         "RETRY_MAX_SECONDS=900",
         "DOWNLOAD_WAIT_TIMEOUT_SECONDS=300",
         "DOWNLOAD_STABLE_SECONDS=10",
+        "POST_PROCESS_ENABLED=true",
+        r"POST_PROCESS_COMMAND=D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat",
         r"FINAL_BASE_FOLDER=G:\4K Stogram\00.FAVORITES",
         r"MANUAL_RENAME_BAT_PATH=C:\path\to\ManualRenameFiles.bat",
         r"MANUAL_RENAME_CONFIG_PATH=C:\path\to\config.json",
@@ -77,6 +81,10 @@ def test_load_settings_from_env_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert settings.retry_max_seconds == 900
     assert settings.download_wait_timeout_seconds == 300
     assert settings.download_stable_seconds == 10
+    assert settings.post_process_enabled is True
+    assert settings.post_process_command == Path(
+        r"D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat"
+    )
     assert settings.final_base_folder == Path(r"G:\4K Stogram\00.FAVORITES")
     assert settings.manual_rename_bat_path == Path(r"C:\path\to\ManualRenameFiles.bat")
     assert settings.manual_rename_config_path == Path(r"C:\path\to\config.json")
@@ -107,6 +115,8 @@ def test_reserved_future_variables_are_optional(
     content = env_file.read_text(encoding="utf-8")
     for env_name in (
         "FINAL_BASE_FOLDER",
+        "POST_PROCESS_ENABLED",
+        "POST_PROCESS_COMMAND",
         "MANUAL_RENAME_BAT_PATH",
         "MANUAL_RENAME_CONFIG_PATH",
     ):
@@ -118,5 +128,25 @@ def test_reserved_future_variables_are_optional(
     settings = load_settings(env_file)
 
     assert settings.final_base_folder is None
+    assert settings.post_process_enabled is False
+    assert settings.post_process_command is None
     assert settings.manual_rename_bat_path is None
     assert settings.manual_rename_config_path is None
+
+
+def test_invalid_post_process_enabled_raises_clear_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_settings_environment(monkeypatch)
+    env_file = tmp_path / ".env"
+    write_env_file(env_file)
+    content = env_file.read_text(encoding="utf-8").replace(
+        "POST_PROCESS_ENABLED=true",
+        "POST_PROCESS_ENABLED=maybe",
+    )
+    env_file.write_text(content, encoding="utf-8")
+
+    with pytest.raises(SettingsError) as exc_info:
+        load_settings(env_file)
+
+    assert "POST_PROCESS_ENABLED must be a boolean" in str(exc_info.value)
