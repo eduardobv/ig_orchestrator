@@ -8,10 +8,17 @@ from ig_orchestrator.input.batch_json_parser import (
 )
 from ig_orchestrator.input.batch_importer import (
     BatchImportResult,
-    DuplicateBatchNameError,
     build_story_url,
     import_batch_json,
     import_parsed_batch,
+)
+from ig_orchestrator.input.batch_creation_service import (
+    BatchCreationAccount,
+    BatchCreationDuplicateUrl,
+    BatchCreationRequest,
+    BatchCreationResult,
+    DuplicateBatchNameError,
+    create_batch,
 )
 from ig_orchestrator.input.batch_file_service import (
     BatchFileFinalization,
@@ -24,6 +31,10 @@ from ig_orchestrator.input.url_classifier import (
 
 __all__ = [
     "BatchJsonParserError",
+    "BatchCreationAccount",
+    "BatchCreationDuplicateUrl",
+    "BatchCreationRequest",
+    "BatchCreationResult",
     "BatchImportResult",
     "DuplicateBatchNameError",
     "BatchFileFinalization",
@@ -34,6 +45,7 @@ __all__ = [
     "UrlClassifierError",
     "build_story_url",
     "classify_instagram_url",
+    "create_batch",
     "import_batch_json",
     "backup_and_clean_batch_json",
     "import_parsed_batch",

@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.25.0 - Tarea GUI 1 - Editor de lote y persistencia SQLite
+
+Fecha: 2026-07-06
+
+### Creado
+
+* `src/ig_orchestrator/input/batch_creation_service.py` como servicio comun
+  para crear lotes SQLite desde JSON o GUI.
+* Paquete `src/ig_orchestrator/gui/` con borradores de lote, validacion,
+  catalogo de cuentas, ventana Tkinter y placeholder de runner.
+* `tests/test_gui_services.py` con cobertura de persistencia del borrador,
+  catalogo desde `account_history`, catalogo desde `config/batch.json`,
+  cuenta vacia invalida y batch duplicado.
+
+### Modificado
+
+* `src/ig_orchestrator/input/batch_importer.py` delega la persistencia en el
+  servicio comun sin cambiar el contrato CLI existente.
+* `src/ig_orchestrator/main.py` agrega `python -m ig_orchestrator gui`.
+* `src/ig_orchestrator/input/__init__.py` expone los DTOs de creacion comun.
+* Version actualizada a `1.25.0`.
+
+### Resumen
+
+La aplicacion puede abrir una GUI de escritorio con Tkinter para crear un lote,
+seleccionar cuentas frecuentes desde SQLite o `config/batch.json`, editar filas
+del borrador, validar URLs de Instagram y guardar el batch en SQLite sin tocar
+`config/batch.json`. La ejecucion desde la ventana queda reservada para la
+Tarea GUI 2.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_batch_importer.py tests/test_package_smoke.py tests/test_main_batch_modes.py -q` (`17 passed`)
+* `python -m compileall -q src tests`
+* `python -m pytest -q` (`144 passed`)
+* `git diff --check` (solo avisos de normalizacion LF/CRLF)
+
 ## v1.24.5 - Patch - Post-proceso Manual Rename Files
 
 Fecha: 2026-07-05

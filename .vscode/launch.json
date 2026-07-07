@@ -58,6 +58,23 @@
       "noDebug": true
     },
     {
+      "name": "Ejecutar: GUI ig_orchestrator",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ig_orchestrator",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "PYDEVD_USE_SYS_MONITORING": "false"
+      },
+      "args": [
+        "gui"
+      ],
+      "noDebug": true
+    },
+    {
       "name": "Depurar: run_continue",
       "type": "debugpy",
       "request": "launch",

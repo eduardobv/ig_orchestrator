@@ -77,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command")
     init_db_parser = subparsers.add_parser("init-db")
     init_db_parser.add_argument("--db-path", type=Path, default=None)
+    gui_parser = subparsers.add_parser("gui", help="Open the desktop batch editor.")
+    gui_parser.add_argument("--batch-json", type=Path, default=Path("config/batch.json"))
     run_continue_parser = subparsers.add_parser(
         "run_continue",
         help="Continue resumable work from SQLite without importing batch.json.",
@@ -97,6 +99,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "init-db":
         return _init_db(args.db_path)
+    if args.command == "gui":
+        return _run_gui(args.batch_json)
     if args.command == "run_continue":
         return _run_continue(
             batch_id=args.batch_id,
@@ -127,6 +131,28 @@ def _init_db(db_path: Path | None) -> int:
 
     init_database(db_path)
     print(f"SQLite database ready: {db_path}")
+    return 0
+
+
+def _run_gui(batch_json_path: Path) -> int:
+    try:
+        settings = load_settings()
+    except SettingsError as exc:
+        print(f"Cannot open GUI: {exc}")
+        return 2
+
+    init_database(settings.sqlite_db_path)
+    connection = connect(settings.sqlite_db_path)
+    try:
+        from ig_orchestrator.gui import launch_gui
+
+        launch_gui(
+            connection=connection,
+            settings=settings,
+            batch_json_path=batch_json_path,
+        )
+    finally:
+        connection.close()
     return 0
 
 
