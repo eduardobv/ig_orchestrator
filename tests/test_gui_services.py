@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -9,18 +10,21 @@ from ig_orchestrator.db import (
     AccountHistoryRepository,
     AccountRepository,
     BatchRepository,
+    RunRepository,
     UrlJobRepository,
     connect,
     init_database,
 )
+from ig_orchestrator.gui.app import _latest_executed_batch_name
 from ig_orchestrator.gui.account_catalog_service import AccountCatalogService
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
+    normalize_url_lines,
     save_batch_draft,
 )
 from ig_orchestrator.input import DuplicateBatchNameError
-from ig_orchestrator.models import PublicationType, UrlSource
+from ig_orchestrator.models import PublicationType, RunStatus, RunSummary, UrlSource
 
 
 def test_gui_draft_is_persisted_as_sqlite_batch(tmp_path: Path) -> None:
@@ -144,3 +148,138 @@ def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:
 
         with pytest.raises(DuplicateBatchNameError, match="already exists"):
             save_batch_draft(draft, connection)
+
+
+def test_gui_url_normalization_accepts_quoted_comma_lists() -> None:
+    assert normalize_url_lines(
+        [
+            '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+            '"https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",',
+            '"https://www.instagram.com/p/DaO63b4t9_h/"',
+        ]
+    ) == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+        "https://www.instagram.com/p/DaO63b4t9_h/",
+    ]
+
+
+def test_gui_url_normalization_accepts_trailing_comma() -> None:
+    assert normalize_url_lines(
+        [
+            '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+            '"https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",',
+        ]
+    ) == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+    ]
+
+
+def test_gui_url_normalization_keeps_clean_line_lists() -> None:
+    assert normalize_url_lines(
+        [
+            "https://www.instagram.com/p/DaGP2rHuY0P/",
+            "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+        ]
+    ) == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+    ]
+
+
+def test_gui_draft_validation_uses_comma_url_normalization(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="comma_urls",
+        default_start_now_date="2026-07-06",
+        accounts=[
+            AccountDraft(
+                username="comma_user",
+                urls=[
+                    '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+                    '"https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",',
+                ],
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        account = AccountRepository(connection).list_by_batch(result.batch.id)[0]
+
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+
+    assert [job.url for job in jobs] == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+    ]
+
+
+def test_gui_initial_batch_name_uses_latest_executed_batch(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        older = save_batch_draft(
+            BatchDraft(
+                batch_name="older_batch",
+                default_start_now_date="2026-07-06",
+                accounts=[
+                    AccountDraft(
+                        username="older_user",
+                        urls=["https://www.instagram.com/reel/ABC123xyz/"],
+                    )
+                ],
+            ),
+            connection,
+        ).batch
+        newer = save_batch_draft(
+            BatchDraft(
+                batch_name="newer_batch",
+                default_start_now_date="2026-07-06",
+                accounts=[
+                    AccountDraft(
+                        username="newer_user",
+                        urls=["https://www.instagram.com/reel/DEF123xyz/"],
+                    )
+                ],
+            ),
+            connection,
+        ).batch
+        run_repository = RunRepository(connection)
+        run_repository.create(
+            RunSummary(status=RunStatus.COMPLETED),
+            batch_id=newer.id,
+            started_at=datetime(2026, 7, 7, 9, 0, tzinfo=timezone.utc),
+        )
+        run_repository.create(
+            RunSummary(status=RunStatus.COMPLETED),
+            batch_id=older.id,
+            started_at=datetime(2026, 7, 7, 10, 0, tzinfo=timezone.utc),
+        )
+
+        assert _latest_executed_batch_name(connection) == "older_batch"
+
+
+def test_gui_initial_batch_name_falls_back_to_latest_saved_batch(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        save_batch_draft(
+            BatchDraft(
+                batch_name="saved_batch",
+                default_start_now_date="2026-07-06",
+                accounts=[
+                    AccountDraft(
+                        username="saved_user",
+                        urls=["https://www.instagram.com/reel/ABC123xyz/"],
+                    )
+                ],
+            ),
+            connection,
+        )
+
+        assert _latest_executed_batch_name(connection) == "saved_batch"

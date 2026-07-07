@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from datetime import date
+from io import StringIO
 from sqlite3 import Connection
 from urllib.parse import urlparse
 
@@ -134,7 +136,7 @@ def _normalized_urls(values: list[str]) -> tuple[list[str], list[str]]:
     urls: list[str] = []
     duplicates: list[str] = []
     seen: set[str] = set()
-    for raw_url in values:
+    for raw_url in normalize_url_lines(values):
         url = raw_url.strip()
         if not url:
             continue
@@ -144,6 +146,19 @@ def _normalized_urls(values: list[str]) -> tuple[list[str], list[str]]:
         urls.append(url)
         seen.add(url)
     return urls, duplicates
+
+
+def normalize_url_lines(values: list[str]) -> list[str]:
+    text = "\n".join(values)
+    parsed_urls: list[str] = []
+    for row in csv.reader(StringIO(text), skipinitialspace=True):
+        for raw_value in row:
+            value = raw_value.strip().strip('"').strip("'").strip()
+            if value.endswith(","):
+                value = value[:-1].strip()
+            if value:
+                parsed_urls.append(value)
+    return parsed_urls
 
 
 def _parse_date(value: str, label: str) -> date:
@@ -168,6 +183,7 @@ __all__ = [
     "AccountDraftValidation",
     "BatchDraftValidationError",
     "inspect_account_draft",
+    "normalize_url_lines",
     "save_batch_draft",
     "validate_batch_draft",
 ]

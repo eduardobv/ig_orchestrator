@@ -14,6 +14,7 @@ from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
+    normalize_url_lines,
     save_batch_draft,
 )
 from ig_orchestrator.gui.process_runner import build_run_continue_command
@@ -56,12 +57,15 @@ class InstagramOrchestratorApp:
         self.selected_index: int | None = None
         self.saved_batch_id: int | None = None
 
-        self.batch_name_var = tk.StringVar(value=_suggest_batch_name())
-        self.default_date_var = tk.StringVar(value=date.today().isoformat())
+        today = date.today().isoformat()
+        self.batch_name_var = tk.StringVar(
+            value=_latest_executed_batch_name(connection) or _suggest_batch_name()
+        )
+        self.default_date_var = tk.StringVar(value=today)
         self.dry_run_var = tk.BooleanVar(value=False)
         self.catalog_filter_var = tk.StringVar()
         self.username_var = tk.StringVar()
-        self.account_date_var = tk.StringVar()
+        self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Ready")
         self.indicators_var = tk.StringVar(value="URLs: 0")
@@ -249,11 +253,8 @@ class InstagramOrchestratorApp:
         self._apply_catalog_date()
 
     def _apply_catalog_date(self) -> None:
-        username = self.username_var.get().strip().lower()
-        for entry in self.catalog_entries:
-            if entry.username.lower() == username and entry.start_now_date:
-                self.account_date_var.set(entry.start_now_date)
-                break
+        if not self.account_date_var.get().strip():
+            self.account_date_var.set(date.today().isoformat())
 
     def _load_selected_row(self) -> None:
         selection = self.tree.selection()
@@ -351,7 +352,7 @@ class InstagramOrchestratorApp:
     def _clear_editor(self) -> None:
         self.selected_index = None
         self.username_var.set("")
-        self.account_date_var.set("")
+        self.account_date_var.set(date.today().isoformat())
         self.stories_var.set(False)
         self.urls_text.delete("1.0", tk.END)
         self._update_indicators()
@@ -365,8 +366,7 @@ class InstagramOrchestratorApp:
         self._update_indicators()
 
     def _normalize_urls(self) -> None:
-        urls = [url.strip() for url in self.urls_text.get("1.0", tk.END).splitlines()]
-        urls = [url for url in urls if url]
+        urls = normalize_url_lines(self.urls_text.get("1.0", tk.END).splitlines())
         self.urls_text.delete("1.0", tk.END)
         self.urls_text.insert("1.0", "\n".join(urls))
         self._update_indicators()
@@ -440,6 +440,33 @@ class InstagramOrchestratorApp:
 
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M')}"
+
+
+def _latest_executed_batch_name(connection: Connection) -> str | None:
+    row = connection.execute(
+        """
+        SELECT input_batches.batch_name
+        FROM runs
+        JOIN input_batches ON input_batches.id = runs.batch_id
+        WHERE runs.batch_id IS NOT NULL
+        ORDER BY runs.started_at DESC, runs.id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row is not None:
+        return str(row[0])
+
+    row = connection.execute(
+        """
+        SELECT batch_name
+        FROM input_batches
+        ORDER BY id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if row is None:
+        return None
+    return str(row[0])
 
 
 __all__ = ["InstagramOrchestratorApp", "launch_gui"]

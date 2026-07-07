@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.25.1 - Patch - Ajustes GUI de lote
+
+Fecha: 2026-07-07
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` inicializa `Batch name` desde el ultimo
+  lote ejecutado en SQLite, rellena fechas de lote y cuenta con hoy, y mantiene
+  la fecha de cuenta tras `Agregar / Actualizar`.
+* `src/ig_orchestrator/gui/batch_draft_service.py` normaliza URLs pegadas con
+  comillas, comas y coma final, compartiendo la misma logica entre el boton
+  `Normalizar` y el guardado del lote.
+* `tasks/task-gui.md` y `README.md` documentan el nuevo comportamiento.
+* Version actualizada a `1.25.1`.
+
+### Resumen
+
+La GUI arranca con datos mas utiles para el flujo diario y acepta listados de
+URLs copiados tanto como lista limpia por lineas como en formato con comillas y
+comas.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_package_smoke.py -q` (`16 passed`)
+* `python -m compileall -q src tests`
+* `python -m pytest -q` (`150 passed`)
+
 ## v1.25.0 - Tarea GUI 1 - Editor de lote y persistencia SQLite
 
 Fecha: 2026-07-06

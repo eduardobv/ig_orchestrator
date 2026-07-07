@@ -90,8 +90,10 @@ Ventana principal: `Instagram Orchestrator`
 
 Zona superior:
 
-- `Batch name`: input editable, sugerido como `descargas_YYYY_MM_DD_HHMM`.
-- `Start date`: input `YYYY-MM-DD`, por defecto hoy o el ultimo valor usado.
+- `Batch name`: input editable, inicializado con el ultimo `batch_name`
+  ejecutado en SQLite. Si no hay ejecuciones, usa el ultimo batch guardado; si
+  tampoco existe, sugiere `descargas_YYYY_MM_DD_HHMM`.
+- `Start date`: input `YYYY-MM-DD`, por defecto hoy.
 - `Dry-run`: checkbox.
 - `Ejecutar`: boton principal.
 - `Guardar lote`: boton secundario para crear el batch sin ejecutarlo.
@@ -127,7 +129,8 @@ Panel derecho: editor de cuenta
 
 - `Username`: combobox editable con autocomplete.
 - `Download stories`: checkbox.
-- `Start date`: input opcional; si esta vacio hereda la fecha del lote.
+- `Start date`: input por defecto hoy. Tras `Agregar / Actualizar`, el editor
+  limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea.
 - Botones:
   - `Pegar`;
@@ -155,7 +158,9 @@ Panel inferior: ejecucion
 - No permitir una cuenta activa sin stories y sin URLs.
 - Permitir cuentas nuevas no presentes en el catalogo.
 - Normalizar username con `strip()`, sin `@` inicial.
-- Pegar URLs en bloque y separar por saltos de linea.
+- Pegar URLs en bloque separadas por saltos de linea o por comas.
+- Aceptar URLs con comillas dobles o simples, con coma al final, y normalizar
+  el texto a una URL limpia por linea.
 - Ignorar lineas vacias.
 - Detectar duplicados dentro de la misma cuenta antes de guardar.
 - Validar dominio Instagram usando la misma politica del parser actual.

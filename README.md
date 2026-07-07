@@ -242,6 +242,37 @@ Reglas de validacion:
   por numero ascendente de URLs procesables. Los empates mantienen el orden
   original del JSON.
 
+## GUI de escritorio
+
+La GUI local se abre con:
+
+```bash
+python -m ig_orchestrator gui
+```
+
+Al iniciar, el campo `Batch name` se rellena con el ultimo lote ejecutado en
+SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta
+vacia, sugiere un nombre nuevo con timestamp.
+
+Los campos `Start date` del lote y del editor de cuenta arrancan con la fecha
+de hoy. Al pulsar `Agregar / Actualizar`, el editor limpia `username`,
+`download_stories` y `URLs`, pero mantiene el `Start date` de hoy.
+
+El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
+y comas. El boton `Normalizar` convierte entradas como:
+
+```text
+"https://www.instagram.com/p/DaGP2rHuY0P/",
+"https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+```
+
+en:
+
+```text
+https://www.instagram.com/p/DaGP2rHuY0P/
+https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1
+```
+
 ## Como ejecutarlo
 
 ### Preparacion inicial
