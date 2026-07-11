@@ -188,6 +188,20 @@ def test_gui_url_normalization_keeps_clean_line_lists() -> None:
     ]
 
 
+def test_gui_url_normalization_removes_duplicate_clean_urls() -> None:
+    assert normalize_url_lines(
+        [
+            "https://www.instagram.com/p/DaGP2rHuY0P/",
+            '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+            "'https://www.instagram.com/p/DaGP2rHuY0P/'",
+            "https://www.instagram.com/reel/ABC123xyz/",
+        ]
+    ) == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/reel/ABC123xyz/",
+    ]
+
+
 def test_gui_draft_validation_uses_comma_url_normalization(tmp_path: Path) -> None:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)
@@ -214,6 +228,36 @@ def test_gui_draft_validation_uses_comma_url_normalization(tmp_path: Path) -> No
     assert [job.url for job in jobs] == [
         "https://www.instagram.com/p/DaGP2rHuY0P/",
         "https://www.instagram.com/p/DaLSvqrFK3P/?img_index=1",
+    ]
+
+
+def test_gui_draft_validation_removes_duplicate_clean_urls(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="duplicate_clean_urls",
+        default_start_now_date="2026-07-06",
+        accounts=[
+            AccountDraft(
+                username="duplicate_user",
+                urls=[
+                    "https://www.instagram.com/p/DaGP2rHuY0P/",
+                    '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+                    "https://www.instagram.com/reel/ABC123xyz/",
+                ],
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        account = AccountRepository(connection).list_by_batch(result.batch.id)[0]
+
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+
+    assert [job.url for job in jobs] == [
+        "https://www.instagram.com/p/DaGP2rHuY0P/",
+        "https://www.instagram.com/reel/ABC123xyz/",
     ]
 
 

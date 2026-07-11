@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.25.2 - Patch - Deduplicacion de URLs en GUI
+
+Fecha: 2026-07-08
+
+### Modificado
+
+* `src/ig_orchestrator/gui/batch_draft_service.py` elimina URLs repetidas tras
+  limpiar comillas y comas, conservando la primera aparicion.
+* `tests/test_gui_services.py` cubre normalizacion y guardado con URLs
+  duplicadas en formato limpio, con comillas y con coma final.
+* Version actualizada a `1.25.2`.
+
+### Resumen
+
+Los botones `Normalizar` y `Agregar / Actualizar` usan la misma normalizacion,
+por lo que las URLs duplicadas se eliminan antes de actualizar la caja o guardar
+la cuenta en el lote.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_package_smoke.py -q` (`18 passed`)
+* `python -m compileall -q src tests`
+
 ## v1.25.1 - Patch - Ajustes GUI de lote
 
 Fecha: 2026-07-07

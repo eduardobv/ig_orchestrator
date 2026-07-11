@@ -2,6 +2,42 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Ejecutar: GUI ig_orchestrator",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ig_orchestrator",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "PYDEVD_USE_SYS_MONITORING": "false"
+      },
+      "args": [
+        "gui"
+      ],
+      "noDebug": true
+    },
+    {
+      "name": "Ejecutar: run_continue",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ig_orchestrator",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "PYDEVD_USE_SYS_MONITORING": "false"
+      },
+      "args": [
+        "run_continue",
+        "--batch-id",
+        "35"
+      ],
+      "noDebug": true
+    },
+    {
       "name": "Ejecutar: ig_orchestrator",
       "type": "debugpy",
       "request": "launch",
@@ -39,42 +75,6 @@
       ]
     },
     {
-      "name": "Ejecutar: run_continue",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "ig_orchestrator",
-      "cwd": "${workspaceFolder}",
-      "console": "externalTerminal",
-      "justMyCode": true,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src",
-        "PYDEVD_USE_SYS_MONITORING": "false"
-      },
-      "args": [
-        "run_continue",
-        "--batch-id",
-        "24"
-      ],
-      "noDebug": true
-    },
-    {
-      "name": "Ejecutar: GUI ig_orchestrator",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "ig_orchestrator",
-      "cwd": "${workspaceFolder}",
-      "console": "externalTerminal",
-      "justMyCode": true,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src",
-        "PYDEVD_USE_SYS_MONITORING": "false"
-      },
-      "args": [
-        "gui"
-      ],
-      "noDebug": true
-    },
-    {
       "name": "Depurar: run_continue",
       "type": "debugpy",
       "request": "launch",
@@ -88,6 +88,24 @@
       },
       "args": [
         "run_continue"
+      ]
+    },
+    {
+      "name": "Depurar: dry-run batch",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "ig_orchestrator",
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "PYDEVD_USE_SYS_MONITORING": "false"
+      },
+      "args": [
+        "--input",
+        "config/batch.json",
+        "--dry-run"
       ]
     },
     {
@@ -107,24 +125,6 @@
         "tests"
       ],
       "noDebug": true
-    },
-    {
-      "name": "Depurar: dry-run batch",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "ig_orchestrator",
-      "cwd": "${workspaceFolder}",
-      "console": "externalTerminal",
-      "justMyCode": true,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src",
-        "PYDEVD_USE_SYS_MONITORING": "false"
-      },
-      "args": [
-        "--input",
-        "config/batch.json",
-        "--dry-run"
-      ]
     }
   ]
 }

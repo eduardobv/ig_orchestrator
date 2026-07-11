@@ -151,13 +151,15 @@ def _normalized_urls(values: list[str]) -> tuple[list[str], list[str]]:
 def normalize_url_lines(values: list[str]) -> list[str]:
     text = "\n".join(values)
     parsed_urls: list[str] = []
+    seen: set[str] = set()
     for row in csv.reader(StringIO(text), skipinitialspace=True):
         for raw_value in row:
             value = raw_value.strip().strip('"').strip("'").strip()
             if value.endswith(","):
                 value = value[:-1].strip()
-            if value:
+            if value and value not in seen:
                 parsed_urls.append(value)
+                seen.add(value)
     return parsed_urls
 
 
