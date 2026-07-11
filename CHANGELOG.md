@@ -1,5 +1,62 @@
 # Changelog
 
+## v1.25.5 - Patch - URLs equivalentes de publicaciones Instagram
+
+Fecha: 2026-07-11
+
+### Modificado
+
+* `src/ig_orchestrator/gui/batch_draft_service.py` identifica publicaciones
+  por su shortcode y considera duplicadas las variantes `/p/{shortcode}/` y
+  `/reel/{shortcode}/`, conservando la primera URL pegada.
+* `tests/test_gui_services.py` cubre la normalizacion y el contador de
+  duplicados para ambas variantes de una misma publicacion.
+* Version actualizada a `1.25.5`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (`155 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
+## v1.25.4 - Patch - Deduplicacion efectiva de URLs en GUI
+
+Fecha: 2026-07-11
+
+### Modificado
+
+* `src/ig_orchestrator/gui/batch_draft_service.py` separa el parseo de URLs de
+  su deduplicacion para que `Normalizar` y `Agregar / Actualizar` conserven
+  solo la primera aparicion y el indicador pueda contar las repetidas.
+* `tests/test_gui_services.py` corrige el caso de prueba con comillas y comas
+  y verifica tanto el resultado normalizado como el contador de duplicados.
+* Version actualizada a `1.25.4`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (`153 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
+## v1.25.3 - Patch - Lanzadores de Windows
+
+Fecha: 2026-07-11
+
+### Creado
+
+* `ejecutar_gui.bat` abre la interfaz grafica desde la raiz del proyecto.
+* `ejecutar_run_continue.bat` solicita un `batch_id`, valida que sea numerico
+  y solo ejecuta `run_continue` cuando se ha introducido un valor.
+
+### Resumen
+
+Los dos lanzadores configuran `PYTHONPATH`, usan el entorno virtual local si
+existe y funcionan aunque se invoquen desde otro directorio.
+
+### Pruebas ejecutadas
+
+* Inspeccion de comandos y validacion de los lanzadores sin ejecutar Telegram.
+
 ## v1.25.2 - Patch - Deduplicacion de URLs en GUI
 
 Fecha: 2026-07-08

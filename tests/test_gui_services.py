@@ -20,6 +20,7 @@ from ig_orchestrator.gui.account_catalog_service import AccountCatalogService
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
+    inspect_account_draft,
     normalize_url_lines,
     save_batch_draft,
 )
@@ -200,6 +201,52 @@ def test_gui_url_normalization_removes_duplicate_clean_urls() -> None:
         "https://www.instagram.com/p/DaGP2rHuY0P/",
         "https://www.instagram.com/reel/ABC123xyz/",
     ]
+
+
+def test_gui_inspection_counts_duplicates_after_cleaning() -> None:
+    summary = inspect_account_draft(
+        AccountDraft(
+            username="duplicate_user",
+            urls=[
+                "https://www.instagram.com/p/DaGP2rHuY0P/",
+                '"https://www.instagram.com/p/DaGP2rHuY0P/",',
+                "'https://www.instagram.com/p/DaGP2rHuY0P/'",
+            ],
+        ),
+        default_start_now_date="2026-07-11",
+    )
+
+    assert summary.url_count == 1
+    assert summary.duplicate_count == 2
+
+
+def test_gui_normalization_treats_post_and_reel_with_same_shortcode_as_duplicate() -> None:
+    assert normalize_url_lines(
+        [
+            "https://www.instagram.com/p/DWl1cUrD4gW/",
+            "https://www.instagram.com/reel/DWl1cUrD4gW/",
+            "https://www.instagram.com/reel/OTHER123/",
+        ]
+    ) == [
+        "https://www.instagram.com/p/DWl1cUrD4gW/",
+        "https://www.instagram.com/reel/OTHER123/",
+    ]
+
+
+def test_gui_inspection_counts_equivalent_post_and_reel_as_duplicate() -> None:
+    summary = inspect_account_draft(
+        AccountDraft(
+            username="duplicate_format_user",
+            urls=[
+                "https://www.instagram.com/p/DWl1cUrD4gW/",
+                "https://www.instagram.com/reel/DWl1cUrD4gW/",
+            ],
+        ),
+        default_start_now_date="2026-07-11",
+    )
+
+    assert summary.url_count == 1
+    assert summary.duplicate_count == 1
 
 
 def test_gui_draft_validation_uses_comma_url_normalization(tmp_path: Path) -> None:

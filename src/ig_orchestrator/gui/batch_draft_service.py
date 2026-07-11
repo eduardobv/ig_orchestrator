@@ -103,11 +103,7 @@ def _validate_account(
         if account.start_now_date.strip()
         else default_date
     )
-    urls, duplicates = _normalized_urls(account.urls)
-    if duplicates:
-        raise BatchDraftValidationError(
-            f"{context}: duplicated URLs are not allowed before saving"
-        )
+    urls, _duplicates = _normalized_urls(account.urls)
     for url in urls:
         try:
             _validate_instagram_domain(url)
@@ -136,30 +132,54 @@ def _normalized_urls(values: list[str]) -> tuple[list[str], list[str]]:
     urls: list[str] = []
     duplicates: list[str] = []
     seen: set[str] = set()
-    for raw_url in normalize_url_lines(values):
+    for raw_url in _parse_url_lines(values):
         url = raw_url.strip()
         if not url:
             continue
-        if url in seen:
+        identity = _url_identity(url)
+        if identity in seen:
             duplicates.append(url)
             continue
         urls.append(url)
-        seen.add(url)
+        seen.add(identity)
     return urls, duplicates
 
 
 def normalize_url_lines(values: list[str]) -> list[str]:
-    text = "\n".join(values)
     parsed_urls: list[str] = []
     seen: set[str] = set()
+    for value in _parse_url_lines(values):
+        identity = _url_identity(value)
+        if identity not in seen:
+            parsed_urls.append(value)
+            seen.add(identity)
+    return parsed_urls
+
+
+def _url_identity(url: str) -> str:
+    """Return a stable identity for equivalent Instagram publication URLs."""
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if (
+        (hostname == "instagram.com" or hostname.endswith(".instagram.com"))
+        and len(path_parts) >= 2
+        and path_parts[0].lower() in {"p", "reel"}
+    ):
+        return f"instagram-publication:{path_parts[1]}"
+    return url
+
+
+def _parse_url_lines(values: list[str]) -> list[str]:
+    text = "\n".join(values)
+    parsed_urls: list[str] = []
     for row in csv.reader(StringIO(text), skipinitialspace=True):
         for raw_value in row:
             value = raw_value.strip().strip('"').strip("'").strip()
             if value.endswith(","):
                 value = value[:-1].strip()
-            if value and value not in seen:
+            if value:
                 parsed_urls.append(value)
-                seen.add(value)
     return parsed_urls
 
 
