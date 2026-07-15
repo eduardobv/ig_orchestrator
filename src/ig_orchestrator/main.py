@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -105,6 +106,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_continue(
             batch_id=args.batch_id,
             batch_name=args.batch_name,
+            dry_run=args.dry_run,
         )
 
     if args.input is not None:
@@ -296,6 +298,11 @@ def _run_batch(
                 retry_base_seconds=settings.retry_base_seconds,
                 retry_max_seconds=settings.retry_max_seconds,
                 wait_between_retries=True,
+                item_progress_callback=(
+                    _print_item_progress
+                    if os.environ.get("IG_ORCHESTRATOR_GUI_PROGRESS") == "1"
+                    else None
+                ),
             ),
         )
         batch_orchestrator = BatchOrchestrator(
@@ -367,6 +374,7 @@ def _run_continue(
     *,
     batch_id: int | None = None,
     batch_name: str | None = None,
+    dry_run: bool = False,
 ) -> int:
     execution_started_at = datetime.now(timezone.utc)
     configure_app_logging()
@@ -382,8 +390,10 @@ def _run_continue(
 
     init_database(settings.sqlite_db_path)
     connection = connect(settings.sqlite_db_path)
-    telegram_client = TelethonTelegramClient(
-        TelegramClientConfig.from_settings(settings)
+    telegram_client = (
+        None
+        if dry_run
+        else TelethonTelegramClient(TelegramClientConfig.from_settings(settings))
     )
     report_paths: list[Path] = []
 
@@ -403,25 +413,30 @@ def _run_continue(
             print("No resumable batches found in SQLite.")
             return 0
 
-        conversation_service = BotConversationService(
-            telegram_client=telegram_client,
-            url_job_repository=url_job_repository,
-            download_repository=download_repository,
-            config=BotConversationConfig(
-                download_folder=settings.telegram_desktop_download_folder,
-                download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
-                download_stable_seconds=settings.download_stable_seconds,
-            ),
-        )
-        url_job_processor = UrlJobProcessor(
-            url_job_repository=url_job_repository,
-            account_repository=account_repository,
-            download_repository=download_repository,
-            conversation_service=conversation_service,
-            config=UrlJobProcessorConfig(
-                default_working_folder=settings.working_folder,
-            ),
-        )
+        if dry_run:
+            url_job_processor = _DryRunUrlJobProcessor()
+        else:
+            if telegram_client is None:
+                raise RuntimeError("Telegram client is required for a real run")
+            conversation_service = BotConversationService(
+                telegram_client=telegram_client,
+                url_job_repository=url_job_repository,
+                download_repository=download_repository,
+                config=BotConversationConfig(
+                    download_folder=settings.telegram_desktop_download_folder,
+                    download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
+                    download_stable_seconds=settings.download_stable_seconds,
+                ),
+            )
+            url_job_processor = UrlJobProcessor(
+                url_job_repository=url_job_repository,
+                account_repository=account_repository,
+                download_repository=download_repository,
+                conversation_service=conversation_service,
+                config=UrlJobProcessorConfig(
+                    default_working_folder=settings.working_folder,
+                ),
+            )
         account_orchestrator = AccountOrchestrator(
             account_repository=account_repository,
             url_job_repository=url_job_repository,
@@ -434,7 +449,13 @@ def _run_continue(
                 max_retries=settings.max_retries,
                 retry_base_seconds=settings.retry_base_seconds,
                 retry_max_seconds=settings.retry_max_seconds,
-                wait_between_retries=True,
+                wait_between_retries=not dry_run,
+                dry_run=dry_run,
+                item_progress_callback=(
+                    _print_item_progress
+                    if os.environ.get("IG_ORCHESTRATOR_GUI_PROGRESS") == "1"
+                    else None
+                ),
             ),
         )
         batch_orchestrator = BatchOrchestrator(
@@ -445,12 +466,19 @@ def _run_continue(
             run_repository=run_repository,
             account_orchestrator=account_orchestrator,
             config=BatchOrchestratorConfig(
+                dry_run=dry_run,
                 progress_callback=_print_account_progress,
             ),
         )
 
         async def _process_all():
             results = []
+            if telegram_client is None:
+                for batch in batches:
+                    if batch.id is None:
+                        continue
+                    results.append(await batch_orchestrator.process_batch(batch.id))
+                return results
             async with telegram_client:
                 for batch in batches:
                     if batch.id is None:
@@ -480,10 +508,14 @@ def _run_continue(
     print(f"SQLite database: {settings.sqlite_db_path}")
     for report_path in report_paths:
         print(f"Markdown report: {report_path}")
-    post_process_result = _run_post_process_if_ready(
-        settings=settings,
-        results=results,
-        report_paths=report_paths,
+    post_process_result = (
+        None
+        if dry_run
+        else _run_post_process_if_ready(
+            settings=settings,
+            results=results,
+            report_paths=report_paths,
+        )
     )
     if any(result.error for result in results):
         return 1
@@ -606,4 +638,13 @@ def _print_account_progress(current: int, total: int, account) -> None:
     print(
         f"[{current}/{total} | {percentage:3d}%] Processing account: "
         f"{account.username}"
+    )
+
+
+def _print_item_progress(current: int, total: int, account, job, is_retry: bool) -> None:
+    percentage = int((current / total) * 100) if total else 100
+    retry_text = " retry" if is_retry else ""
+    print(
+        f"[GUI_ITEM_PROGRESS] {account.username}: "
+        f"{percentage}% ({current}/{total}){retry_text}"
     )

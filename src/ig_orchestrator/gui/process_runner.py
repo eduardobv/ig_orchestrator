@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+from collections.abc import Callable
+from threading import Thread
 
 
 def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[str]:
@@ -9,23 +12,65 @@ def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[
         sys.executable,
         "-m",
         "ig_orchestrator",
-        "run_continue",
-        "--batch-id",
-        str(batch_id),
     ]
     if dry_run:
         command.append("--dry-run")
+    command.extend(["run_continue", "--batch-id", str(batch_id)])
     return command
 
 
 class ProcessRunner:
-    """Small subprocess wrapper reserved for the execution GUI task."""
+    """Run ``run_continue`` without blocking Tkinter and stream its output."""
 
     def __init__(self) -> None:
         self.process: subprocess.Popen[str] | None = None
 
     def is_running(self) -> bool:
         return self.process is not None and self.process.poll() is None
+
+    def start(
+        self,
+        command: list[str],
+        *,
+        on_output: Callable[[str], None],
+        on_complete: Callable[[int], None],
+    ) -> None:
+        if self.is_running():
+            raise RuntimeError("A GUI process is already running")
+
+        environment = os.environ.copy()
+        environment["PYTHONUNBUFFERED"] = "1"
+        environment["PYTHONIOENCODING"] = "utf-8"
+        environment["IG_ORCHESTRATOR_GUI_PROGRESS"] = "1"
+        self.process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            env=environment,
+        )
+
+        def consume_output() -> None:
+            process = self.process
+            if process is None:
+                return
+            if process.stdout is not None:
+                for line in process.stdout:
+                    on_output(line)
+            exit_code = process.wait()
+            self.process = None
+            on_complete(exit_code)
+
+        Thread(target=consume_output, name="gui-run-continue", daemon=True).start()
+
+    def cancel(self) -> bool:
+        if not self.is_running() or self.process is None:
+            return False
+        self.process.terminate()
+        return True
 
 
 __all__ = ["ProcessRunner", "build_run_continue_command"]

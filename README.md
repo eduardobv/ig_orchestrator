@@ -250,6 +250,19 @@ La GUI local se abre con:
 python -m ig_orchestrator gui
 ```
 
+El catalogo de cuentas se presenta en orden alfabetico, sin distinguir entre
+mayusculas y minusculas. `Registrar lote` valida y guarda el borrador en
+SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
+
+```bash
+python -m ig_orchestrator run_continue --batch-id BATCH_ID
+```
+
+La salida se transmite al cuadro inferior sin congelar la ventana. Durante el
+proceso se muestra el avance total de cuentas y el avance de items de la cuenta
+actual, por ejemplo `10% (1/10)`. La story generada tambien cuenta como item y
+los reintentos conservan el mismo numero de item.
+
 Al iniciar, el campo `Batch name` se rellena con el ultimo lote ejecutado en
 SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta
 vacia, sugiere un nombre nuevo con timestamp.

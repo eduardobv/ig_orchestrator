@@ -26,3 +26,4 @@ if exist ".venv\Scripts\python.exe" (
 
 :end
 endlocal
+pause

@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.26.0 - Tarea GUI 2 - Ejecucion y progreso desde GUI
+
+Fecha: 2026-07-15
+
+### Modificado
+
+* `src/ig_orchestrator/gui/account_catalog_service.py` ordena el catalogo
+  alfabeticamente sin distinguir mayusculas y minusculas.
+* `src/ig_orchestrator/gui/app.py` diferencia `Registrar lote` de `Ejecutar`,
+  lanza el lote registrado sin bloquear Tkinter, transmite la salida al cuadro
+  inferior y muestra progreso de cuentas e items.
+* `src/ig_orchestrator/gui/process_runner.py` ejecuta `run_continue --batch-id`
+  en un subproceso cancelable con salida sin buffer.
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` ofrece progreso
+  por item, incluyendo stories y reintentos sin incrementar el total.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` informa tambien el
+  progreso de cuentas durante dry-run.
+* `src/ig_orchestrator/main.py` activa el detalle por item solo para procesos
+  nacidos desde GUI y permite dry-run de `run_continue` sin abrir Telegram.
+* `tests/test_gui_services.py` y `tests/test_account_orchestrator.py` cubren el
+  orden alfabetico, el comando del subproceso y el progreso por item.
+* `README.md` documenta el registro, la ejecucion y los indicadores de progreso.
+* Version actualizada a `1.26.0`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (`159 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
 ## v1.25.5 - Patch - URLs equivalentes de publicaciones Instagram
 
 Fecha: 2026-07-11

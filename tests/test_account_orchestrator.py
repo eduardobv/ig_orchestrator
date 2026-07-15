@@ -145,6 +145,42 @@ def test_account_orchestrator_retries_temporary_failures_fifo(
     assert stored.job_repo.get_by_id(second.id).retries == 0
 
 
+def test_account_orchestrator_reports_item_progress_including_story_and_retries(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    manual = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    story = _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {
+            manual.id: [UrlJobStatus.COMPLETED],
+            story.id: [UrlJobStatus.RETRY_PENDING, UrlJobStatus.COMPLETED],
+        },
+    )
+    progress: list[tuple[int, int, int, bool]] = []
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        config=AccountOrchestratorConfig(
+            item_progress_callback=lambda current, total, _account, job, retry: (
+                progress.append((current, total, job.id, retry))
+            )
+        ),
+    )
+
+    asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert progress == [
+        (1, 2, story.id, False),
+        (2, 2, manual.id, False),
+        (2, 2, story.id, True),
+    ]
+
+
 def test_account_orchestrator_retries_interrupted_waiting_download_job(
     tmp_path: Path,
 ) -> None:

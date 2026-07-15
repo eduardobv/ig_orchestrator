@@ -24,6 +24,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     normalize_url_lines,
     save_batch_draft,
 )
+from ig_orchestrator.gui.process_runner import build_run_continue_command
 from ig_orchestrator.input import DuplicateBatchNameError
 from ig_orchestrator.models import PublicationType, RunStatus, RunSummary, UrlSource
 
@@ -113,6 +114,47 @@ def test_account_catalog_reads_config_batch_json(tmp_path: Path) -> None:
     assert [entry.username for entry in entries] == ["first_user", "second_user"]
     assert entries[0].start_now_date == "2026-06-21"
     assert all(entry.source == "batch.json" for entry in entries)
+
+
+def test_account_catalog_is_sorted_alphabetically_case_insensitive(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        history = AccountHistoryRepository(connection)
+        history.create_or_get("zeta_user")
+        history.create_or_get("Alpha_user")
+        history.create_or_get("middle_user")
+
+        entries = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        ).list_entries()
+
+    assert [entry.username for entry in entries] == [
+        "Alpha_user",
+        "middle_user",
+        "zeta_user",
+    ]
+
+
+def test_gui_run_continue_command_uses_current_python_and_batch_id() -> None:
+    command = build_run_continue_command(42)
+
+    assert command[1:] == ["-m", "ig_orchestrator", "run_continue", "--batch-id", "42"]
+
+
+def test_gui_dry_run_option_is_placed_before_subcommand() -> None:
+    command = build_run_continue_command(42, dry_run=True)
+
+    assert command[1:] == [
+        "-m",
+        "ig_orchestrator",
+        "--dry-run",
+        "run_continue",
+        "--batch-id",
+        "42",
+    ]
 
 
 def test_gui_draft_rejects_account_without_stories_or_urls(tmp_path: Path) -> None:

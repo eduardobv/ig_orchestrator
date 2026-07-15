@@ -35,7 +35,10 @@ class AccountCatalogService:
         if not entries:
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
-        return _deduplicate(entries)
+        return sorted(
+            _deduplicate(entries),
+            key=lambda entry: entry.username.casefold(),
+        )
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
         for record in AccountHistoryRepository(self.connection).list_all():

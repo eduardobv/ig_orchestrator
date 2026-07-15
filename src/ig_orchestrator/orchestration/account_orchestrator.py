@@ -45,6 +45,7 @@ class AccountUrlJobProcessor(Protocol):
 
 
 RetryDelayHandler = Callable[[int], Awaitable[None]]
+ItemProgressCallback = Callable[[int, int, Account, UrlJob, bool], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +58,7 @@ class AccountOrchestratorConfig:
     retry_max_seconds: int = 900
     wait_between_retries: bool = False
     retry_delay_handler: RetryDelayHandler | None = None
+    item_progress_callback: ItemProgressCallback | None = None
     dry_run: bool = False
     create_folders_in_dry_run: bool = False
 
@@ -224,7 +226,17 @@ class AccountOrchestrator:
 
         ordered_jobs = _ordered_main_pass_jobs(jobs)
         retry_jobs = _existing_retry_jobs(jobs)
-        for job in [*ordered_jobs, *retry_jobs]:
+        dry_run_jobs = [*ordered_jobs, *retry_jobs]
+        terminal_count = sum(1 for job in jobs if job.status in _TERMINAL_URL_STATUSES)
+        for item_index, job in enumerate(dry_run_jobs, start=1):
+            if self._config.item_progress_callback is not None:
+                self._config.item_progress_callback(
+                    min(terminal_count + item_index, len(jobs)),
+                    len(jobs),
+                    account,
+                    job,
+                    job.status in _RESUMABLE_RETRY_URL_STATUSES,
+                )
             logger.info(
                 "Dry-run would process URL job: job_id={} type={} source={} status={} url={}",
                 _require_job_id(job),
@@ -283,7 +295,23 @@ class AccountOrchestrator:
             logger.info("Account folders ready: {}", working_base / account.username)
 
             retry_queue: RetryQueue[int] = RetryQueue()
+            terminal_count = sum(1 for job in jobs if job.status in _TERMINAL_URL_STATUSES)
+            visited_job_ids: set[int] = set()
+
+            def notify_progress(job: UrlJob, *, is_retry: bool) -> None:
+                job_id = _require_job_id(job)
+                visited_job_ids.add(job_id)
+                if self._config.item_progress_callback is not None:
+                    self._config.item_progress_callback(
+                        min(terminal_count + len(visited_job_ids), len(jobs)),
+                        len(jobs),
+                        account,
+                        job,
+                        is_retry,
+                    )
+
             for job in _ordered_main_pass_jobs(jobs):
+                notify_progress(job, is_retry=False)
                 logger.info(
                     "Processing URL job: job_id={} type={} source={} url={}",
                     _require_job_id(job),
@@ -305,6 +333,8 @@ class AccountOrchestrator:
                 job = self._url_job_repository.get_by_id(job_id)
                 if job is None or job.status in _TERMINAL_URL_STATUSES:
                     continue
+
+                notify_progress(job, is_retry=True)
 
                 decision = self._retry_decision(job)
                 if decision.is_final_failure:

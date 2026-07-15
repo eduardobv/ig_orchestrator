@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
+import re
 from sqlite3 import Connection
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -17,7 +18,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     normalize_url_lines,
     save_batch_draft,
 )
-from ig_orchestrator.gui.process_runner import build_run_continue_command
+from ig_orchestrator.gui.process_runner import ProcessRunner, build_run_continue_command
 from ig_orchestrator.settings import Settings
 
 
@@ -56,6 +57,8 @@ class InstagramOrchestratorApp:
         self.accounts: list[AccountDraft] = []
         self.selected_index: int | None = None
         self.saved_batch_id: int | None = None
+        self.saved_draft_signature: tuple[object, ...] | None = None
+        self.process_runner = ProcessRunner()
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -68,6 +71,8 @@ class InstagramOrchestratorApp:
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Ready")
+        self.account_progress_var = tk.StringVar(value="Cuentas: -")
+        self.item_progress_var = tk.StringVar(value="Items: -")
         self.indicators_var = tk.StringVar(value="URLs: 0")
 
         self.root.title("Instagram Orchestrator")
@@ -81,6 +86,7 @@ class InstagramOrchestratorApp:
         self.root.rowconfigure(1, weight=1)
 
         top = ttk.Frame(self.root, padding=8)
+        self.top_region = top
         top.grid(row=0, column=0, sticky="ew")
         top.columnconfigure(1, weight=1)
 
@@ -95,14 +101,17 @@ class InstagramOrchestratorApp:
         ttk.Checkbutton(top, text="Dry-run", variable=self.dry_run_var).grid(
             row=0, column=4, sticky="w", padx=(0, 12)
         )
-        ttk.Button(top, text="Guardar lote", command=self._save_batch).grid(
+        self.register_button = ttk.Button(
+            top, text="Registrar lote", command=self._save_batch
+        )
+        self.register_button.grid(
             row=0, column=5, padx=(0, 6)
         )
-        ttk.Button(top, text="Ejecutar", command=self._execute_placeholder).grid(
-            row=0, column=6
-        )
+        self.execute_button = ttk.Button(top, text="Ejecutar", command=self._execute)
+        self.execute_button.grid(row=0, column=6)
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        self.body_region = body
         body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
 
         catalog = ttk.Frame(body, padding=6)
@@ -119,11 +128,27 @@ class InstagramOrchestratorApp:
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
         bottom.columnconfigure(0, weight=1)
-        self.console = tk.Text(bottom, height=6, state="disabled", wrap="word")
+        self.console = tk.Text(bottom, height=9, state="disabled", wrap="word")
         self.console.grid(row=0, column=0, sticky="ew")
-        ttk.Label(bottom, textvariable=self.status_var).grid(
-            row=1, column=0, sticky="w", pady=(4, 0)
+        progress = ttk.Frame(bottom)
+        progress.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        progress.columnconfigure(2, weight=1)
+        ttk.Label(progress, textvariable=self.account_progress_var).grid(
+            row=0, column=0, sticky="w"
         )
+        ttk.Label(progress, textvariable=self.item_progress_var).grid(
+            row=0, column=1, sticky="w", padx=(18, 0)
+        )
+        ttk.Label(progress, textvariable=self.status_var).grid(
+            row=0, column=2, sticky="w", padx=(18, 0)
+        )
+        self.cancel_button = ttk.Button(
+            progress,
+            text="Cancelar proceso",
+            command=self._cancel_process,
+            state="disabled",
+        )
+        self.cancel_button.grid(row=0, column=3, sticky="e")
 
     def _build_catalog(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(2, weight=1)
@@ -387,7 +412,7 @@ class InstagramOrchestratorApp:
             f"invalidas: {len(summary.invalid_urls)} | tipos: {types}"
         )
 
-    def _save_batch(self) -> int | None:
+    def _save_batch(self, *, show_confirmation: bool = True) -> int | None:
         draft = BatchDraft(
             batch_name=self.batch_name_var.get(),
             default_start_now_date=self.default_date_var.get(),
@@ -403,30 +428,111 @@ class InstagramOrchestratorApp:
             return None
 
         self.saved_batch_id = result.batch.id
+        self.saved_draft_signature = _draft_signature(draft)
         self._write_console(
             f"Batch saved: {result.batch.batch_name} (id={result.batch.id})\n"
             f"SQLite database: {self.settings.sqlite_db_path}\n"
         )
         self._set_status(f"Saved batch id {result.batch.id}")
-        messagebox.showinfo("Saved", f"Batch saved with id {result.batch.id}")
+        if show_confirmation:
+            messagebox.showinfo("Lote registrado", f"Lote registrado con id {result.batch.id}")
         return result.batch.id
 
-    def _execute_placeholder(self) -> None:
-        batch_id = self.saved_batch_id or self._save_batch()
+    def _execute(self) -> None:
+        if self.process_runner.is_running():
+            return
+
+        draft = BatchDraft(
+            batch_name=self.batch_name_var.get(),
+            default_start_now_date=self.default_date_var.get(),
+            accounts=list(self.accounts),
+        )
+        batch_id = (
+            self.saved_batch_id
+            if self.saved_batch_id is not None
+            and self.saved_draft_signature == _draft_signature(draft)
+            else self._save_batch(show_confirmation=False)
+        )
         if batch_id is None:
             return
-        command = " ".join(build_run_continue_command(batch_id))
-        dry_run_note = (
-            "Dry-run for GUI batches is reserved for Tarea GUI 2.\n"
-            if self.dry_run_var.get()
-            else ""
-        )
+
+        command = build_run_continue_command(batch_id, dry_run=self.dry_run_var.get())
         self._write_console(
-            "Execution from GUI is reserved for Tarea GUI 2.\n"
-            f"{dry_run_note}"
-            f"Run manually now: {command}\n"
+            f"Ejecutando lote {batch_id}: {' '.join(command)}\n"
         )
-        messagebox.showinfo("Batch ready", f"Batch id {batch_id} ready.\n{command}")
+        self.account_progress_var.set("Cuentas: iniciando...")
+        self.item_progress_var.set("Items: iniciando...")
+        self._set_process_running(True)
+        try:
+            self.process_runner.start(
+                command,
+                on_output=lambda line: self.root.after(
+                    0, self._handle_process_output, line
+                ),
+                on_complete=lambda exit_code: self.root.after(
+                    0, self._handle_process_complete, batch_id, exit_code
+                ),
+            )
+        except (OSError, RuntimeError) as exc:
+            self._set_process_running(False)
+            messagebox.showerror("Ejecucion", str(exc))
+
+    def _handle_process_output(self, line: str) -> None:
+        account_match = _ACCOUNT_PROGRESS_RE.search(line)
+        if account_match:
+            self.account_progress_var.set(
+                f"Cuentas: {account_match.group('percentage')}% "
+                f"({account_match.group('current')}/{account_match.group('total')})"
+            )
+
+        item_match = _ITEM_PROGRESS_RE.search(line)
+        if item_match:
+            item_status = (
+                f"Items {item_match.group('username')}: "
+                f"{item_match.group('percentage')}% "
+                f"({item_match.group('current')}/{item_match.group('total')})"
+            )
+            self.item_progress_var.set(item_status)
+            self._set_status(item_status)
+            line = item_status + (" reintento" if item_match.group("retry") else "") + "\n"
+        self._write_console(line)
+
+    def _handle_process_complete(self, batch_id: int, exit_code: int) -> None:
+        self._set_process_running(False)
+        if exit_code == 0:
+            self.account_progress_var.set("Cuentas: 100%")
+            self.item_progress_var.set("Items: 100%")
+            self._set_status(f"Lote {batch_id} finalizado correctamente")
+            self._write_console(f"Lote {batch_id} finalizado correctamente.\n")
+        else:
+            self._set_status(f"Lote {batch_id} finalizado con codigo {exit_code}")
+            self._write_console(
+                f"Lote {batch_id} finalizado con codigo de salida {exit_code}.\n"
+            )
+
+    def _cancel_process(self) -> None:
+        if self.process_runner.cancel():
+            self._set_status("Cancelando proceso...")
+            self._write_console("Cancelacion solicitada.\n")
+
+    def _set_process_running(self, running: bool) -> None:
+        self._set_descendants_enabled(self.top_region, not running)
+        self._set_descendants_enabled(self.body_region, not running)
+        button_state = "disabled" if running else "normal"
+        self.register_button.configure(state=button_state)
+        self.execute_button.configure(state=button_state)
+        self.cancel_button.configure(state="normal" if running else "disabled")
+        self._set_status("Ejecutando..." if running else self.status_var.get())
+
+    def _set_descendants_enabled(self, parent: tk.Misc, enabled: bool) -> None:
+        state = "normal" if enabled else "disabled"
+        for child in parent.winfo_children():
+            try:
+                if "state" in child.configure():
+                    child.configure(state=state)
+            except tk.TclError:
+                pass
+            self._set_descendants_enabled(child, enabled)
 
     def _write_console(self, text: str) -> None:
         self.console.configure(state="normal")
@@ -467,6 +573,32 @@ def _latest_executed_batch_name(connection: Connection) -> str | None:
     if row is None:
         return None
     return str(row[0])
+
+
+def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
+    return (
+        draft.batch_name,
+        draft.default_start_now_date,
+        tuple(
+            (
+                account.username,
+                account.download_stories,
+                tuple(account.urls),
+                account.start_now_date,
+            )
+            for account in draft.accounts
+        ),
+    )
+
+
+_ACCOUNT_PROGRESS_RE = re.compile(
+    r"\[(?P<current>\d+)/(?P<total>\d+)\s*\|\s*(?P<percentage>\d+)%\]"
+)
+_ITEM_PROGRESS_RE = re.compile(
+    r"\[GUI_ITEM_PROGRESS\]\s+(?P<username>[^:]+):\s+"
+    r"(?P<percentage>\d+)%\s+\((?P<current>\d+)/(?P<total>\d+)\)"
+    r"(?P<retry>\s+retry)?"
+)
 
 
 __all__ = ["InstagramOrchestratorApp", "launch_gui"]

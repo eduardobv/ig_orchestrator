@@ -219,7 +219,13 @@ class BatchOrchestrator:
             for account in accounts
             if account.id is not None and account.status in _PROCESSABLE_ACCOUNT_STATUSES
         ]
-        for account in pending_accounts:
+        for account_index, account in enumerate(pending_accounts, start=1):
+            if self._config.progress_callback is not None:
+                self._config.progress_callback(
+                    account_index,
+                    len(pending_accounts),
+                    account,
+                )
             logger.info(
                 "Dry-run would process batch account: batch_id={} account_id={} username={}",
                 batch_id,
