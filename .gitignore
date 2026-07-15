@@ -79,3 +79,5 @@ reports/old/*.md
 .mypy_cache/
 .dmypy.json
 dmypy.json
+logs/old/old.zip
+reports/old/old.7z
