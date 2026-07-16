@@ -258,10 +258,19 @@ SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
-La salida se transmite al cuadro inferior sin congelar la ventana. Durante el
-proceso se muestra el avance total de cuentas y el avance de items de la cuenta
-actual, por ejemplo `10% (1/10)`. La story generada tambien cuenta como item y
-los reintentos conservan el mismo numero de item.
+La salida se transmite al cuadro inferior sin congelar la ventana. Cada linea
+se presenta con fecha y hora local hasta milisegundos, por ejemplo
+`2026-06-21 17:48:57.983 Evento`. Durante el proceso se muestra el avance total
+de cuentas y el avance de items de la cuenta actual, por ejemplo `10% (1/10)`.
+La story generada tambien cuenta como item y los reintentos conservan el mismo
+numero de item.
+
+El boton `Renombrar`, situado junto a las acciones del proceso, permanece
+deshabilitado hasta que finaliza correctamente una ejecucion real del lote. No
+se habilita tras un dry-run ni tras un fallo. Al pulsarlo ejecuta en segundo
+plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
+`Start date` global y aplica `--no-duplicated --move-renamed`. Toda la salida
+del renombrador se muestra en la misma consola con timestamp.
 
 Al iniciar, el campo `Batch name` se rellena con el ultimo lote ejecutado en
 SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta

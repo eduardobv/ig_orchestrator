@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.26.1 - Patch - Timestamp y renombrado manual desde GUI
+
+Fecha: 2026-07-16
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` agrega fecha y hora local con milisegundos a
+  cada linea de la consola de estado y situa el boton contextual `Renombrar`
+  junto a las acciones de ejecucion. El boton solo se habilita al completar
+  correctamente un lote real y transmite la salida del renombrador sin
+  bloquear Tkinter.
+* `src/ig_orchestrator/gui/process_runner.py` construye el comando para
+  `ManualRenameFiles/main.py` con `--newRename`, la fecha global de la GUI,
+  `--no-duplicated` y `--move-renamed`.
+* `tests/test_gui_services.py` cubre el comando externo y el timestamp aplicado
+  a todas las lineas.
+* `tests/test_package_smoke.py` verifica la nueva version del paquete y del
+  entrypoint.
+* `README.md` y `tasks/task-gui.md` documentan el flujo, la ubicacion y las
+  reglas de habilitacion del nuevo boton.
+* Version actualizada a `1.26.1`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py -q` (`21 passed`).
+* `python -m pytest -q` (`161 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
 ## v1.26.0 - Tarea GUI 2 - Ejecucion y progreso desde GUI
 
 Fecha: 2026-07-15

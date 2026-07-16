@@ -145,12 +145,23 @@ Panel derecho: editor de cuenta
 
 Panel inferior: ejecucion
 
-- Consola read-only con stdout/stderr del proceso.
+- Consola read-only con stdout/stderr del proceso y timestamp local con
+  milisegundos en cada linea.
 - Barra de progreso indeterminada mientras corre.
 - Botones:
   - `Cancelar proceso` si se lanzo como subprocess;
+  - `Renombrar`, deshabilitado hasta que termine correctamente un lote real;
   - `Abrir reporte` cuando exista;
   - `Abrir carpeta logs`.
+
+`Renombrar` ejecuta en segundo plano:
+
+```text
+python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDate "START_DATE_GLOBAL" --no-duplicated --move-renamed
+```
+
+La salida combinada del renombrador se transmite a la consola de estado. El
+boton no se habilita tras dry-run ni tras una ejecucion fallida.
 
 ## Reglas funcionales
 

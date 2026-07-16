@@ -18,7 +18,12 @@ from ig_orchestrator.gui.batch_draft_service import (
     normalize_url_lines,
     save_batch_draft,
 )
-from ig_orchestrator.gui.process_runner import ProcessRunner, build_run_continue_command
+from ig_orchestrator.gui.process_runner import (
+    MANUAL_RENAME_SCRIPT,
+    ProcessRunner,
+    build_manual_rename_command,
+    build_run_continue_command,
+)
 from ig_orchestrator.settings import Settings
 
 
@@ -59,6 +64,8 @@ class InstagramOrchestratorApp:
         self.saved_batch_id: int | None = None
         self.saved_draft_signature: tuple[object, ...] | None = None
         self.process_runner = ProcessRunner()
+        self.batch_ready_for_rename = False
+        self.last_run_was_dry_run = False
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -148,7 +155,14 @@ class InstagramOrchestratorApp:
             command=self._cancel_process,
             state="disabled",
         )
-        self.cancel_button.grid(row=0, column=3, sticky="e")
+        self.rename_button = ttk.Button(
+            progress,
+            text="Renombrar",
+            command=self._rename_manual_files,
+            state="disabled",
+        )
+        self.rename_button.grid(row=0, column=3, sticky="e", padx=(0, 6))
+        self.cancel_button.grid(row=0, column=4, sticky="e")
 
     def _build_catalog(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(2, weight=1)
@@ -456,7 +470,10 @@ class InstagramOrchestratorApp:
         if batch_id is None:
             return
 
-        command = build_run_continue_command(batch_id, dry_run=self.dry_run_var.get())
+        self.batch_ready_for_rename = False
+        self.last_run_was_dry_run = self.dry_run_var.get()
+        self.rename_button.configure(state="disabled")
+        command = build_run_continue_command(batch_id, dry_run=self.last_run_was_dry_run)
         self._write_console(
             f"Ejecutando lote {batch_id}: {' '.join(command)}\n"
         )
@@ -498,6 +515,7 @@ class InstagramOrchestratorApp:
         self._write_console(line)
 
     def _handle_process_complete(self, batch_id: int, exit_code: int) -> None:
+        self.batch_ready_for_rename = exit_code == 0 and not self.last_run_was_dry_run
         self._set_process_running(False)
         if exit_code == 0:
             self.account_progress_var.set("Cuentas: 100%")
@@ -508,6 +526,59 @@ class InstagramOrchestratorApp:
             self._set_status(f"Lote {batch_id} finalizado con codigo {exit_code}")
             self._write_console(
                 f"Lote {batch_id} finalizado con codigo de salida {exit_code}.\n"
+            )
+
+    def _rename_manual_files(self) -> None:
+        if self.process_runner.is_running() or not self.batch_ready_for_rename:
+            return
+
+        start_now_date = self.default_date_var.get().strip()
+        try:
+            parsed_date = date.fromisoformat(start_now_date)
+        except ValueError:
+            parsed_date = None
+        if parsed_date is None or parsed_date.isoformat() != start_now_date:
+            messagebox.showerror(
+                "Renombrar",
+                "Start date debe tener formato YYYY-MM-DD antes de renombrar.",
+            )
+            return
+        if not MANUAL_RENAME_SCRIPT.is_file():
+            error = f"No se encontro el script de renombrado: {MANUAL_RENAME_SCRIPT}"
+            self._write_console(error + "\n")
+            messagebox.showerror("Renombrar", error)
+            return
+
+        command = build_manual_rename_command(start_now_date)
+        self._write_console(
+            f"Iniciando renombrado con Start date {start_now_date}: "
+            f"{' '.join(command)}\n"
+        )
+        self._set_process_running(True)
+        self._set_status("Renombrando archivos...")
+        try:
+            self.process_runner.start(
+                command,
+                on_output=lambda line: self.root.after(0, self._write_console, line),
+                on_complete=lambda exit_code: self.root.after(
+                    0, self._handle_rename_complete, exit_code
+                ),
+            )
+        except (OSError, RuntimeError) as exc:
+            self._set_process_running(False)
+            self._set_status("No se pudo iniciar el renombrado")
+            self._write_console(f"No se pudo iniciar el renombrado: {exc}\n")
+            messagebox.showerror("Renombrar", str(exc))
+
+    def _handle_rename_complete(self, exit_code: int) -> None:
+        self._set_process_running(False)
+        if exit_code == 0:
+            self._set_status("Renombrado finalizado correctamente")
+            self._write_console("Renombrado finalizado correctamente.\n")
+        else:
+            self._set_status(f"Renombrado finalizado con codigo {exit_code}")
+            self._write_console(
+                f"Renombrado finalizado con codigo de salida {exit_code}.\n"
             )
 
     def _cancel_process(self) -> None:
@@ -522,6 +593,9 @@ class InstagramOrchestratorApp:
         self.register_button.configure(state=button_state)
         self.execute_button.configure(state=button_state)
         self.cancel_button.configure(state="normal" if running else "disabled")
+        self.rename_button.configure(
+            state="normal" if not running and self.batch_ready_for_rename else "disabled"
+        )
         self._set_status("Ejecutando..." if running else self.status_var.get())
 
     def _set_descendants_enabled(self, parent: tk.Misc, enabled: bool) -> None:
@@ -536,7 +610,7 @@ class InstagramOrchestratorApp:
 
     def _write_console(self, text: str) -> None:
         self.console.configure(state="normal")
-        self.console.insert(tk.END, text)
+        self.console.insert(tk.END, _timestamp_console_text(text))
         self.console.see(tk.END)
         self.console.configure(state="disabled")
 
@@ -546,6 +620,15 @@ class InstagramOrchestratorApp:
 
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M')}"
+
+
+def _timestamp_console_text(text: str, *, now: datetime | None = None) -> str:
+    """Prefix every GUI console line with a local timestamp including milliseconds."""
+    if not text:
+        return ""
+    current = now or datetime.now()
+    timestamp = current.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    return "".join(f"{timestamp} {line}" for line in text.splitlines(keepends=True))
 
 
 def _latest_executed_batch_name(connection: Connection) -> str | None:

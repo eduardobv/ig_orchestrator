@@ -4,7 +4,11 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from threading import Thread
+
+
+MANUAL_RENAME_SCRIPT = Path(r"D:\Archivos\Scripts\IG\ManualRenameFiles\main.py")
 
 
 def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[str]:
@@ -17,6 +21,23 @@ def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[
         command.append("--dry-run")
     command.extend(["run_continue", "--batch-id", str(batch_id)])
     return command
+
+
+def build_manual_rename_command(
+    start_now_date: str,
+    *,
+    script_path: Path = MANUAL_RENAME_SCRIPT,
+) -> list[str]:
+    """Build the external manual-renamer command for a completed GUI batch."""
+    return [
+        sys.executable,
+        str(script_path),
+        "--newRename",
+        "--startNowDate",
+        start_now_date,
+        "--no-duplicated",
+        "--move-renamed",
+    ]
 
 
 class ProcessRunner:
@@ -73,4 +94,9 @@ class ProcessRunner:
         return True
 
 
-__all__ = ["ProcessRunner", "build_run_continue_command"]
+__all__ = [
+    "MANUAL_RENAME_SCRIPT",
+    "ProcessRunner",
+    "build_manual_rename_command",
+    "build_run_continue_command",
+]

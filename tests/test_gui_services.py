@@ -15,7 +15,7 @@ from ig_orchestrator.db import (
     connect,
     init_database,
 )
-from ig_orchestrator.gui.app import _latest_executed_batch_name
+from ig_orchestrator.gui.app import _latest_executed_batch_name, _timestamp_console_text
 from ig_orchestrator.gui.account_catalog_service import AccountCatalogService
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -24,7 +24,10 @@ from ig_orchestrator.gui.batch_draft_service import (
     normalize_url_lines,
     save_batch_draft,
 )
-from ig_orchestrator.gui.process_runner import build_run_continue_command
+from ig_orchestrator.gui.process_runner import (
+    build_manual_rename_command,
+    build_run_continue_command,
+)
 from ig_orchestrator.input import DuplicateBatchNameError
 from ig_orchestrator.models import PublicationType, RunStatus, RunSummary, UrlSource
 
@@ -155,6 +158,33 @@ def test_gui_dry_run_option_is_placed_before_subcommand() -> None:
         "--batch-id",
         "42",
     ]
+
+
+def test_gui_manual_rename_command_uses_global_start_date() -> None:
+    script_path = Path(r"D:\tools\ManualRenameFiles\main.py")
+
+    command = build_manual_rename_command("2026-07-16", script_path=script_path)
+
+    assert command[1:] == [
+        str(script_path),
+        "--newRename",
+        "--startNowDate",
+        "2026-07-16",
+        "--no-duplicated",
+        "--move-renamed",
+    ]
+
+
+def test_gui_console_prefixes_every_line_with_millisecond_timestamp() -> None:
+    formatted = _timestamp_console_text(
+        "Primer evento\nSegundo evento\n",
+        now=datetime(2026, 6, 21, 17, 48, 57, 983000),
+    )
+
+    assert formatted == (
+        "2026-06-21 17:48:57.983 Primer evento\n"
+        "2026-06-21 17:48:57.983 Segundo evento\n"
+    )
 
 
 def test_gui_draft_rejects_account_without_stories_or_urls(tmp_path: Path) -> None:
