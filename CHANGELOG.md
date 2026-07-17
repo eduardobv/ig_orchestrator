@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.26.2 - Patch - Nuevas cuentas desde GUI y renombrador
+
+Fecha: 2026-07-17
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` elimina el boton ambiguo `Agregar cuenta
+  nueva` del catalogo y agrega el checkbox condicional `New account` al editor,
+  con `ownerId`, `startInitDate` y `path` obligatorios. Las filas nuevas se
+  incorporan al lote y al catalogo al pulsar `Agregar / Actualizar`.
+* `src/ig_orchestrator/gui/batch_draft.py` y
+  `src/ig_orchestrator/gui/batch_draft_service.py` modelan y validan los datos
+  adicionales sin mezclarlos con la fecha de descarga de la cuenta.
+* `src/ig_orchestrator/db/account_history_repository.py` y
+  `src/ig_orchestrator/gui/account_catalog_service.py` conservan y exponen
+  `ownerId`, `path` y `startInitDate` en el catalogo global.
+* `src/ig_orchestrator/gui/process_runner.py` agrega un bloque repetible
+  `--new-account USERNAME OWNER_ID START_INIT_DATE PATH` por cada cuenta nueva
+  antes de `--no-duplicated --move-renamed`.
+* `tests/test_gui_services.py` cubre campos obligatorios, persistencia del
+  catalogo, filtrado de cuentas nuevas y comandos con multiples cuentas.
+* `README.md` y `tasks/task-gui.md` documentan el nuevo flujo y el contrato del
+  comando externo.
+* Version actualizada a `1.26.2`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_package_smoke.py -q`
+  (`32 passed`).
+* `python -m pytest -q` (`167 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
 ## v1.26.1 - Patch - Timestamp y renombrado manual desde GUI
 
 Fecha: 2026-07-16

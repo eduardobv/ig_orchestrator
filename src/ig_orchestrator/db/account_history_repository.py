@@ -65,6 +65,30 @@ class AccountHistoryRepository:
         ).fetchall()
         return [_row_to_history(row) for row in rows]
 
+    def update_rename_metadata(
+        self,
+        user_name: str,
+        *,
+        owner_id: str,
+        destination_path: str,
+        start_init_date: str,
+    ) -> AccountHistory:
+        """Create a catalog entry or update the data required by the renamer."""
+        record = self.create_or_get(user_name)
+        self.connection.execute(
+            """
+            UPDATE account_history
+            SET user_ig_id = ?, field1 = ?, field2 = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (owner_id, destination_path, start_init_date, record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Account history row disappeared during update")
+        return stored
+
 
 def _row_to_history(row: Row | None) -> AccountHistory | None:
     if row is None:

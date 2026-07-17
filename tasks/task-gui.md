@@ -106,7 +106,6 @@ Panel izquierdo: catalogo de cuentas
   - `config/batch.json`;
   - opcionalmente `config/bkp/*.json` si no hay suficientes entradas en `account_history`.
 - Doble click en un username lo carga en el editor.
-- Accion `Agregar cuenta nueva` si el username no existe.
 - Accion futura opcional: marcar cuenta como `DISABLED` para ocultarla.
 
 Panel central: lote actual
@@ -129,6 +128,8 @@ Panel derecho: editor de cuenta
 
 - `Username`: combobox editable con autocomplete.
 - `Download stories`: checkbox.
+- `New account`: checkbox desmarcado por defecto. Al marcarlo muestra tres
+  campos obligatorios: `ownerId`, `path` y `startInitDate` (`YYYY-MM-DD`).
 - `Start date`: input por defecto hoy. Tras `Agregar / Actualizar`, el editor
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea.
@@ -157,8 +158,13 @@ Panel inferior: ejecucion
 `Renombrar` ejecuta en segundo plano:
 
 ```text
-python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDate "START_DATE_GLOBAL" --no-duplicated --move-renamed
+python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDate "START_DATE_GLOBAL" [--new-account "USERNAME" "OWNER_ID" "START_INIT_DATE" "PATH"]... --no-duplicated --move-renamed
 ```
+
+Cada cuenta marcada como `New account` agrega su propio bloque
+`--new-account`. `Agregar / Actualizar` la incorpora al lote actual y tambien
+al catalogo `account_history`, donde se conserva `ownerId`, `path` y
+`startInitDate` para consultas posteriores.
 
 La salida combinada del renombrador se transmite a la consola de estado. El
 boton no se habilita tras dry-run ni tras una ejecucion fallida.

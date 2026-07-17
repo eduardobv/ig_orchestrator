@@ -14,6 +14,9 @@ class AccountCatalogEntry:
     username: str
     start_now_date: str | None = None
     source: str = ""
+    owner_id: str | None = None
+    destination_path: str | None = None
+    start_init_date: str | None = None
 
 
 class AccountCatalogService:
@@ -42,7 +45,13 @@ class AccountCatalogService:
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
         for record in AccountHistoryRepository(self.connection).list_all():
-            yield AccountCatalogEntry(username=record.user_name, source="account_history")
+            yield AccountCatalogEntry(
+                username=record.user_name,
+                source="account_history",
+                owner_id=record.user_ig_id,
+                destination_path=record.field1,
+                start_init_date=record.field2,
+            )
 
     def _from_batch_json(
         self,

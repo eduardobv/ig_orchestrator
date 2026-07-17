@@ -7,6 +7,7 @@ from io import StringIO
 from sqlite3 import Connection
 from urllib.parse import urlparse
 
+from ig_orchestrator.db import AccountHistoryRepository
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.input import (
     BatchCreationAccount,
@@ -31,6 +32,13 @@ class AccountDraftValidation:
     publication_types: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class NewAccountDetails:
+    owner_id: str
+    start_init_date: str
+    destination_path: str
+
+
 def save_batch_draft(
     draft: BatchDraft,
     connection: Connection,
@@ -38,7 +46,29 @@ def save_batch_draft(
     settings: Settings | None = None,
 ) -> BatchCreationResult:
     request = validate_batch_draft(draft)
-    return create_batch(request, connection, settings=settings)
+    result = create_batch(request, connection, settings=settings)
+    for account in draft.accounts:
+        save_new_account_to_catalog(account, connection)
+    return result
+
+
+def save_new_account_to_catalog(
+    account: AccountDraft,
+    connection: Connection,
+) -> None:
+    """Persist a checked new account in the global catalog immediately."""
+    if not account.is_new_account:
+        return
+    username = _normalize_username(account.username)
+    if not username:
+        raise BatchDraftValidationError("username must not be blank")
+    details = validate_new_account_details(account)
+    AccountHistoryRepository(connection).update_rename_metadata(
+        username,
+        owner_id=details.owner_id,
+        destination_path=details.destination_path,
+        start_init_date=details.start_init_date,
+    )
 
 
 def validate_batch_draft(draft: BatchDraft) -> BatchCreationRequest:
@@ -98,6 +128,12 @@ def _validate_account(
     if not username:
         raise BatchDraftValidationError(f"{context}: username must not be blank")
 
+    if account.is_new_account:
+        try:
+            validate_new_account_details(account)
+        except BatchDraftValidationError as exc:
+            raise BatchDraftValidationError(f"{context}: {exc}") from exc
+
     start_now_date = (
         _parse_date(account.start_now_date, f"{context} start date")
         if account.start_now_date.strip()
@@ -121,6 +157,27 @@ def _validate_account(
         start_now_date=start_now_date,
         download_stories=account.download_stories,
         urls=tuple(urls),
+    )
+
+
+def validate_new_account_details(account: AccountDraft) -> NewAccountDetails:
+    owner_id = account.owner_id.strip()
+    if not owner_id:
+        raise BatchDraftValidationError("ownerId is required for a new account")
+
+    start_init_date = account.start_init_date.strip()
+    if not start_init_date:
+        raise BatchDraftValidationError("startInitDate is required for a new account")
+    _parse_date(start_init_date, "startInitDate")
+
+    destination_path = account.destination_path.strip()
+    if not destination_path:
+        raise BatchDraftValidationError("path is required for a new account")
+
+    return NewAccountDetails(
+        owner_id=owner_id,
+        start_init_date=start_init_date,
+        destination_path=destination_path,
     )
 
 
@@ -204,8 +261,11 @@ def _validate_instagram_domain(url: str) -> None:
 __all__ = [
     "AccountDraftValidation",
     "BatchDraftValidationError",
+    "NewAccountDetails",
     "inspect_account_draft",
     "normalize_url_lines",
+    "save_new_account_to_catalog",
     "save_batch_draft",
+    "validate_new_account_details",
     "validate_batch_draft",
 ]

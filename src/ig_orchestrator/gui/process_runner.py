@@ -4,11 +4,20 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
 
 
 MANUAL_RENAME_SCRIPT = Path(r"D:\Archivos\Scripts\IG\ManualRenameFiles\main.py")
+
+
+@dataclass(frozen=True, slots=True)
+class NewAccountRenameParameters:
+    username: str
+    owner_id: str
+    start_init_date: str
+    destination_path: str
 
 
 def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[str]:
@@ -26,18 +35,29 @@ def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[
 def build_manual_rename_command(
     start_now_date: str,
     *,
+    new_accounts: tuple[NewAccountRenameParameters, ...] = (),
     script_path: Path = MANUAL_RENAME_SCRIPT,
 ) -> list[str]:
     """Build the external manual-renamer command for a completed GUI batch."""
-    return [
+    command = [
         sys.executable,
         str(script_path),
         "--newRename",
         "--startNowDate",
         start_now_date,
-        "--no-duplicated",
-        "--move-renamed",
     ]
+    for account in new_accounts:
+        command.extend(
+            [
+                "--new-account",
+                account.username,
+                account.owner_id,
+                account.start_init_date,
+                account.destination_path,
+            ]
+        )
+    command.extend(["--no-duplicated", "--move-renamed"])
+    return command
 
 
 class ProcessRunner:
@@ -96,6 +116,7 @@ class ProcessRunner:
 
 __all__ = [
     "MANUAL_RENAME_SCRIPT",
+    "NewAccountRenameParameters",
     "ProcessRunner",
     "build_manual_rename_command",
     "build_run_continue_command",

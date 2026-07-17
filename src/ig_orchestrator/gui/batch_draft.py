@@ -9,6 +9,10 @@ class AccountDraft:
     download_stories: bool = False
     urls: list[str] = field(default_factory=list)
     start_now_date: str = ""
+    is_new_account: bool = False
+    owner_id: str = ""
+    start_init_date: str = ""
+    destination_path: str = ""
 
 
 @dataclass(slots=True)

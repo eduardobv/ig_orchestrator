@@ -16,10 +16,12 @@ from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
     normalize_url_lines,
+    save_new_account_to_catalog,
     save_batch_draft,
 )
 from ig_orchestrator.gui.process_runner import (
     MANUAL_RENAME_SCRIPT,
+    NewAccountRenameParameters,
     ProcessRunner,
     build_manual_rename_command,
     build_run_continue_command,
@@ -55,16 +57,18 @@ class InstagramOrchestratorApp:
         self.root = root
         self.connection = connection
         self.settings = settings
-        self.catalog_entries = AccountCatalogService(
+        self.catalog_service = AccountCatalogService(
             connection,
             batch_json_path=batch_json_path,
-        ).list_entries()
+        )
+        self.catalog_entries = self.catalog_service.list_entries()
         self.accounts: list[AccountDraft] = []
         self.selected_index: int | None = None
         self.saved_batch_id: int | None = None
         self.saved_draft_signature: tuple[object, ...] | None = None
         self.process_runner = ProcessRunner()
         self.batch_ready_for_rename = False
+        self.rename_new_accounts: tuple[NewAccountRenameParameters, ...] = ()
         self.last_run_was_dry_run = False
 
         today = date.today().isoformat()
@@ -77,6 +81,10 @@ class InstagramOrchestratorApp:
         self.username_var = tk.StringVar()
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
+        self.new_account_var = tk.BooleanVar(value=False)
+        self.owner_id_var = tk.StringVar()
+        self.start_init_date_var = tk.StringVar()
+        self.destination_path_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Ready")
         self.account_progress_var = tk.StringVar(value="Cuentas: -")
         self.item_progress_var = tk.StringVar(value="Items: -")
@@ -174,9 +182,6 @@ class InstagramOrchestratorApp:
         self.catalog_list = tk.Listbox(parent, exportselection=False)
         self.catalog_list.grid(row=2, column=0, sticky="nsew")
         self.catalog_list.bind("<Double-Button-1>", lambda _event: self._load_catalog())
-        ttk.Button(parent, text="Agregar cuenta nueva", command=self._clear_editor).grid(
-            row=3, column=0, sticky="ew", pady=(6, 0)
-        )
 
     def _build_batch_table(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
@@ -216,7 +221,7 @@ class InstagramOrchestratorApp:
         )
 
     def _build_editor(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(7, weight=1)
+        parent.rowconfigure(5, weight=1)
         parent.columnconfigure(1, weight=1)
         ttk.Label(parent, text="Editor").grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Label(parent, text="Username").grid(row=1, column=0, sticky="w", pady=(8, 0))
@@ -233,29 +238,73 @@ class InstagramOrchestratorApp:
             variable=self.stories_var,
             command=self._update_indicators,
         ).grid(row=2, column=1, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(
+            parent,
+            text="New account",
+            variable=self.new_account_var,
+            command=self._toggle_new_account_fields,
+        ).grid(row=2, column=2, sticky="w", pady=(8, 0))
         ttk.Label(parent, text="Start date").grid(row=3, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(parent, textvariable=self.account_date_var, width=12).grid(
             row=3, column=1, sticky="w", pady=(8, 0)
         )
-        ttk.Label(parent, text="URLs").grid(row=4, column=0, sticky="nw", pady=(8, 0))
-        self.urls_text = tk.Text(parent, height=12, wrap="none")
-        self.urls_text.grid(row=4, column=1, columnspan=2, sticky="nsew", pady=(8, 0))
+
+        self.new_account_frame = ttk.LabelFrame(
+            parent,
+            text="Datos de cuenta nueva",
+            padding=6,
+        )
+        self.new_account_frame.columnconfigure(1, weight=1)
+        ttk.Label(self.new_account_frame, text="ownerId *").grid(
+            row=0,
+            column=0,
+            sticky="w",
+        )
+        ttk.Entry(self.new_account_frame, textvariable=self.owner_id_var).grid(
+            row=0, column=1, sticky="ew", padx=(8, 0)
+        )
+        ttk.Label(self.new_account_frame, text="startInitDate *").grid(
+            row=1, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Entry(self.new_account_frame, textvariable=self.start_init_date_var).grid(
+            row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
+        )
+        ttk.Label(self.new_account_frame, text="path *").grid(
+            row=2, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Entry(self.new_account_frame, textvariable=self.destination_path_var).grid(
+            row=2, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
+        )
+        self.new_account_frame.grid(
+            row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0)
+        )
+        self.new_account_frame.grid_remove()
+
+        ttk.Label(parent, text="URLs").grid(row=5, column=0, sticky="nw", pady=(8, 0))
+        self.urls_text = tk.Text(parent, height=9, wrap="none")
+        self.urls_text.grid(row=5, column=1, columnspan=2, sticky="nsew", pady=(8, 0))
         self.urls_text.bind("<KeyRelease>", lambda _event: self._update_indicators())
         ttk.Label(parent, textvariable=self.indicators_var).grid(
-            row=5, column=1, columnspan=2, sticky="w", pady=(6, 0)
+            row=6, column=1, columnspan=2, sticky="w", pady=(6, 0)
         )
         ttk.Button(parent, text="Pegar", command=self._paste_urls).grid(
-            row=6, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
+            row=7, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
         )
         ttk.Button(parent, text="Normalizar", command=self._normalize_urls).grid(
-            row=6, column=1, sticky="ew", pady=(8, 0), padx=(0, 4)
+            row=7, column=1, sticky="ew", pady=(8, 0), padx=(0, 4)
         )
         ttk.Button(parent, text="Agregar / Actualizar", command=self._upsert_account).grid(
-            row=6, column=2, sticky="ew", pady=(8, 0)
+            row=7, column=2, sticky="ew", pady=(8, 0)
         )
         ttk.Button(parent, text="Limpiar editor", command=self._clear_editor).grid(
-            row=7, column=1, columnspan=2, sticky="new", pady=(8, 0)
+            row=8, column=1, columnspan=2, sticky="ew", pady=(8, 0)
         )
+
+    def _toggle_new_account_fields(self) -> None:
+        if self.new_account_var.get():
+            self.new_account_frame.grid()
+        else:
+            self.new_account_frame.grid_remove()
 
     def _refresh_catalog(self) -> None:
         query = self.catalog_filter_var.get().strip().lower()
@@ -268,7 +317,11 @@ class InstagramOrchestratorApp:
         for item_id in self.tree.get_children():
             self.tree.delete(item_id)
         for index, account in enumerate(self.accounts):
-            status = "OK" if account.download_stories or account.urls else "Vacio"
+            status = (
+                "Nueva"
+                if account.is_new_account
+                else "OK" if account.download_stories or account.urls else "Vacio"
+            )
             self.tree.insert(
                 "",
                 tk.END,
@@ -303,6 +356,11 @@ class InstagramOrchestratorApp:
         account = self.accounts[self.selected_index]
         self.username_var.set(account.username)
         self.stories_var.set(account.download_stories)
+        self.new_account_var.set(account.is_new_account)
+        self.owner_id_var.set(account.owner_id)
+        self.start_init_date_var.set(account.start_init_date)
+        self.destination_path_var.set(account.destination_path)
+        self._toggle_new_account_fields()
         self.account_date_var.set(account.start_now_date)
         self.urls_text.delete("1.0", tk.END)
         self.urls_text.insert("1.0", "\n".join(account.urls))
@@ -315,6 +373,10 @@ class InstagramOrchestratorApp:
             download_stories=self.stories_var.get(),
             urls=urls,
             start_now_date=self.account_date_var.get(),
+            is_new_account=self.new_account_var.get(),
+            owner_id=self.owner_id_var.get(),
+            start_init_date=self.start_init_date_var.get(),
+            destination_path=self.destination_path_var.get(),
         )
 
     def _upsert_account(self) -> None:
@@ -337,11 +399,26 @@ class InstagramOrchestratorApp:
             download_stories=validated.download_stories,
             urls=list(validated.urls),
             start_now_date=account.start_now_date.strip(),
+            is_new_account=account.is_new_account,
+            owner_id=account.owner_id.strip(),
+            start_init_date=account.start_init_date.strip(),
+            destination_path=account.destination_path.strip(),
         )
+        try:
+            save_new_account_to_catalog(stored, self.connection)
+        except (BatchDraftValidationError, ValueError) as exc:
+            messagebox.showerror("Catalogo", str(exc))
+            return
         if self.selected_index is None:
             self.accounts.append(stored)
         else:
             self.accounts[self.selected_index] = stored
+        if stored.is_new_account:
+            self.catalog_entries = self.catalog_service.list_entries()
+            self.username_combo.configure(
+                values=[entry.username for entry in self.catalog_entries]
+            )
+            self._refresh_catalog()
         self._refresh_table()
         self._clear_editor()
 
@@ -370,6 +447,10 @@ class InstagramOrchestratorApp:
                 download_stories=account.download_stories,
                 urls=list(account.urls),
                 start_now_date=account.start_now_date,
+                is_new_account=account.is_new_account,
+                owner_id=account.owner_id,
+                start_init_date=account.start_init_date,
+                destination_path=account.destination_path,
             ),
         )
         self._refresh_table()
@@ -393,6 +474,11 @@ class InstagramOrchestratorApp:
         self.username_var.set("")
         self.account_date_var.set(date.today().isoformat())
         self.stories_var.set(False)
+        self.new_account_var.set(False)
+        self.owner_id_var.set("")
+        self.start_init_date_var.set("")
+        self.destination_path_var.set("")
+        self._toggle_new_account_fields()
         self.urls_text.delete("1.0", tk.END)
         self._update_indicators()
 
@@ -471,6 +557,7 @@ class InstagramOrchestratorApp:
             return
 
         self.batch_ready_for_rename = False
+        self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
         self.last_run_was_dry_run = self.dry_run_var.get()
         self.rename_button.configure(state="disabled")
         command = build_run_continue_command(batch_id, dry_run=self.last_run_was_dry_run)
@@ -549,7 +636,10 @@ class InstagramOrchestratorApp:
             messagebox.showerror("Renombrar", error)
             return
 
-        command = build_manual_rename_command(start_now_date)
+        command = build_manual_rename_command(
+            start_now_date,
+            new_accounts=self.rename_new_accounts,
+        )
         self._write_console(
             f"Iniciando renombrado con Start date {start_now_date}: "
             f"{' '.join(command)}\n"
@@ -668,9 +758,28 @@ def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
                 account.download_stories,
                 tuple(account.urls),
                 account.start_now_date,
+                account.is_new_account,
+                account.owner_id,
+                account.start_init_date,
+                account.destination_path,
             )
             for account in draft.accounts
         ),
+    )
+
+
+def _new_account_rename_parameters(
+    accounts: list[AccountDraft],
+) -> tuple[NewAccountRenameParameters, ...]:
+    return tuple(
+        NewAccountRenameParameters(
+            username=account.username,
+            owner_id=account.owner_id,
+            start_init_date=account.start_init_date,
+            destination_path=account.destination_path,
+        )
+        for account in accounts
+        if account.is_new_account
     )
 
 

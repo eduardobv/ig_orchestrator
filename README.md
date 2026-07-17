@@ -258,6 +258,12 @@ SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
+El editor incluye `New account`, desmarcado por defecto. Al marcarlo aparecen
+los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.
+`Agregar / Actualizar` incorpora la cuenta al lote y la registra inmediatamente
+en el catalogo global. En `account_history`, estos datos se guardan como
+`user_ig_id = ownerId`, `field1 = path` y `field2 = startInitDate`.
+
 La salida se transmite al cuadro inferior sin congelar la ventana. Cada linea
 se presenta con fecha y hora local hasta milisegundos, por ejemplo
 `2026-06-21 17:48:57.983 Evento`. Durante el proceso se muestra el avance total
@@ -269,8 +275,16 @@ El boton `Renombrar`, situado junto a las acciones del proceso, permanece
 deshabilitado hasta que finaliza correctamente una ejecucion real del lote. No
 se habilita tras un dry-run ni tras un fallo. Al pulsarlo ejecuta en segundo
 plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
-`Start date` global y aplica `--no-duplicated --move-renamed`. Toda la salida
-del renombrador se muestra en la misma consola con timestamp.
+`Start date` global, agrega un bloque `--new-account USERNAME OWNER_ID
+START_INIT_DATE PATH` por cada fila marcada como nueva y finalmente aplica
+`--no-duplicated --move-renamed`. Las rutas con espacios se transmiten como un
+unico argumento y toda la salida se muestra en la misma consola con timestamp.
+
+Ejemplo con dos cuentas nuevas:
+
+```text
+python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDate "2026-07-16" --new-account "ddmarii" "436651863" "2025-12-14" "G:\4K Stogram\00.MODELS-D" --new-account "second_account" "987654321" "2026-01-10" "G:\4K Stogram\00.MODELS-C" --no-duplicated --move-renamed
+```
 
 Al iniciar, el campo `Batch name` se rellena con el ultimo lote ejecutado en
 SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta
@@ -278,7 +292,8 @@ vacia, sugiere un nombre nuevo con timestamp.
 
 Los campos `Start date` del lote y del editor de cuenta arrancan con la fecha
 de hoy. Al pulsar `Agregar / Actualizar`, el editor limpia `username`,
-`download_stories` y `URLs`, pero mantiene el `Start date` de hoy.
+`download_stories`, `New account`, sus campos condicionales y `URLs`, pero
+mantiene el `Start date` de hoy.
 
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
 y comas. El boton `Normalizar` convierte entradas como:

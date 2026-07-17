@@ -15,7 +15,11 @@ from ig_orchestrator.db import (
     connect,
     init_database,
 )
-from ig_orchestrator.gui.app import _latest_executed_batch_name, _timestamp_console_text
+from ig_orchestrator.gui.app import (
+    _latest_executed_batch_name,
+    _new_account_rename_parameters,
+    _timestamp_console_text,
+)
 from ig_orchestrator.gui.account_catalog_service import AccountCatalogService
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -23,8 +27,10 @@ from ig_orchestrator.gui.batch_draft_service import (
     inspect_account_draft,
     normalize_url_lines,
     save_batch_draft,
+    validate_batch_draft,
 )
 from ig_orchestrator.gui.process_runner import (
+    NewAccountRenameParameters,
     build_manual_rename_command,
     build_run_continue_command,
 )
@@ -175,6 +181,72 @@ def test_gui_manual_rename_command_uses_global_start_date() -> None:
     ]
 
 
+def test_gui_manual_rename_command_adds_all_new_accounts_in_order() -> None:
+    script_path = Path(r"D:\tools\ManualRenameFiles\main.py")
+
+    command = build_manual_rename_command(
+        "2026-07-16",
+        script_path=script_path,
+        new_accounts=(
+            NewAccountRenameParameters(
+                username="ddmarii",
+                owner_id="436651863",
+                start_init_date="2025-12-14",
+                destination_path=r"G:\4K Stogram\00.MODELS-D",
+            ),
+            NewAccountRenameParameters(
+                username="second_account",
+                owner_id="987654321",
+                start_init_date="2026-01-10",
+                destination_path=r"G:\4K Stogram\00.MODELS-C",
+            ),
+        ),
+    )
+
+    assert command[1:] == [
+        str(script_path),
+        "--newRename",
+        "--startNowDate",
+        "2026-07-16",
+        "--new-account",
+        "ddmarii",
+        "436651863",
+        "2025-12-14",
+        r"G:\4K Stogram\00.MODELS-D",
+        "--new-account",
+        "second_account",
+        "987654321",
+        "2026-01-10",
+        r"G:\4K Stogram\00.MODELS-C",
+        "--no-duplicated",
+        "--move-renamed",
+    ]
+
+
+def test_gui_rename_parameters_only_include_checked_new_accounts() -> None:
+    parameters = _new_account_rename_parameters(
+        [
+            AccountDraft(username="existing", is_new_account=False),
+            AccountDraft(
+                username="new_user",
+                is_new_account=True,
+                owner_id="123",
+                start_init_date="2026-01-01",
+                destination_path=r"G:\Models",
+            ),
+        ]
+    )
+
+    assert parameters == (
+        NewAccountRenameParameters(
+            username="new_user",
+            owner_id="123",
+            start_init_date="2026-01-01",
+            destination_path=r"G:\Models",
+        ),
+    )
+
+
 def test_gui_console_prefixes_every_line_with_millisecond_timestamp() -> None:
     formatted = _timestamp_console_text(
         "Primer evento\nSegundo evento\n",
@@ -199,6 +271,79 @@ def test_gui_draft_rejects_account_without_stories_or_urls(tmp_path: Path) -> No
     with connect(db_path) as connection:
         with pytest.raises(BatchDraftValidationError, match="enable stories"):
             save_batch_draft(draft, connection)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "error"),
+    [
+        ("owner_id", "", "ownerId is required"),
+        ("start_init_date", "", "startInitDate is required"),
+        ("destination_path", "", "path is required"),
+    ],
+)
+def test_gui_new_account_requires_rename_fields(
+    field_name: str,
+    field_value: str,
+    error: str,
+) -> None:
+    values = {
+        "owner_id": "436651863",
+        "start_init_date": "2025-12-14",
+        "destination_path": r"G:\4K Stogram\00.MODELS-D",
+    }
+    values[field_name] = field_value
+    account = AccountDraft(
+        username="ddmarii",
+        is_new_account=True,
+        download_stories=True,
+        **values,
+    )
+
+    with pytest.raises(BatchDraftValidationError, match=error):
+        validate_batch_draft(
+            BatchDraft(
+                batch_name="new_account_missing_field",
+                default_start_now_date="2026-07-16",
+                accounts=[account],
+            )
+        )
+
+
+def test_gui_new_account_is_saved_to_batch_and_catalog(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="new_account_batch",
+        default_start_now_date="2026-07-16",
+        accounts=[
+            AccountDraft(
+                username="@ddmarii",
+                download_stories=True,
+                is_new_account=True,
+                owner_id="436651863",
+                start_init_date="2025-12-14",
+                destination_path=r"G:\4K Stogram\00.MODELS-D",
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        assert [account.username for account in result.accounts] == ["ddmarii"]
+
+        catalog_record = AccountHistoryRepository(connection).get_by_user_name("ddmarii")
+        assert catalog_record is not None
+        assert catalog_record.user_ig_id == "436651863"
+        assert catalog_record.field1 == r"G:\4K Stogram\00.MODELS-D"
+        assert catalog_record.field2 == "2025-12-14"
+
+        catalog_entry = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        ).list_entries()[0]
+        assert catalog_entry.owner_id == "436651863"
+        assert catalog_entry.destination_path == r"G:\4K Stogram\00.MODELS-D"
+        assert catalog_entry.start_init_date == "2025-12-14"
 
 
 def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:
