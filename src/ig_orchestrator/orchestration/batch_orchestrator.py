@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from collections.abc import Callable
 from typing import Protocol
+from pathlib import Path
 
 from ig_orchestrator.db import (
     AccountRepository,
@@ -23,6 +24,7 @@ from ig_orchestrator.models import (
     UrlJobStatus,
 )
 from ig_orchestrator.logging_config import configure_app_logging, get_logger
+from ig_orchestrator.filesystem import cleanup_batch_artifacts
 from ig_orchestrator.orchestration.account_orchestrator import (
     AccountOrchestratorResult,
 )
@@ -49,6 +51,8 @@ class BatchOrchestratorResult:
 class BatchOrchestratorConfig:
     dry_run: bool = False
     progress_callback: Callable[[int, int, Account], None] | None = None
+    telegram_download_folder: Path | None = None
+    default_working_folder: Path | None = None
 
 
 class BatchOrchestrator:
@@ -163,6 +167,7 @@ class BatchOrchestrator:
                 summary.failed_urls,
                 summary.downloaded_files,
             )
+            self._cleanup_batch(accounts)
             return BatchOrchestratorResult(
                 batch=batch,
                 run=run,
@@ -189,6 +194,7 @@ class BatchOrchestrator:
                 failed_summary,
                 finished_at=datetime.now(timezone.utc),
             )
+            self._cleanup_batch(accounts)
             return BatchOrchestratorResult(
                 batch=batch,
                 run=run,
@@ -196,6 +202,26 @@ class BatchOrchestrator:
                 account_results=tuple(account_results),
                 error=str(exc),
             )
+
+    def _cleanup_batch(self, accounts: list[Account]) -> None:
+        account_folders = [
+            folder
+            for account in accounts
+            if (folder := _account_folder(account, self._config.default_working_folder))
+            is not None
+        ]
+        result = cleanup_batch_artifacts(
+            telegram_download_folder=self._config.telegram_download_folder,
+            account_folders=account_folders,
+        )
+        logger.info(
+            "Batch cleanup finished: temporary_files={} reel_duplicates={} errors={}",
+            len(result.deleted_temporary_files),
+            len(result.deleted_reel_duplicates),
+            len(result.errors),
+        )
+        for error in result.errors:
+            logger.warning("Batch cleanup warning: {}", error)
 
     async def process_batch_by_name(self, batch_name: str) -> BatchOrchestratorResult:
         if not batch_name.strip():
@@ -309,6 +335,16 @@ def _count_batch_urls(
     return sum(
         len(url_job_repository.list_by_account(account_id)) for account_id in account_ids
     )
+
+
+def _account_folder(account: Account, default_working_folder: Path | None) -> Path | None:
+    if account.working_folder is not None:
+        if account.working_folder.name.lower() == account.username.lower():
+            return account.working_folder
+        return account.working_folder / account.username
+    if default_working_folder is not None:
+        return default_working_folder / account.username
+    return None
 
 
 def _batch_status_from_summary(summary: RunSummary) -> InputBatchStatus:

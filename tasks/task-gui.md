@@ -150,6 +150,7 @@ Panel inferior: ejecucion
   milisegundos en cada linea.
 - Barra de progreso indeterminada mientras corre.
 - Botones:
+  - `Clean`, disponible para vaciar la consola de estado cuando sea necesario;
   - `Cancelar proceso` si se lanzo como subprocess;
   - `Renombrar`, deshabilitado hasta que termine correctamente un lote real;
   - `Abrir reporte` cuando exista;

@@ -742,7 +742,7 @@ Dado:
 username = example_user
 ```
 
-El sistema debe crear:
+El sistema debe disponer de estas rutas, creandolas bajo demanda:
 
 ```text
 C:\Users\eduba\Downloads\DW\Telegram_Desktop\example_user\
@@ -752,6 +752,11 @@ C:\Users\eduba\Downloads\DW\Telegram_Desktop\example_user\highlights\
 C:\Users\eduba\Downloads\DW\Telegram_Desktop\example_user\_errors\
 C:\Users\eduba\Downloads\DW\Telegram_Desktop\example_user\_logs\
 ```
+
+Al iniciar una cuenta se crea unicamente `example_user\`. `story\`, `reels\`
+y `highlights\` se crean cuando se mueve el primer archivo real de ese tipo.
+Al terminar un lote real se eliminan los ficheros `telegram_media*` residuales
+de la raiz de descargas y las copias `*_1.mp4` verificadas dentro de `reels\`.
 
 Reservado para versiones posteriores:
 

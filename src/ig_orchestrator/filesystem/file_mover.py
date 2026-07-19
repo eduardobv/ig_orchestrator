@@ -61,6 +61,7 @@ def move_downloaded_files(
             publication_type=effective_type,
             media_type=download_file.media_type,
         )
+        target_folder.mkdir(parents=True, exist_ok=True)
         destination = _safe_destination(target_folder / download_file.original_path.name)
         shutil.move(str(download_file.original_path), str(destination))
 

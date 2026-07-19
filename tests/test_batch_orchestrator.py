@@ -223,6 +223,74 @@ def test_batch_orchestrator_reports_compact_account_progress(tmp_path: Path) -> 
     assert progress == [(1, 2, "first"), (2, 2, "second")]
 
 
+def test_batch_orchestrator_cleans_artifacts_after_real_batch(tmp_path: Path) -> None:
+    stored = _stored_batch(tmp_path)
+    account = _create_account(
+        stored,
+        "first",
+        AccountStatus.PENDING,
+        working_folder=tmp_path / "working" / "first",
+    )
+    _create_job(stored.job_repo, account.id)
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    temporary = downloads / "telegram_media_leftover.mp4"
+    temporary.write_bytes(b"temporary")
+    reels = tmp_path / "working" / "first" / "reels"
+    reels.mkdir(parents=True)
+    (reels / "123.mp4").write_bytes(b"original")
+    duplicate = reels / "123_1.mp4"
+    duplicate.write_bytes(b"duplicate")
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {account.id: AccountStatus.COMPLETED},
+    )
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(
+            telegram_download_folder=downloads,
+            default_working_folder=tmp_path / "working",
+        ),
+    )
+
+    asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert not temporary.exists()
+    assert not duplicate.exists()
+
+
+def test_batch_orchestrator_does_not_clean_artifacts_in_dry_run(tmp_path: Path) -> None:
+    stored = _stored_batch(tmp_path)
+    account = _create_account(stored, "first", AccountStatus.PENDING)
+    _create_job(stored.job_repo, account.id)
+    downloads = tmp_path / "downloads"
+    downloads.mkdir()
+    temporary = downloads / "telegram_media_leftover.mp4"
+    temporary.write_bytes(b"temporary")
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {account.id: AccountStatus.COMPLETED},
+    )
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(
+            dry_run=True,
+            telegram_download_folder=downloads,
+            default_working_folder=tmp_path / "working",
+        ),
+    )
+
+    asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert temporary.is_file()
+
+
 def _stored_batch(tmp_path: Path) -> StoredBatch:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)
@@ -267,6 +335,8 @@ def _create_account(
     stored: StoredBatch,
     username: str,
     status: AccountStatus,
+    *,
+    working_folder: Path | None = None,
 ) -> Account:
     return stored.account_repo.create(
         Account(
@@ -274,7 +344,7 @@ def _create_account(
             username=username,
             start_now_date=date(2026, 6, 14),
             download_stories=False,
-            working_folder=Path("working") / username,
+            working_folder=working_folder or Path("working") / username,
             status=status,
         )
     )

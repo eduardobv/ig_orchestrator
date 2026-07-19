@@ -170,7 +170,13 @@ class InstagramOrchestratorApp:
             state="disabled",
         )
         self.rename_button.grid(row=0, column=3, sticky="e", padx=(0, 6))
-        self.cancel_button.grid(row=0, column=4, sticky="e")
+        self.clean_console_button = ttk.Button(
+            progress,
+            text="Clean",
+            command=self._clear_console,
+        )
+        self.clean_console_button.grid(row=0, column=4, sticky="e", padx=(0, 6))
+        self.cancel_button.grid(row=0, column=5, sticky="e")
 
     def _build_catalog(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(2, weight=1)
@@ -702,6 +708,11 @@ class InstagramOrchestratorApp:
         self.console.configure(state="normal")
         self.console.insert(tk.END, _timestamp_console_text(text))
         self.console.see(tk.END)
+        self.console.configure(state="disabled")
+
+    def _clear_console(self) -> None:
+        self.console.configure(state="normal")
+        self.console.delete("1.0", tk.END)
         self.console.configure(state="disabled")
 
     def _set_status(self, text: str) -> None:

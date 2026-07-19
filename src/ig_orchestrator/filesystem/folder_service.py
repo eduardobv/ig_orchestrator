@@ -13,6 +13,7 @@ class AccountFolderPaths:
 
 
 def ensure_account_folders(username: str, working_folder: Path | str) -> AccountFolderPaths:
+    """Ensure the account root exists without creating speculative subfolders."""
     normalized_username = username.strip()
     if not normalized_username:
         raise ValueError("username must not be blank")
@@ -26,7 +27,6 @@ def ensure_account_folders(username: str, working_folder: Path | str) -> Account
         highlights=account_root / "highlights",
     )
 
-    for folder in (paths.root, paths.story, paths.reels, paths.highlights):
-        folder.mkdir(parents=True, exist_ok=True)
+    paths.root.mkdir(parents=True, exist_ok=True)
 
     return paths

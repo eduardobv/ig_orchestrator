@@ -314,6 +314,8 @@ def _run_batch(
             account_orchestrator=account_orchestrator,
             config=BatchOrchestratorConfig(
                 progress_callback=_print_account_progress,
+                telegram_download_folder=settings.telegram_desktop_download_folder,
+                default_working_folder=settings.working_folder,
             ),
         )
         if imported.batch.id is None:
@@ -468,6 +470,8 @@ def _run_continue(
             config=BatchOrchestratorConfig(
                 dry_run=dry_run,
                 progress_callback=_print_account_progress,
+                telegram_download_folder=settings.telegram_desktop_download_folder,
+                default_working_folder=settings.working_folder,
             ),
         )
 

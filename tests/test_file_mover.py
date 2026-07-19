@@ -58,6 +58,9 @@ def test_move_downloaded_files_moves_post_image_to_account_root(tmp_path: Path) 
     assert moved[0].working_path == destination
     assert moved[0].status is DownloadFileStatus.CLASSIFIED_AS_POST
     assert destination.read_bytes() == b"image"
+    assert not (destination.parent / "story").exists()
+    assert not (destination.parent / "reels").exists()
+    assert not (destination.parent / "highlights").exists()
 
 
 def test_move_downloaded_files_moves_story_and_highlights_to_subfolders(

@@ -19,19 +19,21 @@ username
 working_folder
 ```
 
-## Carpetas creadas
+## Carpetas y creacion perezosa
 
 ```text
 username/
-username/story/
-username/reels/
-username/highlights/
 ```
+
+Al iniciar una cuenta solo se crea `username/`. Las subcarpetas `story/`,
+`reels/` y `highlights/` se crean al mover el primer archivo que realmente
+corresponda a ese tipo, evitando carpetas vacias por descargas fallidas o tipos
+no presentes.
 
 ## Criterios de aceptacion
 
 * Si la carpeta existe, no destruir contenido.
-* Si falta una subcarpeta, crearla.
+* No crear subcarpetas sin un archivo que vaya a guardarse en ellas.
 * Devolver estructura de rutas.
 * Actualizar `CHANGELOG.md`.
 

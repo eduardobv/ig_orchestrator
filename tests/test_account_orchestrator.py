@@ -105,7 +105,11 @@ def test_account_orchestrator_processes_generated_story_before_manual_urls(
     assert processor.calls == [story.id, manual.id]
     assert result.account.status is AccountStatus.COMPLETED
     assert result.summary.status is RunStatus.COMPLETED
-    assert (tmp_path / "working" / "example_user" / "story").is_dir()
+    account_root = tmp_path / "working" / "example_user"
+    assert account_root.is_dir()
+    assert not (account_root / "story").exists()
+    assert not (account_root / "reels").exists()
+    assert not (account_root / "highlights").exists()
     assert stored.job_repo.get_by_id(story.id).run_id == result.run.id
     assert stored.job_repo.get_by_id(manual.id).run_id == result.run.id
 

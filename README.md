@@ -146,7 +146,9 @@ Notas:
 - `TELETHON_SESSION_NAME` define el nombre base del archivo de sesion de Telethon.
 - `TELEGRAM_DOWNLOAD_BOT_USERNAME` es el bot al que se enviaran las URLs.
 - `TELEGRAM_DESKTOP_DOWNLOAD_FOLDER` es donde Telegram Desktop deja los archivos descargados.
-- `WORKING_FOLDER` es la carpeta base donde el orquestador crea `username/`, `username/story/`, `username/reels/` y `username/highlights/`.
+- `WORKING_FOLDER` es la carpeta base donde el orquestador crea `username/`.
+  Las subcarpetas `story/`, `reels/` y `highlights/` aparecen solo cuando se
+  mueve el primer archivo real de ese tipo.
 - `SQLITE_DB_PATH` define la base SQLite local.
 
 ### `pyproject.toml`
@@ -681,6 +683,14 @@ Reglas:
 - Si el destino existe, se agrega sufijo numerico: `archivo_1.jpg`, `archivo_2.jpg`, etc.
 
 En dry-run no se mueven archivos ni se crean carpetas de cuenta por defecto.
+
+Al finalizar cada lote real, el orquestador limpia los ficheros
+`telegram_media*` que hayan quedado en la raiz de descargas de Telegram. En las
+carpetas `reels\` de las cuentas del lote elimina un `*_1.mp4` solamente cuando
+existe el archivo homologo sin `_1`. Esta limpieza no se ejecuta en dry-run.
+
+La consola de estado de la GUI incluye el boton `Clean` para vaciar su texto
+sin afectar el lote ni el proceso en ejecucion.
 
 ### Reportes
 

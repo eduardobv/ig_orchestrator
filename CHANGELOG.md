@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.26.3 - Patch - Carpetas bajo demanda y limpieza de lote
+
+Fecha: 2026-07-18
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/batch_cleanup.py` implementa la limpieza
+  conservadora posterior a cada lote real: temporales `telegram_media*` en la
+  raiz de descargas y duplicados `*_1.mp4` verificados dentro de `reels/`.
+* `tests/test_batch_cleanup.py` cubre temporales, alcance no recursivo y
+  eliminacion de duplicados solo cuando existe el original.
+* `tasks/Patch_v1.26.3.md` documenta el alcance y los criterios del patch.
+
+### Modificado
+
+* `src/ig_orchestrator/filesystem/folder_service.py` crea solo la carpeta raiz
+  de la cuenta y deja de generar subcarpetas especulativas.
+* `src/ig_orchestrator/filesystem/file_mover.py` crea `story/`, `reels/` o
+  `highlights/` justo antes de mover el primer archivo destinado a ellas.
+* `src/ig_orchestrator/orchestration/batch_orchestrator.py` ejecuta la limpieza
+  al finalizar lotes reales, incluidos lotes parciales o con fallo de
+  infraestructura, y la omite en dry-run.
+* `src/ig_orchestrator/main.py` entrega al orquestador las rutas de descargas y
+  trabajo necesarias para limitar la limpieza a las cuentas del lote.
+* `src/ig_orchestrator/gui/app.py` agrega el boton `Clean` a la caja de estados
+  para vaciar la consola sin alterar el proceso.
+* `PLAN.md`, `README.md`, `tasks/Tarea8.md`, `tasks/Tarea17.md` y
+  `tasks/task-gui.md` documentan las nuevas reglas.
+* Tests de carpetas, movimiento, orquestadores y smoke adaptados al nuevo
+  comportamiento. Version del paquete actualizada a `1.26.3`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_folder_service.py tests/test_file_mover.py
+  tests/test_batch_cleanup.py tests/test_batch_orchestrator.py
+  tests/test_package_smoke.py tests/test_gui_services.py -q` (`51 passed`).
+* `python -m pytest -q` (`171 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
 ## v1.26.2 - Patch - Nuevas cuentas desde GUI y renombrador
 
 Fecha: 2026-07-17
