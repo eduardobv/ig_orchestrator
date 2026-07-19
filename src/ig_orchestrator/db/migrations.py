@@ -23,6 +23,24 @@ def apply_migrations(connection: Connection) -> None:
 
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     connection.executescript(schema)
+    _add_column_if_missing(
+        connection,
+        table="input_batches",
+        column="default_start_now_date",
+        definition="TEXT",
+    )
+    for column, definition in (
+        ("is_new_account", "INTEGER NOT NULL DEFAULT 0"),
+        ("rename_owner_id", "TEXT"),
+        ("rename_start_init_date", "TEXT"),
+        ("rename_destination_path", "TEXT"),
+    ):
+        _add_column_if_missing(
+            connection,
+            table="accounts",
+            column=column,
+            definition=definition,
+        )
     duplicates = connection.execute(
         """
         SELECT batch_name, COUNT(*) AS total
@@ -45,6 +63,21 @@ def apply_migrations(connection: Connection) -> None:
         """
     )
     connection.commit()
+
+
+def _add_column_if_missing(
+    connection: Connection,
+    *,
+    table: str,
+    column: str,
+    definition: str,
+) -> None:
+    columns = {
+        str(row["name"])
+        for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 __all__ = ["SCHEMA_PATH", "apply_migrations", "init_database"]

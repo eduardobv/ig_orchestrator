@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.26.4 - Patch - Recuperacion y seguimiento de batches desde GUI
+
+Fecha: 2026-07-19
+
+### Creado
+
+* `src/ig_orchestrator/gui/batch_resume_service.py` consulta batches con trabajo
+  reanudable, reconstruye el borrador completo, resume estados por cuenta y
+  permite finalizar o marcar como interrumpido un lote.
+* `tasks/Patch_v1.26.4.md` documenta el alcance del patch.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` agrega el selector `Ejecuciones pendientes`,
+  las acciones `Reanudar seleccionado` y `Dar por finalizado`, la recuperacion
+  de `Lote actual` y estados por cuenta actualizados en color desde SQLite.
+* `src/ig_orchestrator/gui/batch_draft_service.py`, `db/schema.sql` y
+  `db/migrations.py` persisten de forma compatible la fecha global del lote y
+  la asociacion de cuentas nuevas con sus parametros de renombrado.
+* Al cancelar un proceso de batch desde la GUI, su estado queda `PARTIAL` sin
+  alterar cuentas, URL jobs, errores ni archivos ya registrados.
+* `tests/test_gui_services.py` cubre persistencia de metadatos, listado y
+  reconstruccion de pendientes, progreso, cancelacion y finalizacion manual.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` documentan el flujo y las
+  respuestas de persistencia. Version actualizada a `1.26.4`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_db_repositories.py
+  tests/test_main_batch_modes.py tests/test_batch_orchestrator.py -q`
+  (`42 passed`).
+* `python -m pytest -q` (`174 passed`).
+
 ## v1.26.3 - Patch - Carpetas bajo demanda y limpieza de lote
 
 Fecha: 2026-07-18

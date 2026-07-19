@@ -47,8 +47,39 @@ def save_batch_draft(
 ) -> BatchCreationResult:
     request = validate_batch_draft(draft)
     result = create_batch(request, connection, settings=settings)
+    connection.execute(
+        """
+        UPDATE input_batches
+        SET default_start_now_date = ?, updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (draft.default_start_now_date.strip(), result.batch.id),
+    )
+    stored_accounts = {account.username.casefold(): account for account in result.accounts}
     for account in draft.accounts:
         save_new_account_to_catalog(account, connection)
+        stored = stored_accounts.get(_normalize_username(account.username).casefold())
+        if stored is None or stored.id is None:
+            continue
+        connection.execute(
+            """
+            UPDATE accounts
+            SET is_new_account = ?,
+                rename_owner_id = ?,
+                rename_start_init_date = ?,
+                rename_destination_path = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                int(account.is_new_account),
+                account.owner_id.strip() if account.is_new_account else None,
+                account.start_init_date.strip() if account.is_new_account else None,
+                account.destination_path.strip() if account.is_new_account else None,
+                stored.id,
+            ),
+        )
+    connection.commit()
     return result
 
 

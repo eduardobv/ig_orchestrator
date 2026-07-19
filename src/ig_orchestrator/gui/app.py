@@ -19,6 +19,14 @@ from ig_orchestrator.gui.batch_draft_service import (
     save_new_account_to_catalog,
     save_batch_draft,
 )
+from ig_orchestrator.gui.batch_resume_service import (
+    AccountRuntimeProgress,
+    finish_batch,
+    get_account_runtime_progress,
+    list_pending_batches,
+    load_batch_draft,
+    mark_batch_interrupted,
+)
 from ig_orchestrator.gui.process_runner import (
     MANUAL_RENAME_SCRIPT,
     NewAccountRenameParameters,
@@ -70,6 +78,11 @@ class InstagramOrchestratorApp:
         self.batch_ready_for_rename = False
         self.rename_new_accounts: tuple[NewAccountRenameParameters, ...] = ()
         self.last_run_was_dry_run = False
+        self.active_batch_id: int | None = None
+        self.cancel_requested = False
+        self.active_process_kind: str | None = None
+        self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
+        self.progress_poll_id: str | None = None
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -91,10 +104,11 @@ class InstagramOrchestratorApp:
         self.indicators_var = tk.StringVar(value="URLs: 0")
 
         self.root.title("Instagram Orchestrator")
-        self.root.geometry("1180x720")
+        self.root.geometry("1280x760")
         self._build_widgets()
         self._refresh_catalog()
         self._refresh_table()
+        self._update_pending_button_label()
 
     def _build_widgets(self) -> None:
         self.root.columnconfigure(0, weight=1)
@@ -119,11 +133,15 @@ class InstagramOrchestratorApp:
         self.register_button = ttk.Button(
             top, text="Registrar lote", command=self._save_batch
         )
-        self.register_button.grid(
-            row=0, column=5, padx=(0, 6)
+        self.register_button.grid(row=0, column=5, padx=(0, 6))
+        self.pending_button = ttk.Button(
+            top,
+            text="Recuperar ejecucion",
+            command=self._open_pending_batches,
         )
+        self.pending_button.grid(row=0, column=6, padx=(0, 6))
         self.execute_button = ttk.Button(top, text="Ejecutar", command=self._execute)
-        self.execute_button.grid(row=0, column=6)
+        self.execute_button.grid(row=0, column=7)
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.body_region = body
@@ -210,6 +228,11 @@ class InstagramOrchestratorApp:
             self.tree.column(column, width=width, anchor="w")
         self.tree.grid(row=1, column=0, columnspan=5, sticky="nsew", pady=(6, 6))
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
+        self.tree.tag_configure("completed", foreground="#238636")
+        self.tree.tag_configure("retry", foreground="#b76e00")
+        self.tree.tag_configure("processing", foreground="#0969da")
+        self.tree.tag_configure("pending", foreground="#57606a")
+        self.tree.tag_configure("failed", foreground="#cf222e")
         ttk.Button(parent, text="Subir", command=lambda: self._move_selected(-1)).grid(
             row=2, column=0, sticky="ew", padx=(0, 4)
         )
@@ -323,11 +346,8 @@ class InstagramOrchestratorApp:
         for item_id in self.tree.get_children():
             self.tree.delete(item_id)
         for index, account in enumerate(self.accounts):
-            status = (
-                "Nueva"
-                if account.is_new_account
-                else "OK" if account.download_stories or account.urls else "Vacio"
-            )
+            runtime = self.runtime_progress.get(account.username.casefold())
+            status, tag = _account_display_status(account, runtime)
             self.tree.insert(
                 "",
                 tk.END,
@@ -339,8 +359,36 @@ class InstagramOrchestratorApp:
                     account.start_now_date or self.default_date_var.get(),
                     status,
                 ),
+                tags=(tag,),
             )
-        self._set_status(f"{len(self.accounts)} account(s) in draft")
+        if not self.runtime_progress:
+            self._set_status(f"{len(self.accounts)} account(s) in draft")
+
+    def _refresh_runtime_progress(self) -> None:
+        if self.active_batch_id is None:
+            return
+        progress = get_account_runtime_progress(self.connection, self.active_batch_id)
+        self.runtime_progress = {item.username.casefold(): item for item in progress}
+        self._refresh_table()
+        completed = sum(item.status == "COMPLETED" for item in progress)
+        retry = sum(item.retry_items > 0 for item in progress)
+        remaining = sum(item.status != "COMPLETED" for item in progress)
+        self.account_progress_var.set(
+            f"Cuentas: {completed}/{len(progress)} completas | "
+            f"{retry} en reintento | {remaining} pendientes"
+        )
+
+    def _schedule_progress_poll(self) -> None:
+        if not self.process_runner.is_running() or self.active_batch_id is None:
+            self.progress_poll_id = None
+            return
+        self._refresh_runtime_progress()
+        self.progress_poll_id = self.root.after(600, self._schedule_progress_poll)
+
+    def _stop_progress_poll(self) -> None:
+        if self.progress_poll_id is not None:
+            self.root.after_cancel(self.progress_poll_id)
+            self.progress_poll_id = None
 
     def _load_catalog(self) -> None:
         selection = self.catalog_list.curselection()
@@ -518,6 +566,135 @@ class InstagramOrchestratorApp:
             f"invalidas: {len(summary.invalid_urls)} | tipos: {types}"
         )
 
+    def _open_pending_batches(self) -> None:
+        pending = list_pending_batches(self.connection)
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Ejecuciones pendientes")
+        dialog.geometry("940x360")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(1, weight=1)
+        ttk.Label(
+            dialog,
+            text=(
+                "Selecciona un lote interrumpido para recuperar su contenido y "
+                "reanudarlo desde SQLite."
+            ),
+            padding=(10, 10, 10, 4),
+        ).grid(row=0, column=0, sticky="w")
+        columns = ("date", "name", "id", "status", "progress")
+        tree = ttk.Treeview(dialog, columns=columns, show="headings", selectmode="browse")
+        for column, title, width in (
+            ("date", "Fecha", 170),
+            ("name", "Nombre", 260),
+            ("id", "Batch ID", 75),
+            ("status", "Estado", 100),
+            ("progress", "Cuentas", 230),
+        ):
+            tree.heading(column, text=title)
+            tree.column(column, width=width, anchor="w")
+        tree.grid(row=1, column=0, sticky="nsew", padx=10, pady=6)
+
+        def reload_rows() -> None:
+            for item in tree.get_children():
+                tree.delete(item)
+            for summary in list_pending_batches(self.connection):
+                tree.insert(
+                    "",
+                    tk.END,
+                    iid=str(summary.batch_id),
+                    values=(
+                        summary.batch_date,
+                        summary.batch_name,
+                        summary.batch_id,
+                        summary.status,
+                        f"{summary.completed_accounts}/{summary.total_accounts} completas; "
+                        f"{summary.retry_accounts} reintento; "
+                        f"{summary.remaining_accounts} por terminar",
+                    ),
+                )
+
+        def selected_batch_id() -> int | None:
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning(
+                    "Ejecuciones pendientes",
+                    "Selecciona primero un lote.",
+                    parent=dialog,
+                )
+                return None
+            return int(selection[0])
+
+        def resume_selected() -> None:
+            batch_id = selected_batch_id()
+            if batch_id is None:
+                return
+            try:
+                draft = load_batch_draft(self.connection, batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Reanudar lote", str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._load_persisted_draft(batch_id, draft)
+            self._start_batch(batch_id)
+
+        def finish_selected() -> None:
+            batch_id = selected_batch_id()
+            if batch_id is None:
+                return
+            if not messagebox.askyesno(
+                "Dar por finalizado",
+                f"¿Seguro que quieres dar por finalizado el batch {batch_id}?\n\n"
+                "No volverá a aparecer entre las ejecuciones pendientes. "
+                "Los datos y archivos no se eliminarán.",
+                parent=dialog,
+            ):
+                return
+            try:
+                finish_batch(self.connection, batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Dar por finalizado", str(exc), parent=dialog)
+                return
+            self._write_console(f"Batch {batch_id} marcado manualmente como COMPLETED.\n")
+            reload_rows()
+            self._update_pending_button_label()
+
+        actions = ttk.Frame(dialog, padding=10)
+        actions.grid(row=2, column=0, sticky="ew")
+        ttk.Button(actions, text="Reanudar seleccionado", command=resume_selected).pack(
+            side=tk.RIGHT
+        )
+        ttk.Button(actions, text="Dar por finalizado", command=finish_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        ttk.Button(actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
+        tree.bind("<Double-Button-1>", lambda _event: resume_selected())
+        reload_rows()
+        if not pending:
+            ttk.Label(dialog, text="No hay ejecuciones pendientes.").place(
+                relx=0.5, rely=0.48, anchor="center"
+            )
+
+    def _update_pending_button_label(self) -> None:
+        total = len(list_pending_batches(self.connection))
+        self.pending_button.configure(text=f"Recuperar ejecucion ({total})")
+
+    def _load_persisted_draft(self, batch_id: int, draft: BatchDraft) -> None:
+        self.batch_name_var.set(draft.batch_name)
+        self.default_date_var.set(draft.default_start_now_date)
+        self.accounts = list(draft.accounts)
+        self.selected_index = None
+        self.saved_batch_id = batch_id
+        self.saved_draft_signature = _draft_signature(draft)
+        self.active_batch_id = batch_id
+        self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
+        self._clear_editor()
+        self._refresh_runtime_progress()
+        self._write_console(
+            f"Lote {batch_id} recuperado desde SQLite: {draft.batch_name}.\n"
+        )
+
     def _save_batch(self, *, show_confirmation: bool = True) -> int | None:
         draft = BatchDraft(
             batch_name=self.batch_name_var.get(),
@@ -534,7 +711,9 @@ class InstagramOrchestratorApp:
             return None
 
         self.saved_batch_id = result.batch.id
+        self.active_batch_id = result.batch.id
         self.saved_draft_signature = _draft_signature(draft)
+        self._refresh_runtime_progress()
         self._write_console(
             f"Batch saved: {result.batch.batch_name} (id={result.batch.id})\n"
             f"SQLite database: {self.settings.sqlite_db_path}\n"
@@ -562,9 +741,18 @@ class InstagramOrchestratorApp:
         if batch_id is None:
             return
 
+        self._start_batch(batch_id)
+
+    def _start_batch(self, batch_id: int) -> None:
+        if self.process_runner.is_running():
+            return
+
         self.batch_ready_for_rename = False
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
         self.last_run_was_dry_run = self.dry_run_var.get()
+        self.active_batch_id = batch_id
+        self.cancel_requested = False
+        self.active_process_kind = "batch"
         self.rename_button.configure(state="disabled")
         command = build_run_continue_command(batch_id, dry_run=self.last_run_was_dry_run)
         self._write_console(
@@ -583,6 +771,7 @@ class InstagramOrchestratorApp:
                     0, self._handle_process_complete, batch_id, exit_code
                 ),
             )
+            self._schedule_progress_poll()
         except (OSError, RuntimeError) as exc:
             self._set_process_running(False)
             messagebox.showerror("Ejecucion", str(exc))
@@ -608,9 +797,23 @@ class InstagramOrchestratorApp:
         self._write_console(line)
 
     def _handle_process_complete(self, batch_id: int, exit_code: int) -> None:
-        self.batch_ready_for_rename = exit_code == 0 and not self.last_run_was_dry_run
+        self._stop_progress_poll()
+        if self.cancel_requested:
+            mark_batch_interrupted(self.connection, batch_id)
+        self._refresh_runtime_progress()
+        self.batch_ready_for_rename = (
+            exit_code == 0
+            and not self.last_run_was_dry_run
+            and not self.cancel_requested
+        )
         self._set_process_running(False)
-        if exit_code == 0:
+        if self.cancel_requested:
+            self._set_status(f"Lote {batch_id} interrumpido; queda pendiente")
+            self._write_console(
+                f"Lote {batch_id} cancelado. SQLite conserva el trabajo y el batch "
+                "queda en estado PARTIAL para poder reanudarlo.\n"
+            )
+        elif exit_code == 0:
             self.account_progress_var.set("Cuentas: 100%")
             self.item_progress_var.set("Items: 100%")
             self._set_status(f"Lote {batch_id} finalizado correctamente")
@@ -620,6 +823,9 @@ class InstagramOrchestratorApp:
             self._write_console(
                 f"Lote {batch_id} finalizado con codigo de salida {exit_code}.\n"
             )
+        self.cancel_requested = False
+        self.active_process_kind = None
+        self._update_pending_button_label()
 
     def _rename_manual_files(self) -> None:
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
@@ -652,6 +858,7 @@ class InstagramOrchestratorApp:
         )
         self._set_process_running(True)
         self._set_status("Renombrando archivos...")
+        self.active_process_kind = "rename"
         try:
             self.process_runner.start(
                 command,
@@ -667,6 +874,7 @@ class InstagramOrchestratorApp:
             messagebox.showerror("Renombrar", str(exc))
 
     def _handle_rename_complete(self, exit_code: int) -> None:
+        self.active_process_kind = None
         self._set_process_running(False)
         if exit_code == 0:
             self._set_status("Renombrado finalizado correctamente")
@@ -679,6 +887,7 @@ class InstagramOrchestratorApp:
 
     def _cancel_process(self) -> None:
         if self.process_runner.cancel():
+            self.cancel_requested = self.active_process_kind == "batch"
             self._set_status("Cancelando proceso...")
             self._write_console("Cancelacion solicitada.\n")
 
@@ -687,6 +896,7 @@ class InstagramOrchestratorApp:
         self._set_descendants_enabled(self.body_region, not running)
         button_state = "disabled" if running else "normal"
         self.register_button.configure(state=button_state)
+        self.pending_button.configure(state=button_state)
         self.execute_button.configure(state=button_state)
         self.cancel_button.configure(state="normal" if running else "disabled")
         self.rename_button.configure(
@@ -792,6 +1002,29 @@ def _new_account_rename_parameters(
         for account in accounts
         if account.is_new_account
     )
+
+
+def _account_display_status(
+    account: AccountDraft,
+    runtime: AccountRuntimeProgress | None,
+) -> tuple[str, str]:
+    if runtime is None:
+        if account.is_new_account:
+            return "Nueva", "pending"
+        if account.download_stories or account.urls:
+            return "Preparada", "pending"
+        return "Vacia", "failed"
+    if runtime.status == "COMPLETED":
+        return f"Completada {runtime.completed_items}/{runtime.total_items}", "completed"
+    if runtime.retry_items:
+        return f"Reintento ({runtime.retry_items})", "retry"
+    if runtime.status == "PROCESSING":
+        return f"En curso {runtime.completed_items}/{runtime.total_items}", "processing"
+    if runtime.status == "FAILED" or (
+        runtime.failed_items and not runtime.pending_items
+    ):
+        return f"Fallida ({runtime.failed_items})", "failed"
+    return f"Pendiente ({runtime.pending_items})", "pending"
 
 
 _ACCOUNT_PROGRESS_RE = re.compile(

@@ -1510,3 +1510,22 @@ La version 1 completa, posterior a `v1.0.1`, se considera terminada cuando adema
 2. El sistema mueve duplicados a `_duplicated`.
 3. El sistema mueve la carpeta final al destino configurado.
 4. El sistema mantiene reportes de descarga y de post-procesado.
+
+---
+
+## 25. Recuperacion de ejecuciones desde la GUI
+
+La GUI usa SQLite como fuente de verdad también después de cerrar la ventana o
+cancelar el subproceso. Debe ofrecer un selector de batches con trabajo
+reanudable que muestre fecha, nombre e id, reconstruir `Lote actual` y ejecutar
+`run_continue --batch-id` para el lote elegido.
+
+Un batch cancelado desde la GUI queda `PARTIAL`; no se revierten cuentas ni URL
+jobs completados. La finalización manual requiere confirmación, cambia sólo el
+estado del batch a `COMPLETED` y conserva toda su trazabilidad.
+
+La tabla de cuentas refleja en tiempo real los estados persistidos y distingue
+visualmente completadas, reintentos, procesamiento, pendientes y fallos. La
+fecha global del lote y los parámetros de renombrado de las cuentas nuevas se
+guardan asociados al batch para que una ejecución recuperada pueda lanzar el
+mismo post-proceso de renombrado.

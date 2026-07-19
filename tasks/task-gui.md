@@ -156,6 +156,19 @@ Panel inferior: ejecucion
   - `Abrir reporte` cuando exista;
   - `Abrir carpeta logs`.
 
+Zona superior de recuperacion:
+
+- `Recuperar ejecucion (N)` abre `Ejecuciones pendientes`, un selector con `batch date`, `batch name`,
+  `batch id`, estado y resumen de cuentas.
+- `Reanudar seleccionado` recupera el lote completo en `Lote actual` y ejecuta
+  `run_continue --batch-id`.
+- `Dar por finalizado` pide confirmacion, marca el batch `COMPLETED` sin borrar
+  datos y lo retira del selector.
+- Durante la ejecucion, `Lote actual` muestra por color cuentas completadas,
+  en reintento, en curso, pendientes y fallidas.
+- `Cancelar proceso` conserva los estados individuales y deja el batch
+  `PARTIAL`, listo para reanudar.
+
 `Renombrar` ejecuta en segundo plano:
 
 ```text
@@ -200,6 +213,7 @@ src/ig_orchestrator/gui/
   batch_draft_service.py
   account_catalog_service.py
   process_runner.py
+  batch_resume_service.py
 ```
 
 Responsabilidades:
@@ -209,6 +223,8 @@ Responsabilidades:
 - `gui.batch_draft_service`: valida el borrador y lo persiste en SQLite como `input_batches`, `accounts` y `url_jobs`.
 - `gui.account_catalog_service`: lee sugerencias desde `account_history`, `config/batch.json` y backups.
 - `gui.process_runner`: lanza el proceso en background y stream de salida.
+- `gui.batch_resume_service`: consulta pendientes, reconstruye borradores,
+  resume el seguimiento y finaliza batches manualmente.
 
 Agregar entrada CLI:
 

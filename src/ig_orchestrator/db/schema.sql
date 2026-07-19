@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS input_batches (
     schema_version TEXT NOT NULL,
     source_file TEXT,
     status TEXT NOT NULL,
+    default_start_now_date TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -27,6 +28,10 @@ CREATE TABLE IF NOT EXISTS accounts (
     generated_story_url TEXT,
     working_folder TEXT,
     final_destination_folder TEXT,
+    is_new_account INTEGER NOT NULL DEFAULT 0,
+    rename_owner_id TEXT,
+    rename_start_init_date TEXT,
+    rename_destination_path TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,

@@ -15,6 +15,7 @@ from ig_orchestrator.db import (
     connect,
     init_database,
 )
+from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
     _latest_executed_batch_name,
     _new_account_rename_parameters,
@@ -29,13 +30,28 @@ from ig_orchestrator.gui.batch_draft_service import (
     save_batch_draft,
     validate_batch_draft,
 )
+from ig_orchestrator.gui.batch_resume_service import (
+    finish_batch,
+    get_account_runtime_progress,
+    list_pending_batches,
+    load_batch_draft,
+    mark_batch_interrupted,
+)
 from ig_orchestrator.gui.process_runner import (
     NewAccountRenameParameters,
     build_manual_rename_command,
     build_run_continue_command,
 )
 from ig_orchestrator.input import DuplicateBatchNameError
-from ig_orchestrator.models import PublicationType, RunStatus, RunSummary, UrlSource
+from ig_orchestrator.models import (
+    AccountStatus,
+    InputBatchStatus,
+    PublicationType,
+    RunStatus,
+    RunSummary,
+    UrlJobStatus,
+    UrlSource,
+)
 
 
 def test_gui_draft_is_persisted_as_sqlite_batch(tmp_path: Path) -> None:
@@ -344,6 +360,140 @@ def test_gui_new_account_is_saved_to_batch_and_catalog(tmp_path: Path) -> None:
         assert catalog_entry.owner_id == "436651863"
         assert catalog_entry.destination_path == r"G:\4K Stogram\00.MODELS-D"
         assert catalog_entry.start_init_date == "2025-12-14"
+
+        stored = connection.execute(
+            "SELECT * FROM accounts WHERE batch_id = ?",
+            (result.batch.id,),
+        ).fetchone()
+        assert stored["is_new_account"] == 1
+        assert stored["rename_owner_id"] == "436651863"
+        assert stored["rename_start_init_date"] == "2025-12-14"
+        assert stored["rename_destination_path"] == r"G:\4K Stogram\00.MODELS-D"
+
+
+def test_gui_lists_and_recovers_pending_batch_from_sqlite(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="recover_me",
+        default_start_now_date="2026-07-18",
+        accounts=[
+            AccountDraft(
+                username="new_recovered_user",
+                download_stories=True,
+                urls=["https://www.instagram.com/reel/RECOVER123/"],
+                start_now_date="2026-07-17",
+                is_new_account=True,
+                owner_id="9988",
+                start_init_date="2025-12-01",
+                destination_path=r"G:\Models",
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        pending = list_pending_batches(connection)
+
+        assert [(item.batch_id, item.batch_name) for item in pending] == [
+            (result.batch.id, "recover_me")
+        ]
+        assert pending[0].total_accounts == 1
+        assert pending[0].remaining_accounts == 1
+
+        recovered = load_batch_draft(connection, result.batch.id)
+        assert recovered == draft
+
+
+def test_gui_resume_columns_are_added_to_an_existing_database(tmp_path: Path) -> None:
+    db_path = tmp_path / "legacy.db"
+    with connect(db_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE input_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_name TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                source_file TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_id INTEGER,
+                username TEXT NOT NULL,
+                start_now_date TEXT NOT NULL,
+                download_stories INTEGER NOT NULL DEFAULT 0,
+                generated_story_url TEXT,
+                working_folder TEXT,
+                final_destination_folder TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+
+        apply_migrations(connection)
+
+        batch_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(input_batches)")
+        }
+        account_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(accounts)")
+        }
+        assert "default_start_now_date" in batch_columns
+        assert {
+            "is_new_account",
+            "rename_owner_id",
+            "rename_start_init_date",
+            "rename_destination_path",
+        } <= account_columns
+
+
+def test_gui_runtime_progress_and_manual_finish(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="runtime_batch",
+        default_start_now_date="2026-07-18",
+        accounts=[
+            AccountDraft(
+                username="runtime_user",
+                urls=[
+                    "https://www.instagram.com/reel/RUNTIME1/",
+                    "https://www.instagram.com/reel/RUNTIME2/",
+                ],
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        account = result.accounts[0]
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+        UrlJobRepository(connection).update_status(jobs[0].id, UrlJobStatus.COMPLETED)
+        UrlJobRepository(connection).update_error(
+            jobs[1].id,
+            status=UrlJobStatus.RETRY_PENDING,
+            last_error="temporary",
+            last_error_type="TEMPORARY",
+            non_retryable=False,
+        )
+        AccountRepository(connection).update_status(account.id, AccountStatus.PARTIAL)
+
+        progress = get_account_runtime_progress(connection, result.batch.id)
+        assert progress[0].completed_items == 1
+        assert progress[0].retry_items == 1
+
+        mark_batch_interrupted(connection, result.batch.id)
+        assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.PARTIAL
+        assert list_pending_batches(connection)
+
+        finish_batch(connection, result.batch.id)
+        assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.COMPLETED
+        assert list_pending_batches(connection) == []
 
 
 def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:

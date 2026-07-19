@@ -260,11 +260,21 @@ SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
+`Recuperar ejecucion (N)` abre un selector ordenado por fecha con el nombre,
+batch id, estado y resumen de cuentas de cada lote que conserva trabajo
+reanudable. `Reanudar seleccionado` reconstruye `Lote actual` desde SQLite y
+lanza `run_continue` para ese id. `Dar por finalizado` solicita confirmacion y
+marca únicamente el batch como `COMPLETED`: deja intactas sus cuentas, URLs,
+errores y archivos, pero lo retira del selector.
+
 El editor incluye `New account`, desmarcado por defecto. Al marcarlo aparecen
 los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.
 `Agregar / Actualizar` incorpora la cuenta al lote y la registra inmediatamente
 en el catalogo global. En `account_history`, estos datos se guardan como
 `user_ig_id = ownerId`, `field1 = path` y `field2 = startInitDate`.
+Además, la GUI guarda dentro de las cuentas del batch si eran nuevas y sus
+parámetros de renombrado. Así, al recuperar un lote, el botón `Renombrar`
+conserva exactamente los bloques `--new-account` que le correspondían.
 
 La salida se transmite al cuadro inferior sin congelar la ventana. Cada linea
 se presenta con fecha y hora local hasta milisegundos, por ejemplo
@@ -272,6 +282,16 @@ se presenta con fecha y hora local hasta milisegundos, por ejemplo
 de cuentas y el avance de items de la cuenta actual, por ejemplo `10% (1/10)`.
 La story generada tambien cuenta como item y los reintentos conservan el mismo
 numero de item.
+
+La tabla `Lote actual` se actualiza periódicamente desde SQLite durante el
+proceso. Las cuentas completadas aparecen en verde, los reintentos en ámbar,
+la cuenta en curso en azul, las pendientes en gris y los fallos en rojo. El
+resumen indica cuántas están completas, en reintento y por terminar.
+
+`Cancelar proceso` termina el subproceso y, cuando éste se cierra, marca el
+batch como `PARTIAL`. No reinicia ni elimina estados: las cuentas y URL jobs
+ya completados permanecen completados y el lote vuelve a aparecer en
+`Ejecuciones pendientes` para continuar el trabajo restante.
 
 El boton `Renombrar`, situado junto a las acciones del proceso, permanece
 deshabilitado hasta que finaliza correctamente una ejecucion real del lote. No
