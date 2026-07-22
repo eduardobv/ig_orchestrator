@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.26.6 - Patch - Estado de Treeview durante la ejecucion
+
+Fecha: 2026-07-22
+
+### Creado
+
+* `tasks/Patch_v1.26.6.md` documenta el error y la correccion.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` deja de pasar la opcion Tcl inexistente
+  `-state` a `ttk.Treeview` y usa la API `Widget.state()` para mantener
+  seleccionable `Lote actual` durante la ejecucion.
+* `tests/test_gui_services.py` agrega una prueba de regresion para el manejo de
+  estados ttk.
+* Version del paquete actualizada a `1.26.6`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_package_smoke.py -q`
+  (`42 passed`).
+* `python -m pytest -q` (`182 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
 ## v1.26.5 - Patch - Control de cuentas y ajustes de GUI
 
 Fecha: 2026-07-22

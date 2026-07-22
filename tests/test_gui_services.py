@@ -20,6 +20,7 @@ from ig_orchestrator.gui.app import (
     _half_screen_geometry,
     _instagram_profile_url,
     _open_chrome_tab,
+    _set_ttk_enabled,
     _latest_executed_batch_name,
     _new_account_rename_parameters,
     _timestamp_console_text,
@@ -234,6 +235,20 @@ def test_gui_open_catalog_prefers_chrome(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert _open_chrome_tab("https://www.instagram.com/sample_user/") is True
     assert opened == ["https://www.instagram.com/sample_user/"]
+
+
+def test_gui_treeview_state_uses_ttk_state_api() -> None:
+    state_calls: list[tuple[str, ...]] = []
+
+    class FakeTtkWidget:
+        def state(self, statespec: tuple[str, ...]) -> None:
+            state_calls.append(statespec)
+
+    widget = FakeTtkWidget()
+    _set_ttk_enabled(widget, True)
+    _set_ttk_enabled(widget, False)
+
+    assert state_calls == [("!disabled",), ("disabled",)]
 
 
 def test_gui_run_continue_command_uses_current_python_and_batch_id() -> None:

@@ -1064,7 +1064,7 @@ class InstagramOrchestratorApp:
         self.pending_button.configure(state=button_state)
         self.execute_button.configure(state=button_state)
         if running and self.active_process_kind == "batch":
-            self.tree.configure(state="normal")
+            _set_ttk_enabled(self.tree, True)
             self.delete_button.configure(state="normal")
         self.cancel_button.configure(state="normal" if running else "disabled")
         self.rename_button.configure(
@@ -1118,6 +1118,11 @@ def _open_chrome_tab(url: str) -> bool:
     except webbrowser.Error:
         return webbrowser.open_new_tab(url)
     return chrome.open_new_tab(url)
+
+
+def _set_ttk_enabled(widget: ttk.Widget, enabled: bool) -> None:
+    """Change a ttk state without using unsupported configure options."""
+    widget.state(("!disabled",) if enabled else ("disabled",))
 
 
 def _timestamp_console_text(text: str, *, now: datetime | None = None) -> str:
