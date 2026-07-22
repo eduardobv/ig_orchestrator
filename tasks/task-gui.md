@@ -105,7 +105,8 @@ Panel izquierdo: catalogo de cuentas
   - `account_history`;
   - `config/batch.json`;
   - opcionalmente `config/bkp/*.json` si no hay suficientes entradas en `account_history`.
-- Doble click en un username lo carga en el editor.
+- Doble click en un username lo carga en `Editor > Username` y abre el perfil
+  en una pestaña de Chrome.
 - Click derecho ofrece `Abrir` y `Delete`. `Abrir` abre el perfil en una nueva
   pestaña del navegador; `Delete` marca la cuenta `DISABLED` sin borrarla y la
   oculta del catalogo.
@@ -156,14 +157,17 @@ Panel inferior: ejecucion
 - Botones:
   - `Clean`, disponible para vaciar la consola de estado cuando sea necesario;
   - `Cancelar proceso` si se lanzo como subprocess;
-  - `Renombrar`, deshabilitado hasta que termine correctamente un lote real;
+  - `Renombrar`, deshabilitado hasta que termine un lote real o se cierren
+    manualmente todas sus cuentas tras una cancelación;
   - `Abrir reporte` cuando exista;
   - `Abrir carpeta logs`.
 
 Zona superior de recuperacion:
 
-- `Recuperar ejecucion (N)` abre `Ejecuciones pendientes`, un selector con `batch date`, `batch name`,
+- `Lotes / ejecuciones (N)` abre un maestro con `batch date`, `batch name`,
   `batch id`, estado y resumen de cuentas.
+- Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar
+  o ejecutar. Al ejecutarlos cambian a `IMPORTED` y ya no se pueden editar.
 - `Reanudar seleccionado` recupera el lote completo en `Lote actual` y ejecuta
   `run_continue --batch-id`.
 - `Dar por finalizado` pide confirmacion, marca el batch `COMPLETED` sin borrar
@@ -178,6 +182,11 @@ Zona superior de recuperacion:
   ocultan desde v1.26.5.
 - `Cancelar proceso` conserva los estados individuales y deja el batch
   `PARTIAL`, listo para reanudar.
+- Tras cancelar, el click derecho en una cuenta ofrece `Completar`. La cuenta
+  queda `COMPLETED`, sus jobs no terminales quedan `FAILED_FINAL` con auditoría
+  y, cuando todas las cuentas se cierran, se habilita `Renombrar`.
+- La falta total de respuesta de Telegram usa `NO_BOT_RESPONSE`, se reintenta y
+  al agotar el máximo termina en `FAILED_FINAL` sin bloquear el lote.
 
 `Renombrar` ejecuta en segundo plano:
 

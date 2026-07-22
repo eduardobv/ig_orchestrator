@@ -19,6 +19,7 @@ from ig_orchestrator.input.batch_creation_service import (
     BatchCreationResult,
     DuplicateBatchNameError,
     create_batch,
+    update_draft_batch,
 )
 from ig_orchestrator.input.batch_file_service import (
     BatchFileFinalization,
@@ -46,6 +47,7 @@ __all__ = [
     "build_story_url",
     "classify_instagram_url",
     "create_batch",
+    "update_draft_batch",
     "import_batch_json",
     "backup_and_clean_batch_json",
     "import_parsed_batch",

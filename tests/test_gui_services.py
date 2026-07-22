@@ -17,6 +17,7 @@ from ig_orchestrator.db import (
 )
 from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
+    InstagramOrchestratorApp,
     _half_screen_geometry,
     _instagram_profile_url,
     _open_chrome_tab,
@@ -35,9 +36,14 @@ from ig_orchestrator.gui.batch_draft_service import (
     validate_batch_draft,
 )
 from ig_orchestrator.gui.batch_resume_service import (
+    activate_draft_batch,
+    complete_account_manually,
+    delete_draft_batch,
     fail_account_manually,
     finish_batch,
     get_account_runtime_progress,
+    is_batch_ready_for_rename,
+    list_managed_batches,
     list_pending_batches,
     load_batch_draft,
     mark_batch_interrupted,
@@ -235,6 +241,42 @@ def test_gui_open_catalog_prefers_chrome(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert _open_chrome_tab("https://www.instagram.com/sample_user/") is True
     assert opened == ["https://www.instagram.com/sample_user/"]
+
+
+def test_gui_catalog_double_click_loads_username_and_opens_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[str] = []
+    applied_dates: list[bool] = []
+
+    class FakeCatalogList:
+        def curselection(self) -> tuple[int]:
+            return (0,)
+
+        def get(self, index: int) -> str:
+            assert index == 0
+            return "selected_user"
+
+    class FakeStringVar:
+        value = ""
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.catalog_list = FakeCatalogList()
+    app.username_var = FakeStringVar()
+    app._apply_catalog_date = lambda: applied_dates.append(True)
+    monkeypatch.setattr(
+        "ig_orchestrator.gui.app._open_chrome_tab",
+        lambda url: opened.append(url) or True,
+    )
+
+    app._open_and_load_catalog_account()
+
+    assert app.username_var.value == "selected_user"
+    assert applied_dates == [True]
+    assert opened == ["https://www.instagram.com/selected_user/"]
 
 
 def test_gui_treeview_state_uses_ttk_state_api() -> None:
@@ -481,16 +523,78 @@ def test_gui_lists_and_recovers_pending_batch_from_sqlite(tmp_path: Path) -> Non
 
     with connect(db_path) as connection:
         result = save_batch_draft(draft, connection)
-        pending = list_pending_batches(connection)
+        managed = list_managed_batches(connection)
 
-        assert [(item.batch_id, item.batch_name) for item in pending] == [
+        assert [(item.batch_id, item.batch_name) for item in managed] == [
             (result.batch.id, "recover_me")
         ]
-        assert pending[0].total_accounts == 1
-        assert pending[0].remaining_accounts == 1
+        assert managed[0].status == "DRAFT"
+        assert managed[0].total_accounts == 1
+        assert list_pending_batches(connection) == []
 
         recovered = load_batch_draft(connection, result.batch.id)
         assert recovered == draft
+
+
+def test_gui_saved_draft_can_be_updated_then_is_locked_when_executed(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    original = BatchDraft(
+        batch_name="night_batch",
+        default_start_now_date="2026-07-22",
+        accounts=[
+            AccountDraft(
+                username="large_account",
+                urls=["https://www.instagram.com/reel/LARGE1/"],
+            )
+        ],
+    )
+    updated = BatchDraft(
+        batch_name="night_batch_updated",
+        default_start_now_date="2026-07-23",
+        accounts=[
+            AccountDraft(
+                username="large_account",
+                download_stories=True,
+                urls=["https://www.instagram.com/reel/LARGE2/"],
+                start_now_date="2026-07-23",
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        created = save_batch_draft(original, connection)
+        saved = save_batch_draft(updated, connection, batch_id=created.batch.id)
+
+        assert saved.batch.id == created.batch.id
+        assert saved.batch.status is InputBatchStatus.DRAFT
+        assert load_batch_draft(connection, saved.batch.id) == updated
+
+        activate_draft_batch(connection, saved.batch.id)
+        assert BatchRepository(connection).get_by_id(saved.batch.id).status is InputBatchStatus.IMPORTED
+        assert list_pending_batches(connection)[0].batch_id == saved.batch.id
+        with pytest.raises(ValueError, match="Only saved DRAFT"):
+            save_batch_draft(original, connection, batch_id=saved.batch.id)
+        with pytest.raises(ValueError, match="Only saved DRAFT"):
+            delete_draft_batch(connection, saved.batch.id)
+
+
+def test_gui_can_delete_only_unexecuted_saved_draft(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="delete_later",
+        default_start_now_date="2026-07-22",
+        accounts=[AccountDraft(username="unused", download_stories=True)],
+    )
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        delete_draft_batch(connection, result.batch.id)
+
+        assert BatchRepository(connection).get_by_id(result.batch.id) is None
+        assert list_managed_batches(connection) == []
 
 
 def test_gui_recovered_batch_uses_persisted_processing_order(tmp_path: Path) -> None:
@@ -656,6 +760,46 @@ def test_gui_manual_account_removal_marks_non_terminal_urls_and_account_failed(
     assert stored_jobs[1].status is UrlJobStatus.FAILED_FINAL
     assert stored_jobs[1].last_error_type == "MANUAL_ACCOUNT_REMOVAL"
     assert stored_jobs[1].non_retryable is True
+
+
+def test_gui_manual_completion_closes_stuck_account_and_enables_rename(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="stuck_account",
+        default_start_now_date="2026-07-22",
+        accounts=[
+            AccountDraft(
+                username="stuck_user",
+                urls=["https://www.instagram.com/reel/STUCK1/"],
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        activate_draft_batch(connection, result.batch.id)
+        mark_batch_interrupted(connection, result.batch.id)
+        RunRepository(connection).create(
+            RunSummary(status=RunStatus.PROCESSING, total_urls=1, summary="Processing batch"),
+            batch_id=result.batch.id,
+        )
+        account = result.accounts[0]
+
+        affected = complete_account_manually(
+            connection,
+            batch_id=result.batch.id,
+            account_id=account.id,
+        )
+        stored_job = UrlJobRepository(connection).list_by_account(account.id)[0]
+
+        assert affected == 1
+        assert AccountRepository(connection).get_by_id(account.id).status is AccountStatus.COMPLETED
+        assert stored_job.status is UrlJobStatus.FAILED_FINAL
+        assert stored_job.last_error_type == "MANUAL_ACCOUNT_COMPLETION"
+        assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.COMPLETED
+        assert is_batch_ready_for_rename(connection, result.batch.id) is True
 
 
 def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:

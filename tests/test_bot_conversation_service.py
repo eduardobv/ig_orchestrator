@@ -363,7 +363,7 @@ def test_process_url_job_marks_retryable_error_as_retry_pending(
     assert download_repo.list_by_url_job(job.id) == []
 
 
-def test_process_url_job_marks_missing_files_as_retry_pending(tmp_path: Path) -> None:
+def test_process_url_job_distinguishes_no_bot_response(tmp_path: Path) -> None:
     connection = _connection(tmp_path)
     job_repo = UrlJobRepository(connection)
     download_repo = DownloadRepository(connection)
@@ -379,7 +379,8 @@ def test_process_url_job_marks_missing_files_as_retry_pending(tmp_path: Path) ->
     result = asyncio.run(service.process_url_job(job))
 
     assert result.job.status == UrlJobStatus.RETRY_PENDING
-    assert result.job.last_error_type == "NO_FILES_DETECTED"
+    assert result.job.last_error_type == "NO_BOT_RESPONSE"
+    assert result.job.last_error == "Telegram bot returned no response before timeout."
     assert download_repo.list_by_url_job(job.id) == []
 
 

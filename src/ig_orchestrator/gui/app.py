@@ -22,10 +22,14 @@ from ig_orchestrator.gui.batch_draft_service import (
 )
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
+    activate_draft_batch,
+    complete_account_manually,
+    delete_draft_batch,
     fail_account_manually,
     finish_batch,
     get_account_runtime_progress,
-    list_pending_batches,
+    is_batch_ready_for_rename,
+    list_managed_batches,
     load_batch_draft,
     mark_batch_interrupted,
 )
@@ -224,7 +228,9 @@ class InstagramOrchestratorApp:
         self.catalog_filter_var.trace_add("write", lambda *_: self._refresh_catalog())
         self.catalog_list = tk.Listbox(parent, exportselection=False)
         self.catalog_list.grid(row=2, column=0, sticky="nsew")
-        self.catalog_list.bind("<Double-Button-1>", lambda _event: self._load_catalog())
+        self.catalog_list.bind(
+            "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
+        )
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
         self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
@@ -259,6 +265,11 @@ class InstagramOrchestratorApp:
         batch_scroll.grid(row=1, column=2, sticky="ns", pady=(6, 6))
         self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
+        self.tree.bind("<Button-3>", self._show_batch_menu)
+        self.batch_menu = tk.Menu(self.root, tearoff=False)
+        self.batch_menu.add_command(
+            label="Completar", command=self._complete_selected_account
+        )
         self.tree.tag_configure("completed", foreground="#238636")
         self.tree.tag_configure("retry", foreground="#b76e00")
         self.tree.tag_configure("processing", foreground="#0969da")
@@ -392,6 +403,11 @@ class InstagramOrchestratorApp:
         if username is not None:
             _open_chrome_tab(_instagram_profile_url(username))
 
+    def _open_and_load_catalog_account(self) -> None:
+        """Load the selected username into the editor and open its profile."""
+        self._load_catalog()
+        self._open_catalog_account()
+
     def _disable_catalog_account(self) -> None:
         username = self._selected_catalog_username()
         if username is None:
@@ -513,6 +529,15 @@ class InstagramOrchestratorApp:
         self.urls_text.delete("1.0", tk.END)
         self.urls_text.insert("1.0", "\n".join(account.urls))
         self._update_indicators()
+
+    def _show_batch_menu(self, event: tk.Event) -> None:
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return
+        self.tree.selection_set(item_id)
+        self.tree.focus(item_id)
+        self.selected_index = int(item_id)
+        self.batch_menu.tk_popup(event.x_root, event.y_root)
 
     def _editor_account(self) -> AccountDraft:
         urls = self.urls_text.get("1.0", tk.END).splitlines()
@@ -697,9 +722,9 @@ class InstagramOrchestratorApp:
         )
 
     def _open_pending_batches(self) -> None:
-        pending = list_pending_batches(self.connection)
+        managed = list_managed_batches(self.connection)
         dialog = tk.Toplevel(self.root)
-        dialog.title("Ejecuciones pendientes")
+        dialog.title("Lotes guardados y ejecuciones pendientes")
         dialog.geometry("940x360")
         dialog.transient(self.root)
         dialog.grab_set()
@@ -708,8 +733,8 @@ class InstagramOrchestratorApp:
         ttk.Label(
             dialog,
             text=(
-                "Selecciona un lote interrumpido para recuperar su contenido y "
-                "reanudarlo desde SQLite."
+                "Los lotes GUARDADOS se pueden recuperar, modificar, borrar o ejecutar. "
+                "Los demás estados pertenecen a ejecuciones y sólo se pueden reanudar."
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
@@ -729,7 +754,7 @@ class InstagramOrchestratorApp:
         def reload_rows() -> None:
             for item in tree.get_children():
                 tree.delete(item)
-            for summary in list_pending_batches(self.connection):
+            for summary in list_managed_batches(self.connection):
                 tree.insert(
                     "",
                     tk.END,
@@ -738,10 +763,14 @@ class InstagramOrchestratorApp:
                         summary.batch_date,
                         summary.batch_name,
                         summary.batch_id,
-                        summary.status,
-                        f"{summary.completed_accounts}/{summary.total_accounts} completas; "
-                        f"{summary.retry_accounts} reintento; "
-                        f"{summary.remaining_accounts} por terminar",
+                        "GUARDADO" if summary.is_draft else summary.status,
+                        (
+                            f"{summary.total_accounts} cuentas editables"
+                            if summary.is_draft
+                            else f"{summary.completed_accounts}/{summary.total_accounts} completas; "
+                            f"{summary.retry_accounts} reintento; "
+                            f"{summary.remaining_accounts} por terminar"
+                        ),
                     ),
                 )
 
@@ -756,6 +785,37 @@ class InstagramOrchestratorApp:
                 return None
             return int(selection[0])
 
+        def selected_summary():
+            batch_id = selected_batch_id()
+            if batch_id is None:
+                return None
+            return next(
+                (item for item in list_managed_batches(self.connection) if item.batch_id == batch_id),
+                None,
+            )
+
+        def recover_selected() -> None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            if not summary.is_draft:
+                messagebox.showwarning(
+                    "Recuperar lote",
+                    "Una ejecución ya iniciada no se puede editar. Usa Reanudar / Ejecutar.",
+                    parent=dialog,
+                )
+                return
+            try:
+                draft = load_batch_draft(self.connection, summary.batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Recuperar lote", str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._load_persisted_draft(summary.batch_id, draft)
+            self._write_console(
+                f"Lote guardado {summary.batch_id} abierto para modificación.\n"
+            )
+
         def resume_selected() -> None:
             batch_id = selected_batch_id()
             if batch_id is None:
@@ -769,9 +829,46 @@ class InstagramOrchestratorApp:
             self._load_persisted_draft(batch_id, draft)
             self._start_batch(batch_id)
 
+        def delete_selected() -> None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            if not summary.is_draft:
+                messagebox.showwarning(
+                    "Borrar lote",
+                    "Sólo se pueden borrar lotes GUARDADOS que nunca se hayan ejecutado.",
+                    parent=dialog,
+                )
+                return
+            if not messagebox.askyesno(
+                "Borrar lote guardado",
+                f"¿Borrar definitivamente el lote guardado {summary.batch_name} "
+                f"(id={summary.batch_id})?",
+                parent=dialog,
+            ):
+                return
+            try:
+                delete_draft_batch(self.connection, summary.batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Borrar lote", str(exc), parent=dialog)
+                return
+            if self.saved_batch_id == summary.batch_id:
+                self.saved_batch_id = None
+                self.saved_draft_signature = None
+            reload_rows()
+            self._update_pending_button_label()
+
         def finish_selected() -> None:
-            batch_id = selected_batch_id()
-            if batch_id is None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            batch_id = summary.batch_id
+            if summary.is_draft:
+                messagebox.showwarning(
+                    "Dar por finalizado",
+                    "Un lote GUARDADO todavía no es una ejecución.",
+                    parent=dialog,
+                )
                 return
             if not messagebox.askyesno(
                 "Dar por finalizado",
@@ -792,8 +889,14 @@ class InstagramOrchestratorApp:
 
         actions = ttk.Frame(dialog, padding=10)
         actions.grid(row=2, column=0, sticky="ew")
-        ttk.Button(actions, text="Reanudar seleccionado", command=resume_selected).pack(
+        ttk.Button(actions, text="Reanudar / Ejecutar", command=resume_selected).pack(
             side=tk.RIGHT
+        )
+        ttk.Button(actions, text="Recuperar / Modificar", command=recover_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        ttk.Button(actions, text="Borrar lote", command=delete_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
         )
         ttk.Button(actions, text="Dar por finalizado", command=finish_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
@@ -801,14 +904,14 @@ class InstagramOrchestratorApp:
         ttk.Button(actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
         tree.bind("<Double-Button-1>", lambda _event: resume_selected())
         reload_rows()
-        if not pending:
-            ttk.Label(dialog, text="No hay ejecuciones pendientes.").place(
+        if not managed:
+            ttk.Label(dialog, text="No hay lotes guardados ni ejecuciones pendientes.").place(
                 relx=0.5, rely=0.48, anchor="center"
             )
 
     def _update_pending_button_label(self) -> None:
-        total = len(list_pending_batches(self.connection))
-        self.pending_button.configure(text=f"Recuperar ejecucion ({total})")
+        total = len(list_managed_batches(self.connection))
+        self.pending_button.configure(text=f"Lotes / ejecuciones ({total})")
 
     def _load_persisted_draft(self, batch_id: int, draft: BatchDraft) -> None:
         self.batch_name_var.set(draft.batch_name)
@@ -833,7 +936,12 @@ class InstagramOrchestratorApp:
             accounts=list(self.accounts),
         )
         try:
-            result = save_batch_draft(draft, self.connection, settings=self.settings)
+            result = save_batch_draft(
+                draft,
+                self.connection,
+                settings=self.settings,
+                batch_id=self.saved_batch_id,
+            )
         except BatchDraftValidationError as exc:
             messagebox.showerror("Validation", str(exc))
             return None
@@ -846,10 +954,11 @@ class InstagramOrchestratorApp:
         self.saved_draft_signature = _draft_signature(draft)
         self._refresh_runtime_progress()
         self._write_console(
-            f"Batch saved: {result.batch.batch_name} (id={result.batch.id})\n"
+            f"Lote guardado: {result.batch.batch_name} (id={result.batch.id}, estado=DRAFT)\n"
             f"SQLite database: {self.settings.sqlite_db_path}\n"
         )
-        self._set_status(f"Saved batch id {result.batch.id}")
+        self._set_status(f"Lote guardado id {result.batch.id}")
+        self._update_pending_button_label()
         if show_confirmation:
             messagebox.showinfo("Lote registrado", f"Lote registrado con id {result.batch.id}")
         return result.batch.id
@@ -877,6 +986,14 @@ class InstagramOrchestratorApp:
     def _start_batch(self, batch_id: int) -> None:
         if self.process_runner.is_running():
             return
+
+        try:
+            activate_draft_batch(self.connection, batch_id)
+        except ValueError as exc:
+            messagebox.showerror("Ejecucion", str(exc))
+            return
+        if self.saved_batch_id == batch_id:
+            self.saved_batch_id = None
 
         # SQLite already contains the stable processing order and the complete
         # rename metadata. Rehydrate before every start/resume so the GUI never
@@ -974,6 +1091,51 @@ class InstagramOrchestratorApp:
             )
         self.cancel_requested = False
         self.active_process_kind = None
+        self._update_pending_button_label()
+
+    def _complete_selected_account(self) -> None:
+        if self.process_runner.is_running():
+            messagebox.showwarning(
+                "Completar cuenta",
+                "Cancela primero la ejecución antes de completar una cuenta manualmente.",
+            )
+            return
+        if self.selected_index is None or self.active_batch_id is None:
+            return
+        account = self.accounts[self.selected_index]
+        runtime = self.runtime_progress.get(account.username.casefold())
+        if runtime is None:
+            messagebox.showwarning(
+                "Completar cuenta", "No se encontró el estado persistido de la cuenta."
+            )
+            return
+        if not messagebox.askyesno(
+            "Completar cuenta",
+            f"¿Dar por completada @{account.username}?\n\n"
+            "Las URLs todavía pendientes quedarán como FAILED_FINAL con motivo de "
+            "finalización manual.",
+        ):
+            return
+        try:
+            affected = complete_account_manually(
+                self.connection,
+                batch_id=self.active_batch_id,
+                account_id=runtime.account_id,
+            )
+        except ValueError as exc:
+            messagebox.showerror("Completar cuenta", str(exc))
+            return
+        self._refresh_runtime_progress()
+        self.batch_ready_for_rename = is_batch_ready_for_rename(
+            self.connection, self.active_batch_id
+        )
+        self.rename_button.configure(
+            state="normal" if self.batch_ready_for_rename else "disabled"
+        )
+        self._write_console(
+            f"Cuenta @{account.username} completada manualmente; "
+            f"{affected} URL(s) pendientes cerradas como FAILED_FINAL.\n"
+        )
         self._update_pending_button_label()
 
     def _rename_manual_files(self) -> None:

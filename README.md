@@ -260,16 +260,21 @@ SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
-El click derecho sobre una cuenta del catalogo ofrece `Abrir`, que intenta
-abrir su perfil en una pestaña de Chrome activo (y usa el navegador
+El doble click sobre una cuenta del catalogo carga el username seleccionado en
+el editor y abre su perfil. El click derecho
+ofrece la misma accion `Abrir`, que intenta abrirlo en una pestaña de Chrome
+activo (y usa el navegador
 predeterminado como fallback), y `Delete`.
 Esta ultima accion no borra datos: cambia `account_history.status` a
 `DISABLED` y oculta la cuenta incluso si tambien aparece en `batch.json`.
 
-`Recuperar ejecucion (N)` abre un selector ordenado por fecha con el nombre,
-batch id, estado y resumen de cuentas de cada lote que conserva trabajo
-reanudable. `Reanudar seleccionado` reconstruye `Lote actual` desde SQLite y
-lanza `run_continue` para ese id. `Dar por finalizado` solicita confirmacion y
+`Lotes / ejecuciones (N)` abre un maestro ordenado por fecha. Un lote registrado
+queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar para
+modificarlo, actualizarlo conservando su batch id, borrarlo o ejecutarlo. Al
+ejecutarlo cambia a `IMPORTED` y queda bloqueado para edición. Desde entonces
+se trata como ejecución y sólo se puede reanudar o finalizar. `Reanudar /
+Ejecutar` reconstruye `Lote actual` desde SQLite y lanza `run_continue` para ese
+id. `Dar por finalizado` solicita confirmacion y
 marca únicamente el batch como `COMPLETED`: deja intactas sus cuentas, URLs,
 errores y archivos, pero lo retira del selector.
 
@@ -306,11 +311,16 @@ Los botones `Subir`, `Bajar` y `Duplicar` estan ocultos en esta version.
 `Cancelar proceso` termina el subproceso y, cuando éste se cierra, marca el
 batch como `PARTIAL`. No reinicia ni elimina estados: las cuentas y URL jobs
 ya completados permanecen completados y el lote vuelve a aparecer en
-`Ejecuciones pendientes` para continuar el trabajo restante.
+el maestro para continuar el trabajo restante. Tras cancelar, el click derecho
+sobre una cuenta ofrece `Completar`: cierra como `FAILED_FINAL` sus URLs aún no
+terminales, conserva el error previo cuando existe y marca la cuenta como
+`COMPLETED`. Cuando todas las cuentas quedan completadas manualmente, el batch
+pasa a `COMPLETED`.
 
-El boton `Renombrar`, situado junto a las acciones del proceso, permanece
-deshabilitado hasta que finaliza correctamente una ejecucion real del lote. No
-se habilita tras un dry-run ni tras un fallo. Al pulsarlo ejecuta en segundo
+El boton `Renombrar`, situado junto a las acciones del proceso, se habilita
+cuando finaliza correctamente una ejecución real o cuando, tras cancelarla,
+todas las cuentas pendientes se han completado manualmente. No se habilita tras
+un dry-run ni mientras queden cuentas abiertas. Al pulsarlo ejecuta en segundo
 plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
 `Start date` global, agrega un bloque `--new-account USERNAME OWNER_ID
 START_INIT_DATE PATH` por cada fila marcada como nueva y finalmente aplica
@@ -650,7 +660,7 @@ Puedes inspeccionarla con cualquier visor SQLite o con la CLI de SQLite si la ti
 
 Estados relevantes:
 
-- Batch: `IMPORTED`, `PROCESSING`, `COMPLETED`, `PARTIAL`, `FAILED`.
+- Batch: `DRAFT`, `IMPORTED`, `PROCESSING`, `COMPLETED`, `PARTIAL`, `FAILED`.
 - Cuenta: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`.
 - URL: `PENDING`, `SENT_TO_BOT`, `WAITING_DOWNLOAD`, `DOWNLOADED`, `RETRY_PENDING`, `FAILED_TEMPORARY`, `FAILED_FINAL`, `CLASSIFIED`, `COMPLETED`.
 - Archivo: `DETECTED`, `MOVED_TO_WORKING_FOLDER`, `CLASSIFIED_AS_REEL`, `CLASSIFIED_AS_POST`, `CLASSIFIED_AS_STORY`, `CLASSIFIED_AS_HIGHLIGHTS`, `FINALIZED`.
@@ -786,6 +796,9 @@ Politica:
 - Despues se procesan URLs manuales.
 - Al final se procesa la cola FIFO de reintentos.
 - Tras `MAX_RETRIES`, se marca `FAILED_FINAL`.
+- Si el bot no devuelve ningún mensaje ni archivo antes del timeout, se registra
+  `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
+  `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.
 - Backoff por defecto: 90, 180, 360, 720, 900 segundos.
 
 `Stories for {username} not found` se reconoce como patron dinamico. Por

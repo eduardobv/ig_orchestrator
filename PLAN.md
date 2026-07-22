@@ -465,6 +465,7 @@ CREATE TABLE IF NOT EXISTS input_batches (
 Estados posibles:
 
 ```text
+DRAFT
 IMPORTED
 PROCESSING
 COMPLETED
@@ -1541,3 +1542,19 @@ El catalogo admite baja logica mediante `account_history.status = DISABLED` y
 omite esas cuentas aunque sigan presentes en fuentes JSON. Los paths historicos
 de `account_history.field1` alimentan de forma distinta un combobox editable
 para las cuentas nuevas.
+
+Los batches creados desde GUI se registran inicialmente como `DRAFT`. El
+maestro de lotes permite recuperar, modificar y borrar únicamente ese estado.
+Al ejecutar un draft cambia a `IMPORTED` y queda bloqueado para edición; desde
+ese punto pasa al flujo normal de recuperación de ejecuciones.
+
+Después de cancelar una ejecución, el menú contextual de una cuenta permite
+completarla manualmente. Sus jobs no terminales quedan `FAILED_FINAL` con
+trazabilidad del motivo, la cuenta queda `COMPLETED` y el batch queda
+`COMPLETED` cuando ya no quedan cuentas abiertas. Esta finalización operativa
+habilita el renombrador igual que una ejecución real terminada, pero nunca tras
+un dry-run.
+
+La ausencia total de respuesta del bot se clasifica como `NO_BOT_RESPONSE`, se
+reintenta por rondas y termina como `FAILED_FINAL` al agotar `MAX_RETRIES`, sin
+detener el procesamiento posterior.

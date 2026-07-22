@@ -33,6 +33,10 @@ class PendingBatchSummary:
     retry_accounts: int
     remaining_accounts: int
 
+    @property
+    def is_draft(self) -> bool:
+        return self.status == InputBatchStatus.DRAFT.value
+
 
 @dataclass(frozen=True, slots=True)
 class AccountRuntimeProgress:
@@ -63,7 +67,7 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
                 WHERE a.batch_id = b.id
                   AND j.status IN ({placeholders})) AS remaining_accounts
         FROM input_batches b
-        WHERE b.status <> 'COMPLETED'
+        WHERE b.status NOT IN ('DRAFT', 'COMPLETED')
           AND EXISTS (
               SELECT 1
               FROM accounts a JOIN url_jobs j ON j.account_id = a.id
@@ -88,6 +92,40 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
         )
         for row in rows
     ]
+
+
+def list_managed_batches(connection: Connection) -> list[PendingBatchSummary]:
+    """Return editable drafts and executions that still have resumable work."""
+
+    executions = {item.batch_id: item for item in list_pending_batches(connection)}
+    rows = connection.execute(
+        """
+        SELECT b.id, b.batch_name, b.created_at, b.status,
+               COUNT(DISTINCT a.id) AS total_accounts
+        FROM input_batches b
+        LEFT JOIN accounts a ON a.batch_id = b.id
+        WHERE b.status = 'DRAFT'
+        GROUP BY b.id
+        ORDER BY b.created_at DESC, b.id DESC
+        """
+    ).fetchall()
+    for row in rows:
+        batch_id = int(row["id"])
+        executions[batch_id] = PendingBatchSummary(
+            batch_id=batch_id,
+            batch_name=str(row["batch_name"]),
+            batch_date=str(row["created_at"]),
+            status=str(row["status"]),
+            total_accounts=int(row["total_accounts"] or 0),
+            completed_accounts=0,
+            retry_accounts=0,
+            remaining_accounts=int(row["total_accounts"] or 0),
+        )
+    return sorted(
+        executions.values(),
+        key=lambda item: (item.batch_date, item.batch_id),
+        reverse=True,
+    )
 
 
 def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
@@ -187,6 +225,56 @@ def finish_batch(connection: Connection, batch_id: int) -> None:
     connection.commit()
 
 
+def activate_draft_batch(connection: Connection, batch_id: int) -> None:
+    """Lock a saved draft for editing immediately before its first execution."""
+
+    row = connection.execute(
+        "SELECT status FROM input_batches WHERE id = ?", (batch_id,)
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Batch not found: {batch_id}")
+    if str(row["status"]) == InputBatchStatus.DRAFT.value:
+        connection.execute(
+            """
+            UPDATE input_batches
+            SET status = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (InputBatchStatus.IMPORTED.value, batch_id),
+        )
+        connection.commit()
+
+
+def delete_draft_batch(connection: Connection, batch_id: int) -> None:
+    """Delete only a never-executed draft and its draft-only child rows."""
+
+    row = connection.execute(
+        "SELECT status FROM input_batches WHERE id = ?", (batch_id,)
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Batch not found: {batch_id}")
+    if str(row["status"]) != InputBatchStatus.DRAFT.value:
+        raise ValueError("Only saved DRAFT batches can be deleted")
+    if connection.execute(
+        "SELECT 1 FROM runs WHERE batch_id = ? LIMIT 1", (batch_id,)
+    ).fetchone() is not None:
+        raise ValueError("An executed batch cannot be deleted")
+    account_ids = [
+        int(item["id"])
+        for item in connection.execute(
+            "SELECT id FROM accounts WHERE batch_id = ?", (batch_id,)
+        ).fetchall()
+    ]
+    for account_id in account_ids:
+        connection.execute(
+            "DELETE FROM duplicate_url_jobs WHERE account_id = ?", (account_id,)
+        )
+        connection.execute("DELETE FROM url_jobs WHERE account_id = ?", (account_id,))
+    connection.execute("DELETE FROM accounts WHERE batch_id = ?", (batch_id,))
+    connection.execute("DELETE FROM input_batches WHERE id = ?", (batch_id,))
+    connection.commit()
+
+
 def mark_batch_interrupted(connection: Connection, batch_id: int) -> None:
     connection.execute(
         """
@@ -248,12 +336,101 @@ def fail_account_manually(
     return int(cursor.rowcount)
 
 
+def complete_account_manually(
+    connection: Connection,
+    *,
+    batch_id: int,
+    account_id: int,
+) -> int:
+    """Close a stuck account while retaining unresolved URLs as audited failures."""
+
+    batch = connection.execute(
+        "SELECT status FROM input_batches WHERE id = ?", (batch_id,)
+    ).fetchone()
+    if batch is None:
+        raise ValueError(f"Batch not found: {batch_id}")
+    if str(batch["status"]) not in {"PARTIAL", "FAILED", "PROCESSING"}:
+        raise ValueError("Manual completion is only available for an interrupted execution")
+    account = connection.execute(
+        "SELECT status FROM accounts WHERE id = ? AND batch_id = ?",
+        (account_id, batch_id),
+    ).fetchone()
+    if account is None:
+        raise ValueError(f"Account {account_id} does not belong to batch {batch_id}")
+    if str(account["status"]) == "COMPLETED":
+        raise ValueError("The selected account is already completed")
+
+    cursor = connection.execute(
+        """
+        UPDATE url_jobs
+        SET status = 'FAILED_FINAL',
+            last_error = COALESCE(last_error, 'Account completed manually from GUI'),
+            last_error_type = COALESCE(last_error_type, 'MANUAL_ACCOUNT_COMPLETION'),
+            non_retryable = 1,
+            next_retry_at = NULL,
+            finished_at = COALESCE(finished_at, datetime('now')),
+            updated_at = datetime('now')
+        WHERE account_id = ?
+          AND status NOT IN ('COMPLETED', 'FAILED_FINAL')
+        """,
+        (account_id,),
+    )
+    connection.execute(
+        "UPDATE accounts SET status = 'COMPLETED', updated_at = datetime('now') WHERE id = ?",
+        (account_id,),
+    )
+    remaining = connection.execute(
+        """
+        SELECT 1 FROM accounts
+        WHERE batch_id = ? AND status <> 'COMPLETED'
+        LIMIT 1
+        """,
+        (batch_id,),
+    ).fetchone()
+    connection.execute(
+        "UPDATE input_batches SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        (
+            InputBatchStatus.COMPLETED.value
+            if remaining is None
+            else InputBatchStatus.PARTIAL.value,
+            batch_id,
+        ),
+    )
+    connection.commit()
+    return int(cursor.rowcount)
+
+
+def is_batch_ready_for_rename(connection: Connection, batch_id: int) -> bool:
+    """A real run may be renamed once every account is operationally closed."""
+
+    has_run = connection.execute(
+        """
+        SELECT 1 FROM runs
+        WHERE batch_id = ? AND summary NOT LIKE 'Dry-run batch %'
+        LIMIT 1
+        """,
+        (batch_id,),
+    ).fetchone()
+    if has_run is None:
+        return False
+    unfinished = connection.execute(
+        "SELECT 1 FROM accounts WHERE batch_id = ? AND status <> 'COMPLETED' LIMIT 1",
+        (batch_id,),
+    ).fetchone()
+    return unfinished is None
+
+
 __all__ = [
     "AccountRuntimeProgress",
     "PendingBatchSummary",
+    "activate_draft_batch",
+    "complete_account_manually",
+    "delete_draft_batch",
     "finish_batch",
     "fail_account_manually",
     "get_account_runtime_progress",
+    "is_batch_ready_for_rename",
+    "list_managed_batches",
     "list_pending_batches",
     "load_batch_draft",
     "mark_batch_interrupted",

@@ -67,10 +67,81 @@ def create_batch(
     connection: Connection,
     *,
     settings: Settings | None = None,
+    status: InputBatchStatus = InputBatchStatus.IMPORTED,
 ) -> BatchCreationResult:
     """Persist a validated batch request as SQLite batch, account and URL jobs."""
 
-    batch = _create_unique_batch(request, BatchRepository(connection))
+    batch = _create_unique_batch(request, BatchRepository(connection), status=status)
+    return _populate_batch(request, connection, batch=batch, settings=settings)
+
+
+def update_draft_batch(
+    batch_id: int,
+    request: BatchCreationRequest,
+    connection: Connection,
+    *,
+    settings: Settings | None = None,
+) -> BatchCreationResult:
+    """Replace an unexecuted GUI draft while preserving its stable batch id."""
+
+    batch = BatchRepository(connection).get_by_id(batch_id)
+    if batch is None:
+        raise ValueError(f"Input batch not found: {batch_id}")
+    if batch.status is not InputBatchStatus.DRAFT:
+        raise ValueError("Only saved DRAFT batches can be modified")
+    if connection.execute(
+        "SELECT 1 FROM runs WHERE batch_id = ? LIMIT 1", (batch_id,)
+    ).fetchone() is not None:
+        raise ValueError("A batch that has already been executed cannot be modified")
+    duplicate = connection.execute(
+        "SELECT id FROM input_batches WHERE batch_name = ? AND id <> ? LIMIT 1",
+        (request.batch_name, batch_id),
+    ).fetchone()
+    if duplicate is not None:
+        raise DuplicateBatchNameError(
+            f"Batch name '{request.batch_name}' already exists with id {duplicate['id']}."
+        )
+
+    account_ids = [
+        int(row["id"])
+        for row in connection.execute(
+            "SELECT id FROM accounts WHERE batch_id = ?", (batch_id,)
+        ).fetchall()
+    ]
+    for account_id in account_ids:
+        connection.execute(
+            "DELETE FROM duplicate_url_jobs WHERE account_id = ?", (account_id,)
+        )
+        connection.execute("DELETE FROM url_jobs WHERE account_id = ?", (account_id,))
+    connection.execute("DELETE FROM accounts WHERE batch_id = ?", (batch_id,))
+    connection.execute(
+        """
+        UPDATE input_batches
+        SET batch_name = ?, schema_version = ?, source_file = ?,
+            status = 'DRAFT', updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (
+            request.batch_name,
+            request.schema_version,
+            str(request.source_file) if request.source_file is not None else None,
+            batch_id,
+        ),
+    )
+    connection.commit()
+    updated = BatchRepository(connection).get_by_id(batch_id)
+    if updated is None:
+        raise RuntimeError(f"Input batch disappeared during update: {batch_id}")
+    return _populate_batch(request, connection, batch=updated, settings=settings)
+
+
+def _populate_batch(
+    request: BatchCreationRequest,
+    connection: Connection,
+    *,
+    batch: InputBatch,
+    settings: Settings | None,
+) -> BatchCreationResult:
     if settings is not None:
         _upsert_operational_config(ConfigRepository(connection), settings)
 
@@ -210,6 +281,8 @@ def _upsert_operational_config(
 def _create_unique_batch(
     request: BatchCreationRequest,
     repository: BatchRepository,
+    *,
+    status: InputBatchStatus,
 ) -> InputBatch:
     existing = repository.get_by_name(request.batch_name)
     if existing is not None:
@@ -224,7 +297,7 @@ def _create_unique_batch(
             batch_name=request.batch_name,
             schema_version=request.schema_version,
             source_file=request.source_file,
-            status=InputBatchStatus.IMPORTED,
+            status=status,
         )
     )
 
@@ -410,4 +483,5 @@ __all__ = [
     "DuplicateBatchNameError",
     "build_story_url",
     "create_batch",
+    "update_draft_batch",
 ]

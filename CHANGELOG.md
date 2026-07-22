@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.26.8 - Patch - Doble click del catálogo
+
+Fecha: 2026-07-22
+
+### Creado
+
+* `tasks/Patch_v1.26.8.md` documenta el ajuste del evento.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` carga el username seleccionado y sus datos
+  de catálogo en el editor antes de abrir Instagram con doble click.
+* `tests/test_gui_services.py` agrega la prueba de regresión de las dos acciones.
+* `README.md` y `tasks/task-gui.md` aclaran el comportamiento.
+* Version actualizada a `1.26.8`.
+
+### Pruebas ejecutadas
+
+* `pytest -q tests/test_gui_services.py tests/test_package_smoke.py`
+  (`46 passed`).
+* `pytest -q` (`186 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
+## v1.26.7 - Patch - Maestro de lotes y cierre manual
+
+Fecha: 2026-07-22
+
+### Creado
+
+* `tasks/Patch_v1.26.7.md` documenta el alcance, los estados y la compatibilidad
+  de persistencia del patch.
+
+### Modificado
+
+* `src/ig_orchestrator/models/input_batch.py` incorpora el estado `DRAFT` para
+  distinguir lotes guardados de ejecuciones.
+* `src/ig_orchestrator/input/batch_creation_service.py`,
+  `src/ig_orchestrator/input/__init__.py` y
+  `src/ig_orchestrator/gui/batch_draft_service.py` permiten crear y actualizar
+  borradores conservando el batch id y bloquean cualquier edición tras la
+  primera ejecución.
+* `src/ig_orchestrator/gui/batch_resume_service.py` agrega el maestro conjunto,
+  activación y borrado seguro de drafts, finalización manual de cuentas y la
+  política que habilita el renombrador al cerrar todas las cuentas.
+* `src/ig_orchestrator/gui/app.py` abre el catálogo con doble click, reemplaza
+  el selector de pendientes por `Lotes / ejecuciones`, expone las acciones de
+  borrador y agrega `Completar` al menú contextual de cuentas.
+* `src/ig_orchestrator/telegram/bot_conversation_service.py` diferencia la
+  ausencia total de respuesta como `NO_BOT_RESPONSE`, evita una segunda espera
+  redundante y deja que la política existente finalice la URL al agotar
+  reintentos sin bloquear el lote.
+* `tests/test_gui_services.py` y `tests/test_bot_conversation_service.py`
+  cubren los nuevos estados, acciones y el silencio del bot.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen el nuevo flujo.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y
+  `tests/test_package_smoke.py` actualizan la versión a `1.26.7`.
+
+### Pruebas ejecutadas
+
+* `pytest -q tests/test_gui_services.py tests/test_bot_conversation_service.py tests/test_account_orchestrator.py`
+  (`59 passed`).
+* `pytest -q` (`185 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
 ## v1.26.6 - Patch - Estado de Treeview durante la ejecucion
 
 Fecha: 2026-07-22

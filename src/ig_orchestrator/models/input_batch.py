@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 class InputBatchStatus(StrEnum):
+    DRAFT = "DRAFT"
     IMPORTED = "IMPORTED"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"

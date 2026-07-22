@@ -168,17 +168,30 @@ class BotConversationService:
             UrlJobStatus.WAITING_DOWNLOAD,
         )
 
-        bot_message, direct_paths = await self._wait_for_bot_response_and_downloads(
-            job_id=job_id,
-            media_filename_prefix=_media_filename_prefix(job),
-            since=started_at,
-            sent_message_id=sent_message_id,
+        bot_message, direct_paths, bot_responded = (
+            await self._wait_for_bot_response_and_downloads(
+                job_id=job_id,
+                media_filename_prefix=_media_filename_prefix(job),
+                since=started_at,
+                sent_message_id=sent_message_id,
+            )
         )
         logger.info(
             "Bot response received: job_id={} response={}",
             job_id,
             bot_message or "<no text response>",
         )
+        if not bot_responded and not direct_paths:
+            logger.warning("Telegram bot did not respond before timeout: job_id={}", job_id)
+            retry_job = self._url_job_repository.update_error(
+                job_id,
+                status=UrlJobStatus.RETRY_PENDING,
+                last_error="Telegram bot returned no response before timeout.",
+                last_error_type="NO_BOT_RESPONSE",
+                non_retryable=False,
+            )
+            return BotConversationResult(job=retry_job)
+
         response = parse_bot_response(bot_message)
 
         if (
@@ -267,7 +280,7 @@ class BotConversationService:
         media_filename_prefix: str,
         since: datetime,
         sent_message_id: int | None,
-    ) -> tuple[str | None, list[Path]]:
+    ) -> tuple[str | None, list[Path], bool]:
         deadline = asyncio.get_running_loop().time() + max(
             self._config.response_wait_timeout_seconds,
             self._config.download_wait_timeout_seconds,
@@ -276,6 +289,7 @@ class BotConversationService:
         bot_texts: list[str] = []
         downloads: list[_MediaDownload] = []
         last_media_at: float | None = None
+        bot_responded = False
 
         while True:
             messages = await self._telegram_client.get_bot_messages_after(
@@ -293,14 +307,20 @@ class BotConversationService:
                 if sent_message_id is not None and message_id == sent_message_id:
                     continue
 
+                bot_responded = True
+
                 text = _message_text(message)
                 if text is not None and text.strip():
                     bot_texts.append(text.strip())
                     if parse_bot_response(text).status is not BotResponseStatus.OK:
-                        return _join_bot_texts(bot_texts), _finalize_media_downloads(
-                            self._config.download_folder,
-                            downloads,
-                            media_filename_prefix,
+                        return (
+                            _join_bot_texts(bot_texts),
+                            _finalize_media_downloads(
+                                self._config.download_folder,
+                                downloads,
+                                media_filename_prefix,
+                            ),
+                            bot_responded,
                         )
 
                 if _message_has_media(message) and _can_download_media(
@@ -315,17 +335,25 @@ class BotConversationService:
             if downloads and last_media_at is not None:
                 quiet_seconds = now - last_media_at
                 if quiet_seconds >= self._config.download_stable_seconds:
-                    return _join_bot_texts(bot_texts), _finalize_media_downloads(
-                        self._config.download_folder,
-                        downloads,
-                        media_filename_prefix,
+                    return (
+                        _join_bot_texts(bot_texts),
+                        _finalize_media_downloads(
+                            self._config.download_folder,
+                            downloads,
+                            media_filename_prefix,
+                        ),
+                        bot_responded,
                     )
 
             if now >= deadline:
-                return _join_bot_texts(bot_texts), _finalize_media_downloads(
-                    self._config.download_folder,
-                    downloads,
-                    media_filename_prefix,
+                return (
+                    _join_bot_texts(bot_texts),
+                    _finalize_media_downloads(
+                        self._config.download_folder,
+                        downloads,
+                        media_filename_prefix,
+                    ),
+                    bot_responded,
                 )
 
             await asyncio.sleep(

@@ -14,7 +14,9 @@ from ig_orchestrator.input import (
     BatchCreationRequest,
     BatchCreationResult,
     create_batch,
+    update_draft_batch,
 )
+from ig_orchestrator.models import InputBatchStatus
 from ig_orchestrator.input.url_classifier import classify_instagram_url
 from ig_orchestrator.settings import Settings
 
@@ -44,9 +46,23 @@ def save_batch_draft(
     connection: Connection,
     *,
     settings: Settings | None = None,
+    batch_id: int | None = None,
 ) -> BatchCreationResult:
     request = validate_batch_draft(draft)
-    result = create_batch(request, connection, settings=settings)
+    if batch_id is None:
+        result = create_batch(
+            request,
+            connection,
+            settings=settings,
+            status=InputBatchStatus.DRAFT,
+        )
+    else:
+        result = update_draft_batch(
+            batch_id,
+            request,
+            connection,
+            settings=settings,
+        )
     connection.execute(
         """
         UPDATE input_batches
