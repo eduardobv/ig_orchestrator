@@ -106,7 +106,9 @@ Panel izquierdo: catalogo de cuentas
   - `config/batch.json`;
   - opcionalmente `config/bkp/*.json` si no hay suficientes entradas en `account_history`.
 - Doble click en un username lo carga en el editor.
-- Accion futura opcional: marcar cuenta como `DISABLED` para ocultarla.
+- Click derecho ofrece `Abrir` y `Delete`. `Abrir` abre el perfil en una nueva
+  pestaña del navegador; `Delete` marca la cuenta `DISABLED` sin borrarla y la
+  oculta del catalogo.
 
 Panel central: lote actual
 
@@ -130,6 +132,8 @@ Panel derecho: editor de cuenta
 - `Download stories`: checkbox.
 - `New account`: checkbox desmarcado por defecto. Al marcarlo muestra tres
   campos obligatorios: `ownerId`, `path` y `startInitDate` (`YYYY-MM-DD`).
+  `path` es un combobox editable con los valores `DISTINCT` historicos de
+  `account_history.field1`.
 - `Start date`: input por defecto hoy. Tras `Agregar / Actualizar`, el editor
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea.
@@ -166,6 +170,12 @@ Zona superior de recuperacion:
   datos y lo retira del selector.
 - Durante la ejecucion, `Lote actual` muestra por color cuentas completadas,
   en reintento, en curso, pendientes y fallidas.
+- Al comenzar se ordena como se procesa (solo stories primero y despues menor
+  numero de URLs), mantiene la seleccion durante los refrescos y permite
+  eliminar una cuenta pendiente/en curso marcando sus jobs no terminales
+  `FAILED_FINAL` y la cuenta `FAILED`.
+- `Subir`, `Bajar` y `Duplicar` permanecen implementados, pero sus botones se
+  ocultan desde v1.26.5.
 - `Cancelar proceso` conserva los estados individuales y deja el batch
   `PARTIAL`, listo para reanudar.
 
@@ -179,6 +189,12 @@ Cada cuenta marcada como `New account` agrega su propio bloque
 `--new-account`. `Agregar / Actualizar` la incorpora al lote actual y tambien
 al catalogo `account_history`, donde se conserva `ownerId`, `path` y
 `startInitDate` para consultas posteriores.
+Antes de ejecutar `Renombrar`, estos datos y la fecha global se releen desde
+SQLite para que tambien se incluyan despues de cancelar y recuperar el batch.
+
+La geometria inicial ocupa la mitad izquierda de un monitor 1920x1080, las
+columnas del lote son compactas y tanto el lote como la consola tienen scroll
+vertical fino.
 
 La salida combinada del renombrador se transmite a la consola de estado. El
 boton no se habilita tras dry-run ni tras una ejecucion fallida.

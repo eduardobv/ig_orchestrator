@@ -1529,3 +1529,15 @@ visualmente completadas, reintentos, procesamiento, pendientes y fallos. La
 fecha global del lote y los parámetros de renombrado de las cuentas nuevas se
 guardan asociados al batch para que una ejecución recuperada pueda lanzar el
 mismo post-proceso de renombrado.
+
+Antes de ejecutar el renombrador, la GUI reconstruye desde SQLite el contexto
+del batch y no depende del borrador que quede en memoria. Al iniciar o reanudar,
+`Lote actual` usa el orden real de procesamiento y conserva la seleccion entre
+refrescos. Una cuenta pendiente o en curso se puede retirar manualmente: la
+cuenta queda `FAILED` y sus URL jobs no terminales quedan `FAILED_FINAL` con el
+motivo de baja manual, sin borrar filas.
+
+El catalogo admite baja logica mediante `account_history.status = DISABLED` y
+omite esas cuentas aunque sigan presentes en fuentes JSON. Los paths historicos
+de `account_history.field1` alimentan de forma distinta un combobox editable
+para las cuentas nuevas.

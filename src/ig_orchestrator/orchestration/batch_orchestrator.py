@@ -133,20 +133,34 @@ class BatchOrchestrator:
                 and account.status in _PROCESSABLE_ACCOUNT_STATUSES
             ]
             for account_index, account in enumerate(processable_accounts, start=1):
+                current_account = self._account_repository.get_by_id(account.id)
+                if (
+                    current_account is None
+                    or current_account.status not in _PROCESSABLE_ACCOUNT_STATUSES
+                ):
+                    logger.info(
+                        "Skipping batch account after external status change: "
+                        "batch_id={} account_id={} previous_status={} current_status={}",
+                        batch_id,
+                        account.id,
+                        account.status.value,
+                        current_account.status.value if current_account else "MISSING",
+                    )
+                    continue
                 if self._config.progress_callback is not None:
                     self._config.progress_callback(
                         account_index,
                         len(processable_accounts),
-                        account,
+                        current_account,
                     )
                 logger.info(
                     "Processing batch account: batch_id={} account_id={} username={}",
                     batch_id,
                     account.id,
-                    account.username,
+                    current_account.username,
                 )
                 account_results.append(
-                    await self._account_orchestrator.process_account(account.id)
+                    await self._account_orchestrator.process_account(current_account.id)
                 )
 
             summary = self._build_batch_summary(batch_id)

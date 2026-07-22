@@ -17,6 +17,9 @@ from ig_orchestrator.db import (
 )
 from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
+    _half_screen_geometry,
+    _instagram_profile_url,
+    _open_chrome_tab,
     _latest_executed_batch_name,
     _new_account_rename_parameters,
     _timestamp_console_text,
@@ -31,6 +34,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     validate_batch_draft,
 )
 from ig_orchestrator.gui.batch_resume_service import (
+    fail_account_manually,
     finish_batch,
     get_account_runtime_progress,
     list_pending_batches,
@@ -161,6 +165,75 @@ def test_account_catalog_is_sorted_alphabetically_case_insensitive(tmp_path: Pat
         "middle_user",
         "zeta_user",
     ]
+
+
+def test_catalog_disabled_account_is_hidden_even_if_json_contains_it(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    batch_json = tmp_path / "batch.json"
+    batch_json.write_text(
+        json.dumps({"accounts": [{"username": "hidden_user"}]}),
+        encoding="utf-8",
+    )
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        service = AccountCatalogService(connection, batch_json_path=batch_json)
+        assert [entry.username for entry in service.list_entries()] == ["hidden_user"]
+        service.disable("hidden_user")
+        assert service.list_entries() == []
+        stored = AccountHistoryRepository(connection).get_by_user_name("hidden_user")
+
+    assert stored is not None
+    assert stored.status.value == "DISABLED"
+
+
+def test_catalog_destination_paths_are_distinct_and_editable_source_data(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        history = AccountHistoryRepository(connection)
+        for username, destination in (
+            ("one", r"G:\Models"),
+            ("two", r"G:\Models"),
+            ("three", r"G:\Favorites"),
+        ):
+            history.update_rename_metadata(
+                username,
+                owner_id=username,
+                destination_path=destination,
+                start_init_date="2026-01-01",
+            )
+        paths = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        ).list_destination_paths()
+
+    assert paths == [r"G:\Favorites", r"G:\Models"]
+
+
+def test_gui_half_screen_geometry_and_instagram_profile_url() -> None:
+    assert _half_screen_geometry(1920, 1080) == "960x1000+0+0"
+    assert _instagram_profile_url(" @sample_user ") == (
+        "https://www.instagram.com/sample_user/"
+    )
+
+
+def test_gui_open_catalog_prefers_chrome(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened: list[str] = []
+
+    class ChromeController:
+        def open_new_tab(self, url: str) -> bool:
+            opened.append(url)
+            return True
+
+    monkeypatch.setattr("ig_orchestrator.gui.app.webbrowser.get", lambda name: ChromeController())
+
+    assert _open_chrome_tab("https://www.instagram.com/sample_user/") is True
+    assert opened == ["https://www.instagram.com/sample_user/"]
 
 
 def test_gui_run_continue_command_uses_current_python_and_batch_id() -> None:
@@ -405,6 +478,40 @@ def test_gui_lists_and_recovers_pending_batch_from_sqlite(tmp_path: Path) -> Non
         assert recovered == draft
 
 
+def test_gui_recovered_batch_uses_persisted_processing_order(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="processing_order",
+        default_start_now_date="2026-07-22",
+        accounts=[
+            AccountDraft(
+                username="three_urls",
+                urls=[
+                    "https://www.instagram.com/reel/ORDER1/",
+                    "https://www.instagram.com/reel/ORDER2/",
+                    "https://www.instagram.com/reel/ORDER3/",
+                ],
+            ),
+            AccountDraft(username="story_only", download_stories=True),
+            AccountDraft(
+                username="one_url",
+                urls=["https://www.instagram.com/reel/ORDER4/"],
+            ),
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        recovered = load_batch_draft(connection, result.batch.id)
+
+    assert [account.username for account in recovered.accounts] == [
+        "story_only",
+        "one_url",
+        "three_urls",
+    ]
+
+
 def test_gui_resume_columns_are_added_to_an_existing_database(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy.db"
     with connect(db_path) as connection:
@@ -494,6 +601,46 @@ def test_gui_runtime_progress_and_manual_finish(tmp_path: Path) -> None:
         finish_batch(connection, result.batch.id)
         assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.COMPLETED
         assert list_pending_batches(connection) == []
+
+
+def test_gui_manual_account_removal_marks_non_terminal_urls_and_account_failed(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="remove_account",
+        default_start_now_date="2026-07-22",
+        accounts=[
+            AccountDraft(
+                username="blocked_user",
+                urls=[
+                    "https://www.instagram.com/reel/BLOCKED1/",
+                    "https://www.instagram.com/reel/BLOCKED2/",
+                ],
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        account = result.accounts[0]
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+        UrlJobRepository(connection).update_status(jobs[0].id, UrlJobStatus.COMPLETED)
+
+        affected = fail_account_manually(
+            connection,
+            batch_id=result.batch.id,
+            account_id=account.id,
+        )
+        stored_account = AccountRepository(connection).get_by_id(account.id)
+        stored_jobs = UrlJobRepository(connection).list_by_account(account.id)
+
+    assert affected == 1
+    assert stored_account.status is AccountStatus.FAILED
+    assert stored_jobs[0].status is UrlJobStatus.COMPLETED
+    assert stored_jobs[1].status is UrlJobStatus.FAILED_FINAL
+    assert stored_jobs[1].last_error_type == "MANUAL_ACCOUNT_REMOVAL"
+    assert stored_jobs[1].non_retryable is True
 
 
 def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:

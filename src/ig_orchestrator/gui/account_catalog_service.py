@@ -7,6 +7,7 @@ from sqlite3 import Connection
 from typing import Iterable
 
 from ig_orchestrator.db import AccountHistoryRepository
+from ig_orchestrator.models import AccountHistoryStatus
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,8 @@ class AccountCatalogService:
         self.backup_dir = backup_dir
 
     def list_entries(self) -> list[AccountCatalogEntry]:
+        history = AccountHistoryRepository(self.connection)
+        disabled_user_names = history.list_disabled_user_names()
         entries: list[AccountCatalogEntry] = []
         entries.extend(self._from_account_history())
         entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
@@ -39,12 +42,29 @@ class AccountCatalogService:
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
         return sorted(
-            _deduplicate(entries),
+            (
+                entry
+                for entry in _deduplicate(entries)
+                if entry.username.casefold() not in disabled_user_names
+            ),
             key=lambda entry: entry.username.casefold(),
         )
 
+    def disable(self, username: str) -> None:
+        repository = AccountHistoryRepository(self.connection)
+        repository.create_or_get(username)
+        repository.update_status(
+            username,
+            AccountHistoryStatus.DISABLED,
+        )
+
+    def list_destination_paths(self) -> list[str]:
+        return AccountHistoryRepository(
+            self.connection
+        ).list_distinct_destination_paths()
+
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
-        for record in AccountHistoryRepository(self.connection).list_all():
+        for record in AccountHistoryRepository(self.connection).list_enabled():
             yield AccountCatalogEntry(
                 username=record.user_name,
                 source="account_history",

@@ -287,6 +287,22 @@ class AccountOrchestrator:
         working_base: Path,
     ) -> AccountOrchestratorResult:
         try:
+            if self._account_was_failed_externally(account_id):
+                summary = self._build_account_summary(account_id)
+                run = self._run_repository.update_summary(
+                    run.id,
+                    summary,
+                    finished_at=datetime.now(timezone.utc),
+                )
+                current = self._account_repository.get_by_id(account_id)
+                if current is None:
+                    raise ValueError(f"Account not found: {account_id}")
+                return AccountOrchestratorResult(
+                    account=current,
+                    run=run,
+                    summary=summary,
+                    processed_job_ids=tuple(processed_job_ids),
+                )
             account = self._account_repository.update_status(
                 account_id,
                 AccountStatus.PROCESSING,
@@ -311,22 +327,33 @@ class AccountOrchestrator:
                     )
 
             for job in _ordered_main_pass_jobs(jobs):
-                notify_progress(job, is_retry=False)
+                if self._account_was_failed_externally(account_id):
+                    break
+                current_job = self._url_job_repository.get_by_id(_require_job_id(job))
+                if current_job is None or current_job.status in _TERMINAL_URL_STATUSES:
+                    continue
+                notify_progress(current_job, is_retry=False)
                 logger.info(
                     "Processing URL job: job_id={} type={} source={} url={}",
                     _require_job_id(job),
-                    job.publication_type.value,
-                    job.source.value,
-                    job.url,
+                    current_job.publication_type.value,
+                    current_job.source.value,
+                    current_job.url,
                 )
-                result = await self._url_job_processor.process(_require_job_id(job))
+                result = await self._url_job_processor.process(_require_job_id(current_job))
                 processed_job_ids.append(_require_job_id(result.job))
+                if self._account_was_failed_externally(account_id):
+                    self._mark_manually_removed_job(result.job)
+                    break
                 self._enqueue_or_finalize_retry(result.job, retry_queue)
 
-            for job in _existing_retry_jobs(jobs):
-                self._enqueue_or_finalize_retry(job, retry_queue)
+            if not self._account_was_failed_externally(account_id):
+                for job in _existing_retry_jobs(jobs):
+                    self._enqueue_or_finalize_retry(job, retry_queue)
 
             while retry_queue:
+                if self._account_was_failed_externally(account_id):
+                    break
                 job_id = retry_queue.pop_next()
                 if job_id is None:
                     break
@@ -354,6 +381,8 @@ class AccountOrchestrator:
                         decision.delay_seconds,
                     )
                     await self._wait_retry_delay(decision.delay_seconds)
+                    if self._account_was_failed_externally(account_id):
+                        break
 
                 logger.info(
                     "Retrying URL job: job_id={} retries={} url={}",
@@ -363,6 +392,9 @@ class AccountOrchestrator:
                 )
                 result = await self._url_job_processor.process(job_id)
                 processed_job_ids.append(_require_job_id(result.job))
+                if self._account_was_failed_externally(account_id):
+                    self._mark_manually_removed_job(result.job)
+                    break
                 if result.job.status in _RETRYABLE_URL_STATUSES:
                     failed_retry = self._increment_retry_failure(result.job)
                     retry_decision = self._retry_decision(failed_retry)
@@ -387,7 +419,11 @@ class AccountOrchestrator:
                         retry_queue.requeue(_require_job_id(failed_retry))
 
             summary = self._build_account_summary(account_id)
-            account_status = _account_status_from_summary(summary)
+            account_status = (
+                AccountStatus.FAILED
+                if self._account_was_failed_externally(account_id)
+                else _account_status_from_summary(summary)
+            )
             account = self._account_repository.update_status(account_id, account_status)
             run = self._run_repository.update_summary(
                 run.id,
@@ -410,6 +446,20 @@ class AccountOrchestrator:
         except Exception:
             logger.exception("Account processing failed")
             raise
+
+    def _account_was_failed_externally(self, account_id: int) -> bool:
+        current = self._account_repository.get_by_id(account_id)
+        return current is not None and current.status is AccountStatus.FAILED
+
+    def _mark_manually_removed_job(self, job: UrlJob) -> UrlJob:
+        return self._url_job_repository.update_error(
+            _require_job_id(job),
+            status=UrlJobStatus.FAILED_FINAL,
+            last_error="Account removed manually from GUI",
+            last_error_type="MANUAL_ACCOUNT_REMOVAL",
+            non_retryable=True,
+            retries=job.retries,
+        )
 
     def _enqueue_or_finalize_retry(
         self,

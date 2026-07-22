@@ -65,6 +65,57 @@ class AccountHistoryRepository:
         ).fetchall()
         return [_row_to_history(row) for row in rows]
 
+    def list_enabled(self) -> list[AccountHistory]:
+        rows = self.connection.execute(
+            """
+            SELECT * FROM account_history
+            WHERE status <> ?
+            ORDER BY id
+            """,
+            (AccountHistoryStatus.DISABLED.value,),
+        ).fetchall()
+        return [_row_to_history(row) for row in rows]
+
+    def list_disabled_user_names(self) -> set[str]:
+        rows = self.connection.execute(
+            "SELECT user_name FROM account_history WHERE status = ?",
+            (AccountHistoryStatus.DISABLED.value,),
+        ).fetchall()
+        return {str(row["user_name"]).casefold() for row in rows}
+
+    def list_distinct_destination_paths(self) -> list[str]:
+        rows = self.connection.execute(
+            """
+            SELECT DISTINCT TRIM(field1) AS destination_path
+            FROM account_history
+            WHERE field1 IS NOT NULL AND TRIM(field1) <> ''
+            ORDER BY destination_path COLLATE NOCASE
+            """
+        ).fetchall()
+        return [str(row["destination_path"]) for row in rows]
+
+    def update_status(
+        self,
+        user_name: str,
+        status: AccountHistoryStatus,
+    ) -> AccountHistory:
+        record = self.get_by_user_name(user_name)
+        if record is None:
+            raise ValueError(f"Catalog account not found: {user_name}")
+        self.connection.execute(
+            """
+            UPDATE account_history
+            SET status = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (status.value, record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Account history row disappeared during update")
+        return stored
+
     def update_rename_metadata(
         self,
         user_name: str,

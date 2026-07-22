@@ -79,6 +79,34 @@ class FakeUrlJobProcessor:
         return UrlJobProcessorResult(job=job)
 
 
+class ManualRemovalProcessor:
+    def __init__(self, stored: StoredAccount) -> None:
+        self.stored = stored
+        self.calls: list[int] = []
+
+    async def process(self, url_job_id: int) -> UrlJobProcessorResult:
+        self.calls.append(url_job_id)
+        for job in self.stored.job_repo.list_by_account(self.stored.account.id):
+            if job.status not in {UrlJobStatus.COMPLETED, UrlJobStatus.FAILED_FINAL}:
+                self.stored.job_repo.update_error(
+                    job.id,
+                    status=UrlJobStatus.FAILED_FINAL,
+                    last_error="Account removed manually from GUI",
+                    last_error_type="MANUAL_ACCOUNT_REMOVAL",
+                    non_retryable=True,
+                )
+        self.stored.account_repo.update_status(
+            self.stored.account.id,
+            AccountStatus.FAILED,
+        )
+        # Simulate an in-flight processor finishing just after the GUI request.
+        completed = self.stored.job_repo.update_status(
+            url_job_id,
+            UrlJobStatus.COMPLETED,
+        )
+        return UrlJobProcessorResult(job=completed)
+
+
 def test_account_orchestrator_processes_generated_story_before_manual_urls(
     tmp_path: Path,
 ) -> None:
@@ -112,6 +140,32 @@ def test_account_orchestrator_processes_generated_story_before_manual_urls(
     assert not (account_root / "highlights").exists()
     assert stored.job_repo.get_by_id(story.id).run_id == result.run.id
     assert stored.job_repo.get_by_id(manual.id).run_id == result.run.id
+
+
+def test_account_orchestrator_stops_after_manual_account_removal(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    first = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    second = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    processor = ManualRemovalProcessor(stored)
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+    )
+
+    result = asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert processor.calls == [first.id]
+    assert second.id not in processor.calls
+    assert result.account.status is AccountStatus.FAILED
+    assert all(
+        job.status is UrlJobStatus.FAILED_FINAL
+        for job in stored.job_repo.list_by_account(stored.account.id)
+    )
 
 
 def test_account_orchestrator_retries_temporary_failures_fifo(

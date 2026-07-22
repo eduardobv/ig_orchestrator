@@ -6,6 +6,7 @@ import re
 from sqlite3 import Connection
 import tkinter as tk
 from tkinter import messagebox, ttk
+import webbrowser
 
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
@@ -21,6 +22,7 @@ from ig_orchestrator.gui.batch_draft_service import (
 )
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
+    fail_account_manually,
     finish_batch,
     get_account_runtime_progress,
     list_pending_batches,
@@ -70,6 +72,7 @@ class InstagramOrchestratorApp:
             batch_json_path=batch_json_path,
         )
         self.catalog_entries = self.catalog_service.list_entries()
+        self.destination_paths = self.catalog_service.list_destination_paths()
         self.accounts: list[AccountDraft] = []
         self.selected_index: int | None = None
         self.saved_batch_id: int | None = None
@@ -104,13 +107,20 @@ class InstagramOrchestratorApp:
         self.indicators_var = tk.StringVar(value="URLs: 0")
 
         self.root.title("Instagram Orchestrator")
-        self.root.geometry("1280x760")
+        self.root.geometry(
+            _half_screen_geometry(
+                self.root.winfo_screenwidth(),
+                self.root.winfo_screenheight(),
+            )
+        )
+        self.root.minsize(860, 680)
         self._build_widgets()
         self._refresh_catalog()
         self._refresh_table()
         self._update_pending_button_label()
 
     def _build_widgets(self) -> None:
+        ttk.Style(self.root).configure("Thin.Vertical.TScrollbar", width=8)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
@@ -161,8 +171,17 @@ class InstagramOrchestratorApp:
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
         bottom.columnconfigure(0, weight=1)
-        self.console = tk.Text(bottom, height=9, state="disabled", wrap="word")
-        self.console.grid(row=0, column=0, sticky="ew")
+        bottom.rowconfigure(0, weight=1)
+        self.console = tk.Text(bottom, height=8, state="disabled", wrap="word")
+        self.console.grid(row=0, column=0, sticky="nsew")
+        console_scroll = ttk.Scrollbar(
+            bottom,
+            orient=tk.VERTICAL,
+            command=self.console.yview,
+            style="Thin.Vertical.TScrollbar",
+        )
+        console_scroll.grid(row=0, column=1, sticky="ns")
+        self.console.configure(yscrollcommand=console_scroll.set)
         progress = ttk.Frame(bottom)
         progress.grid(row=1, column=0, sticky="ew", pady=(4, 0))
         progress.columnconfigure(2, weight=1)
@@ -206,6 +225,10 @@ class InstagramOrchestratorApp:
         self.catalog_list = tk.Listbox(parent, exportselection=False)
         self.catalog_list.grid(row=2, column=0, sticky="nsew")
         self.catalog_list.bind("<Double-Button-1>", lambda _event: self._load_catalog())
+        self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
+        self.catalog_menu = tk.Menu(self.root, tearoff=False)
+        self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
+        self.catalog_menu.add_command(label="Delete", command=self._disable_catalog_account)
 
     def _build_batch_table(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
@@ -218,35 +241,37 @@ class InstagramOrchestratorApp:
             selectmode="browse",
         )
         for column, title, width in (
-            ("username", "Username", 140),
-            ("stories", "Stories", 70),
-            ("urls", "URLs", 55),
-            ("start_date", "Start date", 95),
-            ("status", "Estado", 90),
+            ("username", "Username", 118),
+            ("stories", "Stories", 53),
+            ("urls", "URLs", 38),
+            ("start_date", "Start date", 82),
+            ("status", "Estado", 76),
         ):
             self.tree.heading(column, text=title)
-            self.tree.column(column, width=width, anchor="w")
-        self.tree.grid(row=1, column=0, columnspan=5, sticky="nsew", pady=(6, 6))
+            self.tree.column(column, width=width, minwidth=width, anchor="w")
+        self.tree.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(6, 6))
+        batch_scroll = ttk.Scrollbar(
+            parent,
+            orient=tk.VERTICAL,
+            command=self.tree.yview,
+            style="Thin.Vertical.TScrollbar",
+        )
+        batch_scroll.grid(row=1, column=2, sticky="ns", pady=(6, 6))
+        self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
         self.tree.tag_configure("completed", foreground="#238636")
         self.tree.tag_configure("retry", foreground="#b76e00")
         self.tree.tag_configure("processing", foreground="#0969da")
         self.tree.tag_configure("pending", foreground="#57606a")
         self.tree.tag_configure("failed", foreground="#cf222e")
-        ttk.Button(parent, text="Subir", command=lambda: self._move_selected(-1)).grid(
-            row=2, column=0, sticky="ew", padx=(0, 4)
+        # v1.26.5: Subir, Bajar y Duplicar se conservan en los metodos, pero sus
+        # botones se ocultan porque el orden visible pasa a ser el de procesamiento.
+        self.delete_button = ttk.Button(
+            parent, text="Eliminar", command=self._delete_selected
         )
-        ttk.Button(parent, text="Bajar", command=lambda: self._move_selected(1)).grid(
-            row=2, column=1, sticky="ew", padx=(0, 4)
-        )
-        ttk.Button(parent, text="Duplicar", command=self._duplicate_selected).grid(
-            row=2, column=2, sticky="ew", padx=(0, 4)
-        )
-        ttk.Button(parent, text="Eliminar", command=self._delete_selected).grid(
-            row=2, column=3, sticky="ew", padx=(0, 4)
-        )
+        self.delete_button.grid(row=2, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(parent, text="Limpiar lote", command=self._clear_batch).grid(
-            row=2, column=4, sticky="ew"
+            row=2, column=1, columnspan=2, sticky="ew"
         )
 
     def _build_editor(self, parent: ttk.Frame) -> None:
@@ -301,7 +326,12 @@ class InstagramOrchestratorApp:
         ttk.Label(self.new_account_frame, text="path *").grid(
             row=2, column=0, sticky="w", pady=(6, 0)
         )
-        ttk.Entry(self.new_account_frame, textvariable=self.destination_path_var).grid(
+        self.destination_path_combo = ttk.Combobox(
+            self.new_account_frame,
+            textvariable=self.destination_path_var,
+            values=self.destination_paths,
+        )
+        self.destination_path_combo.grid(
             row=2, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
         )
         self.new_account_frame.grid(
@@ -342,25 +372,72 @@ class InstagramOrchestratorApp:
             if not query or query in entry.username.lower():
                 self.catalog_list.insert(tk.END, entry.username)
 
+    def _show_catalog_menu(self, event: tk.Event) -> None:
+        index = self.catalog_list.nearest(event.y)
+        if index < 0 or index >= self.catalog_list.size():
+            return
+        self.catalog_list.selection_clear(0, tk.END)
+        self.catalog_list.selection_set(index)
+        self.catalog_list.activate(index)
+        self.catalog_menu.tk_popup(event.x_root, event.y_root)
+
+    def _selected_catalog_username(self) -> str | None:
+        selection = self.catalog_list.curselection()
+        if not selection:
+            return None
+        return str(self.catalog_list.get(selection[0]))
+
+    def _open_catalog_account(self) -> None:
+        username = self._selected_catalog_username()
+        if username is not None:
+            _open_chrome_tab(_instagram_profile_url(username))
+
+    def _disable_catalog_account(self) -> None:
+        username = self._selected_catalog_username()
+        if username is None:
+            return
+        if not messagebox.askyesno(
+            "Delete del catalogo",
+            f"¿Ocultar @{username} del catalogo?\n\n"
+            "La cuenta se conservara en SQLite con estado DISABLED.",
+        ):
+            return
+        try:
+            self.catalog_service.disable(username)
+        except ValueError as exc:
+            messagebox.showerror("Catalogo", str(exc))
+            return
+        self.catalog_entries = self.catalog_service.list_entries()
+        self.username_combo.configure(
+            values=[entry.username for entry in self.catalog_entries]
+        )
+        self._refresh_catalog()
+
     def _refresh_table(self) -> None:
+        selected = self.tree.selection()
+        selected_iid = selected[0] if selected else None
+        expected_ids = {str(index) for index in range(len(self.accounts))}
         for item_id in self.tree.get_children():
-            self.tree.delete(item_id)
+            if item_id not in expected_ids:
+                self.tree.delete(item_id)
         for index, account in enumerate(self.accounts):
             runtime = self.runtime_progress.get(account.username.casefold())
             status, tag = _account_display_status(account, runtime)
-            self.tree.insert(
-                "",
-                tk.END,
-                iid=str(index),
-                values=(
-                    account.username,
-                    "si" if account.download_stories else "no",
-                    len([url for url in account.urls if url.strip()]),
-                    account.start_now_date or self.default_date_var.get(),
-                    status,
-                ),
-                tags=(tag,),
+            iid = str(index)
+            values = (
+                account.username,
+                "si" if account.download_stories else "no",
+                len([url for url in account.urls if url.strip()]),
+                account.start_now_date or self.default_date_var.get(),
+                status,
             )
+            if self.tree.exists(iid):
+                self.tree.item(iid, values=values, tags=(tag,))
+                self.tree.move(iid, "", index)
+            else:
+                self.tree.insert("", tk.END, iid=iid, values=values, tags=(tag,))
+        if selected_iid is not None and self.tree.exists(selected_iid):
+            self.tree.selection_set(selected_iid)
         if not self.runtime_progress:
             self._set_status(f"{len(self.accounts)} account(s) in draft")
 
@@ -401,6 +478,23 @@ class InstagramOrchestratorApp:
     def _apply_catalog_date(self) -> None:
         if not self.account_date_var.get().strip():
             self.account_date_var.set(date.today().isoformat())
+        username = self.username_var.get().strip().casefold()
+        entry = next(
+            (
+                item
+                for item in self.catalog_entries
+                if item.username.casefold() == username
+            ),
+            None,
+        )
+        if entry is None:
+            return
+        if entry.owner_id:
+            self.owner_id_var.set(entry.owner_id)
+        if entry.start_init_date:
+            self.start_init_date_var.set(entry.start_init_date)
+        if entry.destination_path:
+            self.destination_path_var.set(entry.destination_path)
 
     def _load_selected_row(self) -> None:
         selection = self.tree.selection()
@@ -469,9 +563,11 @@ class InstagramOrchestratorApp:
             self.accounts[self.selected_index] = stored
         if stored.is_new_account:
             self.catalog_entries = self.catalog_service.list_entries()
+            self.destination_paths = self.catalog_service.list_destination_paths()
             self.username_combo.configure(
                 values=[entry.username for entry in self.catalog_entries]
             )
+            self.destination_path_combo.configure(values=self.destination_paths)
             self._refresh_catalog()
         self._refresh_table()
         self._clear_editor()
@@ -512,10 +608,44 @@ class InstagramOrchestratorApp:
     def _delete_selected(self) -> None:
         if self.selected_index is None:
             return
+        if self.process_runner.is_running() and self.active_process_kind == "batch":
+            self._fail_selected_running_account()
+            return
         del self.accounts[self.selected_index]
         self.selected_index = None
         self._refresh_table()
         self._clear_editor()
+
+    def _fail_selected_running_account(self) -> None:
+        if self.selected_index is None or self.active_batch_id is None:
+            return
+        account = self.accounts[self.selected_index]
+        runtime = self.runtime_progress.get(account.username.casefold())
+        if runtime is None:
+            messagebox.showwarning(
+                "Eliminar cuenta",
+                "No se encontro el estado persistido de la cuenta seleccionada.",
+            )
+            return
+        if not messagebox.askyesno(
+            "Eliminar cuenta del lote",
+            f"¿Marcar @{account.username} como fallida y detener sus URLs pendientes?",
+        ):
+            return
+        try:
+            affected = fail_account_manually(
+                self.connection,
+                batch_id=self.active_batch_id,
+                account_id=runtime.account_id,
+            )
+        except ValueError as exc:
+            messagebox.showerror("Eliminar cuenta", str(exc))
+            return
+        self._write_console(
+            f"Cuenta @{account.username} eliminada del procesamiento: "
+            f"{affected} URL(s) marcadas FAILED_FINAL.\n"
+        )
+        self._refresh_runtime_progress()
 
     def _clear_batch(self) -> None:
         self.accounts.clear()
@@ -690,6 +820,7 @@ class InstagramOrchestratorApp:
         self.active_batch_id = batch_id
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
         self._clear_editor()
+        self.tree.selection_remove(*self.tree.selection())
         self._refresh_runtime_progress()
         self._write_console(
             f"Lote {batch_id} recuperado desde SQLite: {draft.batch_name}.\n"
@@ -746,6 +877,24 @@ class InstagramOrchestratorApp:
     def _start_batch(self, batch_id: int) -> None:
         if self.process_runner.is_running():
             return
+
+        # SQLite already contains the stable processing order and the complete
+        # rename metadata. Rehydrate before every start/resume so the GUI never
+        # relies on a stale in-memory draft.
+        try:
+            persisted_draft = load_batch_draft(self.connection, batch_id)
+        except ValueError as exc:
+            messagebox.showerror("Ejecucion", str(exc))
+            return
+        self.batch_name_var.set(persisted_draft.batch_name)
+        self.default_date_var.set(persisted_draft.default_start_now_date)
+        self.accounts = list(persisted_draft.accounts)
+        self.saved_draft_signature = _draft_signature(persisted_draft)
+        self.selected_index = None
+        self.runtime_progress = {}
+        self._clear_editor()
+        self.tree.selection_remove(*self.tree.selection())
+        self._refresh_table()
 
         self.batch_ready_for_rename = False
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
@@ -831,6 +980,22 @@ class InstagramOrchestratorApp:
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
 
+        if self.active_batch_id is None:
+            messagebox.showerror("Renombrar", "No hay un batch activo para renombrar.")
+            return
+        try:
+            persisted_draft = load_batch_draft(
+                self.connection,
+                self.active_batch_id,
+            )
+        except ValueError as exc:
+            messagebox.showerror("Renombrar", str(exc))
+            return
+        self.default_date_var.set(persisted_draft.default_start_now_date)
+        self.rename_new_accounts = _new_account_rename_parameters(
+            persisted_draft.accounts
+        )
+
         start_now_date = self.default_date_var.get().strip()
         try:
             parsed_date = date.fromisoformat(start_now_date)
@@ -898,6 +1063,9 @@ class InstagramOrchestratorApp:
         self.register_button.configure(state=button_state)
         self.pending_button.configure(state=button_state)
         self.execute_button.configure(state=button_state)
+        if running and self.active_process_kind == "batch":
+            self.tree.configure(state="normal")
+            self.delete_button.configure(state="normal")
         self.cancel_button.configure(state="normal" if running else "disabled")
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
@@ -931,6 +1099,25 @@ class InstagramOrchestratorApp:
 
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M')}"
+
+
+def _half_screen_geometry(screen_width: int, screen_height: int) -> str:
+    width = max(860, screen_width // 2)
+    height = max(680, screen_height - 80)
+    return f"{width}x{height}+0+0"
+
+
+def _instagram_profile_url(username: str) -> str:
+    normalized = username.strip().lstrip("@").strip()
+    return f"https://www.instagram.com/{normalized}/"
+
+
+def _open_chrome_tab(url: str) -> bool:
+    try:
+        chrome = webbrowser.get("chrome")
+    except webbrowser.Error:
+        return webbrowser.open_new_tab(url)
+    return chrome.open_new_tab(url)
 
 
 def _timestamp_console_text(text: str, *, now: datetime | None = None) -> str:

@@ -260,6 +260,12 @@ SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
+El click derecho sobre una cuenta del catalogo ofrece `Abrir`, que intenta
+abrir su perfil en una pestaña de Chrome activo (y usa el navegador
+predeterminado como fallback), y `Delete`.
+Esta ultima accion no borra datos: cambia `account_history.status` a
+`DISABLED` y oculta la cuenta incluso si tambien aparece en `batch.json`.
+
 `Recuperar ejecucion (N)` abre un selector ordenado por fecha con el nombre,
 batch id, estado y resumen de cuentas de cada lote que conserva trabajo
 reanudable. `Reanudar seleccionado` reconstruye `Lote actual` desde SQLite y
@@ -272,6 +278,8 @@ los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.
 `Agregar / Actualizar` incorpora la cuenta al lote y la registra inmediatamente
 en el catalogo global. En `account_history`, estos datos se guardan como
 `user_ig_id = ownerId`, `field1 = path` y `field2 = startInitDate`.
+`path` es un combobox editable que propone, sin duplicados, los paths ya
+guardados en `account_history.field1`.
 Además, la GUI guarda dentro de las cuentas del batch si eran nuevas y sus
 parámetros de renombrado. Así, al recuperar un lote, el botón `Renombrar`
 conserva exactamente los bloques `--new-account` que le correspondían.
@@ -287,6 +295,13 @@ La tabla `Lote actual` se actualiza periódicamente desde SQLite durante el
 proceso. Las cuentas completadas aparecen en verde, los reintentos en ámbar,
 la cuenta en curso en azul, las pendientes en gris y los fallos en rojo. El
 resumen indica cuántas están completas, en reintento y por terminar.
+Al iniciar el lote, sus filas adoptan el orden persistido de procesamiento:
+primero cuentas que solo descargan stories y despues menor numero de URLs. Los
+refrescos conservan la seleccion. Durante una ejecucion, `Eliminar` permanece
+disponible para cuentas pendientes o en proceso; tras confirmar, marca la
+cuenta `FAILED` y sus URLs no terminales `FAILED_FINAL` con error
+`MANUAL_ACCOUNT_REMOVAL`, sin borrar trazabilidad ni detener las demas cuentas.
+Los botones `Subir`, `Bajar` y `Duplicar` estan ocultos en esta version.
 
 `Cancelar proceso` termina el subproceso y, cuando éste se cierra, marca el
 batch como `PARTIAL`. No reinicia ni elimina estados: las cuentas y URL jobs
@@ -301,6 +316,13 @@ plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
 START_INIT_DATE PATH` por cada fila marcada como nueva y finalmente aplica
 `--no-duplicated --move-renamed`. Las rutas con espacios se transmiten como un
 unico argumento y toda la salida se muestra en la misma consola con timestamp.
+Justo antes de construir el comando, la GUI vuelve a leer el lote desde
+SQLite; por ello una cancelacion, cierre y recuperacion conserva `ownerId`,
+`path`, `startInitDate` y el flag de cuenta nueva.
+
+La ventana inicial ocupa la mitad izquierda de la pantalla (960x1000 en un
+monitor 1920x1080), usa columnas compactas y muestra scroll vertical fino en
+`Lote actual` y en la caja de estado.
 
 Ejemplo con dos cuentas nuevas:
 

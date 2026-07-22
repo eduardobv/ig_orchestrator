@@ -203,10 +203,56 @@ def mark_batch_interrupted(connection: Connection, batch_id: int) -> None:
     connection.commit()
 
 
+def fail_account_manually(
+    connection: Connection,
+    *,
+    batch_id: int,
+    account_id: int,
+) -> int:
+    """Stop one pending/processing account without deleting its audit trail."""
+    account = connection.execute(
+        "SELECT id, status FROM accounts WHERE id = ? AND batch_id = ?",
+        (account_id, batch_id),
+    ).fetchone()
+    if account is None:
+        raise ValueError(f"Account {account_id} does not belong to batch {batch_id}")
+    if str(account["status"]) not in {"PENDING", "PROCESSING", "PARTIAL"}:
+        raise ValueError(
+            "Only pending or processing accounts can be removed from a running batch"
+        )
+
+    cursor = connection.execute(
+        """
+        UPDATE url_jobs
+        SET status = 'FAILED_FINAL',
+            last_error = 'Account removed manually from GUI',
+            last_error_type = 'MANUAL_ACCOUNT_REMOVAL',
+            non_retryable = 1,
+            next_retry_at = NULL,
+            finished_at = COALESCE(finished_at, datetime('now')),
+            updated_at = datetime('now')
+        WHERE account_id = ?
+          AND status NOT IN ('COMPLETED', 'FAILED_FINAL')
+        """,
+        (account_id,),
+    )
+    connection.execute(
+        """
+        UPDATE accounts
+        SET status = 'FAILED', updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (account_id,),
+    )
+    connection.commit()
+    return int(cursor.rowcount)
+
+
 __all__ = [
     "AccountRuntimeProgress",
     "PendingBatchSummary",
     "finish_batch",
+    "fail_account_manually",
     "get_account_runtime_progress",
     "list_pending_batches",
     "load_batch_draft",

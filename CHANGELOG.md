@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.26.5 - Patch - Control de cuentas y ajustes de GUI
+
+Fecha: 2026-07-22
+
+### Creado
+
+* `tasks/Patch_v1.26.5.md` documenta el alcance del patch.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` ajusta la ventana a media pantalla, compacta
+  `Lote actual`, agrega scrollbars, conserva la seleccion durante el refresco,
+  muestra el orden persistido al ejecutar y oculta los botones de reordenado.
+* El catalogo incorpora click derecho `Abrir` / `Delete`; la baja usa
+  `account_history.status = DISABLED` y no elimina datos.
+* El campo `path` de `New account` es ahora un combobox editable con valores
+  distintos de `account_history.field1`.
+* La recuperacion y `Renombrar` releen desde SQLite la fecha global, el flag de
+  cuenta nueva, `ownerId`, `startInitDate` y `path`, evitando depender del
+  borrador en memoria despues de cancelar y reanudar.
+* `Eliminar` permanece activo durante un lote para marcar una cuenta pendiente
+  o en proceso como `FAILED` y sus jobs no terminales como `FAILED_FINAL`, con
+  `MANUAL_ACCOUNT_REMOVAL`; los orquestadores respetan esa baja cooperativa.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen el comportamiento.
+  Version del paquete actualizada a `1.26.5`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest tests/test_gui_services.py tests/test_account_orchestrator.py
+  tests/test_batch_orchestrator.py -q` (`52 passed`).
+* `python -m pytest -q` (`181 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check` (solo avisos de normalizacion LF/CRLF).
+
 ## v1.26.4 - Patch - Recuperacion y seguimiento de batches desde GUI
 
 Fecha: 2026-07-19
