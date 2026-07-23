@@ -18,6 +18,7 @@ from ig_orchestrator.db import (
 from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
     InstagramOrchestratorApp,
+    _batch_mode_details,
     _half_screen_geometry,
     _instagram_profile_url,
     _open_chrome_tab,
@@ -291,6 +292,142 @@ def test_gui_treeview_state_uses_ttk_state_api() -> None:
     _set_ttk_enabled(widget, False)
 
     assert state_calls == [("!disabled",), ("disabled",)]
+
+
+def test_gui_batch_mode_distinguishes_new_and_registered_drafts() -> None:
+    assert _batch_mode_details(
+        saved_batch_id=None,
+        active_batch_id=None,
+        batch_name="new_batch",
+    ) == (
+        "Modo: NUEVO LOTE (sin registrar y sin ID)",
+        "Registrar lote nuevo",
+        "Ejecutar lote nuevo",
+        True,
+    )
+
+    context, register_text, execute_text, enabled = _batch_mode_details(
+        saved_batch_id=37,
+        active_batch_id=37,
+        batch_name="saved_batch",
+    )
+
+    assert context == (
+        "Modo: EDITANDO LOTE REGISTRADO — saved_batch (ID: 37)"
+    )
+    assert register_text == "Actualizar lote"
+    assert execute_text == "Ejecutar lote ID 37"
+    assert enabled is True
+
+
+def test_gui_batch_mode_locks_an_already_started_batch() -> None:
+    context, register_text, execute_text, enabled = _batch_mode_details(
+        saved_batch_id=None,
+        active_batch_id=91,
+        batch_name="running_batch",
+    )
+
+    assert context == (
+        "Modo: LOTE YA INICIADO — running_batch (ID: 91). "
+        "Pulsa «Nuevo lote» para registrar otro."
+    )
+    assert register_text == "Lote no editable"
+    assert execute_text == "Ejecución iniciada"
+    assert enabled is False
+
+
+def test_gui_new_batch_detaches_registered_id_and_clears_editors() -> None:
+    class FakeRunner:
+        @staticmethod
+        def is_running() -> bool:
+            return False
+
+    class FakeVar:
+        def __init__(self, value=None) -> None:
+            self.value = value
+
+        def set(self, value) -> None:
+            self.value = value
+
+    class FakeTree:
+        @staticmethod
+        def selection() -> tuple[str, ...]:
+            return ("0",)
+
+        @staticmethod
+        def selection_remove(*_items: str) -> None:
+            return None
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.process_runner = FakeRunner()
+    app.saved_batch_id = 12
+    app.saved_draft_signature = ("old",)
+    app.active_batch_id = 12
+    app.runtime_progress = {"old": object()}
+    app.batch_ready_for_rename = True
+    app.rename_new_accounts = (object(),)
+    app.last_run_was_dry_run = True
+    app.cancel_requested = True
+    app.active_process_kind = "batch"
+    app.batch_name_var = FakeVar("old_batch")
+    app.default_date_var = FakeVar("2026-07-01")
+    app.accounts = [AccountDraft(username="old", download_stories=True)]
+    app.selected_index = 0
+    app.tree = FakeTree()
+    app.account_progress_var = FakeVar()
+    app.item_progress_var = FakeVar()
+    app.rename_button = type(
+        "FakeButton",
+        (),
+        {"configure": lambda self, **_kwargs: None},
+    )()
+    calls: list[str] = []
+    app._clear_editor = lambda: calls.append("editor")
+    app._refresh_table = lambda: calls.append("table")
+    app._update_batch_context = lambda: calls.append("context")
+    app._set_status = lambda text: calls.append(text)
+    app._write_console = lambda text: calls.append(text)
+
+    app._start_new_batch()
+
+    assert app.saved_batch_id is None
+    assert app.active_batch_id is None
+    assert app.accounts == []
+    assert app.runtime_progress == {}
+    assert app.batch_name_var.value.startswith("descargas_")
+    assert calls[:3] == ["editor", "table", "context"]
+    assert "Nuevo lote sin registrar" in calls
+
+
+def test_gui_delete_all_warns_with_registered_batch_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompts: list[tuple[str, str]] = []
+
+    class FakeVar:
+        @staticmethod
+        def get() -> str:
+            return "registered_batch"
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.saved_batch_id = 44
+    app.batch_name_var = FakeVar()
+    app.accounts = [AccountDraft(username="one", download_stories=True)]
+    app.selected_index = 0
+    app._refresh_table = lambda: None
+    app._clear_editor = lambda: None
+    app._set_status = lambda _text: None
+    monkeypatch.setattr(
+        "ig_orchestrator.gui.app.messagebox.askyesno",
+        lambda title, message: prompts.append((title, message)) or True,
+    )
+
+    app._delete_all_accounts()
+
+    assert app.accounts == []
+    assert "Nombre: registered_batch" in prompts[0][1]
+    assert "ID: 44" in prompts[0][1]
+    assert "Actualizar lote" in prompts[0][1]
 
 
 def test_gui_run_continue_command_uses_current_python_and_batch_id() -> None:
@@ -579,6 +716,31 @@ def test_gui_saved_draft_can_be_updated_then_is_locked_when_executed(
             save_batch_draft(original, connection, batch_id=saved.batch.id)
         with pytest.raises(ValueError, match="Only saved DRAFT"):
             delete_draft_batch(connection, saved.batch.id)
+
+
+def test_gui_registered_draft_can_remove_all_accounts_and_be_recovered(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    original = BatchDraft(
+        batch_name="empty_after_update",
+        default_start_now_date="2026-07-23",
+        accounts=[AccountDraft(username="remove_me", download_stories=True)],
+    )
+    empty = BatchDraft(
+        batch_name="empty_after_update",
+        default_start_now_date="2026-07-23",
+        accounts=[],
+    )
+
+    with connect(db_path) as connection:
+        created = save_batch_draft(original, connection)
+        updated = save_batch_draft(empty, connection, batch_id=created.batch.id)
+
+        assert updated.accounts == ()
+        assert AccountRepository(connection).list_by_batch(created.batch.id) == []
+        assert load_batch_draft(connection, created.batch.id) == empty
 
 
 def test_gui_can_delete_only_unexecuted_saved_draft(tmp_path: Path) -> None:

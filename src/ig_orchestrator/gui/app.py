@@ -105,6 +105,7 @@ class InstagramOrchestratorApp:
         self.owner_id_var = tk.StringVar()
         self.start_init_date_var = tk.StringVar()
         self.destination_path_var = tk.StringVar()
+        self.batch_context_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Ready")
         self.account_progress_var = tk.StringVar(value="Cuentas: -")
         self.item_progress_var = tk.StringVar(value="Items: -")
@@ -119,9 +120,11 @@ class InstagramOrchestratorApp:
         )
         self.root.minsize(860, 680)
         self._build_widgets()
+        self.batch_name_var.trace_add("write", lambda *_: self._update_batch_context())
         self._refresh_catalog()
         self._refresh_table()
         self._update_pending_button_label()
+        self._update_batch_context()
 
     def _build_widgets(self) -> None:
         ttk.Style(self.root).configure("Thin.Vertical.TScrollbar", width=8)
@@ -144,18 +147,25 @@ class InstagramOrchestratorApp:
         ttk.Checkbutton(top, text="Dry-run", variable=self.dry_run_var).grid(
             row=0, column=4, sticky="w", padx=(0, 12)
         )
-        self.register_button = ttk.Button(
-            top, text="Registrar lote", command=self._save_batch
+        self.new_batch_button = ttk.Button(
+            top, text="Nuevo lote", command=self._start_new_batch
         )
-        self.register_button.grid(row=0, column=5, padx=(0, 6))
+        self.new_batch_button.grid(row=0, column=5, padx=(0, 6))
+        self.register_button = ttk.Button(top, command=self._save_batch)
+        self.register_button.grid(row=0, column=6, padx=(0, 6))
         self.pending_button = ttk.Button(
             top,
             text="Recuperar ejecucion",
             command=self._open_pending_batches,
         )
-        self.pending_button.grid(row=0, column=6, padx=(0, 6))
+        self.pending_button.grid(row=0, column=7, padx=(0, 6))
         self.execute_button = ttk.Button(top, text="Ejecutar", command=self._execute)
-        self.execute_button.grid(row=0, column=7)
+        self.execute_button.grid(row=0, column=8)
+        ttk.Label(
+            top,
+            textvariable=self.batch_context_var,
+            font=("TkDefaultFont", 9, "bold"),
+        ).grid(row=1, column=0, columnspan=9, sticky="w", pady=(7, 0))
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.body_region = body
@@ -239,7 +249,9 @@ class InstagramOrchestratorApp:
     def _build_batch_table(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
         parent.columnconfigure(0, weight=1)
-        ttk.Label(parent, text="Lote actual").grid(row=0, column=0, sticky="w")
+        ttk.Label(parent, text="Cuentas del lote actual").grid(
+            row=0, column=0, sticky="w"
+        )
         self.tree = ttk.Treeview(
             parent,
             columns=("username", "stories", "urls", "start_date", "status"),
@@ -281,7 +293,12 @@ class InstagramOrchestratorApp:
             parent, text="Eliminar", command=self._delete_selected
         )
         self.delete_button.grid(row=2, column=0, sticky="ew", padx=(0, 4))
-        ttk.Button(parent, text="Limpiar lote", command=self._clear_batch).grid(
+        self.delete_all_button = ttk.Button(
+            parent,
+            text="Eliminar todo",
+            command=self._delete_all_accounts,
+        )
+        self.delete_all_button.grid(
             row=2, column=1, columnspan=2, sticky="ew"
         )
 
@@ -672,11 +689,56 @@ class InstagramOrchestratorApp:
         )
         self._refresh_runtime_progress()
 
-    def _clear_batch(self) -> None:
+    def _delete_all_accounts(self) -> None:
+        if self.saved_batch_id is not None:
+            batch_name = self.batch_name_var.get().strip()
+            if not messagebox.askyesno(
+                "Eliminar todas las cuentas",
+                "Se eliminarán todas las cuentas del lote ya registrado con:\n\n"
+                f"Nombre: {batch_name}\n"
+                f"ID: {self.saved_batch_id}\n\n"
+                "El cambio quedará pendiente hasta pulsar «Actualizar lote».",
+            ):
+                return
         self.accounts.clear()
         self.selected_index = None
         self._refresh_table()
         self._clear_editor()
+        if self.saved_batch_id is not None:
+            self._set_status(
+                f"Todas las cuentas eliminadas; actualiza el lote {self.saved_batch_id}"
+            )
+
+    def _start_new_batch(self) -> None:
+        """Leave any loaded batch untouched in SQLite and open a clean draft."""
+
+        if self.process_runner.is_running():
+            return
+        self.saved_batch_id = None
+        self.saved_draft_signature = None
+        self.active_batch_id = None
+        self.runtime_progress = {}
+        self.batch_ready_for_rename = False
+        self.rename_new_accounts = ()
+        self.last_run_was_dry_run = False
+        self.cancel_requested = False
+        self.active_process_kind = None
+        self.batch_name_var.set(_suggest_batch_name())
+        today = date.today().isoformat()
+        self.default_date_var.set(today)
+        self.accounts.clear()
+        self.selected_index = None
+        self.tree.selection_remove(*self.tree.selection())
+        self._clear_editor()
+        self._refresh_table()
+        self.account_progress_var.set("Cuentas: -")
+        self.item_progress_var.set("Items: -")
+        self.rename_button.configure(state="disabled")
+        self._update_batch_context()
+        self._set_status("Nuevo lote sin registrar")
+        self._write_console(
+            "Nuevo lote iniciado. El lote anterior permanece sin cambios en SQLite.\n"
+        )
 
     def _clear_editor(self) -> None:
         self.selected_index = None
@@ -853,8 +915,7 @@ class InstagramOrchestratorApp:
                 messagebox.showerror("Borrar lote", str(exc), parent=dialog)
                 return
             if self.saved_batch_id == summary.batch_id:
-                self.saved_batch_id = None
-                self.saved_draft_signature = None
+                self._start_new_batch()
             reload_rows()
             self._update_pending_button_label()
 
@@ -913,6 +974,25 @@ class InstagramOrchestratorApp:
         total = len(list_managed_batches(self.connection))
         self.pending_button.configure(text=f"Lotes / ejecuciones ({total})")
 
+    def _update_batch_context(self) -> None:
+        context, register_text, execute_text, actions_enabled = _batch_mode_details(
+            saved_batch_id=self.saved_batch_id,
+            active_batch_id=self.active_batch_id,
+            batch_name=self.batch_name_var.get(),
+        )
+        self.batch_context_var.set(context)
+        self.register_button.configure(
+            text=register_text,
+            state="normal" if actions_enabled else "disabled",
+        )
+        self.execute_button.configure(
+            text=execute_text,
+            state="normal" if actions_enabled else "disabled",
+        )
+        self.delete_all_button.configure(
+            state="normal" if actions_enabled else "disabled"
+        )
+
     def _load_persisted_draft(self, batch_id: int, draft: BatchDraft) -> None:
         self.batch_name_var.set(draft.batch_name)
         self.default_date_var.set(draft.default_start_now_date)
@@ -925,6 +1005,7 @@ class InstagramOrchestratorApp:
         self._clear_editor()
         self.tree.selection_remove(*self.tree.selection())
         self._refresh_runtime_progress()
+        self._update_batch_context()
         self._write_console(
             f"Lote {batch_id} recuperado desde SQLite: {draft.batch_name}.\n"
         )
@@ -953,6 +1034,7 @@ class InstagramOrchestratorApp:
         self.active_batch_id = result.batch.id
         self.saved_draft_signature = _draft_signature(draft)
         self._refresh_runtime_progress()
+        self._update_batch_context()
         self._write_console(
             f"Lote guardado: {result.batch.batch_name} (id={result.batch.id}, estado=DRAFT)\n"
             f"SQLite database: {self.settings.sqlite_db_path}\n"
@@ -972,6 +1054,12 @@ class InstagramOrchestratorApp:
             default_start_now_date=self.default_date_var.get(),
             accounts=list(self.accounts),
         )
+        if not draft.accounts:
+            messagebox.showerror(
+                "Ejecución",
+                "No se puede ejecutar un lote vacío. Agrega al menos una cuenta.",
+            )
+            return
         batch_id = (
             self.saved_batch_id
             if self.saved_batch_id is not None
@@ -1017,6 +1105,7 @@ class InstagramOrchestratorApp:
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
         self.last_run_was_dry_run = self.dry_run_var.get()
         self.active_batch_id = batch_id
+        self._update_batch_context()
         self.cancel_requested = False
         self.active_process_kind = "batch"
         self.rename_button.configure(state="disabled")
@@ -1232,6 +1321,8 @@ class InstagramOrchestratorApp:
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
         )
+        if not running:
+            self._update_batch_context()
         self._set_status("Ejecutando..." if running else self.status_var.get())
 
     def _set_descendants_enabled(self, parent: tk.Misc, enabled: bool) -> None:
@@ -1260,7 +1351,41 @@ class InstagramOrchestratorApp:
 
 
 def _suggest_batch_name() -> str:
-    return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M')}"
+    return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
+
+
+def _batch_mode_details(
+    *,
+    saved_batch_id: int | None,
+    active_batch_id: int | None,
+    batch_name: str,
+) -> tuple[str, str, str, bool]:
+    """Return explicit GUI labels for new, editable and already-started batches."""
+
+    normalized_name = batch_name.strip() or "(sin nombre)"
+    if saved_batch_id is not None:
+        return (
+            "Modo: EDITANDO LOTE REGISTRADO — "
+            f"{normalized_name} (ID: {saved_batch_id})",
+            "Actualizar lote",
+            f"Ejecutar lote ID {saved_batch_id}",
+            True,
+        )
+    if active_batch_id is not None:
+        return (
+            "Modo: LOTE YA INICIADO — "
+            f"{normalized_name} (ID: {active_batch_id}). "
+            "Pulsa «Nuevo lote» para registrar otro.",
+            "Lote no editable",
+            "Ejecución iniciada",
+            False,
+        )
+    return (
+        "Modo: NUEVO LOTE (sin registrar y sin ID)",
+        "Registrar lote nuevo",
+        "Ejecutar lote nuevo",
+        True,
+    )
 
 
 def _half_screen_geometry(screen_width: int, screen_height: int) -> str:

@@ -1548,6 +1548,16 @@ maestro de lotes permite recuperar, modificar y borrar únicamente ese estado.
 Al ejecutar un draft cambia a `IMPORTED` y queda bloqueado para edición; desde
 ese punto pasa al flujo normal de recuperación de ejecuciones.
 
+La GUI diferencia de forma permanente el contexto de trabajo: lote nuevo sin
+ID, lote `DRAFT` registrado en edición y lote cuya ejecución ya comenzó. Al
+recuperar un `DRAFT`, la cabecera muestra su nombre e ID y la acción de guardado
+se denomina `Actualizar lote`. `Nuevo lote` abandona ese contexto sin modificar
+SQLite, desvincula el ID y limpia las cuentas y el editor. La acción masiva se
+denomina `Eliminar todo`; si el lote ya está registrado, exige confirmación con
+su nombre e ID antes de retirar todas sus cuentas del borrador visible. Un
+`DRAFT` registrado puede persistirse vacío y recuperarse para completarlo más
+tarde, aunque nunca puede activarse ni ejecutarse sin cuentas.
+
 Después de cancelar una ejecución, el menú contextual de una cuenta permite
 completarla manualmente. Sus jobs no terminales quedan `FAILED_FINAL` con
 trazabilidad del motivo, la cuenta queda `COMPLETED` y el batch queda

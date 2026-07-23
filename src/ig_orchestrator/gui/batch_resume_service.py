@@ -139,7 +139,7 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
         "SELECT * FROM accounts WHERE batch_id = ? ORDER BY id",
         (batch_id,),
     ).fetchall()
-    if not account_rows:
+    if not account_rows and str(batch["status"]) != InputBatchStatus.DRAFT.value:
         raise ValueError(f"Batch {batch_id} has no accounts")
 
     accounts: list[AccountDraft] = []
@@ -165,7 +165,11 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
             )
         )
 
-    default_date = batch["default_start_now_date"] or account_rows[0]["start_now_date"]
+    default_date = batch["default_start_now_date"]
+    if not default_date and account_rows:
+        default_date = account_rows[0]["start_now_date"]
+    if not default_date:
+        raise ValueError(f"Batch {batch_id} has no default start date")
     return BatchDraft(
         batch_name=str(batch["batch_name"]),
         default_start_now_date=str(default_date),

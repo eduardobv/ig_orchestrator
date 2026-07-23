@@ -253,8 +253,11 @@ python -m ig_orchestrator gui
 ```
 
 El catalogo de cuentas se presenta en orden alfabetico, sin distinguir entre
-mayusculas y minusculas. `Registrar lote` valida y guarda el borrador en
-SQLite sin procesarlo. `Ejecutar` registra el lote y lanza en segundo plano:
+mayusculas y minusculas. La cabecera indica siempre uno de estos contextos:
+`NUEVO LOTE`, `EDITANDO LOTE REGISTRADO` o `LOTE YA INICIADO`. En el primero,
+`Registrar lote nuevo` crea un borrador; al abrir o guardar uno existente, el
+boton cambia a `Actualizar lote` y la cabecera muestra su nombre e ID.
+`Ejecutar lote nuevo` registra el lote y lanza en segundo plano:
 
 ```bash
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
@@ -277,6 +280,15 @@ Ejecutar` reconstruye `Lote actual` desde SQLite y lanza `run_continue` para ese
 id. `Dar por finalizado` solicita confirmacion y
 marca únicamente el batch como `COMPLETED`: deja intactas sus cuentas, URLs,
 errores y archivos, pero lo retira del selector.
+
+`Nuevo lote` cierra el contexto editable actual sin tocarlo en SQLite, vacia
+las cuentas y el editor, desvincula su ID y propone un nombre nuevo. Es la
+accion que debe usarse antes de preparar otro lote. `Eliminar todo` sustituye
+a `Limpiar lote`: en un lote nuevo vacia directamente sus cuentas; si se esta
+editando un lote registrado, primero avisa con su nombre e ID. En este ultimo
+caso la eliminacion queda en el borrador de pantalla y se persiste al pulsar
+`Actualizar lote`. Un borrador registrado puede quedar temporalmente sin
+cuentas y recuperarse despues, pero `Ejecutar` rechaza siempre un lote vacio.
 
 El editor incluye `New account`, desmarcado por defecto. Al marcarlo aparecen
 los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.

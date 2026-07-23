@@ -125,7 +125,8 @@ Panel central: lote actual
   - `Bajar`;
   - `Duplicar`;
   - `Eliminar`;
-  - `Limpiar lote`.
+  - `Eliminar todo`; si el lote ya esta registrado, confirma mostrando nombre
+    e ID antes de retirar todas las cuentas del borrador visible.
 
 Panel derecho: editor de cuenta
 
@@ -164,6 +165,12 @@ Panel inferior: ejecucion
 
 Zona superior de recuperacion:
 
+- La cabecera distingue siempre `NUEVO LOTE`, `EDITANDO LOTE REGISTRADO` y
+  `LOTE YA INICIADO`, con nombre e ID cuando existen.
+- `Nuevo lote` desvincula cualquier borrador abierto sin modificar SQLite y
+  limpia la tabla y el editor para registrar uno distinto.
+- El guardado se presenta como `Registrar lote nuevo` o `Actualizar lote`
+  segun el contexto.
 - `Lotes / ejecuciones (N)` abre un maestro con `batch date`, `batch name`,
   `batch id`, estado y resumen de cuentas.
 - Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar
@@ -211,6 +218,8 @@ boton no se habilita tras dry-run ni tras una ejecucion fallida.
 ## Reglas funcionales
 
 - No permitir ejecutar un lote vacio.
+- Permitir que un lote `DRAFT` ya registrado quede temporalmente vacio tras
+  `Eliminar todo`, de modo que pueda guardarse y recuperarse sin ejecutarlo.
 - No permitir una cuenta activa sin stories y sin URLs.
 - Permitir cuentas nuevas no presentes en el catalogo.
 - Normalizar username con `strip()`, sin `@` inicial.

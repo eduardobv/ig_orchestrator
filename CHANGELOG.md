@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.26.9 - Patch - Contexto de lote nuevo y lote registrado
+
+Fecha: 2026-07-23
+
+### Creado
+
+* `tasks/Patch_v1.26.9.md` documenta los contextos del editor y la transición
+  segura a un lote nuevo.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` muestra el contexto actual, diferencia
+  `Registrar lote nuevo` de `Actualizar lote`, agrega `Nuevo lote`, reemplaza
+  `Limpiar lote` por `Eliminar todo` y bloquea la edición de lotes ya iniciados.
+* `src/ig_orchestrator/gui/batch_draft_service.py` y
+  `src/ig_orchestrator/gui/batch_resume_service.py` permiten persistir y
+  recuperar un `DRAFT` registrado sin cuentas, manteniendo bloqueada su
+  ejecución hasta que vuelva a contener al menos una.
+* `tests/test_gui_services.py` cubre las etiquetas de contexto, el reinicio de
+  IDs y estado al crear un lote nuevo y el aviso con nombre e ID antes de
+  eliminar todas las cuentas de un lote registrado.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen el flujo actualizado.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y
+  `tests/test_package_smoke.py` actualizan la versión a `1.26.9`.
+
+### Resumen
+
+Preparar un segundo lote ya no puede reutilizar silenciosamente el ID de un
+borrador recuperado: `Nuevo lote` crea un contexto limpio y el estado visible
+indica en todo momento si el siguiente guardado crea o actualiza.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py` (`46 passed`).
+* `python -m compileall -q src tests`.
+* `python -m pytest -q` (`191 passed`).
+* `git diff --check`.
+
 ## v1.26.8 - Patch - Doble click del catálogo
 
 Fecha: 2026-07-22

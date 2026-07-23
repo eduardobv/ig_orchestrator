@@ -48,7 +48,7 @@ def save_batch_draft(
     settings: Settings | None = None,
     batch_id: int | None = None,
 ) -> BatchCreationResult:
-    request = validate_batch_draft(draft)
+    request = validate_batch_draft(draft, allow_empty=batch_id is not None)
     if batch_id is None:
         result = create_batch(
             request,
@@ -118,13 +118,17 @@ def save_new_account_to_catalog(
     )
 
 
-def validate_batch_draft(draft: BatchDraft) -> BatchCreationRequest:
+def validate_batch_draft(
+    draft: BatchDraft,
+    *,
+    allow_empty: bool = False,
+) -> BatchCreationRequest:
     batch_name = draft.batch_name.strip()
     if not batch_name:
         raise BatchDraftValidationError("Batch name must not be blank")
 
     default_date = _parse_date(draft.default_start_now_date, "default start date")
-    if not draft.accounts:
+    if not draft.accounts and not allow_empty:
         raise BatchDraftValidationError("Batch must contain at least one account")
 
     accounts = []
