@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,11 +19,15 @@ from ig_orchestrator.db import (
 )
 from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
+    _BATCH_COLUMNS,
     InstagramOrchestratorApp,
+    _batch_column_samples,
     _batch_mode_details,
+    _catalog_width_chars,
     _half_screen_geometry,
     _instagram_profile_url,
     _open_chrome_tab,
+    _play_completion_sound,
     _set_ttk_enabled,
     _latest_executed_batch_name,
     _new_account_rename_parameters,
@@ -292,6 +298,98 @@ def test_gui_treeview_state_uses_ttk_state_api() -> None:
     _set_ttk_enabled(widget, False)
 
     assert state_calls == [("!disabled",), ("disabled",)]
+
+
+def test_gui_batch_columns_follow_compact_requested_order_and_catalog_width() -> None:
+    usernames = ["short", "the_longest_catalog_account"]
+
+    assert _BATCH_COLUMNS == (
+        ("username", "Username"),
+        ("urls", "URLs"),
+        ("status", "Estado"),
+        ("stories", "Stories"),
+        ("start_date", "Start date"),
+    )
+    assert _catalog_width_chars(usernames) == len("the_longest_catalog_account")
+    assert _batch_column_samples(usernames) == {
+        "username": "the_longest_catalog_account",
+        "urls": "9999",
+        "status": "Completada 9999/9999",
+        "stories": "Stories",
+        "start_date": "0000-00-00",
+    }
+
+
+def test_gui_clear_editor_deselects_the_batch_account() -> None:
+    removed: list[tuple[str, ...]] = []
+
+    class FakeTree:
+        @staticmethod
+        def selection() -> tuple[str, ...]:
+            return ("3",)
+
+        @staticmethod
+        def selection_remove(*items: str) -> None:
+            removed.append(items)
+
+    class FakeVar:
+        def set(self, _value) -> None:
+            pass
+
+    class FakeText:
+        def delete(self, _start: str, _end: str) -> None:
+            pass
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.selected_index = 3
+    app.tree = FakeTree()
+    app.username_var = FakeVar()
+    app.account_date_var = FakeVar()
+    app.stories_var = FakeVar()
+    app.new_account_var = FakeVar()
+    app.owner_id_var = FakeVar()
+    app.start_init_date_var = FakeVar()
+    app.destination_path_var = FakeVar()
+    app.urls_text = FakeText()
+    app._toggle_new_account_fields = lambda: None
+    app._update_indicators = lambda: None
+
+    app._clear_editor()
+
+    assert app.selected_index is None
+    assert removed == [("3",)]
+
+
+def test_gui_paste_and_add_only_upserts_after_a_successful_paste() -> None:
+    app = object.__new__(InstagramOrchestratorApp)
+    calls: list[str] = []
+    app._paste_urls = lambda: True
+    app._upsert_account = lambda: calls.append("upsert")
+
+    app._paste_and_upsert()
+
+    assert calls == ["upsert"]
+    app._paste_urls = lambda: False
+    app._paste_and_upsert()
+    assert calls == ["upsert"]
+
+
+def test_gui_plays_native_completion_sound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    beeps: list[int] = []
+    bells: list[bool] = []
+    fake_winsound = SimpleNamespace(
+        MB_OK=0,
+        MessageBeep=lambda sound: beeps.append(sound),
+    )
+    monkeypatch.setitem(sys.modules, "winsound", fake_winsound)
+    root = SimpleNamespace(bell=lambda: bells.append(True))
+
+    _play_completion_sound(root)
+
+    assert beeps == [0]
+    assert bells == []
 
 
 def test_gui_batch_mode_distinguishes_new_and_registered_drafts() -> None:

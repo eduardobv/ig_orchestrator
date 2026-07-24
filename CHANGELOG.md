@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.26.10 - Patch - Flujo de alta y dimensiones del GUI
+
+Fecha: 2026-07-24
+
+### Creado
+
+* `tasks/Patch_v1.26.10.md` documenta la deseleccion del editor, el pegado
+  rapido, los anchos adaptativos y el sonido de finalizacion.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` agrega `Pegar/Agregar`, deselecciona la
+  cuenta al limpiar, reordena y dimensiona las columnas, adapta el catalogo al
+  username mas largo y reproduce el aviso sonoro al terminar un lote.
+* `tests/test_gui_services.py` cubre el nuevo comportamiento y los calculos de
+  presentacion.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen el flujo actualizado.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y
+  `tests/test_package_smoke.py` actualizan la version a `1.26.10`.
+
+### Resumen
+
+El editor permite volver de forma explicita al modo de alta, incorpora una
+accion de pegar y guardar, aprovecha mejor el ancho de la ventana y avisa
+audiblemente cuando termina el procesamiento.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py tests/test_package_smoke.py`
+  (`55 passed`).
+* `python -m pytest -q` (`195 passed`).
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
 ## v1.26.9 - Patch - Contexto de lote nuevo y lote registrado
 
 Fecha: 2026-07-23

@@ -343,8 +343,14 @@ SQLite; por ello una cancelacion, cierre y recuperacion conserva `ownerId`,
 `path`, `startInitDate` y el flag de cuenta nueva.
 
 La ventana inicial ocupa la mitad izquierda de la pantalla (960x1000 en un
-monitor 1920x1080), usa columnas compactas y muestra scroll vertical fino en
-`Lote actual` y en la caja de estado.
+monitor 1920x1080), muestra scroll vertical fino en `Lote actual` y en la caja
+de estado, y ajusta el ancho inicial del catalogo al username mas largo. La
+tabla presenta `Username`, `URLs`, `Estado`, `Stories` y `Start date`: username
+usa el mismo maximo del catalogo y el resto reserva solo su contenido maximo
+esperado.
+
+Cuando el subproceso de un lote termina, la GUI reproduce el sonido de
+finalizacion de Windows. Si no esta disponible, utiliza la campana de Tk.
 
 Ejemplo con dos cuentas nuevas:
 
@@ -359,10 +365,14 @@ vacia, sugiere un nombre nuevo con timestamp.
 Los campos `Start date` del lote y del editor de cuenta arrancan con la fecha
 de hoy. Al pulsar `Agregar / Actualizar`, el editor limpia `username`,
 `download_stories`, `New account`, sus campos condicionales y `URLs`, pero
-mantiene el `Start date` de hoy.
+mantiene el `Start date` de hoy. `Limpiar editor` tambien deselecciona cualquier
+fila de `Lote actual`, de modo que el siguiente guardado agrega una cuenta
+nueva en vez de actualizar la anterior.
 
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
-y comas. El boton `Normalizar` convierte entradas como:
+y comas. `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
+`Agregar / Actualizar`; `Pegar` conserva el flujo de revision manual. El boton
+`Normalizar` convierte entradas como:
 
 ```text
 "https://www.instagram.com/p/DaGP2rHuY0P/",

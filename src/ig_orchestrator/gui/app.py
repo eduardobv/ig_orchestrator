@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
 import re
 from sqlite3 import Connection
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 import webbrowser
 
@@ -171,6 +173,9 @@ class InstagramOrchestratorApp:
         self.body_region = body
         body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
 
+        catalog_width = _catalog_width_chars(
+            entry.username for entry in self.catalog_entries
+        )
         catalog = ttk.Frame(body, padding=6)
         batch = ttk.Frame(body, padding=6)
         editor = ttk.Frame(body, padding=6)
@@ -178,7 +183,7 @@ class InstagramOrchestratorApp:
         body.add(batch, weight=2)
         body.add(editor, weight=2)
 
-        self._build_catalog(catalog)
+        self._build_catalog(catalog, width_chars=catalog_width)
         self._build_batch_table(batch)
         self._build_editor(editor)
 
@@ -229,14 +234,18 @@ class InstagramOrchestratorApp:
         self.clean_console_button.grid(row=0, column=4, sticky="e", padx=(0, 6))
         self.cancel_button.grid(row=0, column=5, sticky="e")
 
-    def _build_catalog(self, parent: ttk.Frame) -> None:
+    def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
         parent.rowconfigure(2, weight=1)
         parent.columnconfigure(0, weight=1)
         ttk.Label(parent, text="Catalogo").grid(row=0, column=0, sticky="w")
         filter_entry = ttk.Entry(parent, textvariable=self.catalog_filter_var)
         filter_entry.grid(row=1, column=0, sticky="ew", pady=(6, 6))
         self.catalog_filter_var.trace_add("write", lambda *_: self._refresh_catalog())
-        self.catalog_list = tk.Listbox(parent, exportselection=False)
+        self.catalog_list = tk.Listbox(
+            parent,
+            exportselection=False,
+            width=width_chars,
+        )
         self.catalog_list.grid(row=2, column=0, sticky="nsew")
         self.catalog_list.bind(
             "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
@@ -254,17 +263,20 @@ class InstagramOrchestratorApp:
         )
         self.tree = ttk.Treeview(
             parent,
-            columns=("username", "stories", "urls", "start_date", "status"),
+            columns=tuple(column for column, _title in _BATCH_COLUMNS),
             show="headings",
             selectmode="browse",
         )
-        for column, title, width in (
-            ("username", "Username", 118),
-            ("stories", "Stories", 53),
-            ("urls", "URLs", 38),
-            ("start_date", "Start date", 82),
-            ("status", "Estado", 76),
-        ):
+        style = ttk.Style(self.root)
+        tree_font = tkfont.Font(
+            root=self.root,
+            font=style.lookup("Treeview", "font") or "TkDefaultFont",
+        )
+        column_samples = _batch_column_samples(
+            entry.username for entry in self.catalog_entries
+        )
+        for column, title in _BATCH_COLUMNS:
+            width = tree_font.measure(column_samples[column]) + 16
             self.tree.heading(column, text=title)
             self.tree.column(column, width=width, minwidth=width, anchor="w")
         self.tree.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(6, 6))
@@ -374,17 +386,24 @@ class InstagramOrchestratorApp:
         ttk.Label(parent, textvariable=self.indicators_var).grid(
             row=6, column=1, columnspan=2, sticky="w", pady=(6, 0)
         )
-        ttk.Button(parent, text="Pegar", command=self._paste_urls).grid(
+        ttk.Button(
+            parent,
+            text="Pegar/Agregar",
+            command=self._paste_and_upsert,
+        ).grid(
             row=7, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
         )
+        ttk.Button(parent, text="Pegar", command=self._paste_urls).grid(
+            row=8, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
+        )
         ttk.Button(parent, text="Normalizar", command=self._normalize_urls).grid(
-            row=7, column=1, sticky="ew", pady=(8, 0), padx=(0, 4)
+            row=8, column=1, sticky="ew", pady=(8, 0), padx=(0, 4)
         )
         ttk.Button(parent, text="Agregar / Actualizar", command=self._upsert_account).grid(
-            row=7, column=2, sticky="ew", pady=(8, 0)
+            row=8, column=2, sticky="ew", pady=(8, 0)
         )
         ttk.Button(parent, text="Limpiar editor", command=self._clear_editor).grid(
-            row=8, column=1, columnspan=2, sticky="ew", pady=(8, 0)
+            row=9, column=1, columnspan=2, sticky="ew", pady=(8, 0)
         )
 
     def _toggle_new_account_fields(self) -> None:
@@ -459,10 +478,10 @@ class InstagramOrchestratorApp:
             iid = str(index)
             values = (
                 account.username,
-                "si" if account.download_stories else "no",
                 len([url for url in account.urls if url.strip()]),
-                account.start_now_date or self.default_date_var.get(),
                 status,
+                "si" if account.download_stories else "no",
+                account.start_now_date or self.default_date_var.get(),
             )
             if self.tree.exists(iid):
                 self.tree.item(iid, values=values, tags=(tag,))
@@ -742,6 +761,9 @@ class InstagramOrchestratorApp:
 
     def _clear_editor(self) -> None:
         self.selected_index = None
+        selection = self.tree.selection()
+        if selection:
+            self.tree.selection_remove(*selection)
         self.username_var.set("")
         self.account_date_var.set(date.today().isoformat())
         self.stories_var.set(False)
@@ -753,13 +775,18 @@ class InstagramOrchestratorApp:
         self.urls_text.delete("1.0", tk.END)
         self._update_indicators()
 
-    def _paste_urls(self) -> None:
+    def _paste_urls(self) -> bool:
         try:
             text = self.root.clipboard_get()
         except tk.TclError:
-            return
+            return False
         self.urls_text.insert(tk.INSERT, text)
         self._update_indicators()
+        return True
+
+    def _paste_and_upsert(self) -> None:
+        if self._paste_urls():
+            self._upsert_account()
 
     def _normalize_urls(self) -> None:
         urls = normalize_url_lines(self.urls_text.get("1.0", tk.END).splitlines())
@@ -1181,6 +1208,7 @@ class InstagramOrchestratorApp:
         self.cancel_requested = False
         self.active_process_kind = None
         self._update_pending_button_label()
+        _play_completion_sound(self.root)
 
     def _complete_selected_account(self) -> None:
         if self.process_runner.is_running():
@@ -1392,6 +1420,51 @@ def _half_screen_geometry(screen_width: int, screen_height: int) -> str:
     width = max(860, screen_width // 2)
     height = max(680, screen_height - 80)
     return f"{width}x{height}+0+0"
+
+
+_BATCH_COLUMNS = (
+    ("username", "Username"),
+    ("urls", "URLs"),
+    ("status", "Estado"),
+    ("stories", "Stories"),
+    ("start_date", "Start date"),
+)
+
+
+def _catalog_width_chars(usernames: Iterable[str]) -> int:
+    """Return the initial catalog width in Tk character units."""
+    return max(
+        (len(str(username)) for username in usernames),
+        default=len("Catalogo"),
+    )
+
+
+def _batch_column_samples(usernames: Iterable[str]) -> dict[str, str]:
+    """Return the longest expected visible value for every batch column."""
+    username_values = ["Username", *(str(username) for username in usernames)]
+    longest_username = max(username_values, key=lambda value: (len(value), value))
+    return {
+        "username": longest_username,
+        "urls": "9999",
+        "status": "Completada 9999/9999",
+        "stories": "Stories",
+        "start_date": "0000-00-00",
+    }
+
+
+def _play_completion_sound(root: tk.Misc) -> None:
+    """Play the native Windows completion sound, with Tk's bell as fallback."""
+    try:
+        import winsound
+
+        winsound.MessageBeep(winsound.MB_OK)
+        return
+    except (ImportError, OSError, RuntimeError):
+        pass
+    try:
+        root.bell()
+    except tk.TclError:
+        pass
 
 
 def _instagram_profile_url(username: str) -> str:

@@ -115,10 +115,13 @@ Panel central: lote actual
 
 - Tabla `ttk.Treeview` con columnas:
   - username;
-  - stories: si/no;
   - urls: contador;
-  - start date;
   - estado de validacion.
+  - stories: si/no;
+  - start date.
+- El ancho de `username` se ajusta a la cuenta mas larga del catalogo. `urls`
+  reserva cuatro digitos, `estado` reserva `Completada 9999/9999`, `stories`
+  queda compacto y `start date` reserva diez caracteres.
 - Seleccionar una fila carga sus datos en el editor.
 - Botones:
   - `Subir`;
@@ -140,10 +143,13 @@ Panel derecho: editor de cuenta
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea.
 - Botones:
+  - `Pegar/Agregar`, que pega el portapapeles y ejecuta
+    `Agregar / Actualizar`;
   - `Pegar`;
   - `Normalizar`;
   - `Agregar / Actualizar`;
-  - `Limpiar editor`.
+  - `Limpiar editor`, que tambien deselecciona la fila de `Lote actual` para
+    que la siguiente accion agregue una cuenta en vez de reemplazarla.
 - Indicadores compactos:
   - total URLs;
   - duplicadas;
@@ -210,7 +216,10 @@ SQLite para que tambien se incluyan despues de cancelar y recuperar el batch.
 
 La geometria inicial ocupa la mitad izquierda de un monitor 1920x1080, las
 columnas del lote son compactas y tanto el lote como la consola tienen scroll
-vertical fino.
+vertical fino. El ancho inicial del catalogo se ajusta al username mas largo.
+
+Al terminar la ejecucion de un lote, la GUI reproduce el sonido de finalizacion
+del sistema.
 
 La salida combinada del renombrador se transmite a la consola de estado. El
 boton no se habilita tras dry-run ni tras una ejecucion fallida.

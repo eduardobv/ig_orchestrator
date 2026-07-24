@@ -1568,3 +1568,11 @@ un dry-run.
 La ausencia total de respuesta del bot se clasifica como `NO_BOT_RESPONSE`, se
 reintenta por rondas y termina como `FAILED_FINAL` al agotar `MAX_RETRIES`, sin
 detener el procesamiento posterior.
+
+El editor de cuenta deselecciona la fila activa al limpiarse, por lo que el
+siguiente guardado crea una cuenta adicional. Tambien ofrece `Pegar/Agregar`
+para pegar URLs y guardarlas en una sola accion. `Lote actual` ordena sus
+columnas como `Username`, `URLs`, `Estado`, `Stories`, `Start date`; los anchos
+compactos y el panel del catalogo se calculan usando los maximos visibles y el
+username mas largo. Al finalizar la ejecucion de un lote, la GUI reproduce el
+sonido de finalizacion del sistema.
