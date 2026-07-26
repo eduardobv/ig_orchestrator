@@ -263,8 +263,8 @@ boton cambia a `Actualizar lote` y la cabecera muestra su nombre e ID.
 python -m ig_orchestrator run_continue --batch-id BATCH_ID
 ```
 
-El doble click sobre una cuenta del catalogo carga el username seleccionado en
-el editor y abre su perfil. El click derecho
+Un click izquierdo sobre una cuenta del catalogo carga el username seleccionado
+en el editor. El doble click, ademas, abre su perfil. El click derecho
 ofrece la misma accion `Abrir`, que intenta abrirlo en una pestaña de Chrome
 activo (y usa el navegador
 predeterminado como fallback), y `Delete`.
@@ -292,7 +292,7 @@ cuentas y recuperarse despues, pero `Ejecutar` rechaza siempre un lote vacio.
 
 El editor incluye `New account`, desmarcado por defecto. Al marcarlo aparecen
 los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.
-`Agregar / Actualizar` incorpora la cuenta al lote y la registra inmediatamente
+`Agregar/Actualizar` incorpora la cuenta al lote y la registra inmediatamente
 en el catalogo global. En `account_history`, estos datos se guardan como
 `user_ig_id = ownerId`, `field1 = path` y `field2 = startInitDate`.
 `path` es un combobox editable que propone, sin duplicados, los paths ya
@@ -343,11 +343,13 @@ SQLite; por ello una cancelacion, cierre y recuperacion conserva `ownerId`,
 `path`, `startInitDate` y el flag de cuenta nueva.
 
 La ventana inicial ocupa la mitad izquierda de la pantalla (960x1000 en un
-monitor 1920x1080), muestra scroll vertical fino en `Lote actual` y en la caja
-de estado, y ajusta el ancho inicial del catalogo al username mas largo. La
-tabla presenta `Username`, `URLs`, `Estado`, `Stories` y `Start date`: username
-usa el mismo maximo del catalogo y el resto reserva solo su contenido maximo
-esperado.
+monitor 1920x1080). El catalogo permanece a la izquierda; a su derecha, el
+`Editor` ocupa la zona superior y `Cuentas del lote actual` la inferior, justo
+antes de la caja de estado. `URLs`, `Cuentas del lote actual` y la caja de
+estado muestran scroll vertical permanente y visible. El ancho inicial del
+catalogo se ajusta al username mas largo. La tabla presenta `Username`, `URLs`,
+`Estado`, `Stories` y `Start date`: username usa el mismo maximo del catalogo y
+el resto reserva solo su contenido maximo esperado.
 
 Cuando el subproceso de un lote termina, la GUI reproduce el sonido de
 finalizacion de Windows. Si no esta disponible, utiliza la campana de Tk.
@@ -363,16 +365,19 @@ SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta
 vacia, sugiere un nombre nuevo con timestamp.
 
 Los campos `Start date` del lote y del editor de cuenta arrancan con la fecha
-de hoy. Al pulsar `Agregar / Actualizar`, el editor limpia `username`,
-`download_stories`, `New account`, sus campos condicionales y `URLs`, pero
+de hoy. El checkbox de descarga de stories se muestra como `Stories`. Al pulsar
+`Agregar/Actualizar`, el editor limpia `username`, `Stories`, `New account`,
+sus campos condicionales y `URLs`, pero
 mantiene el `Start date` de hoy. `Limpiar editor` tambien deselecciona cualquier
 fila de `Lote actual`, de modo que el siguiente guardado agrega una cuenta
 nueva en vez de actualizar la anterior.
 
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
 y comas. `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
-`Agregar / Actualizar`; `Pegar` conserva el flujo de revision manual. El boton
-`Normalizar` convierte entradas como:
+`Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Todas las
+acciones quedan en una columna a la izquierda del editor, en este orden:
+`Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, separador, `Normalizar` y
+`Limpiar editor`. El boton `Normalizar` convierte entradas como:
 
 ```text
 "https://www.instagram.com/p/DaGP2rHuY0P/",

@@ -286,6 +286,36 @@ def test_gui_catalog_double_click_loads_username_and_opens_profile(
     assert opened == ["https://www.instagram.com/selected_user/"]
 
 
+def test_gui_catalog_single_selection_only_loads_username() -> None:
+    applied_dates: list[bool] = []
+
+    class FakeCatalogList:
+        @staticmethod
+        def curselection() -> tuple[int]:
+            return (0,)
+
+        @staticmethod
+        def get(index: int) -> str:
+            assert index == 0
+            return "single_click_user"
+
+    class FakeStringVar:
+        value = ""
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.catalog_list = FakeCatalogList()
+    app.username_var = FakeStringVar()
+    app._apply_catalog_date = lambda: applied_dates.append(True)
+
+    app._load_catalog()
+
+    assert app.username_var.value == "single_click_user"
+    assert applied_dates == [True]
+
+
 def test_gui_treeview_state_uses_ttk_state_api() -> None:
     state_calls: list[tuple[str, ...]] = []
 

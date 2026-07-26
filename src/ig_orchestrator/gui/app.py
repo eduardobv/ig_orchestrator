@@ -129,7 +129,7 @@ class InstagramOrchestratorApp:
         self._update_batch_context()
 
     def _build_widgets(self) -> None:
-        ttk.Style(self.root).configure("Thin.Vertical.TScrollbar", width=8)
+        ttk.Style(self.root).configure("Visible.Vertical.TScrollbar", width=14)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
@@ -177,15 +177,18 @@ class InstagramOrchestratorApp:
             entry.username for entry in self.catalog_entries
         )
         catalog = ttk.Frame(body, padding=6)
-        batch = ttk.Frame(body, padding=6)
-        editor = ttk.Frame(body, padding=6)
         body.add(catalog, weight=1)
-        body.add(batch, weight=2)
-        body.add(editor, weight=2)
-
         self._build_catalog(catalog, width_chars=catalog_width)
-        self._build_batch_table(batch)
+
+        workspace = ttk.PanedWindow(body, orient=tk.VERTICAL)
+        editor = ttk.Frame(workspace, padding=6)
+        batch = ttk.Frame(workspace, padding=6)
+        workspace.add(editor, weight=3)
+        workspace.add(batch, weight=2)
+        body.add(workspace, weight=4)
+
         self._build_editor(editor)
+        self._build_batch_table(batch)
 
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
@@ -197,7 +200,7 @@ class InstagramOrchestratorApp:
             bottom,
             orient=tk.VERTICAL,
             command=self.console.yview,
-            style="Thin.Vertical.TScrollbar",
+            style="Visible.Vertical.TScrollbar",
         )
         console_scroll.grid(row=0, column=1, sticky="ns")
         self.console.configure(yscrollcommand=console_scroll.set)
@@ -248,6 +251,9 @@ class InstagramOrchestratorApp:
         )
         self.catalog_list.grid(row=2, column=0, sticky="nsew")
         self.catalog_list.bind(
+            "<ButtonRelease-1>", lambda _event: self._load_catalog()
+        )
+        self.catalog_list.bind(
             "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
         )
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
@@ -284,7 +290,7 @@ class InstagramOrchestratorApp:
             parent,
             orient=tk.VERTICAL,
             command=self.tree.yview,
-            style="Thin.Vertical.TScrollbar",
+            style="Visible.Vertical.TScrollbar",
         )
         batch_scroll.grid(row=1, column=2, sticky="ns", pady=(6, 6))
         self.tree.configure(yscrollcommand=batch_scroll.set)
@@ -315,36 +321,68 @@ class InstagramOrchestratorApp:
         )
 
     def _build_editor(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(5, weight=1)
+        parent.rowconfigure(1, weight=1)
         parent.columnconfigure(1, weight=1)
-        ttk.Label(parent, text="Editor").grid(row=0, column=0, columnspan=3, sticky="w")
-        ttk.Label(parent, text="Username").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(parent, text="Editor").grid(row=0, column=0, columnspan=2, sticky="w")
+
+        actions = ttk.Frame(parent)
+        actions.grid(row=1, column=0, sticky="nsw", padx=(0, 10), pady=(8, 0))
+        ttk.Button(
+            actions,
+            text="Agregar/Actualizar",
+            command=self._upsert_account,
+        ).grid(row=0, column=0, sticky="ew")
+        ttk.Button(
+            actions,
+            text="Pegar/Agregar",
+            command=self._paste_and_upsert,
+        ).grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(actions, text="Pegar", command=self._paste_urls).grid(
+            row=2, column=0, sticky="ew", pady=(6, 0)
+        )
+        ttk.Separator(actions, orient=tk.HORIZONTAL).grid(
+            row=3, column=0, sticky="ew", pady=10
+        )
+        ttk.Button(actions, text="Normalizar", command=self._normalize_urls).grid(
+            row=4, column=0, sticky="ew"
+        )
+        ttk.Button(actions, text="Limpiar editor", command=self._clear_editor).grid(
+            row=5, column=0, sticky="ew", pady=(6, 0)
+        )
+
+        fields = ttk.Frame(parent)
+        fields.grid(row=1, column=1, sticky="nsew", pady=(8, 0))
+        fields.rowconfigure(4, weight=1)
+        fields.columnconfigure(1, weight=1)
+        ttk.Label(fields, text="Username").grid(row=0, column=0, sticky="w")
         self.username_combo = ttk.Combobox(
-            parent,
+            fields,
             textvariable=self.username_var,
             values=[entry.username for entry in self.catalog_entries],
         )
-        self.username_combo.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(8, 0))
+        self.username_combo.grid(row=0, column=1, columnspan=2, sticky="ew")
         self.username_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_catalog_date())
         ttk.Checkbutton(
-            parent,
-            text="Download stories",
+            fields,
+            text="Stories",
             variable=self.stories_var,
             command=self._update_indicators,
-        ).grid(row=2, column=1, sticky="w", pady=(8, 0))
+        ).grid(row=1, column=1, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
-            parent,
+            fields,
             text="New account",
             variable=self.new_account_var,
             command=self._toggle_new_account_fields,
-        ).grid(row=2, column=2, sticky="w", pady=(8, 0))
-        ttk.Label(parent, text="Start date").grid(row=3, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(parent, textvariable=self.account_date_var, width=12).grid(
-            row=3, column=1, sticky="w", pady=(8, 0)
+        ).grid(row=1, column=2, sticky="w", pady=(8, 0))
+        ttk.Label(fields, text="Start date").grid(
+            row=2, column=0, sticky="w", pady=(8, 0)
+        )
+        ttk.Entry(fields, textvariable=self.account_date_var, width=12).grid(
+            row=2, column=1, sticky="w", pady=(8, 0)
         )
 
         self.new_account_frame = ttk.LabelFrame(
-            parent,
+            fields,
             text="Datos de cuenta nueva",
             padding=6,
         )
@@ -375,35 +413,28 @@ class InstagramOrchestratorApp:
             row=2, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
         )
         self.new_account_frame.grid(
-            row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0)
+            row=3, column=0, columnspan=4, sticky="ew", pady=(8, 0)
         )
         self.new_account_frame.grid_remove()
 
-        ttk.Label(parent, text="URLs").grid(row=5, column=0, sticky="nw", pady=(8, 0))
-        self.urls_text = tk.Text(parent, height=9, wrap="none")
-        self.urls_text.grid(row=5, column=1, columnspan=2, sticky="nsew", pady=(8, 0))
+        ttk.Label(fields, text="URLs").grid(
+            row=4, column=0, sticky="nw", pady=(8, 0)
+        )
+        self.urls_text = tk.Text(fields, height=9, wrap="none")
+        self.urls_text.grid(
+            row=4, column=1, columnspan=2, sticky="nsew", pady=(8, 0)
+        )
+        urls_scroll = ttk.Scrollbar(
+            fields,
+            orient=tk.VERTICAL,
+            command=self.urls_text.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        urls_scroll.grid(row=4, column=3, sticky="ns", pady=(8, 0))
+        self.urls_text.configure(yscrollcommand=urls_scroll.set)
         self.urls_text.bind("<KeyRelease>", lambda _event: self._update_indicators())
-        ttk.Label(parent, textvariable=self.indicators_var).grid(
-            row=6, column=1, columnspan=2, sticky="w", pady=(6, 0)
-        )
-        ttk.Button(
-            parent,
-            text="Pegar/Agregar",
-            command=self._paste_and_upsert,
-        ).grid(
-            row=7, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
-        )
-        ttk.Button(parent, text="Pegar", command=self._paste_urls).grid(
-            row=8, column=0, sticky="ew", pady=(8, 0), padx=(0, 4)
-        )
-        ttk.Button(parent, text="Normalizar", command=self._normalize_urls).grid(
-            row=8, column=1, sticky="ew", pady=(8, 0), padx=(0, 4)
-        )
-        ttk.Button(parent, text="Agregar / Actualizar", command=self._upsert_account).grid(
-            row=8, column=2, sticky="ew", pady=(8, 0)
-        )
-        ttk.Button(parent, text="Limpiar editor", command=self._clear_editor).grid(
-            row=9, column=1, columnspan=2, sticky="ew", pady=(8, 0)
+        ttk.Label(fields, textvariable=self.indicators_var).grid(
+            row=5, column=1, columnspan=2, sticky="w", pady=(6, 0)
         )
 
     def _toggle_new_account_fields(self) -> None:

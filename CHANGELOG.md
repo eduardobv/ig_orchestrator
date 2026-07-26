@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.26.11 - Patch - Distribucion vertical del GUI
+
+Fecha: 2026-07-26
+
+### Creado
+
+* `tasks/Patch_v1.26.11.md` documenta la nueva distribucion, el orden de las
+  acciones, los scrollbars y la seleccion simple del catalogo.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` mantiene el catalogo a la izquierda, apila
+  el editor y el lote en la zona derecha, mueve todas las acciones del editor a
+  una columna izquierda, agrega scroll visible a URLs y cambia el texto del
+  checkbox a `Stories`.
+* La seleccion simple del catalogo carga el username en el editor; el doble
+  click conserva la apertura de Instagram.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen la nueva interfaz.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y
+  `tests/test_package_smoke.py` actualizan la version a `1.26.11`.
+
+### Resumen
+
+La zona de trabajo aprovecha todo el ancho derecho para editar arriba y revisar
+el lote abajo, con acciones alineadas y scrollbars visibles en las tres areas
+solicitadas.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_package_smoke.py`
+  (`56 passed`).
+* `python -m pytest -q` (`196 passed`).
+* `python -m compileall -q src tests`.
+* Construccion temporal de la ventana Tkinter: orden de acciones correcto,
+  etiqueta `Stories`, tres scrollbars visibles y paneles horizontal/vertical.
+* `git diff --check`.
+
 ## v1.26.10 - Patch - Flujo de alta y dimensiones del GUI
 
 Fecha: 2026-07-24

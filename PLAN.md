@@ -1576,3 +1576,11 @@ columnas como `Username`, `URLs`, `Estado`, `Stories`, `Start date`; los anchos
 compactos y el panel del catalogo se calculan usando los maximos visibles y el
 username mas largo. Al finalizar la ejecucion de un lote, la GUI reproduce el
 sonido de finalizacion del sistema.
+
+El catalogo permanece a la izquierda y carga el username en el editor con una
+seleccion simple. La zona derecha apila el `Editor` arriba y `Cuentas del lote
+actual` abajo, antes del texto de estado. Las acciones del editor se muestran
+en una columna izquierda con `Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, un
+separador, `Normalizar` y `Limpiar editor`. El flag visible se denomina
+`Stories`, y `URLs`, el lote y el texto de estado mantienen scroll vertical
+permanente y visible.

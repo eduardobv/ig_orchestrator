@@ -105,13 +105,14 @@ Panel izquierdo: catalogo de cuentas
   - `account_history`;
   - `config/batch.json`;
   - opcionalmente `config/bkp/*.json` si no hay suficientes entradas en `account_history`.
-- Doble click en un username lo carga en `Editor > Username` y abre el perfil
+- Un click izquierdo en un username lo carga en `Editor > Username`.
+- El doble click tambien abre el perfil
   en una pestaña de Chrome.
 - Click derecho ofrece `Abrir` y `Delete`. `Abrir` abre el perfil en una nueva
   pestaña del navegador; `Delete` marca la cuenta `DISABLED` sin borrarla y la
   oculta del catalogo.
 
-Panel central: lote actual
+Zona derecha inferior: lote actual
 
 - Tabla `ttk.Treeview` con columnas:
   - username;
@@ -131,23 +132,24 @@ Panel central: lote actual
   - `Eliminar todo`; si el lote ya esta registrado, confirma mostrando nombre
     e ID antes de retirar todas las cuentas del borrador visible.
 
-Panel derecho: editor de cuenta
+Zona derecha superior: editor de cuenta
 
 - `Username`: combobox editable con autocomplete.
-- `Download stories`: checkbox.
+- `Stories`: checkbox.
 - `New account`: checkbox desmarcado por defecto. Al marcarlo muestra tres
   campos obligatorios: `ownerId`, `path` y `startInitDate` (`YYYY-MM-DD`).
   `path` es un combobox editable con los valores `DISTINCT` historicos de
   `account_history.field1`.
-- `Start date`: input por defecto hoy. Tras `Agregar / Actualizar`, el editor
+- `Start date`: input por defecto hoy. Tras `Agregar/Actualizar`, el editor
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea.
-- Botones:
+- Los botones forman una columna a la izquierda, nunca al pie del editor:
+  - `Agregar/Actualizar`;
   - `Pegar/Agregar`, que pega el portapapeles y ejecuta
-    `Agregar / Actualizar`;
+    `Agregar/Actualizar`;
   - `Pegar`;
+  - separador;
   - `Normalizar`;
-  - `Agregar / Actualizar`;
   - `Limpiar editor`, que tambien deselecciona la fila de `Lote actual` para
     que la siguiente accion agregue una cuenta en vez de reemplazarla.
 - Indicadores compactos:
@@ -208,15 +210,17 @@ python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDa
 ```
 
 Cada cuenta marcada como `New account` agrega su propio bloque
-`--new-account`. `Agregar / Actualizar` la incorpora al lote actual y tambien
+`--new-account`. `Agregar/Actualizar` la incorpora al lote actual y tambien
 al catalogo `account_history`, donde se conserva `ownerId`, `path` y
 `startInitDate` para consultas posteriores.
 Antes de ejecutar `Renombrar`, estos datos y la fecha global se releen desde
 SQLite para que tambien se incluyan despues de cancelar y recuperar el batch.
 
-La geometria inicial ocupa la mitad izquierda de un monitor 1920x1080, las
-columnas del lote son compactas y tanto el lote como la consola tienen scroll
-vertical fino. El ancho inicial del catalogo se ajusta al username mas largo.
+La geometria inicial ocupa la mitad izquierda de un monitor 1920x1080. El
+catalogo permanece a la izquierda y la zona derecha apila el editor arriba y el
+lote abajo, inmediatamente antes de la consola. Las columnas del lote son
+compactas y `URLs`, el lote y la consola tienen scroll vertical permanente y
+visible. El ancho inicial del catalogo se ajusta al username mas largo.
 
 Al terminar la ejecucion de un lote, la GUI reproduce el sonido de finalizacion
 del sistema.
