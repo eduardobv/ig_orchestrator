@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlite3 import Connection
 
 from ig_orchestrator.db import (
+    AccountHistoryRepository,
     AccountRepository,
     BatchRepository,
     DownloadRepository,
@@ -17,6 +18,7 @@ from ig_orchestrator.db import (
 )
 from ig_orchestrator.models import (
     Account,
+    AccountHistoryStatus,
     AccountStatus,
     InputBatch,
     InputBatchStatus,
@@ -192,6 +194,53 @@ def test_batch_orchestrator_dry_run_processes_pending_accounts_without_status_ch
     assert "Dry-run batch batch" in result.summary.summary
 
 
+def test_real_batch_reactivates_participating_inactive_account(tmp_path: Path) -> None:
+    stored = _stored_batch(tmp_path)
+    account = _create_account(stored, "returning", AccountStatus.PENDING)
+    _create_job(stored.job_repo, account.id)
+    history = AccountHistoryRepository(stored.connection)
+    history.create_or_get("returning")
+    history.set_inactive("returning")
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {account.id: AccountStatus.COMPLETED},
+    )
+
+    asyncio.run(_batch_orchestrator(stored, fake).process_batch(stored.batch.id))
+
+    assert history.get_by_user_name("returning").status is AccountHistoryStatus.ENABLED
+
+
+def test_dry_run_does_not_reactivate_inactive_account(tmp_path: Path) -> None:
+    stored = _stored_batch(tmp_path)
+    account = _create_account(stored, "still_inactive", AccountStatus.PENDING)
+    _create_job(stored.job_repo, account.id)
+    history = AccountHistoryRepository(stored.connection)
+    history.create_or_get("still_inactive")
+    history.set_inactive("still_inactive")
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {account.id: AccountStatus.COMPLETED},
+    )
+
+    asyncio.run(
+        _batch_orchestrator(
+            stored,
+            fake,
+            config=BatchOrchestratorConfig(dry_run=True),
+        ).process_batch(stored.batch.id)
+    )
+
+    assert (
+        history.get_by_user_name("still_inactive").status
+        is AccountHistoryStatus.INACTIVE
+    )
+
+
 def test_batch_orchestrator_reports_compact_account_progress(tmp_path: Path) -> None:
     stored = _stored_batch(tmp_path)
     first = _create_account(stored, "first", AccountStatus.PENDING)
@@ -323,6 +372,7 @@ def _batch_orchestrator(
     return BatchOrchestrator(
         batch_repository=stored.batch_repo,
         account_repository=stored.account_repo,
+        account_history_repository=AccountHistoryRepository(stored.connection),
         url_job_repository=stored.job_repo,
         download_repository=stored.download_repo,
         run_repository=stored.run_repo,

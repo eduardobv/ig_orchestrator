@@ -41,6 +41,12 @@ def apply_migrations(connection: Connection) -> None:
             column=column,
             definition=definition,
         )
+    _add_column_if_missing(
+        connection,
+        table="account_history",
+        column="is_favorite",
+        definition="INTEGER NOT NULL DEFAULT 0",
+    )
     duplicates = connection.execute(
         """
         SELECT batch_name, COUNT(*) AS total

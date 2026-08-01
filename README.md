@@ -252,8 +252,11 @@ La GUI local se abre con:
 python -m ig_orchestrator gui
 ```
 
-El catalogo de cuentas se presenta en orden alfabetico, sin distinguir entre
-mayusculas y minusculas. La cabecera indica siempre uno de estos contextos:
+El catalogo ordena primero las favoritas; despues las activas que tienen
+`account_history.field1`, agrupadas por esa ruta; a continuacion las activas
+sin ruta; luego las inactivas; y finalmente las desactivadas. Cada grupo ordena
+los usernames alfabeticamente sin distinguir mayusculas y minusculas. La
+cabecera indica siempre uno de estos contextos:
 `NUEVO LOTE`, `EDITANDO LOTE REGISTRADO` o `LOTE YA INICIADO`. En el primero,
 `Registrar lote nuevo` crea un borrador; al abrir o guardar uno existente, el
 boton cambia a `Actualizar lote` y la cabecera muestra su nombre e ID.
@@ -266,10 +269,13 @@ python -m ig_orchestrator run_continue --batch-id BATCH_ID
 Un click izquierdo sobre una cuenta del catalogo carga el username seleccionado
 en el editor. El doble click, ademas, abre su perfil. El click derecho
 ofrece la misma accion `Abrir`, que intenta abrirlo en una pestaña de Chrome
-activo (y usa el navegador
-predeterminado como fallback), y `Delete`.
-Esta ultima accion no borra datos: cambia `account_history.status` a
-`DISABLED` y oculta la cuenta incluso si tambien aparece en `batch.json`.
+activo (y usa el navegador predeterminado como fallback), ademas de `Inactivo`,
+`Favorito`, `Quitar favorito` y `Delete`. Las favoritas aparecen en verde y al
+inicio, las inactivas en amarillo y al final de las activas, y las desactivadas
+en rojo al final del catalogo. `Delete` no borra datos: cambia
+`account_history.status` a `DISABLED`. Una cuenta inactiva vuelve
+automaticamente a `ENABLED` cuando participa en un lote real; un dry-run no
+modifica este estado.
 
 `Lotes / ejecuciones (N)` abre un maestro ordenado por fecha. Un lote registrado
 queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar para
@@ -671,6 +677,7 @@ CREATE TABLE IF NOT EXISTS account_history (
     status TEXT NOT NULL DEFAULT 'ENABLED',
     field1 TEXT,
     field2 TEXT,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -679,9 +686,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_account_history_user_name
 ON account_history(user_name COLLATE NOCASE);
 ```
 
-`status` admite `ENABLED`, `DISABLED` y `CHANGED`. `user_ig_id`, `status`,
-`field1` y `field2` quedan disponibles para actualizacion manual o para otro
-proceso futuro. Un mismo `user_ig_id` puede aparecer con usernames distintos.
+`status` admite `ENABLED`, `INACTIVE`, `DISABLED` y `CHANGED`.
+`is_favorite` conserva el tag favorito de forma independiente. `user_ig_id`,
+`status`, `field1` y `field2` quedan disponibles para actualizacion manual o
+para otro proceso futuro. Un mismo `user_ig_id` puede aparecer con usernames
+distintos.
 
 Puedes inspeccionarla con cualquier visor SQLite o con la CLI de SQLite si la tienes instalada.
 

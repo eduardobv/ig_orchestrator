@@ -1538,10 +1538,16 @@ refrescos. Una cuenta pendiente o en curso se puede retirar manualmente: la
 cuenta queda `FAILED` y sus URL jobs no terminales quedan `FAILED_FINAL` con el
 motivo de baja manual, sin borrar filas.
 
-El catalogo admite baja logica mediante `account_history.status = DISABLED` y
-omite esas cuentas aunque sigan presentes en fuentes JSON. Los paths historicos
-de `account_history.field1` alimentan de forma distinta un combobox editable
-para las cuentas nuevas.
+El catalogo persiste su clasificacion en `account_history`: `status` admite
+`ENABLED`, `INACTIVE`, `DISABLED` y el valor historico `CHANGED`, mientras que
+`is_favorite` conserva el tag favorito. Primero muestra las favoritas en verde;
+despues las activas con `field1`, agrupadas por ruta y ordenadas por username;
+luego las activas sin ruta; las inactivas en amarillo; y las desactivadas en
+rojo. Las bajas logicas siguen visibles al final aunque aparezcan en fuentes
+JSON. Los paths historicos de `account_history.field1` tambien alimentan un
+combobox editable para las cuentas nuevas. Al comenzar a procesarse en una
+ejecucion real, una cuenta `INACTIVE` vuelve a `ENABLED`; los dry-run no cambian
+el catalogo.
 
 Los batches creados desde GUI se registran inicialmente como `DRAFT`. El
 maestro de lotes permite recuperar, modificar y borrar únicamente ese estado.

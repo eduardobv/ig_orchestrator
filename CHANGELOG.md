@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.26.12 - Patch - Estados, favoritos y agrupacion del catalogo
+
+Fecha: 2026-08-01
+
+### Creado
+
+* `tasks/Patch_v1.26.12.md` documenta los nuevos estados visuales, el orden por
+  ruta y la reactivacion automatica.
+
+### Modificado
+
+* `account_history` incorpora `is_favorite` y el estado `INACTIVE` mediante una
+  migracion compatible con bases existentes.
+* El repositorio y el servicio de catalogo persisten favoritos e inactividad,
+  muestran tambien las bajas logicas y ordenan las cuentas por categoria,
+  `field1` y username.
+* El menu contextual del GUI permite marcar una cuenta inactiva, agregar o
+  quitar el tag favorito y mantiene `Delete` como baja logica.
+* El orquestador reactiva cuentas inactivas cuando realmente empiezan a
+  procesarse, sin hacerlo en dry-run.
+* `README.md`, `PLAN.md` y `tasks/task-gui.md` describen el comportamiento.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y las pruebas de smoke
+  actualizan la version a `1.26.12`.
+
+### Resumen
+
+El catalogo diferencia visualmente las cuentas prioritarias, pausadas y dadas
+de baja, conserva la clasificacion en SQLite y agrupa las cuentas activas por
+su ruta historica.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_batch_orchestrator.py tests\test_db_repositories.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+* `git diff --check`.
+
 ## v1.26.11 - Patch - Distribucion vertical del GUI
 
 Fecha: 2026-07-26

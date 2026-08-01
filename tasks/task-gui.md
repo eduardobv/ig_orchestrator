@@ -108,9 +108,16 @@ Panel izquierdo: catalogo de cuentas
 - Un click izquierdo en un username lo carga en `Editor > Username`.
 - El doble click tambien abre el perfil
   en una pestaña de Chrome.
-- Click derecho ofrece `Abrir` y `Delete`. `Abrir` abre el perfil en una nueva
-  pestaña del navegador; `Delete` marca la cuenta `DISABLED` sin borrarla y la
-  oculta del catalogo.
+- Click derecho ofrece `Abrir`, `Inactivo`, `Favorito`, `Quitar favorito` y
+  `Delete`. `Abrir` abre el perfil en una nueva pestaña del navegador;
+  `Inactivo` la mueve a la seccion amarilla; `Favorito` la activa y la mueve a
+  la seccion verde; `Quitar favorito` elimina ese tag; y `Delete` marca la
+  cuenta `DISABLED` sin borrarla, manteniendola visible en rojo al final.
+- El orden es: favoritas; activas agrupadas por `account_history.field1`;
+  activas sin ruta; inactivas; y desactivadas. Los grupos se ordenan por ruta y
+  sus usernames alfabeticamente, sin distinguir mayusculas.
+- Una cuenta `INACTIVE` que empieza a procesarse en un lote real vuelve a
+  `ENABLED`. Un dry-run no reactiva cuentas.
 
 Zona derecha inferior: lote actual
 

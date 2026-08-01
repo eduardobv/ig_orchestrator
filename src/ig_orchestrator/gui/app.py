@@ -43,6 +43,14 @@ from ig_orchestrator.gui.process_runner import (
     build_run_continue_command,
 )
 from ig_orchestrator.settings import Settings
+from ig_orchestrator.models import AccountHistoryStatus
+
+
+_CATALOG_COLORS = {
+    "favorite": "#d9ead3",
+    "inactive": "#fff2cc",
+    "disabled": "#f4cccc",
+}
 
 
 def launch_gui(
@@ -259,6 +267,18 @@ class InstagramOrchestratorApp:
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
         self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
+        self.catalog_menu.add_separator()
+        self.catalog_menu.add_command(
+            label="Inactivo", command=self._set_catalog_account_inactive
+        )
+        self.catalog_menu.add_command(
+            label="Favorito", command=lambda: self._set_catalog_account_favorite(True)
+        )
+        self.catalog_menu.add_command(
+            label="Quitar favorito",
+            command=lambda: self._set_catalog_account_favorite(False),
+        )
+        self.catalog_menu.add_separator()
         self.catalog_menu.add_command(label="Delete", command=self._disable_catalog_account)
 
     def _build_batch_table(self, parent: ttk.Frame) -> None:
@@ -449,6 +469,9 @@ class InstagramOrchestratorApp:
         for entry in self.catalog_entries:
             if not query or query in entry.username.lower():
                 self.catalog_list.insert(tk.END, entry.username)
+                colors = _catalog_entry_colors(entry)
+                if colors:
+                    self.catalog_list.itemconfig(tk.END, **colors)
 
     def _show_catalog_menu(self, event: tk.Event) -> None:
         index = self.catalog_list.nearest(event.y)
@@ -481,8 +504,9 @@ class InstagramOrchestratorApp:
             return
         if not messagebox.askyesno(
             "Delete del catalogo",
-            f"¿Ocultar @{username} del catalogo?\n\n"
-            "La cuenta se conservara en SQLite con estado DISABLED.",
+            f"¿Desactivar @{username} en el catalogo?\n\n"
+            "La cuenta se conservara en SQLite con estado DISABLED y "
+            "aparecera en rojo al final.",
         ):
             return
         try:
@@ -490,6 +514,31 @@ class InstagramOrchestratorApp:
         except ValueError as exc:
             messagebox.showerror("Catalogo", str(exc))
             return
+        self._reload_catalog()
+
+    def _set_catalog_account_inactive(self) -> None:
+        username = self._selected_catalog_username()
+        if username is None:
+            return
+        try:
+            self.catalog_service.set_inactive(username)
+        except ValueError as exc:
+            messagebox.showerror("Catalogo", str(exc))
+            return
+        self._reload_catalog()
+
+    def _set_catalog_account_favorite(self, favorite: bool) -> None:
+        username = self._selected_catalog_username()
+        if username is None:
+            return
+        try:
+            self.catalog_service.set_favorite(username, favorite=favorite)
+        except ValueError as exc:
+            messagebox.showerror("Catalogo", str(exc))
+            return
+        self._reload_catalog()
+
+    def _reload_catalog(self) -> None:
         self.catalog_entries = self.catalog_service.list_entries()
         self.username_combo.configure(
             values=[entry.username for entry in self.catalog_entries]
@@ -1214,6 +1263,7 @@ class InstagramOrchestratorApp:
         if self.cancel_requested:
             mark_batch_interrupted(self.connection, batch_id)
         self._refresh_runtime_progress()
+        self._reload_catalog()
         self.batch_ready_for_rename = (
             exit_code == 0
             and not self.last_run_was_dry_run
@@ -1411,6 +1461,16 @@ class InstagramOrchestratorApp:
 
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
+
+
+def _catalog_entry_colors(entry: AccountCatalogEntry) -> dict[str, str]:
+    if entry.status is AccountHistoryStatus.DISABLED:
+        return {"background": _CATALOG_COLORS["disabled"]}
+    if entry.status is AccountHistoryStatus.INACTIVE:
+        return {"background": _CATALOG_COLORS["inactive"]}
+    if entry.is_favorite:
+        return {"background": _CATALOG_COLORS["favorite"]}
+    return {}
 
 
 def _batch_mode_details(

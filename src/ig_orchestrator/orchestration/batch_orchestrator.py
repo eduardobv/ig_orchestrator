@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ig_orchestrator.db import (
     AccountRepository,
+    AccountHistoryRepository,
     BatchRepository,
     DownloadRepository,
     RunRecord,
@@ -67,10 +68,15 @@ class BatchOrchestrator:
         download_repository: DownloadRepository,
         run_repository: RunRepository,
         account_orchestrator: BatchAccountOrchestrator,
+        account_history_repository: AccountHistoryRepository | None = None,
         config: BatchOrchestratorConfig | None = None,
     ) -> None:
         self._batch_repository = batch_repository
         self._account_repository = account_repository
+        self._account_history_repository = (
+            account_history_repository
+            or AccountHistoryRepository(account_repository.connection)
+        )
         self._url_job_repository = url_job_repository
         self._download_repository = download_repository
         self._run_repository = run_repository
@@ -158,6 +164,9 @@ class BatchOrchestrator:
                     batch_id,
                     account.id,
                     current_account.username,
+                )
+                self._account_history_repository.reactivate_if_inactive(
+                    current_account.username
                 )
                 account_results.append(
                     await self._account_orchestrator.process_account(current_account.id)

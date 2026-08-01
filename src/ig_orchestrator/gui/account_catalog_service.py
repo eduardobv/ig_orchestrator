@@ -18,6 +18,8 @@ class AccountCatalogEntry:
     owner_id: str | None = None
     destination_path: str | None = None
     start_init_date: str | None = None
+    status: AccountHistoryStatus = AccountHistoryStatus.ENABLED
+    is_favorite: bool = False
 
 
 class AccountCatalogService:
@@ -33,22 +35,13 @@ class AccountCatalogService:
         self.backup_dir = backup_dir
 
     def list_entries(self) -> list[AccountCatalogEntry]:
-        history = AccountHistoryRepository(self.connection)
-        disabled_user_names = history.list_disabled_user_names()
         entries: list[AccountCatalogEntry] = []
         entries.extend(self._from_account_history())
         entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
         if not entries:
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
-        return sorted(
-            (
-                entry
-                for entry in _deduplicate(entries)
-                if entry.username.casefold() not in disabled_user_names
-            ),
-            key=lambda entry: entry.username.casefold(),
-        )
+        return sorted(_deduplicate(entries), key=_catalog_sort_key)
 
     def disable(self, username: str) -> None:
         repository = AccountHistoryRepository(self.connection)
@@ -58,19 +51,32 @@ class AccountCatalogService:
             AccountHistoryStatus.DISABLED,
         )
 
+    def set_inactive(self, username: str) -> None:
+        repository = AccountHistoryRepository(self.connection)
+        repository.create_or_get(username)
+        repository.set_inactive(username)
+
+    def set_favorite(self, username: str, *, favorite: bool) -> None:
+        AccountHistoryRepository(self.connection).set_favorite(
+            username,
+            favorite=favorite,
+        )
+
     def list_destination_paths(self) -> list[str]:
         return AccountHistoryRepository(
             self.connection
         ).list_distinct_destination_paths()
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
-        for record in AccountHistoryRepository(self.connection).list_enabled():
+        for record in AccountHistoryRepository(self.connection).list_all():
             yield AccountCatalogEntry(
                 username=record.user_name,
                 source="account_history",
                 owner_id=record.user_ig_id,
                 destination_path=record.field1,
                 start_init_date=record.field2,
+                status=record.status,
+                is_favorite=record.is_favorite,
             )
 
     def _from_batch_json(
@@ -125,6 +131,20 @@ def _deduplicate(entries: Iterable[AccountCatalogEntry]) -> list[AccountCatalogE
         deduplicated.append(entry)
         seen.add(key)
     return deduplicated
+
+
+def _catalog_sort_key(entry: AccountCatalogEntry) -> tuple[object, ...]:
+    username = entry.username.casefold()
+    destination_path = (entry.destination_path or "").strip().casefold()
+    if entry.status is AccountHistoryStatus.DISABLED:
+        return (4, username)
+    if entry.status is AccountHistoryStatus.INACTIVE:
+        return (3, username)
+    if entry.is_favorite:
+        return (0, not bool(destination_path), destination_path, username)
+    if destination_path:
+        return (1, destination_path, username)
+    return (2, username)
 
 
 __all__ = ["AccountCatalogEntry", "AccountCatalogService"]

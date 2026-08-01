@@ -4,6 +4,7 @@ import sqlite3
 import pytest
 
 from ig_orchestrator.db import (
+    AccountHistoryRepository,
     AccountRepository,
     BatchRepository,
     ConfigRepository,
@@ -16,6 +17,7 @@ from ig_orchestrator.db import (
 from ig_orchestrator.main import main
 from ig_orchestrator.models import (
     Account,
+    AccountHistoryStatus,
     AccountStatus,
     AppConfig,
     ConfigValueType,
@@ -203,6 +205,49 @@ def test_init_database_adds_duplicate_url_jobs_table_to_existing_db(
         }
 
     assert "duplicate_url_jobs" in table_names
+
+
+def test_init_database_adds_favorite_flag_without_losing_catalog_data(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "old_catalog.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE account_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_ig_id TEXT,
+                user_name TEXT NOT NULL COLLATE NOCASE,
+                status TEXT NOT NULL DEFAULT 'ENABLED',
+                field1 TEXT,
+                field2 TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO account_history (
+                user_name, status, created_at, updated_at
+            ) VALUES ('legacy_user', 'ENABLED', datetime('now'), datetime('now'))
+            """
+        )
+        connection.commit()
+
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(account_history)")
+        }
+        stored = AccountHistoryRepository(connection).get_by_user_name("legacy_user")
+
+    assert "is_favorite" in columns
+    assert stored is not None
+    assert stored.status is AccountHistoryStatus.ENABLED
+    assert stored.is_favorite is False
 
 
 def test_batch_repository_lists_batches_with_resumable_work(tmp_path: Path) -> None:

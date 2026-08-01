@@ -20,9 +20,10 @@ class AccountHistoryRepository:
         cursor = self.connection.execute(
             """
             INSERT INTO account_history (
-                user_ig_id, user_name, status, field1, field2, created_at, updated_at
+                user_ig_id, user_name, status, field1, field2, is_favorite,
+                created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record.user_ig_id,
@@ -30,6 +31,7 @@ class AccountHistoryRepository:
                 record.status.value,
                 record.field1,
                 record.field2,
+                int(record.is_favorite),
                 dump_datetime(record.created_at),
                 dump_datetime(record.updated_at),
             ),
@@ -116,6 +118,61 @@ class AccountHistoryRepository:
             raise RuntimeError("Account history row disappeared during update")
         return stored
 
+    def set_inactive(self, user_name: str) -> AccountHistory:
+        """Move an account to the inactive catalog section as a normal account."""
+        return self._update_catalog_flags(
+            user_name,
+            status=AccountHistoryStatus.INACTIVE,
+            is_favorite=False,
+        )
+
+    def set_favorite(self, user_name: str, *, favorite: bool) -> AccountHistory:
+        """Set or clear the favorite tag, activating the account when it is set."""
+        record = self.get_by_user_name(user_name)
+        if record is None:
+            record = self.create_or_get(user_name)
+        status = AccountHistoryStatus.ENABLED if favorite else record.status
+        return self._update_catalog_flags(
+            user_name,
+            status=status,
+            is_favorite=favorite,
+        )
+
+    def reactivate_if_inactive(self, user_name: str) -> AccountHistory | None:
+        """Reactivate an inactive account without changing any other catalog row."""
+        record = self.get_by_user_name(user_name)
+        if record is None or record.status is not AccountHistoryStatus.INACTIVE:
+            return record
+        return self._update_catalog_flags(
+            user_name,
+            status=AccountHistoryStatus.ENABLED,
+            is_favorite=False,
+        )
+
+    def _update_catalog_flags(
+        self,
+        user_name: str,
+        *,
+        status: AccountHistoryStatus,
+        is_favorite: bool,
+    ) -> AccountHistory:
+        record = self.get_by_user_name(user_name)
+        if record is None or record.id is None:
+            raise ValueError(f"Catalog account not found: {user_name}")
+        self.connection.execute(
+            """
+            UPDATE account_history
+            SET status = ?, is_favorite = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (status.value, int(is_favorite), record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Account history row disappeared during update")
+        return stored
+
     def update_rename_metadata(
         self,
         user_name: str,
@@ -155,6 +212,7 @@ def _row_to_history(row: Row | None) -> AccountHistory | None:
         status=AccountHistoryStatus(row["status"]),
         field1=row["field1"],
         field2=row["field2"],
+        is_favorite=bool(row["is_favorite"]),
         created_at=created_at,
         updated_at=updated_at,
     )

@@ -23,6 +23,7 @@ from ig_orchestrator.gui.app import (
     InstagramOrchestratorApp,
     _batch_column_samples,
     _batch_mode_details,
+    _catalog_entry_colors,
     _catalog_width_chars,
     _half_screen_geometry,
     _instagram_profile_url,
@@ -33,7 +34,10 @@ from ig_orchestrator.gui.app import (
     _new_account_rename_parameters,
     _timestamp_console_text,
 )
-from ig_orchestrator.gui.account_catalog_service import AccountCatalogService
+from ig_orchestrator.gui.account_catalog_service import (
+    AccountCatalogEntry,
+    AccountCatalogService,
+)
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
@@ -62,6 +66,7 @@ from ig_orchestrator.gui.process_runner import (
 )
 from ig_orchestrator.input import DuplicateBatchNameError
 from ig_orchestrator.models import (
+    AccountHistoryStatus,
     AccountStatus,
     InputBatchStatus,
     PublicationType,
@@ -181,7 +186,7 @@ def test_account_catalog_is_sorted_alphabetically_case_insensitive(tmp_path: Pat
     ]
 
 
-def test_catalog_disabled_account_is_hidden_even_if_json_contains_it(
+def test_catalog_disabled_account_is_shown_last_even_if_json_contains_it(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "orchestrator.db"
@@ -196,11 +201,102 @@ def test_catalog_disabled_account_is_hidden_even_if_json_contains_it(
         service = AccountCatalogService(connection, batch_json_path=batch_json)
         assert [entry.username for entry in service.list_entries()] == ["hidden_user"]
         service.disable("hidden_user")
-        assert service.list_entries() == []
+        entries = service.list_entries()
         stored = AccountHistoryRepository(connection).get_by_user_name("hidden_user")
 
+    assert [entry.username for entry in entries] == ["hidden_user"]
+    assert entries[0].status is AccountHistoryStatus.DISABLED
     assert stored is not None
     assert stored.status.value == "DISABLED"
+
+
+def test_catalog_orders_favorites_paths_normal_inactive_and_disabled(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        history = AccountHistoryRepository(connection)
+        for username, destination in (
+            ("normal_z", r"G:\\Z"),
+            ("normal_a2", r"G:\\A"),
+            ("normal_a1", r"G:\\A"),
+            ("ungrouped", ""),
+            ("favorite_z", r"G:\\Z"),
+            ("favorite_a", r"G:\\A"),
+            ("inactive_b", ""),
+            ("inactive_a", r"G:\\A"),
+            ("disabled_b", r"G:\\A"),
+            ("disabled_a", ""),
+        ):
+            history.update_rename_metadata(
+                username,
+                owner_id=username,
+                destination_path=destination,
+                start_init_date="2026-01-01",
+            )
+        history.set_favorite("favorite_z", favorite=True)
+        history.set_favorite("favorite_a", favorite=True)
+        history.set_inactive("inactive_b")
+        history.set_inactive("inactive_a")
+        history.update_status("disabled_b", AccountHistoryStatus.DISABLED)
+        history.update_status("disabled_a", AccountHistoryStatus.DISABLED)
+
+        entries = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        ).list_entries()
+
+    assert [entry.username for entry in entries] == [
+        "favorite_a",
+        "favorite_z",
+        "normal_a1",
+        "normal_a2",
+        "normal_z",
+        "ungrouped",
+        "inactive_a",
+        "inactive_b",
+        "disabled_a",
+        "disabled_b",
+    ]
+
+
+def test_catalog_colors_follow_favorite_and_account_status() -> None:
+    assert _catalog_entry_colors(AccountCatalogEntry("normal")) == {}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry("favorite", is_favorite=True)
+    ) == {"background": "#d9ead3"}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry("inactive", status=AccountHistoryStatus.INACTIVE)
+    ) == {"background": "#fff2cc"}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry(
+            "disabled",
+            status=AccountHistoryStatus.DISABLED,
+            is_favorite=True,
+        )
+    ) == {"background": "#f4cccc"}
+
+
+def test_catalog_favorite_tag_can_be_added_and_removed(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        service = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        )
+        service.set_favorite("toggle_user", favorite=True)
+        favorite = service.list_entries()[0]
+        service.set_favorite("toggle_user", favorite=False)
+        normal = service.list_entries()[0]
+
+    assert favorite.is_favorite is True
+    assert favorite.status is AccountHistoryStatus.ENABLED
+    assert normal.is_favorite is False
+    assert normal.status is AccountHistoryStatus.ENABLED
 
 
 def test_catalog_destination_paths_are_distinct_and_editable_source_data(

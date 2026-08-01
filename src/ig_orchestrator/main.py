@@ -9,6 +9,7 @@ from typing import Sequence
 
 from ig_orchestrator import __version__
 from ig_orchestrator.db import (
+    AccountHistoryRepository,
     AccountRepository,
     BatchRepository,
     DownloadRepository,
@@ -200,6 +201,7 @@ def _dry_run_batch(input_path: Path) -> int:
         batch_orchestrator = BatchOrchestrator(
             batch_repository=BatchRepository(connection),
             account_repository=account_repository,
+            account_history_repository=AccountHistoryRepository(connection),
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             run_repository=run_repository,
@@ -308,6 +310,7 @@ def _run_batch(
         batch_orchestrator = BatchOrchestrator(
             batch_repository=BatchRepository(connection),
             account_repository=account_repository,
+            account_history_repository=AccountHistoryRepository(connection),
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             run_repository=run_repository,
@@ -463,6 +466,7 @@ def _run_continue(
         batch_orchestrator = BatchOrchestrator(
             batch_repository=batch_repository,
             account_repository=account_repository,
+            account_history_repository=AccountHistoryRepository(connection),
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             run_repository=run_repository,
