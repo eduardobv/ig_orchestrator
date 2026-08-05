@@ -49,6 +49,7 @@ from ig_orchestrator.models import AccountHistoryStatus
 _CATALOG_COLORS = {
     "favorite": "#d9ead3",
     "inactive": "#fff2cc",
+    "in_batch": "#f5c08c",
     "disabled": "#f4cccc",
 }
 
@@ -249,8 +250,17 @@ class InstagramOrchestratorApp:
         parent.rowconfigure(2, weight=1)
         parent.columnconfigure(0, weight=1)
         ttk.Label(parent, text="Catalogo").grid(row=0, column=0, sticky="w")
-        filter_entry = ttk.Entry(parent, textvariable=self.catalog_filter_var)
-        filter_entry.grid(row=1, column=0, sticky="ew", pady=(6, 6))
+        filter_row = ttk.Frame(parent)
+        filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
+        filter_row.columnconfigure(0, weight=1)
+        filter_entry = ttk.Entry(filter_row, textvariable=self.catalog_filter_var)
+        filter_entry.grid(row=0, column=0, sticky="ew")
+        ttk.Button(
+            filter_row,
+            text="❌",
+            width=3,
+            command=self._clear_catalog_filter,
+        ).grid(row=0, column=1, sticky="e", padx=(4, 0))
         self.catalog_filter_var.trace_add("write", lambda *_: self._refresh_catalog())
         self.catalog_list = tk.Listbox(
             parent,
@@ -280,6 +290,9 @@ class InstagramOrchestratorApp:
         )
         self.catalog_menu.add_separator()
         self.catalog_menu.add_command(label="Delete", command=self._disable_catalog_account)
+        self.catalog_menu.add_command(
+            label="Activar", command=self._enable_catalog_account
+        )
 
     def _build_batch_table(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
@@ -463,15 +476,44 @@ class InstagramOrchestratorApp:
         else:
             self.new_account_frame.grid_remove()
 
+    def _clear_catalog_filter(self) -> None:
+        self.catalog_filter_var.set("")
+
+    def _batch_usernames(self) -> set[str]:
+        return {account.username.casefold() for account in self.accounts}
+
     def _refresh_catalog(self) -> None:
+        selected_username = self._selected_catalog_username()
+        try:
+            yview = self.catalog_list.yview()
+        except tk.TclError:
+            yview = (0.0, 1.0)
+
         query = self.catalog_filter_var.get().strip().lower()
+        in_batch = self._batch_usernames()
+        visible: list[str] = []
         self.catalog_list.delete(0, tk.END)
         for entry in self.catalog_entries:
             if not query or query in entry.username.lower():
                 self.catalog_list.insert(tk.END, entry.username)
-                colors = _catalog_entry_colors(entry)
+                colors = _catalog_entry_colors(
+                    entry,
+                    in_batch=entry.username.casefold() in in_batch,
+                )
                 if colors:
                     self.catalog_list.itemconfig(tk.END, **colors)
+                visible.append(entry.username)
+
+        if selected_username is not None:
+            try:
+                index = visible.index(selected_username)
+            except ValueError:
+                index = None
+            if index is not None:
+                self.catalog_list.selection_set(index)
+                self.catalog_list.activate(index)
+        if yview:
+            self.catalog_list.yview_moveto(yview[0])
 
     def _show_catalog_menu(self, event: tk.Event) -> None:
         index = self.catalog_list.nearest(event.y)
@@ -511,6 +553,17 @@ class InstagramOrchestratorApp:
             return
         try:
             self.catalog_service.disable(username)
+        except ValueError as exc:
+            messagebox.showerror("Catalogo", str(exc))
+            return
+        self._reload_catalog()
+
+    def _enable_catalog_account(self) -> None:
+        username = self._selected_catalog_username()
+        if username is None:
+            return
+        try:
+            self.catalog_service.enable(username)
         except ValueError as exc:
             messagebox.showerror("Catalogo", str(exc))
             return
@@ -709,8 +762,8 @@ class InstagramOrchestratorApp:
                 values=[entry.username for entry in self.catalog_entries]
             )
             self.destination_path_combo.configure(values=self.destination_paths)
-            self._refresh_catalog()
         self._refresh_table()
+        self._refresh_catalog()
         self._clear_editor()
 
     def _move_selected(self, direction: int) -> None:
@@ -755,6 +808,7 @@ class InstagramOrchestratorApp:
         del self.accounts[self.selected_index]
         self.selected_index = None
         self._refresh_table()
+        self._refresh_catalog()
         self._clear_editor()
 
     def _fail_selected_running_account(self) -> None:
@@ -802,6 +856,7 @@ class InstagramOrchestratorApp:
         self.accounts.clear()
         self.selected_index = None
         self._refresh_table()
+        self._refresh_catalog()
         self._clear_editor()
         if self.saved_batch_id is not None:
             self._set_status(
@@ -830,6 +885,7 @@ class InstagramOrchestratorApp:
         self.tree.selection_remove(*self.tree.selection())
         self._clear_editor()
         self._refresh_table()
+        self._refresh_catalog()
         self.account_progress_var.set("Cuentas: -")
         self.item_progress_var.set("Items: -")
         self.rename_button.configure(state="disabled")
@@ -1112,6 +1168,7 @@ class InstagramOrchestratorApp:
         self._clear_editor()
         self.tree.selection_remove(*self.tree.selection())
         self._refresh_runtime_progress()
+        self._refresh_catalog()
         self._update_batch_context()
         self._write_console(
             f"Lote {batch_id} recuperado desde SQLite: {draft.batch_name}.\n"
@@ -1207,6 +1264,7 @@ class InstagramOrchestratorApp:
         self._clear_editor()
         self.tree.selection_remove(*self.tree.selection())
         self._refresh_table()
+        self._refresh_catalog()
 
         self.batch_ready_for_rename = False
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
@@ -1463,9 +1521,15 @@ def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
 
 
-def _catalog_entry_colors(entry: AccountCatalogEntry) -> dict[str, str]:
+def _catalog_entry_colors(
+    entry: AccountCatalogEntry,
+    *,
+    in_batch: bool = False,
+) -> dict[str, str]:
     if entry.status is AccountHistoryStatus.DISABLED:
         return {"background": _CATALOG_COLORS["disabled"]}
+    if in_batch:
+        return {"background": _CATALOG_COLORS["in_batch"]}
     if entry.status is AccountHistoryStatus.INACTIVE:
         return {"background": _CATALOG_COLORS["inactive"]}
     if entry.is_favorite:

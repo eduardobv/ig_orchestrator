@@ -270,12 +270,15 @@ Un click izquierdo sobre una cuenta del catalogo carga el username seleccionado
 en el editor. El doble click, ademas, abre su perfil. El click derecho
 ofrece la misma accion `Abrir`, que intenta abrirlo en una pestaña de Chrome
 activo (y usa el navegador predeterminado como fallback), ademas de `Inactivo`,
-`Favorito`, `Quitar favorito` y `Delete`. Las favoritas aparecen en verde y al
-inicio, las inactivas en amarillo y al final de las activas, y las desactivadas
-en rojo al final del catalogo. `Delete` no borra datos: cambia
-`account_history.status` a `DISABLED`. Una cuenta inactiva vuelve
-automaticamente a `ENABLED` cuando participa en un lote real; un dry-run no
-modifica este estado.
+`Favorito`, `Quitar favorito`, `Delete` y `Activar`. Las favoritas aparecen en
+verde y al inicio, las inactivas en amarillo suave y al final de las activas, y
+las desactivadas en rojo al final del catalogo. Las cuentas ya agregadas al
+lote actual se resaltan en amarillo mas intenso (solo durante la sesion).
+`Delete` no borra datos: cambia `account_history.status` a `DISABLED`.
+`Activar` las devuelve a `ENABLED`. El buscador del catalogo tiene un boton
+`❌` para limpiar el filtro; al usar el menu contextual se conserva la
+seleccion y el scroll. Una cuenta inactiva vuelve automaticamente a `ENABLED`
+cuando participa en un lote real; un dry-run no modifica este estado.
 
 `Lotes / ejecuciones (N)` abre un maestro ordenado por fecha. Un lote registrado
 queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar para

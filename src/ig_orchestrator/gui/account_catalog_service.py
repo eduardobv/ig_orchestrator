@@ -51,6 +51,15 @@ class AccountCatalogService:
             AccountHistoryStatus.DISABLED,
         )
 
+    def enable(self, username: str) -> None:
+        """Reactivate a DISABLED or INACTIVE catalog account as ENABLED."""
+        repository = AccountHistoryRepository(self.connection)
+        repository.create_or_get(username)
+        repository.update_status(
+            username,
+            AccountHistoryStatus.ENABLED,
+        )
+
     def set_inactive(self, username: str) -> None:
         repository = AccountHistoryRepository(self.connection)
         repository.create_or_get(username)

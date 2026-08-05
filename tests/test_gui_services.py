@@ -271,12 +271,39 @@ def test_catalog_colors_follow_favorite_and_account_status() -> None:
         AccountCatalogEntry("inactive", status=AccountHistoryStatus.INACTIVE)
     ) == {"background": "#fff2cc"}
     assert _catalog_entry_colors(
+        AccountCatalogEntry("in_batch_favorite", is_favorite=True),
+        in_batch=True,
+    ) == {"background": "#f5c08c"}
+    assert _catalog_entry_colors(
         AccountCatalogEntry(
             "disabled",
             status=AccountHistoryStatus.DISABLED,
             is_favorite=True,
-        )
+        ),
+        in_batch=True,
     ) == {"background": "#f4cccc"}
+
+
+def test_catalog_enable_reactivates_disabled_account(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    with connect(db_path) as connection:
+        service = AccountCatalogService(
+            connection,
+            batch_json_path=tmp_path / "missing.json",
+        )
+        service.disable("paused_user")
+        disabled = next(
+            entry for entry in service.list_entries() if entry.username == "paused_user"
+        )
+        service.enable("paused_user")
+        enabled = next(
+            entry for entry in service.list_entries() if entry.username == "paused_user"
+        )
+
+    assert disabled.status is AccountHistoryStatus.DISABLED
+    assert enabled.status is AccountHistoryStatus.ENABLED
 
 
 def test_catalog_favorite_tag_can_be_added_and_removed(tmp_path: Path) -> None:
@@ -608,6 +635,7 @@ def test_gui_new_batch_detaches_registered_id_and_clears_editors() -> None:
     calls: list[str] = []
     app._clear_editor = lambda: calls.append("editor")
     app._refresh_table = lambda: calls.append("table")
+    app._refresh_catalog = lambda: calls.append("catalog")
     app._update_batch_context = lambda: calls.append("context")
     app._set_status = lambda text: calls.append(text)
     app._write_console = lambda text: calls.append(text)
@@ -619,7 +647,7 @@ def test_gui_new_batch_detaches_registered_id_and_clears_editors() -> None:
     assert app.accounts == []
     assert app.runtime_progress == {}
     assert app.batch_name_var.value.startswith("descargas_")
-    assert calls[:3] == ["editor", "table", "context"]
+    assert calls[:4] == ["editor", "table", "catalog", "context"]
     assert "Nuevo lote sin registrar" in calls
 
 
@@ -639,6 +667,7 @@ def test_gui_delete_all_warns_with_registered_batch_identity(
     app.accounts = [AccountDraft(username="one", download_stories=True)]
     app.selected_index = 0
     app._refresh_table = lambda: None
+    app._refresh_catalog = lambda: None
     app._clear_editor = lambda: None
     app._set_status = lambda _text: None
     monkeypatch.setattr(

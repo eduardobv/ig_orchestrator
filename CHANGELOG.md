@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.26.13 - Patch - Catalogo: highlight en lote, Activar, foco y filtro
+
+Fecha: 2026-08-05
+
+### Creado
+
+* `tasks/Patch_v1.26.13.md` documenta el highlight temporal, `Activar`, la
+  preservacion de foco y el boton de limpiar busqueda.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` resalta en amarillo las cuentas del lote
+  actual, anade `Activar` y el boton `❌` del filtro, y conserva seleccion y
+  scroll al repintar el catalogo.
+* `src/ig_orchestrator/gui/account_catalog_service.py` expone `enable` para
+  reactivar cuentas `DISABLED` o `INACTIVE`.
+* `tests/test_gui_services.py` cubre colores con `in_batch` y la reactivacion.
+* `README.md` y `tasks/task-gui.md` describen el comportamiento.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y las pruebas de smoke
+  actualizan la version a `1.26.13`.
+
+### Resumen
+
+Al armar un lote se ve de un vistazo que cuentas ya estan en la tabla, se puede
+reactivar un Delete, el catalogo no salta al usar el menu contextual y el
+filtro se limpia con un boton compacto.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+
 ## v1.26.12 - Patch - Estados, favoritos y agrupacion del catalogo
 
 Fecha: 2026-08-01
