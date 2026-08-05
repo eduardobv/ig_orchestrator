@@ -101,6 +101,7 @@ class InstagramOrchestratorApp:
         self.active_process_kind: str | None = None
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
+        self._username_sort_ascending: bool | None = None
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -297,14 +298,16 @@ class InstagramOrchestratorApp:
     def _build_batch_table(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
         parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=1)
+        parent.columnconfigure(2, weight=1)
         ttk.Label(parent, text="Cuentas del lote actual").grid(
-            row=0, column=0, sticky="w"
+            row=0, column=0, columnspan=3, sticky="w"
         )
         self.tree = ttk.Treeview(
             parent,
             columns=tuple(column for column, _title in _BATCH_COLUMNS),
             show="headings",
-            selectmode="browse",
+            selectmode="extended",
         )
         style = ttk.Style(self.root)
         tree_font = tkfont.Font(
@@ -316,16 +319,23 @@ class InstagramOrchestratorApp:
         )
         for column, title in _BATCH_COLUMNS:
             width = tree_font.measure(column_samples[column]) + 16
-            self.tree.heading(column, text=title)
+            if column == "username":
+                self.tree.heading(
+                    column,
+                    text=_username_heading_title(self._username_sort_ascending),
+                    command=self._toggle_username_sort,
+                )
+            else:
+                self.tree.heading(column, text=title)
             self.tree.column(column, width=width, minwidth=width, anchor="w")
-        self.tree.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(6, 6))
+        self.tree.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
         batch_scroll = ttk.Scrollbar(
             parent,
             orient=tk.VERTICAL,
             command=self.tree.yview,
             style="Visible.Vertical.TScrollbar",
         )
-        batch_scroll.grid(row=1, column=2, sticky="ns", pady=(6, 6))
+        batch_scroll.grid(row=1, column=3, sticky="ns", pady=(6, 6))
         self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
         self.tree.bind("<Button-3>", self._show_batch_menu)
@@ -344,14 +354,18 @@ class InstagramOrchestratorApp:
             parent, text="Eliminar", command=self._delete_selected
         )
         self.delete_button.grid(row=2, column=0, sticky="ew", padx=(0, 4))
+        self.save_selection_button = ttk.Button(
+            parent,
+            text="Guardar selección",
+            command=self._save_selected_accounts_as_batch,
+        )
+        self.save_selection_button.grid(row=2, column=1, sticky="ew", padx=(0, 4))
         self.delete_all_button = ttk.Button(
             parent,
             text="Eliminar todo",
             command=self._delete_all_accounts,
         )
-        self.delete_all_button.grid(
-            row=2, column=1, columnspan=2, sticky="ew"
-        )
+        self.delete_all_button.grid(row=2, column=2, columnspan=2, sticky="ew")
 
     def _build_editor(self, parent: ttk.Frame) -> None:
         parent.rowconfigure(1, weight=1)
@@ -602,8 +616,7 @@ class InstagramOrchestratorApp:
         self._refresh_catalog()
 
     def _refresh_table(self) -> None:
-        selected = self.tree.selection()
-        selected_iid = selected[0] if selected else None
+        selected_usernames = self._selected_batch_usernames()
         expected_ids = {str(index) for index in range(len(self.accounts))}
         for item_id in self.tree.get_children():
             if item_id not in expected_ids:
@@ -624,10 +637,46 @@ class InstagramOrchestratorApp:
                 self.tree.move(iid, "", index)
             else:
                 self.tree.insert("", tk.END, iid=iid, values=values, tags=(tag,))
-        if selected_iid is not None and self.tree.exists(selected_iid):
-            self.tree.selection_set(selected_iid)
+        self.tree.selection_remove(*self.tree.selection())
+        for index, account in enumerate(self.accounts):
+            if account.username.casefold() in selected_usernames:
+                self.tree.selection_add(str(index))
         if not self.runtime_progress:
             self._set_status(f"{len(self.accounts)} account(s) in draft")
+
+    def _selected_batch_indices(self) -> list[int]:
+        return sorted(int(item_id) for item_id in self.tree.selection())
+
+    def _selected_batch_usernames(self) -> set[str]:
+        usernames: set[str] = set()
+        for index in self._selected_batch_indices():
+            if 0 <= index < len(self.accounts):
+                usernames.add(self.accounts[index].username.casefold())
+        return usernames
+
+    def _toggle_username_sort(self) -> None:
+        self._username_sort_ascending = self._username_sort_ascending is not True
+        selected = self._selected_batch_usernames()
+        # Clear selection before reordering so index-based mapping cannot drift.
+        self.tree.selection_remove(*self.tree.selection())
+        self.accounts = _sort_accounts_by_username(
+            self.accounts,
+            ascending=self._username_sort_ascending,
+        )
+        self.tree.heading(
+            "username",
+            text=_username_heading_title(self._username_sort_ascending),
+            command=self._toggle_username_sort,
+        )
+        self.selected_index = None
+        self._refresh_table()
+        for index, account in enumerate(self.accounts):
+            if account.username.casefold() in selected:
+                self.tree.selection_add(str(index))
+        if self.tree.selection():
+            focus_id = self.tree.selection()[-1]
+            self.tree.focus(focus_id)
+            self.selected_index = int(focus_id)
 
     def _refresh_runtime_progress(self) -> None:
         if self.active_batch_id is None:
@@ -688,7 +737,12 @@ class InstagramOrchestratorApp:
         selection = self.tree.selection()
         if not selection:
             return
-        self.selected_index = int(selection[0])
+        focus = self.tree.focus()
+        item_id = focus if focus in selection else selection[-1]
+        index = int(item_id)
+        if index < 0 or index >= len(self.accounts):
+            return
+        self.selected_index = index
         account = self.accounts[self.selected_index]
         self.username_var.set(account.username)
         self.stories_var.set(account.download_stories)
@@ -706,7 +760,8 @@ class InstagramOrchestratorApp:
         item_id = self.tree.identify_row(event.y)
         if not item_id:
             return
-        self.tree.selection_set(item_id)
+        if item_id not in self.tree.selection():
+            self.tree.selection_set(item_id)
         self.tree.focus(item_id)
         self.selected_index = int(item_id)
         self.batch_menu.tk_popup(event.x_root, event.y_root)
@@ -803,12 +858,18 @@ class InstagramOrchestratorApp:
         self._refresh_table()
 
     def _delete_selected(self) -> None:
-        if self.selected_index is None:
+        indices = self._selected_batch_indices()
+        if not indices and self.selected_index is not None:
+            indices = [self.selected_index]
+        if not indices:
             return
         if self.process_runner.is_running() and self.active_process_kind == "batch":
+            self.selected_index = indices[-1]
             self._fail_selected_running_account()
             return
-        del self.accounts[self.selected_index]
+        for index in reversed(indices):
+            if 0 <= index < len(self.accounts):
+                del self.accounts[index]
         self.selected_index = None
         self._refresh_table()
         self._refresh_catalog()
@@ -1166,6 +1227,9 @@ class InstagramOrchestratorApp:
         self.delete_all_button.configure(
             state="normal" if actions_enabled else "disabled"
         )
+        self.save_selection_button.configure(
+            state="normal" if actions_enabled else "disabled"
+        )
 
     def _load_persisted_draft(self, batch_id: int, draft: BatchDraft) -> None:
         self.batch_name_var.set(draft.batch_name)
@@ -1219,6 +1283,86 @@ class InstagramOrchestratorApp:
         if show_confirmation:
             messagebox.showinfo("Lote registrado", f"Lote registrado con id {result.batch.id}")
         return result.batch.id
+
+    def _save_selected_accounts_as_batch(self) -> None:
+        """Persist only the tree selection as a DRAFT and leave the rest in memory."""
+
+        if self.process_runner.is_running():
+            return
+        indices = self._selected_batch_indices()
+        if not indices:
+            messagebox.showwarning(
+                "Guardar selección",
+                "Selecciona al menos una cuenta del lote actual "
+                "(Ctrl o Shift + click para varias).",
+            )
+            return
+        selected_accounts = [self.accounts[index] for index in indices]
+        batch_name = self.batch_name_var.get().strip() or _suggest_batch_name()
+        if not messagebox.askyesno(
+            "Guardar selección",
+            f"¿Guardar un lote con {len(selected_accounts)} cuenta(s) seleccionada(s)?\n\n"
+            f"Nombre: {batch_name}\n\n"
+            "Las cuentas guardadas saldrán de la tabla. "
+            "Las no seleccionadas permanecen para otro lote.",
+        ):
+            return
+
+        draft = BatchDraft(
+            batch_name=batch_name,
+            default_start_now_date=self.default_date_var.get(),
+            accounts=list(selected_accounts),
+        )
+        # If editing a registered DRAFT, that id receives the selection.
+        # Remaining rows become a new unregistered working set.
+        try:
+            result = save_batch_draft(
+                draft,
+                self.connection,
+                settings=self.settings,
+                batch_id=self.saved_batch_id,
+            )
+        except BatchDraftValidationError as exc:
+            messagebox.showerror("Validation", str(exc))
+            return
+        except ValueError as exc:
+            messagebox.showerror("SQLite", str(exc))
+            return
+
+        for index in reversed(indices):
+            del self.accounts[index]
+
+        remaining = len(self.accounts)
+        self.saved_batch_id = None
+        self.saved_draft_signature = None
+        self.active_batch_id = None
+        self.runtime_progress = {}
+        self.selected_index = None
+        self._username_sort_ascending = None
+        self.tree.heading(
+            "username",
+            text=_username_heading_title(None),
+            command=self._toggle_username_sort,
+        )
+        self.batch_name_var.set(_suggest_batch_name())
+        self._clear_editor()
+        self._refresh_table()
+        self._refresh_catalog()
+        self._update_batch_context()
+        self._update_pending_button_label()
+        self._write_console(
+            f"Selección guardada como lote {result.batch.batch_name} "
+            f"(id={result.batch.id}, estado=DRAFT); "
+            f"{remaining} cuenta(s) quedan en la mesa de trabajo.\n"
+        )
+        self._set_status(
+            f"Selección guardada id {result.batch.id}; quedan {remaining} en mesa"
+        )
+        messagebox.showinfo(
+            "Selección guardada",
+            f"Lote id {result.batch.id} con {len(selected_accounts)} cuenta(s).\n"
+            f"Quedan {remaining} cuenta(s) en la mesa de trabajo.",
+        )
 
     def _execute(self) -> None:
         if self.process_runner.is_running():
@@ -1492,9 +1636,11 @@ class InstagramOrchestratorApp:
         self.register_button.configure(state=button_state)
         self.pending_button.configure(state=button_state)
         self.execute_button.configure(state=button_state)
+        self.save_selection_button.configure(state=button_state)
         if running and self.active_process_kind == "batch":
             _set_ttk_enabled(self.tree, True)
             self.delete_button.configure(state="normal")
+            self.save_selection_button.configure(state="disabled")
         self.cancel_button.configure(state="normal" if running else "disabled")
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
@@ -1595,6 +1741,26 @@ _BATCH_COLUMNS = (
     ("stories", "Stories"),
     ("start_date", "Start date"),
 )
+
+
+def _username_heading_title(ascending: bool | None) -> str:
+    if ascending is True:
+        return "Username ▲"
+    if ascending is False:
+        return "Username ▼"
+    return "Username"
+
+
+def _sort_accounts_by_username(
+    accounts: list[AccountDraft],
+    *,
+    ascending: bool,
+) -> list[AccountDraft]:
+    return sorted(
+        accounts,
+        key=lambda account: account.username.casefold(),
+        reverse=not ascending,
+    )
 
 
 def _catalog_width_chars(usernames: Iterable[str]) -> int:

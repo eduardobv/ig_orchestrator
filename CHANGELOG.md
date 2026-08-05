@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.26.15 - Patch - Lote actual: orden Username y Guardar seleccion
+
+Fecha: 2026-08-05
+
+### Creado
+
+* `tasks/Patch_v1.26.15.md` documenta el orden por username, la seleccion
+  multiple y el boton `Guardar selección`.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` permite ordenar la tabla por `Username`
+  (A-Z / Z-A), usa `selectmode=extended` y anade `Guardar selección` para
+  persistir solo las filas elegidas como DRAFT, dejando el resto en mesa de
+  trabajo sin ID de lote.
+* `tests/test_gui_services.py` cubre helpers de orden y el guardado de
+  seleccion con resto en memoria.
+* `README.md` y `tasks/task-gui.md` describen el comportamiento.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y las pruebas de smoke
+  actualizan la version a `1.26.15`.
+
+### Resumen
+
+Desde la mesa de trabajo se puede reordenar el lote por nombre y partir
+varias cuentas en lotes distintos sin vaciar a mano las que se quieren dejar
+para despues.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+
 ## v1.26.14 - Patch - Editor: checkboxes juntos y foco al final de URLs
 
 Fecha: 2026-08-05

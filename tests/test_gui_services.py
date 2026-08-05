@@ -32,7 +32,9 @@ from ig_orchestrator.gui.app import (
     _set_ttk_enabled,
     _latest_executed_batch_name,
     _new_account_rename_parameters,
+    _sort_accounts_by_username,
     _timestamp_console_text,
+    _username_heading_title,
 )
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
@@ -471,6 +473,133 @@ def test_gui_batch_columns_follow_compact_requested_order_and_catalog_width() ->
         "stories": "Stories",
         "start_date": "0000-00-00",
     }
+
+
+def test_gui_username_heading_and_sort_helpers() -> None:
+    accounts = [
+        AccountDraft(username="zeta", download_stories=False),
+        AccountDraft(username="Alpha", download_stories=True),
+        AccountDraft(username="beta", download_stories=False),
+    ]
+
+    assert _username_heading_title(None) == "Username"
+    assert _username_heading_title(True) == "Username ▲"
+    assert _username_heading_title(False) == "Username ▼"
+    assert [
+        item.username
+        for item in _sort_accounts_by_username(accounts, ascending=True)
+    ] == ["Alpha", "beta", "zeta"]
+    assert [
+        item.username
+        for item in _sort_accounts_by_username(accounts, ascending=False)
+    ] == ["zeta", "beta", "Alpha"]
+
+
+def test_gui_save_selection_persists_subset_and_leaves_remainder(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+
+    class FakeVar:
+        def __init__(self, value: str = "") -> None:
+            self.value = value
+
+        def get(self) -> str:
+            return self.value
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    class FakeRunner:
+        @staticmethod
+        def is_running() -> bool:
+            return False
+
+    class FakeTree:
+        def __init__(self) -> None:
+            self._selection = ("0", "2")
+            self.heading_calls: list[tuple[object, ...]] = []
+
+        def selection(self) -> tuple[str, ...]:
+            return self._selection
+
+        def selection_remove(self, *items: str) -> None:
+            return None
+
+        def heading(self, *_args, **_kwargs) -> None:
+            self.heading_calls.append((_args, _kwargs))
+
+    with connect(db_path) as connection:
+        app = object.__new__(InstagramOrchestratorApp)
+        app.process_runner = FakeRunner()
+        app.connection = connection
+        app.settings = None
+        app.batch_name_var = FakeVar("lote_seleccion")
+        app.default_date_var = FakeVar("2026-08-05")
+        app.accounts = [
+            AccountDraft(
+                username="one",
+                download_stories=True,
+                urls=["https://www.instagram.com/p/AAA/"],
+                start_now_date="2026-08-05",
+            ),
+            AccountDraft(
+                username="two",
+                download_stories=False,
+                urls=["https://www.instagram.com/p/BBB/"],
+                start_now_date="2026-08-05",
+            ),
+            AccountDraft(
+                username="three",
+                download_stories=False,
+                urls=["https://www.instagram.com/p/CCC/"],
+                start_now_date="2026-08-05",
+            ),
+        ]
+        app.saved_batch_id = None
+        app.saved_draft_signature = None
+        app.active_batch_id = 99
+        app.runtime_progress = {"x": object()}
+        app.selected_index = 0
+        app._username_sort_ascending = True
+        app.tree = FakeTree()
+        app._clear_editor = lambda: None
+        app._refresh_table = lambda: None
+        app._refresh_catalog = lambda: None
+        app._update_batch_context = lambda: None
+        app._update_pending_button_label = lambda: None
+        app._write_console = lambda _text: None
+        app._set_status = lambda _text: None
+        monkeypatch.setattr(
+            "ig_orchestrator.gui.app.messagebox.askyesno",
+            lambda *_args, **_kwargs: True,
+        )
+        monkeypatch.setattr(
+            "ig_orchestrator.gui.app.messagebox.showinfo",
+            lambda *_args, **_kwargs: None,
+        )
+
+        app._save_selected_accounts_as_batch()
+
+        batches = connection.execute(
+            "SELECT id, batch_name, status FROM input_batches"
+        ).fetchall()
+        usernames = {
+            str(row["username"])
+            for row in connection.execute("SELECT username FROM accounts").fetchall()
+        }
+
+    assert len(batches) == 1
+    assert batches[0]["batch_name"] == "lote_seleccion"
+    assert batches[0]["status"] == "DRAFT"
+    assert usernames == {"one", "three"}
+    assert [account.username for account in app.accounts] == ["two"]
+    assert app.saved_batch_id is None
+    assert app.active_batch_id is None
+    assert app.runtime_progress == {}
+    assert app.batch_name_var.value.startswith("descargas_")
 
 
 def test_gui_clear_editor_deselects_the_batch_account() -> None:

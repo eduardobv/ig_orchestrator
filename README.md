@@ -358,7 +358,10 @@ antes de la caja de estado. `URLs`, `Cuentas del lote actual` y la caja de
 estado muestran scroll vertical permanente y visible. El ancho inicial del
 catalogo se ajusta al username mas largo. La tabla presenta `Username`, `URLs`,
 `Estado`, `Stories` y `Start date`: username usa el mismo maximo del catalogo y
-el resto reserva solo su contenido maximo esperado.
+el resto reserva solo su contenido maximo esperado. El encabezado `Username`
+ordena A-Z / Z-A. Se pueden seleccionar varias cuentas (Ctrl/Shift) y usar
+`Guardar selección` para registrar solo esas en un lote DRAFT; las demas
+permanecen en la mesa de trabajo. `Registrar lote` sigue guardando todas.
 
 Cuando el subproceso de un lote termina, la GUI reproduce el sonido de
 finalizacion de Windows. Si no esta disponible, utiliza la campana de Tk.

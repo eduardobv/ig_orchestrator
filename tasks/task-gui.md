@@ -137,12 +137,17 @@ Zona derecha inferior: lote actual
 - El ancho de `username` se ajusta a la cuenta mas larga del catalogo. `urls`
   reserva cuatro digitos, `estado` reserva `Completada 9999/9999`, `stories`
   queda compacto y `start date` reserva diez caracteres.
-- Seleccionar una fila carga sus datos en el editor.
+- Click en el encabezado `Username` ordena A-Z / Z-A (indicador ▲/▼).
+- Seleccion multiple (`extended`: Ctrl/Shift + click). Una fila enfocada carga
+  sus datos en el editor.
 - Botones:
   - `Subir`;
   - `Bajar`;
   - `Duplicar`;
-  - `Eliminar`;
+  - `Eliminar` (todas las filas seleccionadas);
+  - `Guardar selección`: crea/actualiza un DRAFT solo con las filas
+    seleccionadas, las saca de la tabla y deja el resto en una mesa de trabajo
+    nueva (sin ID de lote); `Registrar lote` sigue guardando todas;
   - `Eliminar todo`; si el lote ya esta registrado, confirma mostrando nombre
     e ID antes de retirar todas las cuentas del borrador visible.
 
