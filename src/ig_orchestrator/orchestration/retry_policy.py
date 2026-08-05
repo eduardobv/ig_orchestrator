@@ -7,6 +7,10 @@ from typing import Deque, Generic, Iterable, TypeVar
 
 from ig_orchestrator.models import UrlJobStatus
 
+# Bot message "Media not found or unavailable" is retryable once only.
+MEDIA_NOT_FOUND_ERROR_TYPE = "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
+MEDIA_NOT_FOUND_MAX_RETRIES = 1
+
 
 class RetryDecisionAction(StrEnum):
     RETRY = "RETRY"
@@ -60,6 +64,17 @@ class RetryQueue(Generic[T]):
         return tuple(self._items)
 
 
+def resolve_max_retries_for_error(
+    max_retries: int,
+    last_error_type: str | None,
+) -> int:
+    """Cap max_retries for known error types that should not use the global budget."""
+
+    if last_error_type == MEDIA_NOT_FOUND_ERROR_TYPE:
+        return min(max_retries, MEDIA_NOT_FOUND_MAX_RETRIES)
+    return max_retries
+
+
 def calculate_retry_decision(
     *,
     retries: int,
@@ -67,6 +82,7 @@ def calculate_retry_decision(
     base_seconds: int,
     max_seconds: int,
     non_retryable: bool,
+    last_error_type: str | None = None,
 ) -> RetryDecision:
     """Calculate retry backoff and final-failure decisions without sleeping."""
 
@@ -75,6 +91,11 @@ def calculate_retry_decision(
     _validate_positive("base_seconds", base_seconds)
     _validate_positive("max_seconds", max_seconds)
 
+    effective_max_retries = resolve_max_retries_for_error(
+        max_retries,
+        last_error_type,
+    )
+
     if non_retryable:
         return RetryDecision(
             action=RetryDecisionAction.FAILED_FINAL,
@@ -82,7 +103,7 @@ def calculate_retry_decision(
             reason="non_retryable",
         )
 
-    if retries >= max_retries:
+    if retries >= effective_max_retries:
         return RetryDecision(
             action=RetryDecisionAction.FAILED_FINAL,
             status=UrlJobStatus.FAILED_FINAL,
@@ -109,8 +130,11 @@ def _validate_positive(name: str, value: int) -> None:
 
 
 __all__ = [
+    "MEDIA_NOT_FOUND_ERROR_TYPE",
+    "MEDIA_NOT_FOUND_MAX_RETRIES",
     "RetryDecision",
     "RetryDecisionAction",
     "RetryQueue",
     "calculate_retry_decision",
+    "resolve_max_retries_for_error",
 ]

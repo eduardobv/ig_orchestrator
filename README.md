@@ -281,14 +281,14 @@ seleccion y el scroll. Una cuenta inactiva vuelve automaticamente a `ENABLED`
 cuando participa en un lote real; un dry-run no modifica este estado.
 
 `Lotes / ejecuciones (N)` abre un maestro ordenado por fecha. Un lote registrado
-queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar para
-modificarlo, actualizarlo conservando su batch id, borrarlo o ejecutarlo. Al
-ejecutarlo cambia a `IMPORTED` y queda bloqueado para edición. Desde entonces
-se trata como ejecución y sólo se puede reanudar o finalizar. `Reanudar /
-Ejecutar` reconstruye `Lote actual` desde SQLite y lanza `run_continue` para ese
-id. `Dar por finalizado` solicita confirmacion y
-marca únicamente el batch como `COMPLETED`: deja intactas sus cuentas, URLs,
-errores y archivos, pero lo retira del selector.
+queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar,
+exportar, borrar o ejecutar. Al ejecutarlo cambia a `IMPORTED` y queda
+bloqueado para edicion. Las ejecuciones con trabajo pendiente se reanudan;
+cuando las descargas terminan (o se marca **Ejecutado en otra instancia**) el
+lote pasa a `AWAITING_RENAME` (`POR RENOMBRAR`): se puede **Renombrar** o
+**Finalizar sin renombrar**. Solo entonces pasa a `COMPLETED` y desaparece del
+selector. **Exportar** genera un JSON portable; **Importar** crea un DRAFT
+nuevo en la instancia actual (nombre unico si hay colision).
 
 `Nuevo lote` cierra el contexto editable actual sin tocarlo en SQLite, vacia
 las cuentas y el editor, desvincula su ID y propone un nombre nuevo. Es la
@@ -329,17 +329,17 @@ cuenta `FAILED` y sus URLs no terminales `FAILED_FINAL` con error
 `MANUAL_ACCOUNT_REMOVAL`, sin borrar trazabilidad ni detener las demas cuentas.
 Los botones `Subir`, `Bajar` y `Duplicar` estan ocultos en esta version.
 
-`Cancelar proceso` termina el subproceso y, cuando éste se cierra, marca el
+`Detener proceso` termina el subproceso y, cuando éste se cierra, marca el
 batch como `PARTIAL`. No reinicia ni elimina estados: las cuentas y URL jobs
 ya completados permanecen completados y el lote vuelve a aparecer en
-el maestro para continuar el trabajo restante. Tras cancelar, el click derecho
+el maestro para continuar el trabajo restante. Tras detener, el click derecho
 sobre una cuenta ofrece `Completar`: cierra como `FAILED_FINAL` sus URLs aún no
 terminales, conserva el error previo cuando existe y marca la cuenta como
 `COMPLETED`. Cuando todas las cuentas quedan completadas manualmente, el batch
 pasa a `COMPLETED`.
 
 El boton `Renombrar`, situado junto a las acciones del proceso, se habilita
-cuando finaliza correctamente una ejecución real o cuando, tras cancelarla,
+cuando finaliza correctamente una ejecución real o cuando, tras detenerla,
 todas las cuentas pendientes se han completado manualmente. No se habilita tras
 un dry-run ni mientras queden cuentas abiertas. Al pulsarlo ejecuta en segundo
 plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
@@ -810,7 +810,7 @@ Errores reintentables del bot:
 ```text
 The service is overloaded, please try again later.
 geoblock_required
-Media not found or unavailable
+Media not found or unavailable   # solo 1 reintento (tope propio)
 ```
 
 Errores definitivos, sin reintento:
@@ -839,6 +839,8 @@ Politica:
 - Despues se procesan URLs manuales.
 - Al final se procesa la cola FIFO de reintentos.
 - Tras `MAX_RETRIES`, se marca `FAILED_FINAL`.
+- `Media not found or unavailable` solo se reintenta **1 vez**, aunque
+  `MAX_RETRIES` sea mayor; luego `FAILED_FINAL`.
 - Si el bot no devuelve ningún mensaje ni archivo antes del timeout, se registra
   `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
   `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.

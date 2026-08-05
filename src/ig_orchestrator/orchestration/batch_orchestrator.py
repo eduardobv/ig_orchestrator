@@ -372,7 +372,8 @@ def _account_folder(account: Account, default_working_folder: Path | None) -> Pa
 
 def _batch_status_from_summary(summary: RunSummary) -> InputBatchStatus:
     if summary.status is RunStatus.COMPLETED:
-        return InputBatchStatus.COMPLETED
+        # Keep the batch visible for rename / explicit finalize.
+        return InputBatchStatus.AWAITING_RENAME
     if summary.status is RunStatus.PARTIAL:
         return InputBatchStatus.PARTIAL
     return InputBatchStatus.FAILED

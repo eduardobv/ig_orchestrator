@@ -7,7 +7,7 @@ import re
 from sqlite3 import Connection
 import tkinter as tk
 from tkinter import font as tkfont
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 import webbrowser
 
 from ig_orchestrator.gui.account_catalog_service import (
@@ -33,7 +33,13 @@ from ig_orchestrator.gui.batch_resume_service import (
     is_batch_ready_for_rename,
     list_managed_batches,
     load_batch_draft,
+    mark_batch_executed_elsewhere,
     mark_batch_interrupted,
+)
+from ig_orchestrator.gui.batch_transfer_service import (
+    BatchTransferError,
+    export_batch_to_path,
+    import_batch_from_path,
 )
 from ig_orchestrator.gui.process_runner import (
     MANUAL_RENAME_SCRIPT,
@@ -228,7 +234,7 @@ class InstagramOrchestratorApp:
         )
         self.cancel_button = ttk.Button(
             progress,
-            text="Cancelar proceso",
+            text="Detener proceso",
             command=self._cancel_process,
             state="disabled",
         )
@@ -1022,7 +1028,7 @@ class InstagramOrchestratorApp:
         managed = list_managed_batches(self.connection)
         dialog = tk.Toplevel(self.root)
         dialog.title("Lotes guardados y ejecuciones pendientes")
-        dialog.geometry("940x360")
+        dialog.geometry("980x420")
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.columnconfigure(0, weight=1)
@@ -1030,8 +1036,10 @@ class InstagramOrchestratorApp:
         ttk.Label(
             dialog,
             text=(
-                "Los lotes GUARDADOS se pueden recuperar, modificar, borrar o ejecutar. "
-                "Los demás estados pertenecen a ejecuciones y sólo se pueden reanudar."
+                "GUARDADO: recuperar/exportar/ejecutar. "
+                "Ejecuciones: reanudar o finalizar. "
+                "POR RENOMBRAR: renombrar o finalizar sin renombrar. "
+                "Importar crea un lote nuevo en esta instancia."
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
@@ -1039,19 +1047,38 @@ class InstagramOrchestratorApp:
         tree = ttk.Treeview(dialog, columns=columns, show="headings", selectmode="browse")
         for column, title, width in (
             ("date", "Fecha", 170),
-            ("name", "Nombre", 260),
+            ("name", "Nombre", 240),
             ("id", "Batch ID", 75),
-            ("status", "Estado", 100),
-            ("progress", "Cuentas", 230),
+            ("status", "Estado", 120),
+            ("progress", "Cuentas", 250),
         ):
             tree.heading(column, text=title)
             tree.column(column, width=width, anchor="w")
         tree.grid(row=1, column=0, sticky="nsew", padx=10, pady=6)
+        empty_label = ttk.Label(
+            dialog,
+            text="No hay lotes guardados ni ejecuciones pendientes.",
+        )
+
+        def progress_text(summary) -> str:
+            if summary.is_draft:
+                return f"{summary.total_accounts} cuentas editables"
+            if summary.is_awaiting_rename:
+                return (
+                    f"{summary.completed_accounts}/{summary.total_accounts} "
+                    "listas; pendiente renombrar o finalizar"
+                )
+            return (
+                f"{summary.completed_accounts}/{summary.total_accounts} completas; "
+                f"{summary.retry_accounts} reintento; "
+                f"{summary.remaining_accounts} por terminar"
+            )
 
         def reload_rows() -> None:
             for item in tree.get_children():
                 tree.delete(item)
-            for summary in list_managed_batches(self.connection):
+            rows = list_managed_batches(self.connection)
+            for summary in rows:
                 tree.insert(
                     "",
                     tk.END,
@@ -1060,16 +1087,14 @@ class InstagramOrchestratorApp:
                         summary.batch_date,
                         summary.batch_name,
                         summary.batch_id,
-                        "GUARDADO" if summary.is_draft else summary.status,
-                        (
-                            f"{summary.total_accounts} cuentas editables"
-                            if summary.is_draft
-                            else f"{summary.completed_accounts}/{summary.total_accounts} completas; "
-                            f"{summary.retry_accounts} reintento; "
-                            f"{summary.remaining_accounts} por terminar"
-                        ),
+                        summary.display_status,
+                        progress_text(summary),
                     ),
                 )
+            if rows:
+                empty_label.place_forget()
+            else:
+                empty_label.place(relx=0.5, rely=0.48, anchor="center")
 
         def selected_batch_id() -> int | None:
             selection = tree.selection()
@@ -1087,7 +1112,11 @@ class InstagramOrchestratorApp:
             if batch_id is None:
                 return None
             return next(
-                (item for item in list_managed_batches(self.connection) if item.batch_id == batch_id),
+                (
+                    item
+                    for item in list_managed_batches(self.connection)
+                    if item.batch_id == batch_id
+                ),
                 None,
             )
 
@@ -1098,7 +1127,8 @@ class InstagramOrchestratorApp:
             if not summary.is_draft:
                 messagebox.showwarning(
                     "Recuperar lote",
-                    "Una ejecución ya iniciada no se puede editar. Usa Reanudar / Ejecutar.",
+                    "Una ejecucion ya iniciada no se puede editar. "
+                    "Usa Reanudar / Ejecutar o Renombrar segun el estado.",
                     parent=dialog,
                 )
                 return
@@ -1110,13 +1140,22 @@ class InstagramOrchestratorApp:
             dialog.destroy()
             self._load_persisted_draft(summary.batch_id, draft)
             self._write_console(
-                f"Lote guardado {summary.batch_id} abierto para modificación.\n"
+                f"Lote guardado {summary.batch_id} abierto para modificacion.\n"
             )
 
         def resume_selected() -> None:
-            batch_id = selected_batch_id()
-            if batch_id is None:
+            summary = selected_summary()
+            if summary is None:
                 return
+            if summary.is_awaiting_rename:
+                messagebox.showwarning(
+                    "Reanudar lote",
+                    "Este lote esta POR RENOMBRAR. Usa Renombrar o "
+                    "Finalizar sin renombrar.",
+                    parent=dialog,
+                )
+                return
+            batch_id = summary.batch_id
             try:
                 draft = load_batch_draft(self.connection, batch_id)
             except ValueError as exc:
@@ -1133,13 +1172,13 @@ class InstagramOrchestratorApp:
             if not summary.is_draft:
                 messagebox.showwarning(
                     "Borrar lote",
-                    "Sólo se pueden borrar lotes GUARDADOS que nunca se hayan ejecutado.",
+                    "Solo se pueden borrar lotes GUARDADOS que nunca se hayan ejecutado.",
                     parent=dialog,
                 )
                 return
             if not messagebox.askyesno(
                 "Borrar lote guardado",
-                f"¿Borrar definitivamente el lote guardado {summary.batch_name} "
+                f"Borrar definitivamente el lote guardado {summary.batch_name} "
                 f"(id={summary.batch_id})?",
                 parent=dialog,
             ):
@@ -1161,27 +1200,158 @@ class InstagramOrchestratorApp:
             batch_id = summary.batch_id
             if summary.is_draft:
                 messagebox.showwarning(
-                    "Dar por finalizado",
-                    "Un lote GUARDADO todavía no es una ejecución.",
+                    "Finalizar sin renombrar",
+                    "Un lote GUARDADO todavia no es una ejecucion. "
+                    "Si se ejecuto en otra instancia, usa "
+                    "Ejecutado en otra instancia.",
                     parent=dialog,
                 )
                 return
             if not messagebox.askyesno(
-                "Dar por finalizado",
-                f"¿Seguro que quieres dar por finalizado el batch {batch_id}?\n\n"
-                "No volverá a aparecer entre las ejecuciones pendientes. "
-                "Los datos y archivos no se eliminarán.",
+                "Finalizar sin renombrar",
+                f"Dar por finalizado el batch {batch_id} sin renombrar?\n\n"
+                "Pasara a COMPLETED y no volvera a aparecer en pendientes. "
+                "Los datos y archivos no se eliminaran.",
                 parent=dialog,
             ):
                 return
             try:
                 finish_batch(self.connection, batch_id)
             except ValueError as exc:
-                messagebox.showerror("Dar por finalizado", str(exc), parent=dialog)
+                messagebox.showerror("Finalizar sin renombrar", str(exc), parent=dialog)
                 return
-            self._write_console(f"Batch {batch_id} marcado manualmente como COMPLETED.\n")
+            if self.active_batch_id == batch_id:
+                self.batch_ready_for_rename = False
+                self.rename_button.configure(state="disabled")
+            self._write_console(
+                f"Batch {batch_id} marcado como COMPLETED (sin renombrar).\n"
+            )
             reload_rows()
             self._update_pending_button_label()
+
+        def mark_elsewhere_selected() -> None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            if summary.is_awaiting_rename:
+                messagebox.showinfo(
+                    "Ejecutado en otra instancia",
+                    "Este lote ya esta POR RENOMBRAR.",
+                    parent=dialog,
+                )
+                return
+            if not messagebox.askyesno(
+                "Ejecutado en otra instancia",
+                f"Marcar el lote {summary.batch_name} (id={summary.batch_id}) "
+                "como ejecutado en otra instancia?\n\n"
+                "Dejara de ser pendiente de descarga y pasara a POR RENOMBRAR "
+                "(puedes renombrar o finalizar sin renombrar).",
+                parent=dialog,
+            ):
+                return
+            try:
+                mark_batch_executed_elsewhere(self.connection, summary.batch_id)
+            except ValueError as exc:
+                messagebox.showerror(
+                    "Ejecutado en otra instancia",
+                    str(exc),
+                    parent=dialog,
+                )
+                return
+            self._write_console(
+                f"Batch {summary.batch_id} marcado como AWAITING_RENAME "
+                "(ejecutado en otra instancia).\n"
+            )
+            reload_rows()
+            self._update_pending_button_label()
+
+        def rename_selected() -> None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            batch_id = summary.batch_id
+            if not is_batch_ready_for_rename(self.connection, batch_id):
+                messagebox.showwarning(
+                    "Renombrar",
+                    "Este lote aun no esta listo para renombrar. "
+                    "Debe estar POR RENOMBRAR o con todas las cuentas completadas.",
+                    parent=dialog,
+                )
+                return
+            try:
+                draft = load_batch_draft(self.connection, batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Renombrar", str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._load_persisted_draft(batch_id, draft)
+            # Recovered awaiting-rename lots are not editable drafts.
+            self.saved_batch_id = None
+            self.saved_draft_signature = None
+            self.active_batch_id = batch_id
+            self.batch_ready_for_rename = True
+            self._update_batch_context()
+            self.rename_button.configure(state="normal")
+            self._write_console(
+                f"Lote {batch_id} cargado para renombrar. "
+                "Pulsa Renombrar en la ventana principal.\n"
+            )
+            self._rename_manual_files()
+
+        def export_selected() -> None:
+            summary = selected_summary()
+            if summary is None:
+                return
+            path = filedialog.asksaveasfilename(
+                parent=dialog,
+                title="Exportar lote",
+                defaultextension=".json",
+                filetypes=[("JSON", "*.json"), ("Todos", "*.*")],
+                initialfile=f"{summary.batch_name}.json",
+            )
+            if not path:
+                return
+            try:
+                export_batch_to_path(self.connection, summary.batch_id, Path(path))
+            except (OSError, ValueError, BatchTransferError) as exc:
+                messagebox.showerror("Exportar lote", str(exc), parent=dialog)
+                return
+            self._write_console(f"Lote {summary.batch_id} exportado a {path}\n")
+            messagebox.showinfo(
+                "Exportar lote",
+                f"Lote exportado:\n{path}",
+                parent=dialog,
+            )
+
+        def import_batch() -> None:
+            path = filedialog.askopenfilename(
+                parent=dialog,
+                title="Importar lote",
+                filetypes=[("JSON", "*.json"), ("Todos", "*.*")],
+            )
+            if not path:
+                return
+            try:
+                result = import_batch_from_path(
+                    self.connection,
+                    Path(path),
+                    settings=self.settings,
+                )
+            except (OSError, ValueError, BatchTransferError) as exc:
+                messagebox.showerror("Importar lote", str(exc), parent=dialog)
+                return
+            self._write_console(
+                f"Lote importado como DRAFT id={result.batch.id} "
+                f"nombre={result.batch.batch_name} desde {path}\n"
+            )
+            reload_rows()
+            self._update_pending_button_label()
+            messagebox.showinfo(
+                "Importar lote",
+                f"Importado como lote guardado id={result.batch.id}\n"
+                f"Nombre: {result.batch.batch_name}",
+                parent=dialog,
+            )
 
         actions = ttk.Frame(dialog, padding=10)
         actions.grid(row=2, column=0, sticky="ew")
@@ -1191,19 +1361,33 @@ class InstagramOrchestratorApp:
         ttk.Button(actions, text="Recuperar / Modificar", command=recover_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(actions, text="Borrar lote", command=delete_selected).pack(
+        ttk.Button(actions, text="Renombrar", command=rename_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(actions, text="Dar por finalizado", command=finish_selected).pack(
+        ttk.Button(
+            actions,
+            text="Finalizar sin renombrar",
+            command=finish_selected,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(
+            actions,
+            text="Ejecutado en otra instancia",
+            command=mark_elsewhere_selected,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(actions, text="Exportar", command=export_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        ttk.Button(actions, text="Importar", command=import_batch).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        ttk.Button(actions, text="Borrar lote", command=delete_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
         ttk.Button(actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
         tree.bind("<Double-Button-1>", lambda _event: resume_selected())
         reload_rows()
         if not managed:
-            ttk.Label(dialog, text="No hay lotes guardados ni ejecuciones pendientes.").place(
-                relx=0.5, rely=0.48, anchor="center"
-            )
+            empty_label.place(relx=0.5, rely=0.48, anchor="center")
 
     def _update_pending_button_label(self) -> None:
         total = len(list_managed_batches(self.connection))
@@ -1478,22 +1662,31 @@ class InstagramOrchestratorApp:
         self._refresh_runtime_progress()
         self._reload_catalog()
         self.batch_ready_for_rename = (
-            exit_code == 0
-            and not self.last_run_was_dry_run
+            not self.last_run_was_dry_run
             and not self.cancel_requested
+            and is_batch_ready_for_rename(self.connection, batch_id)
         )
         self._set_process_running(False)
         if self.cancel_requested:
             self._set_status(f"Lote {batch_id} interrumpido; queda pendiente")
             self._write_console(
-                f"Lote {batch_id} cancelado. SQLite conserva el trabajo y el batch "
+                f"Lote {batch_id} detenido. SQLite conserva el trabajo y el batch "
                 "queda en estado PARTIAL para poder reanudarlo.\n"
             )
         elif exit_code == 0:
             self.account_progress_var.set("Cuentas: 100%")
             self.item_progress_var.set("Items: 100%")
-            self._set_status(f"Lote {batch_id} finalizado correctamente")
-            self._write_console(f"Lote {batch_id} finalizado correctamente.\n")
+            if self.batch_ready_for_rename:
+                self._set_status(
+                    f"Lote {batch_id} listo para renombrar o finalizar"
+                )
+                self._write_console(
+                    f"Lote {batch_id} finalizado correctamente. "
+                    "Estado POR RENOMBRAR: usa Renombrar o Finalizar sin renombrar.\n"
+                )
+            else:
+                self._set_status(f"Lote {batch_id} finalizado correctamente")
+                self._write_console(f"Lote {batch_id} finalizado correctamente.\n")
         else:
             self._set_status(f"Lote {batch_id} finalizado con codigo {exit_code}")
             self._write_console(
@@ -1508,7 +1701,7 @@ class InstagramOrchestratorApp:
         if self.process_runner.is_running():
             messagebox.showwarning(
                 "Completar cuenta",
-                "Cancela primero la ejecución antes de completar una cuenta manualmente.",
+                "Detén primero la ejecución antes de completar una cuenta manualmente.",
             )
             return
         if self.selected_index is None or self.active_batch_id is None:
@@ -1615,6 +1808,20 @@ class InstagramOrchestratorApp:
         self.active_process_kind = None
         self._set_process_running(False)
         if exit_code == 0:
+            if self.active_batch_id is not None:
+                try:
+                    finish_batch(self.connection, self.active_batch_id)
+                    self._write_console(
+                        f"Batch {self.active_batch_id} marcado COMPLETED "
+                        "tras renombrar.\n"
+                    )
+                except ValueError as exc:
+                    self._write_console(
+                        f"No se pudo marcar COMPLETED tras renombrar: {exc}\n"
+                    )
+            self.batch_ready_for_rename = False
+            self.rename_button.configure(state="disabled")
+            self._update_pending_button_label()
             self._set_status("Renombrado finalizado correctamente")
             self._write_console("Renombrado finalizado correctamente.\n")
         else:
@@ -1626,8 +1833,8 @@ class InstagramOrchestratorApp:
     def _cancel_process(self) -> None:
         if self.process_runner.cancel():
             self.cancel_requested = self.active_process_kind == "batch"
-            self._set_status("Cancelando proceso...")
-            self._write_console("Cancelacion solicitada.\n")
+            self._set_status("Deteniendo proceso...")
+            self._write_console("Detencion solicitada.\n")
 
     def _set_process_running(self, running: bool) -> None:
         self._set_descendants_enabled(self.top_region, not running)

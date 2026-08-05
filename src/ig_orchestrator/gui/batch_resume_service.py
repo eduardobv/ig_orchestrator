@@ -37,6 +37,18 @@ class PendingBatchSummary:
     def is_draft(self) -> bool:
         return self.status == InputBatchStatus.DRAFT.value
 
+    @property
+    def is_awaiting_rename(self) -> bool:
+        return self.status == InputBatchStatus.AWAITING_RENAME.value
+
+    @property
+    def display_status(self) -> str:
+        if self.is_draft:
+            return "GUARDADO"
+        if self.is_awaiting_rename:
+            return "POR RENOMBRAR"
+        return self.status
+
 
 @dataclass(frozen=True, slots=True)
 class AccountRuntimeProgress:
@@ -67,7 +79,7 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
                 WHERE a.batch_id = b.id
                   AND j.status IN ({placeholders})) AS remaining_accounts
         FROM input_batches b
-        WHERE b.status NOT IN ('DRAFT', 'COMPLETED')
+        WHERE b.status NOT IN ('DRAFT', 'COMPLETED', 'AWAITING_RENAME')
           AND EXISTS (
               SELECT 1
               FROM accounts a JOIN url_jobs j ON j.account_id = a.id
@@ -95,31 +107,37 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
 
 
 def list_managed_batches(connection: Connection) -> list[PendingBatchSummary]:
-    """Return editable drafts and executions that still have resumable work."""
+    """Return drafts, download-pending runs and batches waiting for rename."""
 
     executions = {item.batch_id: item for item in list_pending_batches(connection)}
     rows = connection.execute(
         """
         SELECT b.id, b.batch_name, b.created_at, b.status,
-               COUNT(DISTINCT a.id) AS total_accounts
+               COUNT(DISTINCT a.id) AS total_accounts,
+               SUM(CASE WHEN a.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_accounts
         FROM input_batches b
         LEFT JOIN accounts a ON a.batch_id = b.id
-        WHERE b.status = 'DRAFT'
+        WHERE b.status IN ('DRAFT', 'AWAITING_RENAME')
         GROUP BY b.id
         ORDER BY b.created_at DESC, b.id DESC
         """
     ).fetchall()
     for row in rows:
         batch_id = int(row["id"])
+        total = int(row["total_accounts"] or 0)
+        completed = int(row["completed_accounts"] or 0)
+        status = str(row["status"])
         executions[batch_id] = PendingBatchSummary(
             batch_id=batch_id,
             batch_name=str(row["batch_name"]),
             batch_date=str(row["created_at"]),
-            status=str(row["status"]),
-            total_accounts=int(row["total_accounts"] or 0),
-            completed_accounts=0,
+            status=status,
+            total_accounts=total,
+            completed_accounts=completed,
             retry_accounts=0,
-            remaining_accounts=int(row["total_accounts"] or 0),
+            remaining_accounts=(
+                0 if status == InputBatchStatus.AWAITING_RENAME.value else total
+            ),
         )
     return sorted(
         executions.values(),
@@ -226,6 +244,77 @@ def finish_batch(connection: Connection, batch_id: int) -> None:
     )
     if cursor.rowcount == 0:
         raise ValueError(f"Batch not found: {batch_id}")
+    connection.commit()
+
+
+def mark_batch_awaiting_rename(connection: Connection, batch_id: int) -> None:
+    """Mark a batch as ready for rename / finalize without more downloads."""
+
+    cursor = connection.execute(
+        """
+        UPDATE input_batches
+        SET status = ?, updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (InputBatchStatus.AWAITING_RENAME.value, batch_id),
+    )
+    if cursor.rowcount == 0:
+        raise ValueError(f"Batch not found: {batch_id}")
+    connection.commit()
+
+
+def mark_batch_executed_elsewhere(connection: Connection, batch_id: int) -> None:
+    """Close download work locally because the batch ran on another instance."""
+
+    row = connection.execute(
+        "SELECT status FROM input_batches WHERE id = ?",
+        (batch_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Batch not found: {batch_id}")
+    status = str(row["status"])
+    if status == InputBatchStatus.COMPLETED.value:
+        raise ValueError("El lote ya esta completado")
+    if status == InputBatchStatus.AWAITING_RENAME.value:
+        return
+    if status == InputBatchStatus.PROCESSING.value:
+        raise ValueError(
+            "No se puede marcar como ejecutado en otra instancia mientras "
+            "el lote esta PROCESSING en esta maquina"
+        )
+
+    connection.execute(
+        """
+        UPDATE url_jobs
+        SET status = 'FAILED_FINAL',
+            last_error = COALESCE(last_error, 'Executed on another instance'),
+            last_error_type = COALESCE(last_error_type, 'EXECUTED_ELSEWHERE'),
+            non_retryable = 1,
+            next_retry_at = NULL,
+            finished_at = COALESCE(finished_at, datetime('now')),
+            updated_at = datetime('now')
+        WHERE account_id IN (SELECT id FROM accounts WHERE batch_id = ?)
+          AND status NOT IN ('COMPLETED', 'FAILED_FINAL')
+        """,
+        (batch_id,),
+    )
+    connection.execute(
+        """
+        UPDATE accounts
+        SET status = 'COMPLETED', updated_at = datetime('now')
+        WHERE batch_id = ?
+          AND status <> 'COMPLETED'
+        """,
+        (batch_id,),
+    )
+    connection.execute(
+        """
+        UPDATE input_batches
+        SET status = ?, updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (InputBatchStatus.AWAITING_RENAME.value, batch_id),
+    )
     connection.commit()
 
 
@@ -394,7 +483,7 @@ def complete_account_manually(
     connection.execute(
         "UPDATE input_batches SET status = ?, updated_at = datetime('now') WHERE id = ?",
         (
-            InputBatchStatus.COMPLETED.value
+            InputBatchStatus.AWAITING_RENAME.value
             if remaining is None
             else InputBatchStatus.PARTIAL.value,
             batch_id,
@@ -405,7 +494,26 @@ def complete_account_manually(
 
 
 def is_batch_ready_for_rename(connection: Connection, batch_id: int) -> bool:
-    """A real run may be renamed once every account is operationally closed."""
+    """Rename is allowed when the batch is awaiting rename or fully closed."""
+
+    row = connection.execute(
+        "SELECT status FROM input_batches WHERE id = ?",
+        (batch_id,),
+    ).fetchone()
+    if row is None:
+        return False
+    status = str(row["status"])
+    if status == InputBatchStatus.AWAITING_RENAME.value:
+        return True
+    if status == InputBatchStatus.COMPLETED.value:
+        return False
+
+    unfinished = connection.execute(
+        "SELECT 1 FROM accounts WHERE batch_id = ? AND status <> 'COMPLETED' LIMIT 1",
+        (batch_id,),
+    ).fetchone()
+    if unfinished is not None:
+        return False
 
     has_run = connection.execute(
         """
@@ -415,13 +523,7 @@ def is_batch_ready_for_rename(connection: Connection, batch_id: int) -> bool:
         """,
         (batch_id,),
     ).fetchone()
-    if has_run is None:
-        return False
-    unfinished = connection.execute(
-        "SELECT 1 FROM accounts WHERE batch_id = ? AND status <> 'COMPLETED' LIMIT 1",
-        (batch_id,),
-    ).fetchone()
-    return unfinished is None
+    return has_run is not None
 
 
 __all__ = [
@@ -437,5 +539,7 @@ __all__ = [
     "list_managed_batches",
     "list_pending_batches",
     "load_batch_draft",
+    "mark_batch_awaiting_rename",
+    "mark_batch_executed_elsewhere",
     "mark_batch_interrupted",
 ]

@@ -511,6 +511,7 @@ class AccountOrchestrator:
             base_seconds=self._config.retry_base_seconds,
             max_seconds=self._config.retry_max_seconds,
             non_retryable=job.non_retryable,
+            last_error_type=job.last_error_type,
         )
 
     def _increment_retry_failure(self, job: UrlJob) -> UrlJob:

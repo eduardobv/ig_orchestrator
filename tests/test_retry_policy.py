@@ -2,9 +2,12 @@ import pytest
 
 from ig_orchestrator.models import UrlJobStatus
 from ig_orchestrator.orchestration import (
+    MEDIA_NOT_FOUND_ERROR_TYPE,
+    MEDIA_NOT_FOUND_MAX_RETRIES,
     RetryDecisionAction,
     RetryQueue,
     calculate_retry_decision,
+    resolve_max_retries_for_error,
 )
 
 
@@ -80,6 +83,45 @@ def test_zero_max_retries_becomes_final_failure() -> None:
     assert decision.status == UrlJobStatus.FAILED_FINAL
     assert decision.delay_seconds is None
     assert decision.should_retry is False
+
+
+def test_media_not_found_is_capped_to_one_retry() -> None:
+    assert (
+        resolve_max_retries_for_error(5, MEDIA_NOT_FOUND_ERROR_TYPE)
+        == MEDIA_NOT_FOUND_MAX_RETRIES
+    )
+    assert resolve_max_retries_for_error(5, "SERVICE_OVERLOADED") == 5
+
+    first = calculate_retry_decision(
+        retries=0,
+        max_retries=5,
+        base_seconds=90,
+        max_seconds=900,
+        non_retryable=False,
+        last_error_type=MEDIA_NOT_FOUND_ERROR_TYPE,
+    )
+    second = calculate_retry_decision(
+        retries=1,
+        max_retries=5,
+        base_seconds=90,
+        max_seconds=900,
+        non_retryable=False,
+        last_error_type=MEDIA_NOT_FOUND_ERROR_TYPE,
+    )
+    other = calculate_retry_decision(
+        retries=1,
+        max_retries=5,
+        base_seconds=90,
+        max_seconds=900,
+        non_retryable=False,
+        last_error_type="SERVICE_OVERLOADED",
+    )
+
+    assert first.action == RetryDecisionAction.RETRY
+    assert first.should_retry is True
+    assert second.action == RetryDecisionAction.FAILED_FINAL
+    assert second.reason == "max_retries_reached"
+    assert other.action == RetryDecisionAction.RETRY
 
 
 def test_retry_queue_preserves_fifo_order_and_requeues_at_the_end() -> None:

@@ -1,5 +1,76 @@
 # Changelog
 
+## v1.27.0 - Lotes: export/import y ciclo POR RENOMBRAR
+
+Fecha: 2026-08-05
+
+### Creado
+
+* `src/ig_orchestrator/gui/batch_transfer_service.py` exporta e importa lotes
+  en JSON portable (`ig_orchestrator.batch_export`).
+* `tasks/Patch_v1.27.0.md` documenta el estado `AWAITING_RENAME`, el dialogo
+  ampliado y el flujo multi-instancia.
+
+### Modificado
+
+* `InputBatchStatus` incorpora `AWAITING_RENAME` (descargas cerradas; falta
+  renombrar o finalizar).
+* El batch orchestrator, al completar todas las cuentas, deja el lote en
+  `AWAITING_RENAME` en vez de `COMPLETED`.
+* `batch_resume_service`: listados incluyen POR RENOMBRAR; `mark_batch_executed_elsewhere`,
+  `is_batch_ready_for_rename` y finalizacion manual alineados al nuevo ciclo.
+* Dialogo `Lotes / ejecuciones`: Exportar, Importar, Ejecutado en otra
+  instancia, Renombrar, Finalizar sin renombrar.
+* Tras renombrar con exito el lote pasa a `COMPLETED`.
+* Tests de GUI, transfer y orchestrator actualizados.
+* Version `1.27.0`.
+
+### Resumen
+
+Se puede llevar un lote a otra maquina (export/import), marcarlo como
+ejecutado en otra instancia y, en cualquier caso, renombrar o cerrar el lote
+sin perderlo en un limbo `COMPLETED` prematuro.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_batch_orchestrator.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+
+## v1.26.16 - Patch - Media not found 1 reintento y Detener proceso
+
+Fecha: 2026-08-05
+
+### Creado
+
+* `tasks/Patch_v1.26.16.md` documenta el tope de reintentos de
+  `Media not found or unavailable` y el renombrado del boton de detencion.
+
+### Modificado
+
+* `src/ig_orchestrator/orchestration/retry_policy.py` limita ese error a
+  **1 reintento** via `resolve_max_retries_for_error` /
+  `last_error_type` en `calculate_retry_decision`.
+* `src/ig_orchestrator/orchestration/account_orchestrator.py` pasa
+  `job.last_error_type` a la decision de reintento.
+* `src/ig_orchestrator/gui/app.py` cambia el label a `Detener proceso` y alinea
+  mensajes de detencion/interrupcion.
+* `tests/test_retry_policy.py` cubre el tope de un reintento y que otros
+  errores no se capan.
+* `Agents.md`, `README.md` y `tasks/task-gui.md` documentan el comportamiento.
+* Version actualizada a `1.26.16`.
+
+### Resumen
+
+`Media not found or unavailable` deja de consumir todo el presupuesto de
+`MAX_RETRIES`, y la GUI habla de detener el proceso para reanudar despues.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_retry_policy.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+
 ## v1.26.15 - Patch - Lote actual: orden Username y Guardar seleccion
 
 Fecha: 2026-08-05

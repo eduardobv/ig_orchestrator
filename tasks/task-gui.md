@@ -186,7 +186,7 @@ Panel inferior: ejecucion
 - Barra de progreso indeterminada mientras corre.
 - Botones:
   - `Clean`, disponible para vaciar la consola de estado cuando sea necesario;
-  - `Cancelar proceso` si se lanzo como subprocess;
+  - `Detener proceso` si se lanzo como subprocess;
   - `Renombrar`, deshabilitado hasta que termine un lote real o se cierren
     manualmente todas sus cuentas tras una cancelación;
   - `Abrir reporte` cuando exista;
@@ -202,12 +202,17 @@ Zona superior de recuperacion:
   segun el contexto.
 - `Lotes / ejecuciones (N)` abre un maestro con `batch date`, `batch name`,
   `batch id`, estado y resumen de cuentas.
-- Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar
-  o ejecutar. Al ejecutarlos cambian a `IMPORTED` y ya no se pueden editar.
-- `Reanudar seleccionado` recupera el lote completo en `Lote actual` y ejecuta
-  `run_continue --batch-id`.
-- `Dar por finalizado` pide confirmacion, marca el batch `COMPLETED` sin borrar
-  datos y lo retira del selector.
+- Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar,
+  exportar o ejecutar. Al ejecutarlos cambian a `IMPORTED` y ya no se pueden
+  editar. Al cerrar descargas pasan a `AWAITING_RENAME` (`POR RENOMBRAR`).
+- `Reanudar / Ejecutar` recupera el lote en `Lote actual` y lanza
+  `run_continue --batch-id` (no aplica a POR RENOMBRAR).
+- `Exportar` / `Importar` mueven la definicion del lote en JSON entre
+  instancias. `Ejecutado en otra instancia` cierra la descarga local y deja
+  el lote POR RENOMBRAR.
+- `Renombrar` (dialogo o boton principal) y `Finalizar sin renombrar` cierran
+  el ciclo: tras renombrar OK o finalizar, el batch pasa a `COMPLETED` y sale
+  del selector.
 - Durante la ejecucion, `Lote actual` muestra por color cuentas completadas,
   en reintento, en curso, pendientes y fallidas.
 - Al comenzar se ordena como se procesa (solo stories primero y despues menor
@@ -216,7 +221,7 @@ Zona superior de recuperacion:
   `FAILED_FINAL` y la cuenta `FAILED`.
 - `Subir`, `Bajar` y `Duplicar` permanecen implementados, pero sus botones se
   ocultan desde v1.26.5.
-- `Cancelar proceso` conserva los estados individuales y deja el batch
+- `Detener proceso` conserva los estados individuales y deja el batch
   `PARTIAL`, listo para reanudar.
 - Tras cancelar, el click derecho en una cuenta ofrece `Completar`. La cuenta
   queda `COMPLETED`, sus jobs no terminales quedan `FAILED_FINAL` con auditoría

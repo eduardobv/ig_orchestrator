@@ -59,7 +59,13 @@ from ig_orchestrator.gui.batch_resume_service import (
     list_managed_batches,
     list_pending_batches,
     load_batch_draft,
+    mark_batch_executed_elsewhere,
     mark_batch_interrupted,
+)
+from ig_orchestrator.gui.batch_transfer_service import (
+    BatchTransferError,
+    export_batch_payload,
+    import_batch_from_payload,
 )
 from ig_orchestrator.gui.process_runner import (
     NewAccountRenameParameters,
@@ -1416,8 +1422,88 @@ def test_gui_manual_completion_closes_stuck_account_and_enables_rename(
         assert AccountRepository(connection).get_by_id(account.id).status is AccountStatus.COMPLETED
         assert stored_job.status is UrlJobStatus.FAILED_FINAL
         assert stored_job.last_error_type == "MANUAL_ACCOUNT_COMPLETION"
-        assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.COMPLETED
+        assert (
+            BatchRepository(connection).get_by_id(result.batch.id).status
+            is InputBatchStatus.AWAITING_RENAME
+        )
         assert is_batch_ready_for_rename(connection, result.batch.id) is True
+        managed = list_managed_batches(connection)
+        assert any(
+            item.batch_id == result.batch.id and item.is_awaiting_rename
+            for item in managed
+        )
+
+
+def test_gui_mark_executed_elsewhere_moves_to_awaiting_rename(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="elsewhere_batch",
+        default_start_now_date="2026-08-05",
+        accounts=[
+            AccountDraft(
+                username="elsewhere_user",
+                urls=["https://www.instagram.com/reel/ELSE1/"],
+                start_now_date="2026-08-05",
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        mark_batch_executed_elsewhere(connection, result.batch.id)
+        stored = BatchRepository(connection).get_by_id(result.batch.id)
+        account = AccountRepository(connection).get_by_id(result.accounts[0].id)
+        jobs = UrlJobRepository(connection).list_by_account(result.accounts[0].id)
+
+        assert stored.status is InputBatchStatus.AWAITING_RENAME
+        assert account.status is AccountStatus.COMPLETED
+        assert jobs[0].status is UrlJobStatus.FAILED_FINAL
+        assert jobs[0].last_error_type == "EXECUTED_ELSEWHERE"
+        assert is_batch_ready_for_rename(connection, result.batch.id) is True
+        assert list_pending_batches(connection) == []
+        assert any(
+            item.batch_id == result.batch.id and item.display_status == "POR RENOMBRAR"
+            for item in list_managed_batches(connection)
+        )
+
+
+def test_gui_export_import_roundtrip_creates_new_draft(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="transfer_source",
+        default_start_now_date="2026-08-05",
+        accounts=[
+            AccountDraft(
+                username="transfer_user",
+                download_stories=True,
+                urls=["https://www.instagram.com/reel/TR1/"],
+                start_now_date="2026-08-05",
+                is_new_account=True,
+                owner_id="111",
+                start_init_date="2026-01-01",
+                destination_path=r"G:\Models",
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        saved = save_batch_draft(draft, connection)
+        payload = export_batch_payload(connection, saved.batch.id)
+        imported = import_batch_from_payload(connection, payload)
+        loaded = load_batch_draft(connection, imported.batch.id)
+
+        assert payload["format"] == "ig_orchestrator.batch_export"
+        assert imported.batch.status is InputBatchStatus.DRAFT
+        assert imported.batch.batch_name.startswith("transfer_source")
+        assert imported.batch.id != saved.batch.id
+        assert loaded.accounts[0].username == "transfer_user"
+        assert loaded.accounts[0].download_stories is True
+        assert loaded.accounts[0].urls == ["https://www.instagram.com/reel/TR1/"]
+        assert loaded.accounts[0].is_new_account is True
+        assert loaded.accounts[0].owner_id == "111"
+
+        with pytest.raises(BatchTransferError):
+            import_batch_from_payload(connection, {"format": "other"})
 
 
 def test_gui_draft_rejects_duplicate_batch_name(tmp_path: Path) -> None:

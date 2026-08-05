@@ -14,10 +14,13 @@ from ig_orchestrator.orchestration.post_processing import (
     PostProcessRunner,
 )
 from ig_orchestrator.orchestration.retry_policy import (
+    MEDIA_NOT_FOUND_ERROR_TYPE,
+    MEDIA_NOT_FOUND_MAX_RETRIES,
     RetryDecision,
     RetryDecisionAction,
     RetryQueue,
     calculate_retry_decision,
+    resolve_max_retries_for_error,
 )
 from ig_orchestrator.orchestration.url_job_processor import (
     UrlJobProcessor,
@@ -35,6 +38,8 @@ __all__ = [
     "PostProcessConfig",
     "PostProcessResult",
     "PostProcessRunner",
+    "MEDIA_NOT_FOUND_ERROR_TYPE",
+    "MEDIA_NOT_FOUND_MAX_RETRIES",
     "RetryDecision",
     "RetryDecisionAction",
     "RetryQueue",
@@ -42,4 +47,5 @@ __all__ = [
     "UrlJobProcessorConfig",
     "UrlJobProcessorResult",
     "calculate_retry_decision",
+    "resolve_max_retries_for_error",
 ]

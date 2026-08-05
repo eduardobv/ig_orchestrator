@@ -13,6 +13,8 @@ class InputBatchStatus(StrEnum):
     COMPLETED = "COMPLETED"
     PARTIAL = "PARTIAL"
     FAILED = "FAILED"
+    # Downloads closed locally or marked done elsewhere; rename/finalize still open.
+    AWAITING_RENAME = "AWAITING_RENAME"
 
 
 def utc_now() -> datetime:

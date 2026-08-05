@@ -132,6 +132,10 @@ La cola de reintentos es FIFO.
 
 Tras agotar `MAX_RETRIES`, marcar `FAILED_FINAL`.
 
+Excepcion: el mensaje del bot `Media not found or unavailable` solo se reintenta
+**1 vez** (tope propio), aunque `MAX_RETRIES` sea mayor; el resto de errores
+reintentables siguen el tope global.
+
 ## Tests
 
 Cada tarea debe incluir tests cuando toque logica nueva.

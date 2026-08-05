@@ -108,7 +108,7 @@ def test_batch_orchestrator_processes_pending_accounts_and_marks_completed(
     result = asyncio.run(orchestrator.process_batch(stored.batch.id))
 
     assert fake.calls == [first.id]
-    assert result.batch.status is InputBatchStatus.COMPLETED
+    assert result.batch.status is InputBatchStatus.AWAITING_RENAME
     assert result.summary.status is RunStatus.COMPLETED
     assert result.summary.completed_urls == 2
     assert stored.job_repo.get_by_id(first_job.id).run_id == result.run.id
@@ -132,7 +132,7 @@ def test_batch_orchestrator_resumes_processing_accounts(
     result = asyncio.run(orchestrator.process_batch(stored.batch.id))
 
     assert fake.calls == [processing.id]
-    assert result.batch.status is InputBatchStatus.COMPLETED
+    assert result.batch.status is InputBatchStatus.AWAITING_RENAME
 
 
 def test_batch_orchestrator_marks_partial_when_an_account_fails(
