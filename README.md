@@ -374,15 +374,16 @@ SQLite. Si no hay ejecuciones, usa el ultimo lote guardado; si la base esta
 vacia, sugiere un nombre nuevo con timestamp.
 
 Los campos `Start date` del lote y del editor de cuenta arrancan con la fecha
-de hoy. El checkbox de descarga de stories se muestra como `Stories`. Al pulsar
-`Agregar/Actualizar`, el editor limpia `username`, `Stories`, `New account`,
-sus campos condicionales y `URLs`, pero
-mantiene el `Start date` de hoy. `Limpiar editor` tambien deselecciona cualquier
-fila de `Lote actual`, de modo que el siguiente guardado agrega una cuenta
-nueva en vez de actualizar la anterior.
+de hoy. Los checkboxes `Stories` y `New account` van juntos (el click en el
+texto del label tambien conmuta). Al pulsar `Agregar/Actualizar`, el editor
+limpia `username`, `Stories`, `New account`, sus campos condicionales y
+`URLs`, pero mantiene el `Start date` de hoy. `Limpiar editor` tambien
+deselecciona cualquier fila de `Lote actual`, de modo que el siguiente
+guardado agrega una cuenta nueva en vez de actualizar la anterior.
 
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
-y comas. `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
+y comas. Tras `Pegar` o `Normalizar`, el foco queda al final del listado.
+`Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
 `Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Todas las
 acciones quedan en una columna a la izquierda del editor, en este orden:
 `Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, separador, `Normalizar` y

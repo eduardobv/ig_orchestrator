@@ -527,6 +527,80 @@ def test_gui_paste_and_add_only_upserts_after_a_successful_paste() -> None:
     assert calls == ["upsert"]
 
 
+def test_gui_paste_urls_focuses_end_of_text() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            return "https://www.instagram.com/p/ABC/\n"
+
+    class FakeText:
+        def __init__(self) -> None:
+            self.content = ""
+            self.marks: list[tuple[str, str]] = []
+            self.seen: list[str] = []
+            self.focused = False
+
+        def insert(self, index: str, text: str) -> None:
+            self.content += text
+
+        def mark_set(self, name: str, index: str) -> None:
+            self.marks.append((name, index))
+
+        def see(self, index: str) -> None:
+            self.seen.append(index)
+
+        def focus_set(self) -> None:
+            self.focused = True
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.root = FakeRoot()
+    app.urls_text = FakeText()
+    app._update_indicators = lambda: None
+
+    assert app._paste_urls() is True
+    assert "instagram.com/p/ABC" in app.urls_text.content
+    assert app.urls_text.marks[-1][1] == "end"
+    assert app.urls_text.seen == ["end"]
+    assert app.urls_text.focused is True
+
+
+def test_gui_normalize_urls_focuses_end_of_text() -> None:
+    class FakeText:
+        def __init__(self) -> None:
+            self.content = "https://www.instagram.com/p/ONE/\n"
+            self.marks: list[tuple[str, str]] = []
+            self.seen: list[str] = []
+            self.focused = False
+
+        def get(self, _start: str, _end: str) -> str:
+            return self.content
+
+        def delete(self, _start: str, _end: str) -> None:
+            self.content = ""
+
+        def insert(self, _index: str, text: str) -> None:
+            self.content = text
+
+        def mark_set(self, name: str, index: str) -> None:
+            self.marks.append((name, index))
+
+        def see(self, index: str) -> None:
+            self.seen.append(index)
+
+        def focus_set(self) -> None:
+            self.focused = True
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.urls_text = FakeText()
+    app._update_indicators = lambda: None
+
+    app._normalize_urls()
+
+    assert app.urls_text.marks[-1][1] == "end"
+    assert app.urls_text.seen == ["end"]
+    assert app.urls_text.focused is True
+
+
 def test_gui_plays_native_completion_sound(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

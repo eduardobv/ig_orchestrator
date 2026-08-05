@@ -395,18 +395,21 @@ class InstagramOrchestratorApp:
         )
         self.username_combo.grid(row=0, column=1, columnspan=2, sticky="ew")
         self.username_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_catalog_date())
-        ttk.Checkbutton(
-            fields,
+        flags = ttk.Frame(fields)
+        flags.grid(row=1, column=1, columnspan=2, sticky="w", pady=(8, 0))
+        # tk.Checkbutton (not ttk): the label text toggles reliably on Windows.
+        tk.Checkbutton(
+            flags,
             text="Stories",
             variable=self.stories_var,
             command=self._update_indicators,
-        ).grid(row=1, column=1, sticky="w", pady=(8, 0))
-        ttk.Checkbutton(
-            fields,
+        ).pack(side=tk.LEFT)
+        tk.Checkbutton(
+            flags,
             text="New account",
             variable=self.new_account_var,
             command=self._toggle_new_account_fields,
-        ).grid(row=1, column=2, sticky="w", pady=(8, 0))
+        ).pack(side=tk.LEFT, padx=(12, 0))
         ttk.Label(fields, text="Start date").grid(
             row=2, column=0, sticky="w", pady=(8, 0)
         )
@@ -911,12 +914,19 @@ class InstagramOrchestratorApp:
         self.urls_text.delete("1.0", tk.END)
         self._update_indicators()
 
+    def _focus_urls_end(self) -> None:
+        """Keep the caret and viewport at the end of the URLs text."""
+        self.urls_text.mark_set(tk.INSERT, tk.END)
+        self.urls_text.see(tk.END)
+        self.urls_text.focus_set()
+
     def _paste_urls(self) -> bool:
         try:
             text = self.root.clipboard_get()
         except tk.TclError:
             return False
         self.urls_text.insert(tk.INSERT, text)
+        self._focus_urls_end()
         self._update_indicators()
         return True
 
@@ -928,6 +938,7 @@ class InstagramOrchestratorApp:
         urls = normalize_url_lines(self.urls_text.get("1.0", tk.END).splitlines())
         self.urls_text.delete("1.0", tk.END)
         self.urls_text.insert("1.0", "\n".join(urls))
+        self._focus_urls_end()
         self._update_indicators()
 
     def _update_indicators(self) -> None:

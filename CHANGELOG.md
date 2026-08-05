@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.26.14 - Patch - Editor: checkboxes juntos y foco al final de URLs
+
+Fecha: 2026-08-05
+
+### Creado
+
+* `tasks/Patch_v1.26.14.md` documenta el layout de flags del editor y el caret
+  al final tras pegar o normalizar URLs.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/app.py` agrupa `Stories` y `New account` en un frame
+  horizontal con checkboxes Tk (label clicable) y mueve el foco al final del
+  textarea tras `Pegar` y `Normalizar`.
+* `tests/test_gui_services.py` cubre el foco al final al pegar y normalizar.
+* `README.md` y `tasks/task-gui.md` describen el comportamiento.
+* `pyproject.toml`, `src/ig_orchestrator/__init__.py` y las pruebas de smoke
+  actualizan la version a `1.26.14`.
+
+### Resumen
+
+Los flags del editor dejan de separarse en extremos y el listado de URLs
+mantiene el caret al final al pegar o normalizar, sin tener que scrollear a
+mano.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests\test_gui_services.py tests\test_package_smoke.py`.
+* `python -m pytest -q`.
+* `python -m compileall -q src tests`.
+
 ## v1.26.13 - Patch - Catalogo: highlight en lote, Activar, foco y filtro
 
 Fecha: 2026-08-05

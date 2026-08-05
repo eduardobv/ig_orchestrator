@@ -149,14 +149,16 @@ Zona derecha inferior: lote actual
 Zona derecha superior: editor de cuenta
 
 - `Username`: combobox editable con autocomplete.
-- `Stories`: checkbox.
-- `New account`: checkbox desmarcado por defecto. Al marcarlo muestra tres
+- `Stories` y `New account` van juntos en la misma fila (no en extremos). Se
+  usan checkboxes clasicos de Tk para que el click en el texto del label tambien
+  conmute. `New account` desmarcado por defecto; al marcarlo muestra tres
   campos obligatorios: `ownerId`, `path` y `startInitDate` (`YYYY-MM-DD`).
   `path` es un combobox editable con los valores `DISTINCT` historicos de
   `account_history.field1`.
 - `Start date`: input por defecto hoy. Tras `Agregar/Actualizar`, el editor
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
-- `URLs`: textarea multilinea, una URL por linea.
+- `URLs`: textarea multilinea, una URL por linea. Tras `Pegar` o `Normalizar`,
+  el caret y el viewport quedan al final del texto.
 - Los botones forman una columna a la izquierda, nunca al pie del editor:
   - `Agregar/Actualizar`;
   - `Pegar/Agregar`, que pega el portapapeles y ejecuta
