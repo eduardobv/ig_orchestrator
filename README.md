@@ -280,8 +280,9 @@ lote actual se resaltan en amarillo mas intenso (solo durante la sesion).
 seleccion y el scroll. Si el texto del buscador coincide **exactamente** con un
 username del catalogo y esa cuenta tiene `account_history.field1` (ruta de
 carpeta), el resultado incluye **todas** las cuentas que comparten esa misma
-ruta, no solo la coincidencia. Sin match exacto se mantiene el filtro por
-substring. Una cuenta inactiva vuelve automaticamente a `ENABLED`
+ruta, no solo la coincidencia: la cuenta buscada aparece **primera** y el
+resto de la carpeta después (en su orden original). Sin match exacto se
+mantiene el filtro por substring. Una cuenta inactiva vuelve automaticamente a `ENABLED`
 cuando participa en un lote real; un dry-run no modifica este estado.
 
 `Lotes / ejecuciones (N)` abre un maestro ordenado por fecha con columnas

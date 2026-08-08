@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.27.2 - Patch - Catálogo: cuenta exacta primero en el grupo de carpeta
+
+Fecha: 2026-08-08
+
+### Creado
+
+* `tasks/Patch_v1.27.2.md` documenta el ajuste de orden del buscador.
+
+### Modificado
+
+* `filter_catalog_entries`: en match exacto con carpeta, la cuenta buscada
+  aparece **primera** y el resto de peers de `field1` después (orden original).
+* Docs alineados (`README.md`, `PLAN.md`, `tasks/task-gui.md`).
+* Versión `1.27.2`.
+
+### Resumen
+
+Al buscar un username exacto en el catálogo, ya no hay que localizarlo a ojo
+entre las hermanas de carpeta: queda siempre al inicio del listado filtrado.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k catalog_filter`
+* `python -m pytest -q tests/test_package_smoke.py`
+
 ## v1.27.1 - Patch - GUI: carpeta en catálogo, URLs de lote, fallos y renombrado manual
 
 Fecha: 2026-08-08

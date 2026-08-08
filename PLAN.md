@@ -1549,7 +1549,7 @@ despues las activas con `field1`, agrupadas por ruta y ordenadas por username;
 luego las activas sin ruta; las inactivas en amarillo; y las desactivadas en
 rojo. Las bajas logicas siguen visibles al final aunque aparezcan en fuentes
 JSON. El buscador, ante un username exacto con `field1`, devuelve el grupo
-completo de esa carpeta. Los paths historicos de `account_history.field1`
+completo de esa carpeta con la cuenta buscada primero. Los paths historicos de `account_history.field1`
 tambien alimentan un combobox editable para las cuentas nuevas. Al comenzar a
 procesarse en una ejecucion real, una cuenta `INACTIVE` vuelve a `ENABLED`; los
 dry-run no cambian el catalogo.

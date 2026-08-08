@@ -17,6 +17,7 @@ Mejorar la operatividad de la GUI sin cambiar el motor de descarga:
 * Username exacto (case-insensitive) con `destination_path` no vacío → todas las
   cuentas con el mismo path (trim + casefold).
 * Exacto sin path → solo esa cuenta.
+* Orden de la cuenta exacta dentro del grupo: ver patch `v1.27.2`.
 * Sin exacto → substring en username (comportamiento previo).
 
 ### 2. Columna URLs

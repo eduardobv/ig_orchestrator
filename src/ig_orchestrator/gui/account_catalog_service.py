@@ -179,7 +179,9 @@ def filter_catalog_entries(
     When *query* matches a username exactly (case-insensitive) and that entry
     has a non-empty ``destination_path`` (``account_history.field1``), the
     result is every entry that shares the same path, not only the matched
-    username. Without a path, only the exact match is returned.
+    username. The exact match is always listed first; remaining folder peers
+    keep their original relative order. Without a path, only the exact match
+    is returned.
 
     Without an exact username match, filtering is substring-based on username.
     """
@@ -194,14 +196,17 @@ def filter_catalog_entries(
         if entry.username.casefold() == normalized_query
     ]
     if exact_matches:
-        folder_path = _normalized_destination_path(exact_matches[0])
+        exact = exact_matches[0]
+        folder_path = _normalized_destination_path(exact)
         if not folder_path:
-            return exact_matches
-        return [
+            return [exact]
+        peers = [
             entry
             for entry in materialized
             if _normalized_destination_path(entry) == folder_path
+            and entry.username.casefold() != normalized_query
         ]
+        return [exact, *peers]
 
     return [
         entry

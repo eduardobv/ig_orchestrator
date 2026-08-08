@@ -310,9 +310,10 @@ def test_catalog_filter_exact_match_returns_same_folder_peers() -> None:
 
     filtered = filter_catalog_entries(entries, "lerabuns")
 
+    # Exact match first, then remaining folder peers in original order.
     assert [entry.username for entry in filtered] == [
-        "alpha_peer",
         "lerabuns",
+        "alpha_peer",
         "zeta_peer",
     ]
 

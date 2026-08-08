@@ -111,7 +111,8 @@ Panel izquierdo: catalogo de cuentas
 - El buscador del catalogo tiene un boton pequeno `❌` que limpia el filtro.
 - Si el texto del buscador coincide exactamente con un username y esa cuenta
   tiene `account_history.field1` / `destination_path`, el listado incluye
-  todas las cuentas de la misma carpeta (peers). Sin match exacto, el filtro
+  todas las cuentas de la misma carpeta (peers), con la cuenta buscada
+  **primera** y el resto en su orden original. Sin match exacto, el filtro
   es por substring de username.
 - Click derecho ofrece `Abrir`, `Inactivo`, `Favorito`, `Quitar favorito`,
   `Delete` y `Activar`. `Abrir` abre el perfil en una nueva pestaña del
