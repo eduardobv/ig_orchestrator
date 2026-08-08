@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.27.1 - Patch - GUI: carpeta en catálogo, URLs de lote, fallos y renombrado manual
+
+Fecha: 2026-08-08
+
+### Creado
+
+* `tasks/Patch_v1.27.1.md` documenta los cuatro cambios de GUI.
+* `filter_catalog_entries` en `account_catalog_service.py` (match exacto + peers de carpeta).
+* `list_account_problem_urls` / `AccountProblemUrl` en `batch_resume_service.py`.
+* `format_manual_rename_command_preview` y `format_command_for_shell` en `process_runner.py`.
+
+### Modificado
+
+* Buscador del catálogo: si el texto coincide exactamente con un username y
+  tiene `field1`/`destination_path`, muestra todas las cuentas de esa carpeta.
+* Diálogo `Lotes guardados y ejecuciones pendientes`: columna **URLs** con el
+  total de `url_jobs` de origen `INPUT_URL` del lote.
+* `PendingBatchSummary.url_count` en listados de lotes gestionados y pendientes.
+* Durante/tras la ejecución, doble click o menú contextual en cuentas
+  `Reintento` / `Fallida` abre una modal no bloqueante con las URLs afectadas;
+  doble click en una fila abre Chrome.
+* Botón **Renombrar Manual** (siempre habilitado) muestra el comando completo
+  del script de renombrado con parámetros y permite copiarlo sin ejecutarlo.
+* Tests de GUI actualizados.
+* Versión `1.27.1`.
+
+### Resumen
+
+La GUI facilita localizar grupos de carpeta en el catálogo, ver el tamaño del
+lote en URLs, inspeccionar fallos/reintentos en vivo y copiar el comando de
+renombrado para ejecución manual.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py`
+* `python -m pytest -q`
+* `python -m compileall -q src tests`
+
 ## v1.27.0 - Lotes: export/import y ciclo POR RENOMBRAR
 
 Fecha: 2026-08-05

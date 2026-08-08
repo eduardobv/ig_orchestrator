@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from sqlite3 import Connection
+from typing import Literal
 
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.models import InputBatchStatus
@@ -20,6 +21,9 @@ _RETRY_JOB_STATUSES = (
     "RETRY_PENDING",
     "FAILED_TEMPORARY",
 )
+_FAILED_JOB_STATUSES = ("FAILED_FINAL",)
+
+ProblemUrlKind = Literal["retry", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +36,7 @@ class PendingBatchSummary:
     completed_accounts: int
     retry_accounts: int
     remaining_accounts: int
+    url_count: int = 0
 
     @property
     def is_draft(self) -> bool:
@@ -62,6 +67,27 @@ class AccountRuntimeProgress:
     failed_items: int
 
 
+@dataclass(frozen=True, slots=True)
+class AccountProblemUrl:
+    job_id: int
+    url: str
+    status: str
+    publication_type: str
+    source: str
+    retries: int
+    last_error: str | None
+    last_error_type: str | None
+
+
+_URL_COUNT_SUBSELECT = """
+(SELECT COUNT(*)
+ FROM url_jobs j
+ JOIN accounts a ON a.id = j.account_id
+ WHERE a.batch_id = b.id
+   AND j.source = 'INPUT_URL') AS url_count
+"""
+
+
 def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
     placeholders = ", ".join("?" for _ in _RESUMABLE_JOB_STATUSES)
     rows = connection.execute(
@@ -77,7 +103,8 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
                (SELECT COUNT(DISTINCT a.id)
                 FROM accounts a JOIN url_jobs j ON j.account_id = a.id
                 WHERE a.batch_id = b.id
-                  AND j.status IN ({placeholders})) AS remaining_accounts
+                  AND j.status IN ({placeholders})) AS remaining_accounts,
+               {_URL_COUNT_SUBSELECT}
         FROM input_batches b
         WHERE b.status NOT IN ('DRAFT', 'COMPLETED', 'AWAITING_RENAME')
           AND EXISTS (
@@ -101,6 +128,7 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
             completed_accounts=int(row["completed_accounts"]),
             retry_accounts=int(row["retry_accounts"]),
             remaining_accounts=int(row["remaining_accounts"]),
+            url_count=int(row["url_count"] or 0),
         )
         for row in rows
     ]
@@ -111,10 +139,11 @@ def list_managed_batches(connection: Connection) -> list[PendingBatchSummary]:
 
     executions = {item.batch_id: item for item in list_pending_batches(connection)}
     rows = connection.execute(
-        """
+        f"""
         SELECT b.id, b.batch_name, b.created_at, b.status,
                COUNT(DISTINCT a.id) AS total_accounts,
-               SUM(CASE WHEN a.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_accounts
+               SUM(CASE WHEN a.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_accounts,
+               {_URL_COUNT_SUBSELECT}
         FROM input_batches b
         LEFT JOIN accounts a ON a.batch_id = b.id
         WHERE b.status IN ('DRAFT', 'AWAITING_RENAME')
@@ -138,6 +167,7 @@ def list_managed_batches(connection: Connection) -> list[PendingBatchSummary]:
             remaining_accounts=(
                 0 if status == InputBatchStatus.AWAITING_RENAME.value else total
             ),
+            url_count=int(row["url_count"] or 0),
         )
     return sorted(
         executions.values(),
@@ -228,6 +258,54 @@ def get_account_runtime_progress(
             retry_items=int(row["retry_items"] or 0),
             pending_items=int(row["pending_items"] or 0),
             failed_items=int(row["failed_items"] or 0),
+        )
+        for row in rows
+    ]
+
+
+def list_account_problem_urls(
+    connection: Connection,
+    *,
+    account_id: int,
+    kind: ProblemUrlKind,
+) -> list[AccountProblemUrl]:
+    """List retryable or finally-failed URL jobs for one account."""
+
+    if account_id <= 0:
+        raise ValueError("account_id must be positive")
+    if kind == "retry":
+        statuses = _RETRY_JOB_STATUSES
+    elif kind == "failed":
+        statuses = _FAILED_JOB_STATUSES
+    else:
+        raise ValueError(f"Unsupported problem URL kind: {kind}")
+
+    placeholders = ", ".join("?" for _ in statuses)
+    rows = connection.execute(
+        f"""
+        SELECT id, url, status, publication_type, source, retries,
+               last_error, last_error_type
+        FROM url_jobs
+        WHERE account_id = ?
+          AND status IN ({placeholders})
+        ORDER BY id
+        """,
+        (account_id, *statuses),
+    ).fetchall()
+    return [
+        AccountProblemUrl(
+            job_id=int(row["id"]),
+            url=str(row["url"]),
+            status=str(row["status"]),
+            publication_type=str(row["publication_type"]),
+            source=str(row["source"]),
+            retries=int(row["retries"] or 0),
+            last_error=None if row["last_error"] is None else str(row["last_error"]),
+            last_error_type=(
+                None
+                if row["last_error_type"] is None
+                else str(row["last_error_type"])
+            ),
         )
         for row in rows
     ]
@@ -527,8 +605,10 @@ def is_batch_ready_for_rename(connection: Connection, batch_id: int) -> bool:
 
 
 __all__ = [
+    "AccountProblemUrl",
     "AccountRuntimeProgress",
     "PendingBatchSummary",
+    "ProblemUrlKind",
     "activate_draft_batch",
     "complete_account_manually",
     "delete_draft_batch",
@@ -536,6 +616,7 @@ __all__ = [
     "fail_account_manually",
     "get_account_runtime_progress",
     "is_batch_ready_for_rename",
+    "list_account_problem_urls",
     "list_managed_batches",
     "list_pending_batches",
     "load_batch_draft",

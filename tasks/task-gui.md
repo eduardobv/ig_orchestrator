@@ -109,6 +109,10 @@ Panel izquierdo: catalogo de cuentas
 - El doble click tambien abre el perfil
   en una pestaña de Chrome.
 - El buscador del catalogo tiene un boton pequeno `❌` que limpia el filtro.
+- Si el texto del buscador coincide exactamente con un username y esa cuenta
+  tiene `account_history.field1` / `destination_path`, el listado incluye
+  todas las cuentas de la misma carpeta (peers). Sin match exacto, el filtro
+  es por substring de username.
 - Click derecho ofrece `Abrir`, `Inactivo`, `Favorito`, `Quitar favorito`,
   `Delete` y `Activar`. `Abrir` abre el perfil en una nueva pestaña del
   navegador; `Inactivo` la mueve a la seccion amarilla suave; `Favorito` la
@@ -189,6 +193,8 @@ Panel inferior: ejecucion
   - `Detener proceso` si se lanzo como subprocess;
   - `Renombrar`, deshabilitado hasta que termine un lote real o se cierren
     manualmente todas sus cuentas tras una cancelación;
+  - `Renombrar Manual`, siempre habilitado: muestra el comando del renombrador
+    con todos los parámetros (no lo ejecuta) y permite copiarlo;
   - `Abrir reporte` cuando exista;
   - `Abrir carpeta logs`.
 
@@ -201,7 +207,7 @@ Zona superior de recuperacion:
 - El guardado se presenta como `Registrar lote nuevo` o `Actualizar lote`
   segun el contexto.
 - `Lotes / ejecuciones (N)` abre un maestro con `batch date`, `batch name`,
-  `batch id`, estado y resumen de cuentas.
+  `batch id`, estado, total de **URLs** de entrada del lote y resumen de cuentas.
 - Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar,
   exportar o ejecutar. Al ejecutarlos cambian a `IMPORTED` y ya no se pueden
   editar. Al cerrar descargas pasan a `AWAITING_RENAME` (`POR RENOMBRAR`).
@@ -215,6 +221,9 @@ Zona superior de recuperacion:
   del selector.
 - Durante la ejecucion, `Lote actual` muestra por color cuentas completadas,
   en reintento, en curso, pendientes y fallidas.
+- En cuentas `Reintento` o `Fallida`, doble click o menú contextual abre una
+  modal no bloqueante con las URLs afectadas; doble click en una URL la abre
+  en Chrome.
 - Al comenzar se ordena como se procesa (solo stories primero y despues menor
   numero de URLs), mantiene la seleccion durante los refrescos y permite
   eliminar una cuenta pendiente/en curso marcando sus jobs no terminales
@@ -234,6 +243,9 @@ Zona superior de recuperacion:
 ```text
 python D:\Archivos\Scripts\IG\ManualRenameFiles\main.py --newRename --startNowDate "START_DATE_GLOBAL" [--new-account "USERNAME" "OWNER_ID" "START_INIT_DATE" "PATH"]... --no-duplicated --move-renamed
 ```
+
+`Renombrar Manual` muestra ese mismo comando (preview + línea shell copiable)
+sin lanzarlo, releyendo preferentemente el lote desde SQLite.
 
 Cada cuenta marcada como `New account` agrega su propio bloque
 `--new-account`. `Agregar/Actualizar` la incorpora al lote actual y tambien

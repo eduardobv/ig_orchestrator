@@ -21,6 +21,7 @@ from ig_orchestrator.db.migrations import apply_migrations
 from ig_orchestrator.gui.app import (
     _BATCH_COLUMNS,
     InstagramOrchestratorApp,
+    _account_display_status,
     _batch_column_samples,
     _batch_mode_details,
     _catalog_entry_colors,
@@ -39,6 +40,7 @@ from ig_orchestrator.gui.app import (
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
     AccountCatalogService,
+    filter_catalog_entries,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -56,6 +58,7 @@ from ig_orchestrator.gui.batch_resume_service import (
     finish_batch,
     get_account_runtime_progress,
     is_batch_ready_for_rename,
+    list_account_problem_urls,
     list_managed_batches,
     list_pending_batches,
     load_batch_draft,
@@ -71,6 +74,8 @@ from ig_orchestrator.gui.process_runner import (
     NewAccountRenameParameters,
     build_manual_rename_command,
     build_run_continue_command,
+    format_command_for_shell,
+    format_manual_rename_command_preview,
 )
 from ig_orchestrator.input import DuplicateBatchNameError
 from ig_orchestrator.models import (
@@ -290,6 +295,77 @@ def test_catalog_colors_follow_favorite_and_account_status() -> None:
         ),
         in_batch=True,
     ) == {"background": "#f4cccc"}
+
+
+def test_catalog_filter_exact_match_returns_same_folder_peers() -> None:
+    folder = r"G:\4K Stogram\00.FAVORITES\Valeria-Makusheva"
+    other_folder = r"G:\4K Stogram\00.MODELS-A"
+    entries = [
+        AccountCatalogEntry("alpha_peer", destination_path=folder),
+        AccountCatalogEntry("lerabuns", destination_path=folder),
+        AccountCatalogEntry("zeta_peer", destination_path=folder),
+        AccountCatalogEntry("outsider", destination_path=other_folder),
+        AccountCatalogEntry("lerabuns_extra", destination_path=other_folder),
+    ]
+
+    filtered = filter_catalog_entries(entries, "lerabuns")
+
+    assert [entry.username for entry in filtered] == [
+        "alpha_peer",
+        "lerabuns",
+        "zeta_peer",
+    ]
+
+
+def test_catalog_filter_exact_match_is_case_insensitive() -> None:
+    folder = r"G:\4K Stogram\00.FAVORITES\Valeria-Makusheva"
+    entries = [
+        AccountCatalogEntry("leraBuns", destination_path=folder),
+        AccountCatalogEntry("peer_one", destination_path=folder),
+    ]
+
+    filtered = filter_catalog_entries(entries, "LERABUNS")
+
+    assert [entry.username for entry in filtered] == ["leraBuns", "peer_one"]
+
+
+def test_catalog_filter_exact_match_without_path_returns_only_match() -> None:
+    entries = [
+        AccountCatalogEntry("solo_user"),
+        AccountCatalogEntry("solo_user_extra", destination_path=r"G:\Other"),
+        AccountCatalogEntry("other"),
+    ]
+
+    filtered = filter_catalog_entries(entries, "solo_user")
+
+    assert [entry.username for entry in filtered] == ["solo_user"]
+
+
+def test_catalog_filter_substring_without_exact_match() -> None:
+    entries = [
+        AccountCatalogEntry("lera", destination_path=r"G:\A"),
+        AccountCatalogEntry("lerabuns", destination_path=r"G:\B"),
+        AccountCatalogEntry("leraferal", destination_path=r"G:\C"),
+        AccountCatalogEntry("other"),
+    ]
+
+    filtered = filter_catalog_entries(entries, "lera")
+
+    # "lera" is an exact match of the first username, so folder peers of G:\A
+    # would apply; only "lera" shares that path here.
+    assert [entry.username for entry in filtered] == ["lera"]
+
+    partial = filter_catalog_entries(entries, "bun")
+    assert [entry.username for entry in partial] == ["lerabuns"]
+
+
+def test_catalog_filter_empty_query_returns_all() -> None:
+    entries = [
+        AccountCatalogEntry("a"),
+        AccountCatalogEntry("b"),
+    ]
+    assert filter_catalog_entries(entries, "") == entries
+    assert filter_catalog_entries(entries, "   ") == entries
 
 
 def test_catalog_enable_reactivates_disabled_account(tmp_path: Path) -> None:
@@ -968,6 +1044,37 @@ def test_gui_manual_rename_command_adds_all_new_accounts_in_order() -> None:
     ]
 
 
+def test_gui_manual_rename_command_preview_includes_shell_line_and_params() -> None:
+    script_path = Path(r"D:\tools\ManualRenameFiles\main.py")
+    new_accounts = (
+        NewAccountRenameParameters(
+            username="ddmarii",
+            owner_id="436651863",
+            start_init_date="2025-12-14",
+            destination_path=r"G:\4K Stogram\00.MODELS-D",
+        ),
+    )
+    command = build_manual_rename_command(
+        "2026-07-16",
+        script_path=script_path,
+        new_accounts=new_accounts,
+    )
+    preview = format_manual_rename_command_preview(
+        "2026-07-16",
+        script_path=script_path,
+        new_accounts=new_accounts,
+    )
+
+    assert format_command_for_shell(command) in preview
+    assert "--newRename" in preview
+    assert "--startNowDate 2026-07-16" in preview
+    assert "ddmarii" in preview
+    assert r"G:\4K Stogram\00.MODELS-D" in preview
+    assert "--no-duplicated" in preview
+    assert "--move-renamed" in preview
+    assert "[0]" in preview
+
+
 def test_gui_rename_parameters_only_include_checked_new_accounts() -> None:
     parameters = _new_account_rename_parameters(
         [
@@ -1129,10 +1236,52 @@ def test_gui_lists_and_recovers_pending_batch_from_sqlite(tmp_path: Path) -> Non
         ]
         assert managed[0].status == "DRAFT"
         assert managed[0].total_accounts == 1
+        assert managed[0].url_count == 1
         assert list_pending_batches(connection) == []
 
         recovered = load_batch_draft(connection, result.batch.id)
         assert recovered == draft
+
+
+def test_gui_managed_batches_report_total_url_count(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="two_accounts_urls",
+        default_start_now_date="2026-08-08",
+        accounts=[
+            AccountDraft(
+                username="account_a",
+                urls=[
+                    f"https://www.instagram.com/reel/AAAA{i:02d}/"
+                    for i in range(50)
+                ],
+            ),
+            AccountDraft(
+                username="account_b",
+                urls=[
+                    f"https://www.instagram.com/reel/BBBB{i:02d}/"
+                    for i in range(50)
+                ],
+            ),
+        ],
+    )
+    empty = BatchDraft(
+        batch_name="empty_urls_batch",
+        default_start_now_date="2026-08-08",
+        accounts=[AccountDraft(username="no_urls_yet", download_stories=True)],
+    )
+
+    with connect(db_path) as connection:
+        save_batch_draft(draft, connection)
+        save_batch_draft(empty, connection)
+        managed = {
+            item.batch_name: item for item in list_managed_batches(connection)
+        }
+
+        assert managed["two_accounts_urls"].url_count == 100
+        assert managed["two_accounts_urls"].total_accounts == 2
+        assert managed["empty_urls_batch"].url_count == 0
 
 
 def test_gui_saved_draft_can_be_updated_then_is_locked_when_executed(
@@ -1344,6 +1493,87 @@ def test_gui_runtime_progress_and_manual_finish(tmp_path: Path) -> None:
         finish_batch(connection, result.batch.id)
         assert BatchRepository(connection).get_by_id(result.batch.id).status is InputBatchStatus.COMPLETED
         assert list_pending_batches(connection) == []
+
+
+def test_list_account_problem_urls_filters_retry_and_failed(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="problem_urls",
+        default_start_now_date="2026-08-08",
+        accounts=[
+            AccountDraft(
+                username="problem_user",
+                urls=[
+                    "https://www.instagram.com/reel/OKDONE01/",
+                    "https://www.instagram.com/reel/RETRYME01/",
+                    "https://www.instagram.com/reel/RETRYME02/",
+                    "https://www.instagram.com/reel/FAILME01/",
+                    "https://www.instagram.com/p/STILLPENDING/",
+                ],
+            )
+        ],
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection)
+        account = result.accounts[0]
+        jobs = UrlJobRepository(connection).list_by_account(account.id)
+        repo = UrlJobRepository(connection)
+        repo.update_status(jobs[0].id, UrlJobStatus.COMPLETED)
+        repo.update_error(
+            jobs[1].id,
+            status=UrlJobStatus.RETRY_PENDING,
+            last_error="timeout",
+            last_error_type="TEMPORARY",
+            non_retryable=False,
+        )
+        repo.update_error(
+            jobs[2].id,
+            status=UrlJobStatus.FAILED_TEMPORARY,
+            last_error="Media not found or unavailable",
+            last_error_type="TEMPORARY",
+            non_retryable=False,
+        )
+        repo.update_error(
+            jobs[3].id,
+            status=UrlJobStatus.FAILED_FINAL,
+            last_error="We're sorry, we couldn't find that.",
+            last_error_type="NOT_FOUND",
+            non_retryable=True,
+        )
+        # jobs[4] stays PENDING
+
+        retry_rows = list_account_problem_urls(
+            connection,
+            account_id=account.id,
+            kind="retry",
+        )
+        failed_rows = list_account_problem_urls(
+            connection,
+            account_id=account.id,
+            kind="failed",
+        )
+
+        assert [row.url for row in retry_rows] == [
+            "https://www.instagram.com/reel/RETRYME01/",
+            "https://www.instagram.com/reel/RETRYME02/",
+        ]
+        assert retry_rows[0].last_error == "timeout"
+        assert [row.url for row in failed_rows] == [
+            "https://www.instagram.com/reel/FAILME01/",
+        ]
+        assert failed_rows[0].status == UrlJobStatus.FAILED_FINAL.value
+
+        progress = get_account_runtime_progress(connection, result.batch.id)[0]
+        status_label, status_tag = _account_display_status(
+            draft.accounts[0],
+            progress,
+        )
+        assert status_tag == "retry"
+        assert "Reintento" in status_label
+        assert progress.retry_items == 2
+        assert progress.failed_items == 1
 
 
 def test_gui_manual_account_removal_marks_non_terminal_urls_and_account_failed(

@@ -13,6 +13,7 @@ import webbrowser
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
     AccountCatalogService,
+    filter_catalog_entries,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -24,6 +25,7 @@ from ig_orchestrator.gui.batch_draft_service import (
 )
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
+    ProblemUrlKind,
     activate_draft_batch,
     complete_account_manually,
     delete_draft_batch,
@@ -31,6 +33,7 @@ from ig_orchestrator.gui.batch_resume_service import (
     finish_batch,
     get_account_runtime_progress,
     is_batch_ready_for_rename,
+    list_account_problem_urls,
     list_managed_batches,
     load_batch_draft,
     mark_batch_executed_elsewhere,
@@ -47,6 +50,7 @@ from ig_orchestrator.gui.process_runner import (
     ProcessRunner,
     build_manual_rename_command,
     build_run_continue_command,
+    format_manual_rename_command_preview,
 )
 from ig_orchestrator.settings import Settings
 from ig_orchestrator.models import AccountHistoryStatus
@@ -245,13 +249,19 @@ class InstagramOrchestratorApp:
             state="disabled",
         )
         self.rename_button.grid(row=0, column=3, sticky="e", padx=(0, 6))
+        self.rename_manual_button = ttk.Button(
+            progress,
+            text="Renombrar Manual",
+            command=self._show_manual_rename_command,
+        )
+        self.rename_manual_button.grid(row=0, column=4, sticky="e", padx=(0, 6))
         self.clean_console_button = ttk.Button(
             progress,
             text="Clean",
             command=self._clear_console,
         )
-        self.clean_console_button.grid(row=0, column=4, sticky="e", padx=(0, 6))
-        self.cancel_button.grid(row=0, column=5, sticky="e")
+        self.clean_console_button.grid(row=0, column=5, sticky="e", padx=(0, 6))
+        self.cancel_button.grid(row=0, column=6, sticky="e")
 
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
         parent.rowconfigure(2, weight=1)
@@ -345,9 +355,22 @@ class InstagramOrchestratorApp:
         self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
         self.tree.bind("<Button-3>", self._show_batch_menu)
+        self.tree.bind(
+            "<Double-Button-1>",
+            lambda _event: self._open_selected_problem_urls(),
+        )
         self.batch_menu = tk.Menu(self.root, tearoff=False)
         self.batch_menu.add_command(
             label="Completar", command=self._complete_selected_account
+        )
+        self.batch_menu.add_separator()
+        self.batch_menu.add_command(
+            label="Ver URLs en reintento…",
+            command=lambda: self._open_account_problem_urls("retry"),
+        )
+        self.batch_menu.add_command(
+            label="Ver URLs fallidas…",
+            command=lambda: self._open_account_problem_urls("failed"),
         )
         self.tree.tag_configure("completed", foreground="#238636")
         self.tree.tag_configure("retry", foreground="#b76e00")
@@ -512,20 +535,19 @@ class InstagramOrchestratorApp:
         except tk.TclError:
             yview = (0.0, 1.0)
 
-        query = self.catalog_filter_var.get().strip().lower()
+        query = self.catalog_filter_var.get()
         in_batch = self._batch_usernames()
         visible: list[str] = []
         self.catalog_list.delete(0, tk.END)
-        for entry in self.catalog_entries:
-            if not query or query in entry.username.lower():
-                self.catalog_list.insert(tk.END, entry.username)
-                colors = _catalog_entry_colors(
-                    entry,
-                    in_batch=entry.username.casefold() in in_batch,
-                )
-                if colors:
-                    self.catalog_list.itemconfig(tk.END, **colors)
-                visible.append(entry.username)
+        for entry in filter_catalog_entries(self.catalog_entries, query):
+            self.catalog_list.insert(tk.END, entry.username)
+            colors = _catalog_entry_colors(
+                entry,
+                in_batch=entry.username.casefold() in in_batch,
+            )
+            if colors:
+                self.catalog_list.itemconfig(tk.END, **colors)
+            visible.append(entry.username)
 
         if selected_username is not None:
             try:
@@ -770,7 +792,243 @@ class InstagramOrchestratorApp:
             self.tree.selection_set(item_id)
         self.tree.focus(item_id)
         self.selected_index = int(item_id)
+        runtime = self._selected_runtime_progress()
+        retry_state = "normal" if runtime is not None and runtime.retry_items else "disabled"
+        failed_state = (
+            "normal" if runtime is not None and runtime.failed_items else "disabled"
+        )
+        self.batch_menu.entryconfigure("Ver URLs en reintento…", state=retry_state)
+        self.batch_menu.entryconfigure("Ver URLs fallidas…", state=failed_state)
         self.batch_menu.tk_popup(event.x_root, event.y_root)
+
+    def _selected_runtime_progress(self) -> AccountRuntimeProgress | None:
+        if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
+            return None
+        username = self.accounts[self.selected_index].username.casefold()
+        return self.runtime_progress.get(username)
+
+    def _problem_kind_for_runtime(
+        self,
+        runtime: AccountRuntimeProgress | None,
+    ) -> ProblemUrlKind | None:
+        if runtime is None:
+            return None
+        # Same priority as the visible Estado column.
+        if runtime.retry_items:
+            return "retry"
+        if runtime.status == "FAILED" or (
+            runtime.failed_items and not runtime.pending_items
+        ):
+            return "failed"
+        if runtime.failed_items:
+            return "failed"
+        return None
+
+    def _open_selected_problem_urls(self) -> None:
+        self._load_selected_row()
+        kind = self._problem_kind_for_runtime(self._selected_runtime_progress())
+        if kind is None:
+            return
+        self._open_account_problem_urls(kind)
+
+    def _open_account_problem_urls(self, kind: ProblemUrlKind) -> None:
+        if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
+            messagebox.showwarning(
+                "URLs de la cuenta",
+                "Selecciona primero una cuenta del lote.",
+            )
+            return
+        account = self.accounts[self.selected_index]
+        runtime = self.runtime_progress.get(account.username.casefold())
+        if runtime is None:
+            messagebox.showinfo(
+                "URLs de la cuenta",
+                "No hay estado de ejecución para esta cuenta todavía.\n"
+                "Abre o reanuda el lote para consultar fallos y reintentos.",
+            )
+            return
+        if kind == "retry" and not runtime.retry_items:
+            messagebox.showinfo(
+                "URLs en reintento",
+                f"@{account.username} no tiene URLs en reintento ahora mismo.",
+            )
+            return
+        if kind == "failed" and not runtime.failed_items:
+            messagebox.showinfo(
+                "URLs fallidas",
+                f"@{account.username} no tiene URLs fallidas definitivas.",
+            )
+            return
+
+        kind_label = "Reintentos" if kind == "retry" else "Fallidas"
+        title_batch = (
+            f" · batch #{self.active_batch_id}"
+            if self.active_batch_id is not None
+            else ""
+        )
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"{kind_label} · @{account.username}{title_batch}")
+        dialog.geometry("880x380")
+        dialog.minsize(640, 280)
+        dialog.transient(self.root)
+        # Non-modal: keep the main window usable while a batch is running.
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(2, weight=1)
+
+        summary_var = tk.StringVar()
+        ttk.Label(
+            dialog,
+            textvariable=summary_var,
+            padding=(12, 10, 12, 2),
+        ).grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            dialog,
+            text="Doble click en una fila para abrir la URL en Chrome.",
+            foreground="#57606a",
+            padding=(12, 0, 12, 6),
+        ).grid(row=1, column=0, sticky="w")
+
+        table_frame = ttk.Frame(dialog, padding=(10, 0, 10, 0))
+        table_frame.grid(row=2, column=0, sticky="nsew")
+        table_frame.columnconfigure(0, weight=1)
+        table_frame.rowconfigure(0, weight=1)
+
+        columns = ("url", "status", "error", "retries")
+        tree = ttk.Treeview(
+            table_frame,
+            columns=columns,
+            show="headings",
+            selectmode="browse",
+        )
+        for column, title, width, stretch in (
+            ("url", "URL", 420, True),
+            ("status", "Estado", 140, False),
+            ("error", "Error", 220, True),
+            ("retries", "Reintentos", 80, False),
+        ):
+            tree.heading(column, text=title)
+            tree.column(
+                column,
+                width=width,
+                minwidth=60 if column != "url" else 160,
+                anchor="w" if column != "retries" else "e",
+                stretch=stretch,
+            )
+        tree.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(
+            table_frame,
+            orient=tk.VERTICAL,
+            command=tree.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        scroll.grid(row=0, column=1, sticky="ns")
+        tree.configure(yscrollcommand=scroll.set)
+
+        url_by_iid: dict[str, str] = {}
+        refresh_after_id: list[str | None] = [None]
+
+        def truncate_error(text: str | None, *, limit: int = 120) -> str:
+            if not text:
+                return "—"
+            compact = " ".join(text.split())
+            if len(compact) <= limit:
+                return compact
+            return compact[: limit - 1] + "…"
+
+        def reload_rows() -> None:
+            selected = tree.selection()
+            selected_id = selected[0] if selected else None
+            for item in tree.get_children():
+                tree.delete(item)
+            url_by_iid.clear()
+            try:
+                rows = list_account_problem_urls(
+                    self.connection,
+                    account_id=runtime.account_id,
+                    kind=kind,
+                )
+            except ValueError as exc:
+                summary_var.set(str(exc))
+                return
+            for item in rows:
+                iid = str(item.job_id)
+                url_by_iid[iid] = item.url
+                tree.insert(
+                    "",
+                    tk.END,
+                    iid=iid,
+                    values=(
+                        item.url,
+                        item.status,
+                        truncate_error(item.last_error),
+                        item.retries,
+                    ),
+                )
+            live = (
+                " · actualización automática (~1s)"
+                if self.process_runner.is_running()
+                else ""
+            )
+            summary_var.set(f"{len(rows)} URL(s) · {kind_label.lower()}{live}")
+            if selected_id and tree.exists(selected_id):
+                tree.selection_set(selected_id)
+                tree.focus(selected_id)
+                tree.see(selected_id)
+
+        def open_selected_url(_event: tk.Event | None = None) -> None:
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning(
+                    "Abrir URL",
+                    "Selecciona una fila primero.",
+                    parent=dialog,
+                )
+                return
+            url = url_by_iid.get(selection[0])
+            if not url:
+                return
+            if not _open_chrome_tab(url):
+                messagebox.showerror(
+                    "Abrir URL",
+                    "No se pudo abrir la URL en el navegador.",
+                    parent=dialog,
+                )
+
+        def schedule_auto_refresh() -> None:
+            if refresh_after_id[0] is not None:
+                try:
+                    dialog.after_cancel(refresh_after_id[0])
+                except tk.TclError:
+                    pass
+                refresh_after_id[0] = None
+            if not dialog.winfo_exists():
+                return
+            reload_rows()
+            if self.process_runner.is_running():
+                refresh_after_id[0] = dialog.after(1000, schedule_auto_refresh)
+
+        def on_close() -> None:
+            if refresh_after_id[0] is not None:
+                try:
+                    dialog.after_cancel(refresh_after_id[0])
+                except tk.TclError:
+                    pass
+                refresh_after_id[0] = None
+            dialog.destroy()
+
+        actions = ttk.Frame(dialog, padding=10)
+        actions.grid(row=3, column=0, sticky="ew")
+        ttk.Button(actions, text="Cerrar", command=on_close).pack(side=tk.LEFT)
+        ttk.Button(actions, text="Actualizar", command=reload_rows).pack(
+            side=tk.RIGHT
+        )
+        ttk.Button(actions, text="Abrir seleccionada", command=open_selected_url).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        tree.bind("<Double-Button-1>", open_selected_url)
+        dialog.protocol("WM_DELETE_WINDOW", on_close)
+        schedule_auto_refresh()
+        dialog.focus_set()
 
     def _editor_account(self) -> AccountDraft:
         urls = self.urls_text.get("1.0", tk.END).splitlines()
@@ -1028,7 +1286,7 @@ class InstagramOrchestratorApp:
         managed = list_managed_batches(self.connection)
         dialog = tk.Toplevel(self.root)
         dialog.title("Lotes guardados y ejecuciones pendientes")
-        dialog.geometry("980x420")
+        dialog.geometry("1060x420")
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.columnconfigure(0, weight=1)
@@ -1043,17 +1301,18 @@ class InstagramOrchestratorApp:
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
-        columns = ("date", "name", "id", "status", "progress")
+        columns = ("date", "name", "id", "status", "urls", "progress")
         tree = ttk.Treeview(dialog, columns=columns, show="headings", selectmode="browse")
-        for column, title, width in (
-            ("date", "Fecha", 170),
-            ("name", "Nombre", 240),
-            ("id", "Batch ID", 75),
-            ("status", "Estado", 120),
-            ("progress", "Cuentas", 250),
+        for column, title, width, anchor in (
+            ("date", "Fecha", 170, "w"),
+            ("name", "Nombre", 240, "w"),
+            ("id", "Batch ID", 75, "w"),
+            ("status", "Estado", 120, "w"),
+            ("urls", "URLs", 70, "e"),
+            ("progress", "Cuentas", 250, "w"),
         ):
             tree.heading(column, text=title)
-            tree.column(column, width=width, anchor="w")
+            tree.column(column, width=width, anchor=anchor)
         tree.grid(row=1, column=0, sticky="nsew", padx=10, pady=6)
         empty_label = ttk.Label(
             dialog,
@@ -1088,6 +1347,7 @@ class InstagramOrchestratorApp:
                         summary.batch_name,
                         summary.batch_id,
                         summary.display_status,
+                        summary.url_count,
                         progress_text(summary),
                     ),
                 )
@@ -1742,6 +2002,111 @@ class InstagramOrchestratorApp:
         )
         self._update_pending_button_label()
 
+    def _resolve_manual_rename_context(
+        self,
+    ) -> tuple[str, tuple[NewAccountRenameParameters, ...], list[str]]:
+        """Return start date, new-account args and optional warning notes."""
+
+        notes: list[str] = []
+        start_now_date = self.default_date_var.get().strip()
+        accounts = self.accounts
+        batch_id = self.active_batch_id or self.saved_batch_id
+        if batch_id is not None:
+            try:
+                persisted_draft = load_batch_draft(self.connection, batch_id)
+            except ValueError as exc:
+                notes.append(f"No se pudo releer el lote {batch_id} desde SQLite: {exc}")
+            else:
+                if persisted_draft.default_start_now_date.strip():
+                    start_now_date = persisted_draft.default_start_now_date.strip()
+                accounts = persisted_draft.accounts
+                notes.append(f"Parámetros tomados del lote id={batch_id} en SQLite.")
+        else:
+            notes.append(
+                "Sin lote persistido: se usan la fecha global y las cuentas "
+                "del borrador en pantalla."
+            )
+
+        try:
+            parsed_date = date.fromisoformat(start_now_date)
+        except ValueError:
+            parsed_date = None
+        if parsed_date is None or parsed_date.isoformat() != start_now_date:
+            notes.append(
+                f"Aviso: Start date «{start_now_date or '(vacío)'}» no es YYYY-MM-DD."
+            )
+        if not MANUAL_RENAME_SCRIPT.is_file():
+            notes.append(
+                f"Aviso: no se encontró el script en {MANUAL_RENAME_SCRIPT}."
+            )
+
+        new_accounts = _new_account_rename_parameters(accounts)
+        return start_now_date, new_accounts, notes
+
+    def _show_manual_rename_command(self) -> None:
+        """Show the exact rename script invocation without executing it."""
+
+        start_now_date, new_accounts, notes = self._resolve_manual_rename_context()
+        preview = format_manual_rename_command_preview(
+            start_now_date,
+            new_accounts=new_accounts,
+        )
+        if notes:
+            preview = "Notas:\n" + "\n".join(f"- {note}" for note in notes) + "\n\n" + preview
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Comando de renombrado manual")
+        dialog.geometry("820x480")
+        dialog.minsize(560, 320)
+        dialog.transient(self.root)
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(1, weight=1)
+
+        ttk.Label(
+            dialog,
+            text=(
+                "Este diálogo no ejecuta el renombrador: solo muestra el comando "
+                "con todos sus parámetros para copiarlo y lanzarlo a mano."
+            ),
+            wraplength=780,
+            padding=(12, 10, 12, 4),
+        ).grid(row=0, column=0, sticky="ew")
+
+        text = tk.Text(dialog, wrap="word", height=18)
+        text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
+        scroll = ttk.Scrollbar(
+            dialog,
+            orient=tk.VERTICAL,
+            command=text.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        scroll.grid(row=1, column=1, sticky="ns", pady=(0, 6))
+        text.configure(yscrollcommand=scroll.set)
+        text.insert("1.0", preview)
+        text.configure(state="disabled")
+
+        def copy_command() -> None:
+            # Prefer the shell-ready first command line when present.
+            body = preview
+            marker = "Comando listo para pegar (PowerShell / cmd):\n"
+            if marker in body:
+                after = body.split(marker, 1)[1]
+                shell_line = after.splitlines()[0] if after else body
+            else:
+                shell_line = body
+            dialog.clipboard_clear()
+            dialog.clipboard_append(shell_line)
+            dialog.update_idletasks()
+            self._set_status("Comando de renombrado copiado al portapapeles")
+
+        actions = ttk.Frame(dialog, padding=10)
+        actions.grid(row=2, column=0, columnspan=2, sticky="ew")
+        ttk.Button(actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
+        ttk.Button(actions, text="Copiar comando", command=copy_command).pack(
+            side=tk.RIGHT
+        )
+        dialog.focus_set()
+
     def _rename_manual_files(self) -> None:
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
@@ -1852,6 +2217,8 @@ class InstagramOrchestratorApp:
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
         )
+        # Always available: only previews the rename command, never runs it.
+        self.rename_manual_button.configure(state="normal")
         if not running:
             self._update_batch_context()
         self._set_status("Ejecutando..." if running else self.status_var.get())

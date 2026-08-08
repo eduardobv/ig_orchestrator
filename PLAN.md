@@ -1526,17 +1526,21 @@ jobs completados. La finalización manual requiere confirmación, cambia sólo e
 estado del batch a `COMPLETED` y conserva toda su trazabilidad.
 
 La tabla de cuentas refleja en tiempo real los estados persistidos y distingue
-visualmente completadas, reintentos, procesamiento, pendientes y fallos. La
+visualmente completadas, reintentos, procesamiento, pendientes y fallos. Si el
+estado visible es reintento o fallida, la GUI permite abrir una ventana no
+bloqueante con las URL jobs correspondientes y abrir cada URL en Chrome. La
 fecha global del lote y los parámetros de renombrado de las cuentas nuevas se
 guardan asociados al batch para que una ejecución recuperada pueda lanzar el
 mismo post-proceso de renombrado.
 
 Antes de ejecutar el renombrador, la GUI reconstruye desde SQLite el contexto
-del batch y no depende del borrador que quede en memoria. Al iniciar o reanudar,
-`Lote actual` usa el orden real de procesamiento y conserva la seleccion entre
-refrescos. Una cuenta pendiente o en curso se puede retirar manualmente: la
-cuenta queda `FAILED` y sus URL jobs no terminales quedan `FAILED_FINAL` con el
-motivo de baja manual, sin borrar filas.
+del batch y no depende del borrador que quede en memoria. El botón
+`Renombrar Manual` expone en todo momento el comando del script externo sin
+ejecutarlo. Al iniciar o reanudar, `Lote actual` usa el orden real de
+procesamiento y conserva la seleccion entre refrescos. Una cuenta pendiente o
+en curso se puede retirar manualmente: la cuenta queda `FAILED` y sus URL jobs
+no terminales quedan `FAILED_FINAL` con el motivo de baja manual, sin borrar
+filas.
 
 El catalogo persiste su clasificacion en `account_history`: `status` admite
 `ENABLED`, `INACTIVE`, `DISABLED` y el valor historico `CHANGED`, mientras que
@@ -1544,15 +1548,17 @@ El catalogo persiste su clasificacion en `account_history`: `status` admite
 despues las activas con `field1`, agrupadas por ruta y ordenadas por username;
 luego las activas sin ruta; las inactivas en amarillo; y las desactivadas en
 rojo. Las bajas logicas siguen visibles al final aunque aparezcan en fuentes
-JSON. Los paths historicos de `account_history.field1` tambien alimentan un
-combobox editable para las cuentas nuevas. Al comenzar a procesarse en una
-ejecucion real, una cuenta `INACTIVE` vuelve a `ENABLED`; los dry-run no cambian
-el catalogo.
+JSON. El buscador, ante un username exacto con `field1`, devuelve el grupo
+completo de esa carpeta. Los paths historicos de `account_history.field1`
+tambien alimentan un combobox editable para las cuentas nuevas. Al comenzar a
+procesarse en una ejecucion real, una cuenta `INACTIVE` vuelve a `ENABLED`; los
+dry-run no cambian el catalogo.
 
 Los batches creados desde GUI se registran inicialmente como `DRAFT`. El
-maestro de lotes permite recuperar, modificar y borrar únicamente ese estado.
-Al ejecutar un draft cambia a `IMPORTED` y queda bloqueado para edición; desde
-ese punto pasa al flujo normal de recuperación de ejecuciones.
+maestro de lotes permite recuperar, modificar y borrar únicamente ese estado, y
+muestra el total de URLs de entrada del lote. Al ejecutar un draft cambia a
+`IMPORTED` y queda bloqueado para edición; desde ese punto pasa al flujo normal
+de recuperación de ejecuciones.
 
 La GUI diferencia de forma permanente el contexto de trabajo: lote nuevo sin
 ID, lote `DRAFT` registrado en edición y lote cuya ejecución ya comenzó. Al

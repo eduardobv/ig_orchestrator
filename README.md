@@ -277,11 +277,17 @@ lote actual se resaltan en amarillo mas intenso (solo durante la sesion).
 `Delete` no borra datos: cambia `account_history.status` a `DISABLED`.
 `Activar` las devuelve a `ENABLED`. El buscador del catalogo tiene un boton
 `❌` para limpiar el filtro; al usar el menu contextual se conserva la
-seleccion y el scroll. Una cuenta inactiva vuelve automaticamente a `ENABLED`
+seleccion y el scroll. Si el texto del buscador coincide **exactamente** con un
+username del catalogo y esa cuenta tiene `account_history.field1` (ruta de
+carpeta), el resultado incluye **todas** las cuentas que comparten esa misma
+ruta, no solo la coincidencia. Sin match exacto se mantiene el filtro por
+substring. Una cuenta inactiva vuelve automaticamente a `ENABLED`
 cuando participa en un lote real; un dry-run no modifica este estado.
 
-`Lotes / ejecuciones (N)` abre un maestro ordenado por fecha. Un lote registrado
-queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar,
+`Lotes / ejecuciones (N)` abre un maestro ordenado por fecha con columnas
+Fecha, Nombre, Batch ID, Estado, **URLs** (total de URLs de entrada del lote,
+suma de todas las cuentas; no incluye stories generadas) y Cuentas. Un lote
+registrado queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar,
 exportar, borrar o ejecutar. Al ejecutarlo cambia a `IMPORTED` y queda
 bloqueado para edicion. Las ejecuciones con trabajo pendiente se reanudan;
 cuando las descargas terminan (o se marca **Ejecutado en otra instancia**) el
@@ -321,6 +327,11 @@ La tabla `Lote actual` se actualiza periódicamente desde SQLite durante el
 proceso. Las cuentas completadas aparecen en verde, los reintentos en ámbar,
 la cuenta en curso en azul, las pendientes en gris y los fallos en rojo. El
 resumen indica cuántas están completas, en reintento y por terminar.
+Si una cuenta está en **Reintento** o **Fallida**, el doble click (o el menú
+contextual `Ver URLs en reintento…` / `Ver URLs fallidas…`) abre una ventana no
+bloqueante con la lista de URLs afectadas (estado, error y reintentos). El
+doble click sobre una fila de esa lista abre la URL en Chrome. Mientras el
+lote sigue en ejecución, la lista se actualiza ~cada segundo.
 Al iniciar el lote, sus filas adoptan el orden persistido de procesamiento:
 primero cuentas que solo descargan stories y despues menor numero de URLs. Los
 refrescos conservan la seleccion. Durante una ejecucion, `Eliminar` permanece
@@ -350,6 +361,12 @@ unico argumento y toda la salida se muestra en la misma consola con timestamp.
 Justo antes de construir el comando, la GUI vuelve a leer el lote desde
 SQLite; por ello una cancelacion, cierre y recuperacion conserva `ownerId`,
 `path`, `startInitDate` y el flag de cuenta nueva.
+
+Junto a `Renombrar` está **Renombrar Manual**, siempre habilitado. No lanza el
+script: muestra un diálogo con el comando completo (línea lista para
+PowerShell/cmd, resumen de parámetros y lista de argumentos), preferentemente
+releído desde el lote activo o guardado en SQLite. Incluye **Copiar comando**
+para ejecutarlo a mano fuera de la GUI.
 
 La ventana inicial ocupa la mitad izquierda de la pantalla (960x1000 en un
 monitor 1920x1080). El catalogo permanece a la izquierda; a su derecha, el

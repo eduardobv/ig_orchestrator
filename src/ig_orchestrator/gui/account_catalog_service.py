@@ -76,6 +76,14 @@ class AccountCatalogService:
             self.connection
         ).list_distinct_destination_paths()
 
+    def filter_entries(
+        self,
+        entries: Iterable[AccountCatalogEntry],
+        query: str,
+    ) -> list[AccountCatalogEntry]:
+        """Filter catalog rows; exact username match expands same-folder peers."""
+        return filter_catalog_entries(entries, query)
+
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
         for record in AccountHistoryRepository(self.connection).list_all():
             yield AccountCatalogEntry(
@@ -156,4 +164,54 @@ def _catalog_sort_key(entry: AccountCatalogEntry) -> tuple[object, ...]:
     return (2, username)
 
 
-__all__ = ["AccountCatalogEntry", "AccountCatalogService"]
+def _normalized_destination_path(entry: AccountCatalogEntry) -> str:
+    return (entry.destination_path or "").strip().casefold()
+
+
+def filter_catalog_entries(
+    entries: Iterable[AccountCatalogEntry],
+    query: str,
+) -> list[AccountCatalogEntry]:
+    """Return catalog entries matching *query*.
+
+    Empty query keeps every entry (caller order preserved).
+
+    When *query* matches a username exactly (case-insensitive) and that entry
+    has a non-empty ``destination_path`` (``account_history.field1``), the
+    result is every entry that shares the same path, not only the matched
+    username. Without a path, only the exact match is returned.
+
+    Without an exact username match, filtering is substring-based on username.
+    """
+    materialized = list(entries)
+    normalized_query = query.strip().casefold()
+    if not normalized_query:
+        return materialized
+
+    exact_matches = [
+        entry
+        for entry in materialized
+        if entry.username.casefold() == normalized_query
+    ]
+    if exact_matches:
+        folder_path = _normalized_destination_path(exact_matches[0])
+        if not folder_path:
+            return exact_matches
+        return [
+            entry
+            for entry in materialized
+            if _normalized_destination_path(entry) == folder_path
+        ]
+
+    return [
+        entry
+        for entry in materialized
+        if normalized_query in entry.username.casefold()
+    ]
+
+
+__all__ = [
+    "AccountCatalogEntry",
+    "AccountCatalogService",
+    "filter_catalog_entries",
+]

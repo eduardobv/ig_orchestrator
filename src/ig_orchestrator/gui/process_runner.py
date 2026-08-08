@@ -60,6 +60,55 @@ def build_manual_rename_command(
     return command
 
 
+def format_command_for_shell(command: list[str]) -> str:
+    """Return a single shell-ready line (Windows quoting for paths with spaces)."""
+    return subprocess.list2cmdline(command)
+
+
+def format_manual_rename_command_preview(
+    start_now_date: str,
+    *,
+    new_accounts: tuple[NewAccountRenameParameters, ...] = (),
+    script_path: Path = MANUAL_RENAME_SCRIPT,
+) -> str:
+    """Human-readable preview of the rename command for copy/paste."""
+    command = build_manual_rename_command(
+        start_now_date,
+        new_accounts=new_accounts,
+        script_path=script_path,
+    )
+    shell_line = format_command_for_shell(command)
+    args_block = "\n".join(f"  [{index}] {part}" for index, part in enumerate(command))
+    new_account_lines: list[str] = []
+    if new_accounts:
+        for account in new_accounts:
+            new_account_lines.append(
+                "  --new-account "
+                f"{account.username} {account.owner_id} "
+                f"{account.start_init_date} {account.destination_path}"
+            )
+    else:
+        new_account_lines.append("  (ninguna cuenta nueva)")
+
+    return (
+        "Comando listo para pegar (PowerShell / cmd):\n"
+        f"{shell_line}\n"
+        "\n"
+        "Resumen de parámetros:\n"
+        f"  script: {script_path}\n"
+        f"  --newRename\n"
+        f"  --startNowDate {start_now_date}\n"
+        "  cuentas nuevas:\n"
+        + "\n".join(new_account_lines)
+        + "\n"
+        "  --no-duplicated\n"
+        "  --move-renamed\n"
+        "\n"
+        "Argumentos en orden:\n"
+        f"{args_block}\n"
+    )
+
+
 class ProcessRunner:
     """Run ``run_continue`` without blocking Tkinter and stream its output."""
 
@@ -120,4 +169,6 @@ __all__ = [
     "ProcessRunner",
     "build_manual_rename_command",
     "build_run_continue_command",
+    "format_command_for_shell",
+    "format_manual_rename_command_preview",
 ]
