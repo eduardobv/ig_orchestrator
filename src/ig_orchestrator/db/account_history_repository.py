@@ -197,6 +197,29 @@ class AccountHistoryRepository:
             raise RuntimeError("Account history row disappeared during update")
         return stored
 
+    def update_identity_and_path(
+        self,
+        user_name: str,
+        *,
+        owner_id: str,
+        destination_path: str,
+    ) -> AccountHistory:
+        """Register or update owner id and path without touching startInitDate (field2)."""
+        record = self.create_or_get(user_name)
+        self.connection.execute(
+            """
+            UPDATE account_history
+            SET user_ig_id = ?, field1 = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (owner_id, destination_path, record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Account history row disappeared during update")
+        return stored
+
 
 def _row_to_history(row: Row | None) -> AccountHistory | None:
     if row is None:

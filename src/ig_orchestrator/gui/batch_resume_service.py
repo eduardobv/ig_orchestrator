@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from sqlite3 import Connection
 from typing import Literal
 
@@ -22,8 +23,9 @@ _RETRY_JOB_STATUSES = (
     "FAILED_TEMPORARY",
 )
 _FAILED_JOB_STATUSES = ("FAILED_FINAL",)
+_COMPLETED_JOB_STATUSES = ("COMPLETED",)
 
-ProblemUrlKind = Literal["retry", "failed"]
+ProblemUrlKind = Literal["retry", "failed", "completed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,11 +49,17 @@ class PendingBatchSummary:
         return self.status == InputBatchStatus.AWAITING_RENAME.value
 
     @property
+    def is_completed(self) -> bool:
+        return self.status == InputBatchStatus.COMPLETED.value
+
+    @property
     def display_status(self) -> str:
         if self.is_draft:
             return "GUARDADO"
         if self.is_awaiting_rename:
             return "POR RENOMBRAR"
+        if self.is_completed:
+            return "COMPLETADO"
         return self.status
 
 
@@ -176,6 +184,53 @@ def list_managed_batches(connection: Connection) -> list[PendingBatchSummary]:
     )
 
 
+def list_historical_batches(
+    connection: Connection,
+    *,
+    limit: int | None = None,
+) -> list[PendingBatchSummary]:
+    """Return completed (closed-cycle) batches, newest first."""
+
+    sql = f"""
+        SELECT b.id, b.batch_name, b.created_at, b.updated_at, b.status,
+               COUNT(DISTINCT a.id) AS total_accounts,
+               SUM(CASE WHEN a.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_accounts,
+               {_URL_COUNT_SUBSELECT}
+        FROM input_batches b
+        LEFT JOIN accounts a ON a.batch_id = b.id
+        WHERE b.status = 'COMPLETED'
+        GROUP BY b.id
+        ORDER BY COALESCE(b.updated_at, b.created_at) DESC, b.id DESC
+    """
+    params: list[object] = []
+    if limit is not None:
+        if limit <= 0:
+            return []
+        sql += " LIMIT ?"
+        params.append(int(limit))
+    rows = connection.execute(sql, params).fetchall()
+    results: list[PendingBatchSummary] = []
+    for row in rows:
+        total = int(row["total_accounts"] or 0)
+        completed = int(row["completed_accounts"] or 0)
+        # Prefer updated_at for the visible date of closed batches.
+        batch_date = str(row["updated_at"] or row["created_at"])
+        results.append(
+            PendingBatchSummary(
+                batch_id=int(row["id"]),
+                batch_name=str(row["batch_name"]),
+                batch_date=batch_date,
+                status=str(row["status"]),
+                total_accounts=total,
+                completed_accounts=completed,
+                retry_accounts=0,
+                remaining_accounts=0,
+                url_count=int(row["url_count"] or 0),
+            )
+        )
+    return results
+
+
 def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
     batch = connection.execute(
         "SELECT * FROM input_batches WHERE id = ?",
@@ -200,16 +255,24 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
             """,
             (row["id"],),
         ).fetchall()
+        is_new_account = bool(row["is_new_account"])
+        owner_id = str(row["rename_owner_id"] or "")
+        destination_path = str(row["rename_destination_path"] or "")
+        # Update flag is inferred: catalog metadata without new-account renamer flag.
+        is_catalog_update = (
+            not is_new_account and bool(owner_id.strip() or destination_path.strip())
+        )
         accounts.append(
             AccountDraft(
                 username=str(row["username"]),
                 download_stories=bool(row["download_stories"]),
                 urls=[str(url_row["url"]) for url_row in url_rows],
                 start_now_date=str(row["start_now_date"]),
-                is_new_account=bool(row["is_new_account"]),
-                owner_id=str(row["rename_owner_id"] or ""),
+                is_new_account=is_new_account,
+                is_catalog_update=is_catalog_update,
+                owner_id=owner_id,
                 start_init_date=str(row["rename_start_init_date"] or ""),
-                destination_path=str(row["rename_destination_path"] or ""),
+                destination_path=destination_path,
             )
         )
 
@@ -269,7 +332,7 @@ def list_account_problem_urls(
     account_id: int,
     kind: ProblemUrlKind,
 ) -> list[AccountProblemUrl]:
-    """List retryable or finally-failed URL jobs for one account."""
+    """List completed, retryable or finally-failed URL jobs for one account."""
 
     if account_id <= 0:
         raise ValueError("account_id must be positive")
@@ -277,6 +340,8 @@ def list_account_problem_urls(
         statuses = _RETRY_JOB_STATUSES
     elif kind == "failed":
         statuses = _FAILED_JOB_STATUSES
+    elif kind == "completed":
+        statuses = _COMPLETED_JOB_STATUSES
     else:
         raise ValueError(f"Unsupported problem URL kind: {kind}")
 
@@ -309,6 +374,42 @@ def list_account_problem_urls(
         )
         for row in rows
     ]
+
+
+def resolve_account_download_folder(
+    connection: Connection,
+    *,
+    account_id: int | None = None,
+    username: str = "",
+    working_folder_setting: Path | str | None = None,
+) -> Path | None:
+    """Resolve the on-disk download folder for an account without creating it.
+
+    Preference order:
+    1. ``accounts.working_folder`` for ``account_id`` when the path exists.
+    2. ``working_folder_setting / username`` when that path exists.
+    """
+
+    if account_id is not None and account_id > 0:
+        row = connection.execute(
+            "SELECT working_folder, username FROM accounts WHERE id = ?",
+            (account_id,),
+        ).fetchone()
+        if row is not None:
+            stored = row["working_folder"]
+            if stored:
+                path = Path(str(stored))
+                if path.is_dir():
+                    return path
+            if not username:
+                username = str(row["username"] or "")
+
+    normalized = username.strip().lstrip("@").strip()
+    if working_folder_setting is not None and normalized:
+        candidate = Path(working_folder_setting) / normalized
+        if candidate.is_dir():
+            return candidate
+    return None
 
 
 def finish_batch(connection: Connection, batch_id: int) -> None:
@@ -617,10 +718,12 @@ __all__ = [
     "get_account_runtime_progress",
     "is_batch_ready_for_rename",
     "list_account_problem_urls",
+    "list_historical_batches",
     "list_managed_batches",
     "list_pending_batches",
     "load_batch_draft",
     "mark_batch_awaiting_rename",
     "mark_batch_executed_elsewhere",
     "mark_batch_interrupted",
+    "resolve_account_download_folder",
 ]

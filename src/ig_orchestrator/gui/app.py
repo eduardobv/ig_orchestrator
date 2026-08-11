@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import date, datetime
+import os
 from pathlib import Path
 import re
 from sqlite3 import Connection
@@ -20,6 +21,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
     normalize_url_lines,
+    save_catalog_metadata_to_history,
     save_new_account_to_catalog,
     save_batch_draft,
 )
@@ -34,10 +36,12 @@ from ig_orchestrator.gui.batch_resume_service import (
     get_account_runtime_progress,
     is_batch_ready_for_rename,
     list_account_problem_urls,
+    list_historical_batches,
     list_managed_batches,
     load_batch_draft,
     mark_batch_executed_elsewhere,
     mark_batch_interrupted,
+    resolve_account_download_folder,
 )
 from ig_orchestrator.gui.batch_transfer_service import (
     BatchTransferError,
@@ -112,6 +116,7 @@ class InstagramOrchestratorApp:
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
+        self.history_readonly = False
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -124,6 +129,7 @@ class InstagramOrchestratorApp:
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
         self.new_account_var = tk.BooleanVar(value=False)
+        self.catalog_update_var = tk.BooleanVar(value=False)
         self.owner_id_var = tk.StringVar()
         self.start_init_date_var = tk.StringVar()
         self.destination_path_var = tk.StringVar()
@@ -365,12 +371,21 @@ class InstagramOrchestratorApp:
         )
         self.batch_menu.add_separator()
         self.batch_menu.add_command(
+            label="Ver URLs completadas…",
+            command=lambda: self._open_account_problem_urls("completed"),
+        )
+        self.batch_menu.add_command(
             label="Ver URLs en reintento…",
             command=lambda: self._open_account_problem_urls("retry"),
         )
         self.batch_menu.add_command(
             label="Ver URLs fallidas…",
             command=lambda: self._open_account_problem_urls("failed"),
+        )
+        self.batch_menu.add_separator()
+        self.batch_menu.add_command(
+            label="Abrir carpeta",
+            command=self._open_selected_account_folder,
         )
         self.tree.tag_configure("completed", foreground="#238636")
         self.tree.tag_configure("retry", foreground="#b76e00")
@@ -451,7 +466,13 @@ class InstagramOrchestratorApp:
             flags,
             text="New account",
             variable=self.new_account_var,
-            command=self._toggle_new_account_fields,
+            command=self._on_new_account_toggle,
+        ).pack(side=tk.LEFT, padx=(12, 0))
+        tk.Checkbutton(
+            flags,
+            text="Update",
+            variable=self.catalog_update_var,
+            command=self._on_catalog_update_toggle,
         ).pack(side=tk.LEFT, padx=(12, 0))
         ttk.Label(fields, text="Start date").grid(
             row=2, column=0, sticky="w", pady=(8, 0)
@@ -474,10 +495,14 @@ class InstagramOrchestratorApp:
         ttk.Entry(self.new_account_frame, textvariable=self.owner_id_var).grid(
             row=0, column=1, sticky="ew", padx=(8, 0)
         )
-        ttk.Label(self.new_account_frame, text="startInitDate *").grid(
-            row=1, column=0, sticky="w", pady=(6, 0)
+        self.start_init_date_label = ttk.Label(
+            self.new_account_frame, text="startInitDate *"
         )
-        ttk.Entry(self.new_account_frame, textvariable=self.start_init_date_var).grid(
+        self.start_init_date_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.start_init_date_entry = ttk.Entry(
+            self.new_account_frame, textvariable=self.start_init_date_var
+        )
+        self.start_init_date_entry.grid(
             row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
         )
         ttk.Label(self.new_account_frame, text="path *").grid(
@@ -516,11 +541,33 @@ class InstagramOrchestratorApp:
             row=5, column=1, columnspan=2, sticky="w", pady=(6, 0)
         )
 
-    def _toggle_new_account_fields(self) -> None:
+    def _on_new_account_toggle(self) -> None:
         if self.new_account_var.get():
+            self.catalog_update_var.set(False)
+        self._toggle_catalog_metadata_fields()
+
+    def _on_catalog_update_toggle(self) -> None:
+        if self.catalog_update_var.get():
+            self.new_account_var.set(False)
+        self._toggle_catalog_metadata_fields()
+
+    def _toggle_new_account_fields(self) -> None:
+        self._toggle_catalog_metadata_fields()
+
+    def _toggle_catalog_metadata_fields(self) -> None:
+        if self.new_account_var.get():
+            self.new_account_frame.configure(text="Datos de cuenta nueva")
+            self.start_init_date_label.grid()
+            self.start_init_date_entry.grid()
             self.new_account_frame.grid()
-        else:
-            self.new_account_frame.grid_remove()
+            return
+        if self.catalog_update_var.get():
+            self.new_account_frame.configure(text="Datos de catálogo (Update)")
+            self.start_init_date_label.grid_remove()
+            self.start_init_date_entry.grid_remove()
+            self.new_account_frame.grid()
+            return
+        self.new_account_frame.grid_remove()
 
     def _clear_catalog_filter(self) -> None:
         self.catalog_filter_var.set("")
@@ -772,17 +819,29 @@ class InstagramOrchestratorApp:
             return
         self.selected_index = index
         account = self.accounts[self.selected_index]
+        was_disabled = False
+        try:
+            was_disabled = str(self.urls_text.cget("state")) == "disabled"
+        except (tk.TclError, AttributeError):
+            was_disabled = False
+        if was_disabled:
+            self.urls_text.configure(state="normal")
         self.username_var.set(account.username)
         self.stories_var.set(account.download_stories)
         self.new_account_var.set(account.is_new_account)
+        self.catalog_update_var.set(
+            account.is_catalog_update and not account.is_new_account
+        )
         self.owner_id_var.set(account.owner_id)
         self.start_init_date_var.set(account.start_init_date)
         self.destination_path_var.set(account.destination_path)
-        self._toggle_new_account_fields()
+        self._toggle_catalog_metadata_fields()
         self.account_date_var.set(account.start_now_date)
         self.urls_text.delete("1.0", tk.END)
         self.urls_text.insert("1.0", "\n".join(account.urls))
         self._update_indicators()
+        if was_disabled or getattr(self, "history_readonly", False):
+            self.urls_text.configure(state="disabled")
 
     def _show_batch_menu(self, event: tk.Event) -> None:
         item_id = self.tree.identify_row(event.y)
@@ -793,12 +852,24 @@ class InstagramOrchestratorApp:
         self.tree.focus(item_id)
         self.selected_index = int(item_id)
         runtime = self._selected_runtime_progress()
+        completed_state = (
+            "normal" if runtime is not None and runtime.completed_items else "disabled"
+        )
         retry_state = "normal" if runtime is not None and runtime.retry_items else "disabled"
         failed_state = (
             "normal" if runtime is not None and runtime.failed_items else "disabled"
         )
+        folder_state = (
+            "normal"
+            if runtime is not None and runtime.status == "COMPLETED"
+            else "disabled"
+        )
+        complete_state = "disabled" if self.history_readonly else "normal"
+        self.batch_menu.entryconfigure("Completar", state=complete_state)
+        self.batch_menu.entryconfigure("Ver URLs completadas…", state=completed_state)
         self.batch_menu.entryconfigure("Ver URLs en reintento…", state=retry_state)
         self.batch_menu.entryconfigure("Ver URLs fallidas…", state=failed_state)
+        self.batch_menu.entryconfigure("Abrir carpeta", state=folder_state)
         self.batch_menu.tk_popup(event.x_root, event.y_root)
 
     def _selected_runtime_progress(self) -> AccountRuntimeProgress | None:
@@ -822,6 +893,10 @@ class InstagramOrchestratorApp:
             return "failed"
         if runtime.failed_items:
             return "failed"
+        if runtime.status == "COMPLETED" and runtime.completed_items:
+            return "completed"
+        if runtime.completed_items and not runtime.pending_items and not runtime.retry_items:
+            return "completed"
         return None
 
     def _open_selected_problem_urls(self) -> None:
@@ -830,6 +905,44 @@ class InstagramOrchestratorApp:
         if kind is None:
             return
         self._open_account_problem_urls(kind)
+
+    def _open_selected_account_folder(self) -> None:
+        if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
+            messagebox.showwarning(
+                "Abrir carpeta",
+                "Selecciona primero una cuenta del lote.",
+            )
+            return
+        account = self.accounts[self.selected_index]
+        runtime = self.runtime_progress.get(account.username.casefold())
+        if runtime is None or runtime.status != "COMPLETED":
+            messagebox.showinfo(
+                "Abrir carpeta",
+                f"@{account.username} aún no está Completada.\n"
+                "La carpeta se puede abrir cuando la cuenta termina de descargar.",
+            )
+            return
+        folder = resolve_account_download_folder(
+            self.connection,
+            account_id=runtime.account_id,
+            username=account.username,
+            working_folder_setting=self.settings.working_folder,
+        )
+        if folder is None:
+            expected = self.settings.working_folder / account.username
+            messagebox.showwarning(
+                "Abrir carpeta",
+                f"No se encontró la carpeta de @{account.username} en disco.\n"
+                f"Ruta esperada: {expected}",
+            )
+            return
+        try:
+            _open_path_in_explorer(folder)
+        except OSError as exc:
+            messagebox.showerror(
+                "Abrir carpeta",
+                f"No se pudo abrir la carpeta:\n{folder}\n\n{exc}",
+            )
 
     def _open_account_problem_urls(self, kind: ProblemUrlKind) -> None:
         if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
@@ -844,7 +957,13 @@ class InstagramOrchestratorApp:
             messagebox.showinfo(
                 "URLs de la cuenta",
                 "No hay estado de ejecución para esta cuenta todavía.\n"
-                "Abre o reanuda el lote para consultar fallos y reintentos.",
+                "Abre o reanuda el lote para consultar URLs, fallos y reintentos.",
+            )
+            return
+        if kind == "completed" and not runtime.completed_items:
+            messagebox.showinfo(
+                "URLs completadas",
+                f"@{account.username} no tiene URLs completadas todavía.",
             )
             return
         if kind == "retry" and not runtime.retry_items:
@@ -860,7 +979,12 @@ class InstagramOrchestratorApp:
             )
             return
 
-        kind_label = "Reintentos" if kind == "retry" else "Fallidas"
+        kind_labels = {
+            "completed": "Completadas",
+            "retry": "Reintentos",
+            "failed": "Fallidas",
+        }
+        kind_label = kind_labels.get(kind, kind)
         title_batch = (
             f" · batch #{self.active_batch_id}"
             if self.active_batch_id is not None
@@ -1032,18 +1156,23 @@ class InstagramOrchestratorApp:
 
     def _editor_account(self) -> AccountDraft:
         urls = self.urls_text.get("1.0", tk.END).splitlines()
+        is_new = self.new_account_var.get()
+        is_update = self.catalog_update_var.get() and not is_new
         return AccountDraft(
             username=self.username_var.get(),
             download_stories=self.stories_var.get(),
             urls=urls,
             start_now_date=self.account_date_var.get(),
-            is_new_account=self.new_account_var.get(),
+            is_new_account=is_new,
+            is_catalog_update=is_update,
             owner_id=self.owner_id_var.get(),
             start_init_date=self.start_init_date_var.get(),
             destination_path=self.destination_path_var.get(),
         )
 
     def _upsert_account(self) -> None:
+        if self._history_guard("agregar o actualizar cuentas"):
+            return
         account = self._editor_account()
         try:
             draft = BatchDraft(
@@ -1064,12 +1193,13 @@ class InstagramOrchestratorApp:
             urls=list(validated.urls),
             start_now_date=account.start_now_date.strip(),
             is_new_account=account.is_new_account,
+            is_catalog_update=account.is_catalog_update,
             owner_id=account.owner_id.strip(),
             start_init_date=account.start_init_date.strip(),
             destination_path=account.destination_path.strip(),
         )
         try:
-            save_new_account_to_catalog(stored, self.connection)
+            save_catalog_metadata_to_history(stored, self.connection)
         except (BatchDraftValidationError, ValueError) as exc:
             messagebox.showerror("Catalogo", str(exc))
             return
@@ -1077,7 +1207,7 @@ class InstagramOrchestratorApp:
             self.accounts.append(stored)
         else:
             self.accounts[self.selected_index] = stored
-        if stored.is_new_account:
+        if stored.is_new_account or stored.is_catalog_update:
             self.catalog_entries = self.catalog_service.list_entries()
             self.destination_paths = self.catalog_service.list_destination_paths()
             self.username_combo.configure(
@@ -1114,6 +1244,7 @@ class InstagramOrchestratorApp:
                 urls=list(account.urls),
                 start_now_date=account.start_now_date,
                 is_new_account=account.is_new_account,
+                is_catalog_update=account.is_catalog_update,
                 owner_id=account.owner_id,
                 start_init_date=account.start_init_date,
                 destination_path=account.destination_path,
@@ -1122,6 +1253,8 @@ class InstagramOrchestratorApp:
         self._refresh_table()
 
     def _delete_selected(self) -> None:
+        if self._history_guard("eliminar cuentas"):
+            return
         indices = self._selected_batch_indices()
         if not indices and self.selected_index is not None:
             indices = [self.selected_index]
@@ -1171,6 +1304,8 @@ class InstagramOrchestratorApp:
         self._refresh_runtime_progress()
 
     def _delete_all_accounts(self) -> None:
+        if self._history_guard("eliminar todas las cuentas"):
+            return
         if self.saved_batch_id is not None:
             batch_name = self.batch_name_var.get().strip()
             if not messagebox.askyesno(
@@ -1196,6 +1331,7 @@ class InstagramOrchestratorApp:
 
         if self.process_runner.is_running():
             return
+        self.history_readonly = False
         self.saved_batch_id = None
         self.saved_draft_signature = None
         self.active_batch_id = None
@@ -1211,6 +1347,7 @@ class InstagramOrchestratorApp:
         self.accounts.clear()
         self.selected_index = None
         self.tree.selection_remove(*self.tree.selection())
+        self._set_editor_editable(True)
         self._clear_editor()
         self._refresh_table()
         self._refresh_catalog()
@@ -1223,6 +1360,18 @@ class InstagramOrchestratorApp:
             "Nuevo lote iniciado. El lote anterior permanece sin cambios en SQLite.\n"
         )
 
+    def _history_guard(self, action: str) -> bool:
+        """Return True and warn when the UI is in historical read-only mode."""
+        if not getattr(self, "history_readonly", False):
+            return False
+        messagebox.showinfo(
+            "Lote histórico",
+            f"Este lote está en solo lectura.\n"
+            f"No se puede {action}.\n\n"
+            "Usa «Nuevo lote» para salir del histórico.",
+        )
+        return True
+
     def _clear_editor(self) -> None:
         self.selected_index = None
         selection = self.tree.selection()
@@ -1232,11 +1381,21 @@ class InstagramOrchestratorApp:
         self.account_date_var.set(date.today().isoformat())
         self.stories_var.set(False)
         self.new_account_var.set(False)
+        self.catalog_update_var.set(False)
         self.owner_id_var.set("")
         self.start_init_date_var.set("")
         self.destination_path_var.set("")
-        self._toggle_new_account_fields()
+        self._toggle_catalog_metadata_fields()
+        was_disabled = False
+        try:
+            was_disabled = str(self.urls_text.cget("state")) == "disabled"
+        except (tk.TclError, AttributeError):
+            was_disabled = False
+        if was_disabled:
+            self.urls_text.configure(state="normal")
         self.urls_text.delete("1.0", tk.END)
+        if was_disabled or getattr(self, "history_readonly", False):
+            self.urls_text.configure(state="disabled")
         self._update_indicators()
 
     def _focus_urls_end(self) -> None:
@@ -1283,41 +1442,80 @@ class InstagramOrchestratorApp:
         )
 
     def _open_pending_batches(self) -> None:
-        managed = list_managed_batches(self.connection)
         dialog = tk.Toplevel(self.root)
-        dialog.title("Lotes guardados y ejecuciones pendientes")
-        dialog.geometry("1060x420")
+        dialog.title("Lotes guardados y ejecuciones")
+        dialog.geometry("1060x480")
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.columnconfigure(0, weight=1)
         dialog.rowconfigure(1, weight=1)
+
         ttk.Label(
             dialog,
             text=(
-                "GUARDADO: recuperar/exportar/ejecutar. "
-                "Ejecuciones: reanudar o finalizar. "
-                "POR RENOMBRAR: renombrar o finalizar sin renombrar. "
+                "Activos: GUARDADO, ejecuciones y POR RENOMBRAR. "
+                "Históricos: lotes COMPLETED (solo lectura). "
                 "Importar crea un lote nuevo en esta instancia."
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
+
+        notebook = ttk.Notebook(dialog)
+        notebook.grid(row=1, column=0, sticky="nsew", padx=10, pady=6)
+
+        active_tab = ttk.Frame(notebook)
+        history_tab = ttk.Frame(notebook)
+        notebook.add(active_tab, text="Activos")
+        notebook.add(history_tab, text="Históricos")
+        for tab in (active_tab, history_tab):
+            tab.columnconfigure(0, weight=1)
+            tab.rowconfigure(0, weight=1)
+
         columns = ("date", "name", "id", "status", "urls", "progress")
-        tree = ttk.Treeview(dialog, columns=columns, show="headings", selectmode="browse")
-        for column, title, width, anchor in (
+        column_defs = (
             ("date", "Fecha", 170, "w"),
             ("name", "Nombre", 240, "w"),
             ("id", "Batch ID", 75, "w"),
             ("status", "Estado", 120, "w"),
             ("urls", "URLs", 70, "e"),
             ("progress", "Cuentas", 250, "w"),
-        ):
-            tree.heading(column, text=title)
-            tree.column(column, width=width, anchor=anchor)
-        tree.grid(row=1, column=0, sticky="nsew", padx=10, pady=6)
-        empty_label = ttk.Label(
-            dialog,
+        )
+
+        def make_tree(parent: ttk.Frame) -> ttk.Treeview:
+            tree = ttk.Treeview(
+                parent,
+                columns=columns,
+                show="headings",
+                selectmode="browse",
+            )
+            for column, title, width, anchor in column_defs:
+                tree.heading(column, text=title)
+                tree.column(column, width=width, anchor=anchor)
+            tree.grid(row=0, column=0, sticky="nsew")
+            scroll = ttk.Scrollbar(
+                parent,
+                orient=tk.VERTICAL,
+                command=tree.yview,
+                style="Visible.Vertical.TScrollbar",
+            )
+            scroll.grid(row=0, column=1, sticky="ns")
+            tree.configure(yscrollcommand=scroll.set)
+            return tree
+
+        active_tree = make_tree(active_tab)
+        history_tree = make_tree(history_tab)
+        active_empty = ttk.Label(
+            active_tab,
             text="No hay lotes guardados ni ejecuciones pendientes.",
         )
+        history_empty = ttk.Label(
+            history_tab,
+            text=(
+                "No hay lotes históricos todavía. "
+                "Los lotes aparecen aquí al completarse o finalizarse."
+            ),
+        )
+        history_loaded = {"done": False}
 
         def progress_text(summary) -> str:
             if summary.is_draft:
@@ -1327,16 +1525,20 @@ class InstagramOrchestratorApp:
                     f"{summary.completed_accounts}/{summary.total_accounts} "
                     "listas; pendiente renombrar o finalizar"
                 )
+            if summary.is_completed:
+                return (
+                    f"{summary.completed_accounts}/{summary.total_accounts} "
+                    "cuentas en el lote cerrado"
+                )
             return (
                 f"{summary.completed_accounts}/{summary.total_accounts} completas; "
                 f"{summary.retry_accounts} reintento; "
                 f"{summary.remaining_accounts} por terminar"
             )
 
-        def reload_rows() -> None:
+        def fill_tree(tree: ttk.Treeview, rows, empty_label: ttk.Label) -> None:
             for item in tree.get_children():
                 tree.delete(item)
-            rows = list_managed_batches(self.connection)
             for summary in rows:
                 tree.insert(
                     "",
@@ -1354,21 +1556,37 @@ class InstagramOrchestratorApp:
             if rows:
                 empty_label.place_forget()
             else:
-                empty_label.place(relx=0.5, rely=0.48, anchor="center")
+                empty_label.place(relx=0.48, rely=0.48, anchor="center")
 
-        def selected_batch_id() -> int | None:
+        def reload_active() -> list:
+            rows = list_managed_batches(self.connection)
+            fill_tree(active_tree, rows, active_empty)
+            notebook.tab(0, text=f"Activos ({len(rows)})")
+            return rows
+
+        def reload_history() -> list:
+            rows = list_historical_batches(self.connection)
+            fill_tree(history_tree, rows, history_empty)
+            notebook.tab(1, text=f"Históricos ({len(rows)})")
+            history_loaded["done"] = True
+            return rows
+
+        def current_is_history() -> bool:
+            return notebook.index(notebook.select()) == 1
+
+        def selected_batch_id_from(tree: ttk.Treeview) -> int | None:
             selection = tree.selection()
             if not selection:
                 messagebox.showwarning(
-                    "Ejecuciones pendientes",
+                    "Lotes",
                     "Selecciona primero un lote.",
                     parent=dialog,
                 )
                 return None
             return int(selection[0])
 
-        def selected_summary():
-            batch_id = selected_batch_id()
+        def selected_active_summary():
+            batch_id = selected_batch_id_from(active_tree)
             if batch_id is None:
                 return None
             return next(
@@ -1380,8 +1598,21 @@ class InstagramOrchestratorApp:
                 None,
             )
 
+        def selected_history_summary():
+            batch_id = selected_batch_id_from(history_tree)
+            if batch_id is None:
+                return None
+            return next(
+                (
+                    item
+                    for item in list_historical_batches(self.connection)
+                    if item.batch_id == batch_id
+                ),
+                None,
+            )
+
         def recover_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             if not summary.is_draft:
@@ -1404,7 +1635,7 @@ class InstagramOrchestratorApp:
             )
 
         def resume_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             if summary.is_awaiting_rename:
@@ -1426,7 +1657,7 @@ class InstagramOrchestratorApp:
             self._start_batch(batch_id)
 
         def delete_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             if not summary.is_draft:
@@ -1450,11 +1681,11 @@ class InstagramOrchestratorApp:
                 return
             if self.saved_batch_id == summary.batch_id:
                 self._start_new_batch()
-            reload_rows()
+            reload_active()
             self._update_pending_button_label()
 
         def finish_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             batch_id = summary.batch_id
@@ -1486,11 +1717,13 @@ class InstagramOrchestratorApp:
             self._write_console(
                 f"Batch {batch_id} marcado como COMPLETED (sin renombrar).\n"
             )
-            reload_rows()
+            reload_active()
+            if history_loaded["done"]:
+                reload_history()
             self._update_pending_button_label()
 
         def mark_elsewhere_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             if summary.is_awaiting_rename:
@@ -1522,11 +1755,11 @@ class InstagramOrchestratorApp:
                 f"Batch {summary.batch_id} marcado como AWAITING_RENAME "
                 "(ejecutado en otra instancia).\n"
             )
-            reload_rows()
+            reload_active()
             self._update_pending_button_label()
 
         def rename_selected() -> None:
-            summary = selected_summary()
+            summary = selected_active_summary()
             if summary is None:
                 return
             batch_id = summary.batch_id
@@ -1558,10 +1791,19 @@ class InstagramOrchestratorApp:
             )
             self._rename_manual_files()
 
-        def export_selected() -> None:
-            summary = selected_summary()
+        def export_selected_active() -> None:
+            summary = selected_active_summary()
             if summary is None:
                 return
+            _export_summary(summary)
+
+        def export_selected_history() -> None:
+            summary = selected_history_summary()
+            if summary is None:
+                return
+            _export_summary(summary)
+
+        def _export_summary(summary) -> None:
             path = filedialog.asksaveasfilename(
                 parent=dialog,
                 title="Exportar lote",
@@ -1604,7 +1846,7 @@ class InstagramOrchestratorApp:
                 f"Lote importado como DRAFT id={result.batch.id} "
                 f"nombre={result.batch.batch_name} desde {path}\n"
             )
-            reload_rows()
+            reload_active()
             self._update_pending_button_label()
             messagebox.showinfo(
                 "Importar lote",
@@ -1613,47 +1855,112 @@ class InstagramOrchestratorApp:
                 parent=dialog,
             )
 
-        actions = ttk.Frame(dialog, padding=10)
-        actions.grid(row=2, column=0, sticky="ew")
-        ttk.Button(actions, text="Reanudar / Ejecutar", command=resume_selected).pack(
+        def open_history_selected() -> None:
+            summary = selected_history_summary()
+            if summary is None:
+                return
+            try:
+                draft = load_batch_draft(self.connection, summary.batch_id)
+            except ValueError as exc:
+                messagebox.showerror("Abrir histórico", str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._load_historical_batch(summary.batch_id, draft)
+
+        active_actions = ttk.Frame(dialog, padding=10)
+        history_actions = ttk.Frame(dialog, padding=10)
+        active_actions.grid(row=2, column=0, sticky="ew")
+
+        def show_active_actions() -> None:
+            history_actions.grid_remove()
+            active_actions.grid(row=2, column=0, sticky="ew")
+
+        def show_history_actions() -> None:
+            active_actions.grid_remove()
+            history_actions.grid(row=2, column=0, sticky="ew")
+            if not history_loaded["done"]:
+                reload_history()
+
+        def on_tab_changed(_event=None) -> None:
+            if current_is_history():
+                show_history_actions()
+            else:
+                show_active_actions()
+
+        ttk.Button(active_actions, text="Reanudar / Ejecutar", command=resume_selected).pack(
             side=tk.RIGHT
         )
-        ttk.Button(actions, text="Recuperar / Modificar", command=recover_selected).pack(
-            side=tk.RIGHT, padx=(0, 8)
-        )
-        ttk.Button(actions, text="Renombrar", command=rename_selected).pack(
+        ttk.Button(
+            active_actions, text="Recuperar / Modificar", command=recover_selected
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(active_actions, text="Renombrar", command=rename_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
         ttk.Button(
-            actions,
+            active_actions,
             text="Finalizar sin renombrar",
             command=finish_selected,
         ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(
-            actions,
+            active_actions,
             text="Ejecutado en otra instancia",
             command=mark_elsewhere_selected,
         ).pack(side=tk.RIGHT, padx=(0, 8))
-        ttk.Button(actions, text="Exportar", command=export_selected).pack(
+        ttk.Button(active_actions, text="Exportar", command=export_selected_active).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(actions, text="Importar", command=import_batch).pack(
+        ttk.Button(active_actions, text="Importar", command=import_batch).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(actions, text="Borrar lote", command=delete_selected).pack(
+        ttk.Button(active_actions, text="Borrar lote", command=delete_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
-        tree.bind("<Double-Button-1>", lambda _event: resume_selected())
-        reload_rows()
+        ttk.Button(active_actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
+
+        ttk.Button(
+            history_actions,
+            text="Abrir (solo lectura)",
+            command=open_history_selected,
+        ).pack(side=tk.RIGHT)
+        ttk.Button(
+            history_actions,
+            text="Exportar",
+            command=export_selected_history,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(history_actions, text="Cerrar", command=dialog.destroy).pack(
+            side=tk.LEFT
+        )
+
+        active_tree.bind("<Double-Button-1>", lambda _event: resume_selected())
+        history_tree.bind("<Double-Button-1>", lambda _event: open_history_selected())
+        notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
+
+        managed = reload_active()
+        notebook.tab(1, text="Históricos")
+        show_active_actions()
         if not managed:
-            empty_label.place(relx=0.5, rely=0.48, anchor="center")
+            active_empty.place(relx=0.48, rely=0.48, anchor="center")
 
     def _update_pending_button_label(self) -> None:
         total = len(list_managed_batches(self.connection))
         self.pending_button.configure(text=f"Lotes / ejecuciones ({total})")
 
     def _update_batch_context(self) -> None:
+        if self.history_readonly:
+            name = self.batch_name_var.get().strip() or "(sin nombre)"
+            batch_id = self.active_batch_id
+            id_part = f" · id={batch_id}" if batch_id is not None else ""
+            self.batch_context_var.set(
+                f"HISTÓRICO · solo lectura · {name}{id_part} · COMPLETED"
+            )
+            self.register_button.configure(text="Registrar lote", state="disabled")
+            self.execute_button.configure(text="Ejecutar", state="disabled")
+            self.delete_all_button.configure(state="disabled")
+            self.save_selection_button.configure(state="disabled")
+            self.delete_button.configure(state="disabled")
+            self.rename_button.configure(state="disabled")
+            return
+
         context, register_text, execute_text, actions_enabled = _batch_mode_details(
             saved_batch_id=self.saved_batch_id,
             active_batch_id=self.active_batch_id,
@@ -1674,8 +1981,30 @@ class InstagramOrchestratorApp:
         self.save_selection_button.configure(
             state="normal" if actions_enabled else "disabled"
         )
+        running_batch = (
+            self.process_runner.is_running() and self.active_process_kind == "batch"
+        )
+        self.delete_button.configure(
+            state="normal" if (actions_enabled or running_batch) else "disabled"
+        )
+
+    def _set_editor_editable(self, editable: bool) -> None:
+        state = "normal" if editable else "disabled"
+        username_combo = getattr(self, "username_combo", None)
+        if username_combo is not None:
+            try:
+                username_combo.configure(state="normal" if editable else "disabled")
+            except tk.TclError:
+                pass
+        urls_text = getattr(self, "urls_text", None)
+        if urls_text is not None:
+            try:
+                urls_text.configure(state=state)
+            except tk.TclError:
+                pass
 
     def _load_persisted_draft(self, batch_id: int, draft: BatchDraft) -> None:
+        self.history_readonly = False
         self.batch_name_var.set(draft.batch_name)
         self.default_date_var.set(draft.default_start_now_date)
         self.accounts = list(draft.accounts)
@@ -1684,6 +2013,7 @@ class InstagramOrchestratorApp:
         self.saved_draft_signature = _draft_signature(draft)
         self.active_batch_id = batch_id
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
+        self._set_editor_editable(True)
         self._clear_editor()
         self.tree.selection_remove(*self.tree.selection())
         self._refresh_runtime_progress()
@@ -1693,7 +2023,36 @@ class InstagramOrchestratorApp:
             f"Lote {batch_id} recuperado desde SQLite: {draft.batch_name}.\n"
         )
 
+    def _load_historical_batch(self, batch_id: int, draft: BatchDraft) -> None:
+        """Open a COMPLETED batch for inspection only."""
+        self.history_readonly = True
+        self.batch_name_var.set(draft.batch_name)
+        self.default_date_var.set(draft.default_start_now_date)
+        self.accounts = list(draft.accounts)
+        self.selected_index = None
+        self.saved_batch_id = None
+        self.saved_draft_signature = None
+        self.active_batch_id = batch_id
+        self.batch_ready_for_rename = False
+        self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
+        self._set_editor_editable(True)
+        self._clear_editor()
+        self._set_editor_editable(False)
+        self.tree.selection_remove(*self.tree.selection())
+        self._refresh_runtime_progress()
+        self._refresh_catalog()
+        self._update_batch_context()
+        self._set_status(f"Histórico solo lectura id {batch_id}")
+        self._write_console(
+            f"Histórico abierto (solo lectura): {draft.batch_name} "
+            f"(id={batch_id}, COMPLETED).\n"
+            "Puedes inspeccionar cuentas, URLs y carpetas. "
+            "Usa «Nuevo lote» para salir.\n"
+        )
+
     def _save_batch(self, *, show_confirmation: bool = True) -> int | None:
+        if self._history_guard("registrar o actualizar el lote"):
+            return None
         draft = BatchDraft(
             batch_name=self.batch_name_var.get(),
             default_start_now_date=self.default_date_var.get(),
@@ -1730,6 +2089,9 @@ class InstagramOrchestratorApp:
 
     def _save_selected_accounts_as_batch(self) -> None:
         """Persist only the tree selection as a DRAFT and leave the rest in memory."""
+        if self._history_guard("guardar selección"):
+            return
+
 
         if self.process_runner.is_running():
             return
@@ -1809,6 +2171,8 @@ class InstagramOrchestratorApp:
         )
 
     def _execute(self) -> None:
+        if self._history_guard("ejecutar el lote"):
+            return
         if self.process_runner.is_running():
             return
 
@@ -2108,6 +2472,8 @@ class InstagramOrchestratorApp:
         dialog.focus_set()
 
     def _rename_manual_files(self) -> None:
+        if self._history_guard("renombrar"):
+            return
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
 
@@ -2386,6 +2752,19 @@ def _open_chrome_tab(url: str) -> bool:
     return chrome.open_new_tab(url)
 
 
+def _open_path_in_explorer(path: Path) -> None:
+    """Open a local directory in the OS file manager (Explorer on Windows)."""
+    target = Path(path)
+    if not target.is_dir():
+        raise FileNotFoundError(f"Directory not found: {target}")
+    if os.name == "nt":
+        os.startfile(str(target))  # type: ignore[attr-defined]
+        return
+    import subprocess
+
+    subprocess.run(["xdg-open", str(target)], check=False)
+
+
 def _set_ttk_enabled(widget: ttk.Widget, enabled: bool) -> None:
     """Change a ttk state without using unsupported configure options."""
     widget.state(("!disabled",) if enabled else ("disabled",))
@@ -2438,6 +2817,7 @@ def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
                 tuple(account.urls),
                 account.start_now_date,
                 account.is_new_account,
+                account.is_catalog_update,
                 account.owner_id,
                 account.start_init_date,
                 account.destination_path,
@@ -2469,6 +2849,8 @@ def _account_display_status(
     if runtime is None:
         if account.is_new_account:
             return "Nueva", "pending"
+        if account.is_catalog_update:
+            return "Catálogo", "pending"
         if account.download_stories or account.urls:
             return "Preparada", "pending"
         return "Vacia", "failed"

@@ -59,11 +59,13 @@ from ig_orchestrator.gui.batch_resume_service import (
     get_account_runtime_progress,
     is_batch_ready_for_rename,
     list_account_problem_urls,
+    list_historical_batches,
     list_managed_batches,
     list_pending_batches,
     load_batch_draft,
     mark_batch_executed_elsewhere,
     mark_batch_interrupted,
+    resolve_account_download_folder,
 )
 from ig_orchestrator.gui.batch_transfer_service import (
     BatchTransferError,
@@ -88,6 +90,7 @@ from ig_orchestrator.models import (
     UrlJobStatus,
     UrlSource,
 )
+from ig_orchestrator.settings import Settings
 
 
 def test_gui_draft_is_persisted_as_sqlite_batch(tmp_path: Path) -> None:
@@ -702,21 +705,35 @@ def test_gui_clear_editor_deselects_the_batch_account() -> None:
             pass
 
     class FakeText:
+        def __init__(self) -> None:
+            self._state = "normal"
+
+        def cget(self, key: str) -> str:
+            if key == "state":
+                return self._state
+            raise KeyError(key)
+
+        def configure(self, **kwargs) -> None:
+            if "state" in kwargs:
+                self._state = str(kwargs["state"])
+
         def delete(self, _start: str, _end: str) -> None:
             pass
 
     app = object.__new__(InstagramOrchestratorApp)
     app.selected_index = 3
+    app.history_readonly = False
     app.tree = FakeTree()
     app.username_var = FakeVar()
     app.account_date_var = FakeVar()
     app.stories_var = FakeVar()
     app.new_account_var = FakeVar()
+    app.catalog_update_var = FakeVar()
     app.owner_id_var = FakeVar()
     app.start_init_date_var = FakeVar()
     app.destination_path_var = FakeVar()
     app.urls_text = FakeText()
-    app._toggle_new_account_fields = lambda: None
+    app._toggle_catalog_metadata_fields = lambda: None
     app._update_indicators = lambda: None
 
     app._clear_editor()
@@ -1081,6 +1098,12 @@ def test_gui_rename_parameters_only_include_checked_new_accounts() -> None:
         [
             AccountDraft(username="existing", is_new_account=False),
             AccountDraft(
+                username="update_user",
+                is_catalog_update=True,
+                owner_id="999",
+                destination_path=r"G:\Models\Existing",
+            ),
+            AccountDraft(
                 username="new_user",
                 is_new_account=True,
                 owner_id="123",
@@ -1206,6 +1229,130 @@ def test_gui_new_account_is_saved_to_batch_and_catalog(tmp_path: Path) -> None:
         assert stored["rename_owner_id"] == "436651863"
         assert stored["rename_start_init_date"] == "2025-12-14"
         assert stored["rename_destination_path"] == r"G:\4K Stogram\00.MODELS-D"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "error"),
+    [
+        ("owner_id", "", "ownerId is required"),
+        ("destination_path", "", "path is required"),
+    ],
+)
+def test_gui_catalog_update_requires_owner_and_path(
+    field_name: str,
+    field_value: str,
+    error: str,
+) -> None:
+    values = {
+        "owner_id": "111222333",
+        "destination_path": r"G:\4K Stogram\00.MODELS-D",
+    }
+    values[field_name] = field_value
+    account = AccountDraft(
+        username="existing_master_user",
+        is_catalog_update=True,
+        download_stories=True,
+        **values,
+    )
+
+    with pytest.raises(BatchDraftValidationError, match=error):
+        validate_batch_draft(
+            BatchDraft(
+                batch_name="catalog_update_missing_field",
+                default_start_now_date="2026-08-11",
+                accounts=[account],
+            )
+        )
+
+
+def test_gui_catalog_update_saves_metadata_without_new_account_flag(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    # Pre-existing catalog row with startInitDate that Update must preserve.
+    with connect(db_path) as connection:
+        AccountHistoryRepository(connection).update_rename_metadata(
+            "master_user",
+            owner_id="old-id",
+            destination_path=r"G:\OldPath",
+            start_init_date="2024-01-01",
+        )
+        draft = BatchDraft(
+            batch_name="catalog_update_batch",
+            default_start_now_date="2026-08-11",
+            accounts=[
+                AccountDraft(
+                    username="@master_user",
+                    download_stories=True,
+                    is_catalog_update=True,
+                    owner_id="555666777",
+                    destination_path=r"G:\4K Stogram\00.MODELS-M",
+                )
+            ],
+        )
+        result = save_batch_draft(draft, connection)
+
+        catalog = AccountHistoryRepository(connection).get_by_user_name("master_user")
+        assert catalog is not None
+        assert catalog.user_ig_id == "555666777"
+        assert catalog.field1 == r"G:\4K Stogram\00.MODELS-M"
+        assert catalog.field2 == "2024-01-01"
+
+        stored = connection.execute(
+            "SELECT * FROM accounts WHERE batch_id = ?",
+            (result.batch.id,),
+        ).fetchone()
+        assert stored["is_new_account"] == 0
+        assert stored["rename_owner_id"] == "555666777"
+        assert stored["rename_start_init_date"] is None
+        assert stored["rename_destination_path"] == r"G:\4K Stogram\00.MODELS-M"
+
+        loaded = load_batch_draft(connection, result.batch.id)
+        assert loaded.accounts[0].is_new_account is False
+        assert loaded.accounts[0].is_catalog_update is True
+        assert loaded.accounts[0].owner_id == "555666777"
+        assert loaded.accounts[0].destination_path == r"G:\4K Stogram\00.MODELS-M"
+        assert _account_display_status(loaded.accounts[0], None) == ("Catálogo", "pending")
+
+
+def test_gui_export_import_preserves_catalog_update(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft = BatchDraft(
+        batch_name="export_update",
+        default_start_now_date="2026-08-11",
+        accounts=[
+            AccountDraft(
+                username="portable_user",
+                download_stories=True,
+                is_catalog_update=True,
+                owner_id="424242",
+                destination_path=r"G:\Models\Portable",
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        saved = save_batch_draft(draft, connection)
+        payload = export_batch_payload(connection, saved.batch.id)
+        assert payload["batch"]["accounts"][0]["is_catalog_update"] is True
+        assert payload["batch"]["accounts"][0]["is_new_account"] is False
+        assert payload["batch"]["accounts"][0]["owner_id"] == "424242"
+
+        imported = import_batch_from_payload(connection, payload)
+        loaded = load_batch_draft(connection, imported.batch.id)
+        assert loaded.accounts[0].is_catalog_update is True
+        assert loaded.accounts[0].is_new_account is False
+        assert loaded.accounts[0].owner_id == "424242"
+        assert loaded.accounts[0].destination_path == r"G:\Models\Portable"
+
+        catalog = AccountHistoryRepository(connection).get_by_user_name("portable_user")
+        assert catalog is not None
+        assert catalog.user_ig_id == "424242"
+        assert catalog.field1 == r"G:\Models\Portable"
+
+        rename_params = _new_account_rename_parameters(loaded.accounts)
+        assert rename_params == ()
 
 
 def test_gui_lists_and_recovers_pending_batch_from_sqlite(tmp_path: Path) -> None:
@@ -1555,6 +1702,11 @@ def test_list_account_problem_urls_filters_retry_and_failed(tmp_path: Path) -> N
             account_id=account.id,
             kind="failed",
         )
+        completed_rows = list_account_problem_urls(
+            connection,
+            account_id=account.id,
+            kind="completed",
+        )
 
         assert [row.url for row in retry_rows] == [
             "https://www.instagram.com/reel/RETRYME01/",
@@ -1565,6 +1717,10 @@ def test_list_account_problem_urls_filters_retry_and_failed(tmp_path: Path) -> N
             "https://www.instagram.com/reel/FAILME01/",
         ]
         assert failed_rows[0].status == UrlJobStatus.FAILED_FINAL.value
+        assert [row.url for row in completed_rows] == [
+            "https://www.instagram.com/reel/OKDONE01/",
+        ]
+        assert completed_rows[0].status == UrlJobStatus.COMPLETED.value
 
         progress = get_account_runtime_progress(connection, result.batch.id)[0]
         status_label, status_tag = _account_display_status(
@@ -1575,6 +1731,129 @@ def test_list_account_problem_urls_filters_retry_and_failed(tmp_path: Path) -> N
         assert "Reintento" in status_label
         assert progress.retry_items == 2
         assert progress.failed_items == 1
+        assert progress.completed_items == 1
+
+
+def test_list_historical_batches_only_completed(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    draft_active = BatchDraft(
+        batch_name="still_active",
+        default_start_now_date="2026-08-11",
+        accounts=[
+            AccountDraft(
+                username="active_user",
+                urls=["https://www.instagram.com/reel/ACTIVE01/"],
+            )
+        ],
+    )
+    draft_done = BatchDraft(
+        batch_name="already_done",
+        default_start_now_date="2026-08-10",
+        accounts=[
+            AccountDraft(
+                username="done_user",
+                urls=["https://www.instagram.com/reel/DONE01/"],
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        active = save_batch_draft(draft_active, connection)
+        done = save_batch_draft(draft_done, connection)
+        finish_batch(connection, done.batch.id)
+
+        historical = list_historical_batches(connection)
+        managed = list_managed_batches(connection)
+
+        assert [item.batch_id for item in historical] == [done.batch.id]
+        assert historical[0].display_status == "COMPLETADO"
+        assert historical[0].url_count == 1
+        assert all(item.batch_id != done.batch.id for item in managed)
+        assert any(item.batch_id == active.batch.id for item in managed)
+
+
+def test_resolve_account_download_folder_prefers_stored_path(tmp_path: Path) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    working_root = tmp_path / "working"
+    stored_folder = working_root / "folder_user"
+    stored_folder.mkdir(parents=True)
+    fallback_folder = working_root / "fallback_user"
+    fallback_folder.mkdir()
+    draft = BatchDraft(
+        batch_name="folder_resolve",
+        default_start_now_date="2026-08-11",
+        accounts=[
+            AccountDraft(
+                username="folder_user",
+                urls=["https://www.instagram.com/reel/FOLDER01/"],
+            ),
+            AccountDraft(
+                username="fallback_user",
+                urls=["https://www.instagram.com/reel/FOLDER02/"],
+            ),
+            AccountDraft(
+                username="missing_user",
+                urls=["https://www.instagram.com/reel/FOLDER03/"],
+            ),
+        ],
+    )
+    settings = Settings(
+        telegram_api_id=1,
+        telegram_api_hash="hash",
+        telethon_session_name="session",
+        telegram_download_bot_username="@bot",
+        telegram_desktop_download_folder=tmp_path / "tg",
+        working_folder=working_root,
+        reports_folder=tmp_path / "reports",
+        sqlite_db_path=db_path,
+        max_retries=3,
+        retry_base_seconds=90,
+        retry_max_seconds=900,
+        download_wait_timeout_seconds=300,
+        download_stable_seconds=10,
+    )
+
+    with connect(db_path) as connection:
+        result = save_batch_draft(draft, connection, settings=settings)
+        by_name = {account.username: account for account in result.accounts}
+        stored = by_name["folder_user"]
+        connection.execute(
+            "UPDATE accounts SET working_folder = ? WHERE id = ?",
+            (str(stored_folder), stored.id),
+        )
+        connection.commit()
+
+        assert resolve_account_download_folder(
+            connection,
+            account_id=stored.id,
+            username="folder_user",
+            working_folder_setting=working_root,
+        ) == stored_folder
+
+        fallback = by_name["fallback_user"]
+        connection.execute(
+            "UPDATE accounts SET working_folder = NULL WHERE id = ?",
+            (fallback.id,),
+        )
+        connection.commit()
+        assert resolve_account_download_folder(
+            connection,
+            account_id=fallback.id,
+            username="fallback_user",
+            working_folder_setting=working_root,
+        ) == fallback_folder
+
+        missing = by_name["missing_user"]
+        assert (
+            resolve_account_download_folder(
+                connection,
+                account_id=missing.id,
+                username="missing_user",
+                working_folder_setting=working_root,
+            )
+            is None
+        )
 
 
 def test_gui_manual_account_removal_marks_non_terminal_urls_and_account_failed(

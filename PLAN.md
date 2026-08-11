@@ -1528,10 +1528,15 @@ estado del batch a `COMPLETED` y conserva toda su trazabilidad.
 La tabla de cuentas refleja en tiempo real los estados persistidos y distingue
 visualmente completadas, reintentos, procesamiento, pendientes y fallos. Si el
 estado visible es reintento o fallida, la GUI permite abrir una ventana no
-bloqueante con las URL jobs correspondientes y abrir cada URL en Chrome. La
-fecha global del lote y los parámetros de renombrado de las cuentas nuevas se
-guardan asociados al batch para que una ejecución recuperada pueda lanzar el
-mismo post-proceso de renombrado.
+bloqueante con las URL jobs correspondientes y abrir cada URL en Chrome. Si la
+cuenta ya está completada (incluso con el lote aún en curso), el menú contextual
+permite listar las URLs completadas y abrir la carpeta de descarga en el
+explorador del sistema. La fecha global del lote y los parámetros de renombrado
+de las cuentas nuevas se guardan asociados al batch para que una ejecución
+recuperada pueda lanzar el mismo post-proceso de renombrado. El editor también
+permite `Update` (ownerId + path) para registrar en el catálogo del orquestador
+cuentas ya existentes en la BBDD maestra sin tratarlas como cuenta nueva del
+renombrador; esa metadata se persiste en el lote y en export/import.
 
 Antes de ejecutar el renombrador, la GUI reconstruye desde SQLite el contexto
 del batch y no depende del borrador que quede en memoria. El botón
@@ -1555,10 +1560,12 @@ procesarse en una ejecucion real, una cuenta `INACTIVE` vuelve a `ENABLED`; los
 dry-run no cambian el catalogo.
 
 Los batches creados desde GUI se registran inicialmente como `DRAFT`. El
-maestro de lotes permite recuperar, modificar y borrar únicamente ese estado, y
-muestra el total de URLs de entrada del lote. Al ejecutar un draft cambia a
-`IMPORTED` y queda bloqueado para edición; desde ese punto pasa al flujo normal
-de recuperación de ejecuciones.
+maestro de lotes (pestaña Activos) permite recuperar, modificar y borrar
+únicamente ese estado, y muestra el total de URLs de entrada del lote. Al
+ejecutar un draft cambia a `IMPORTED` y queda bloqueado para edición; desde ese
+punto pasa al flujo normal de recuperación de ejecuciones. La pestaña
+Históricos lista los lotes `COMPLETED` y permite abrirlos en solo lectura para
+inspección (sin editar, ejecutar ni renombrar).
 
 La GUI diferencia de forma permanente el contexto de trabajo: lote nuevo sin
 ID, lote `DRAFT` registrado en edición y lote cuya ejecución ya comenzó. Al

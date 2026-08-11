@@ -159,12 +159,18 @@ Zona derecha inferior: lote actual
 Zona derecha superior: editor de cuenta
 
 - `Username`: combobox editable con autocomplete.
-- `Stories` y `New account` van juntos en la misma fila (no en extremos). Se
-  usan checkboxes clasicos de Tk para que el click en el texto del label tambien
-  conmute. `New account` desmarcado por defecto; al marcarlo muestra tres
-  campos obligatorios: `ownerId`, `path` y `startInitDate` (`YYYY-MM-DD`).
-  `path` es un combobox editable con los valores `DISTINCT` historicos de
-  `account_history.field1`.
+- `Stories`, `New account` y `Update` van juntos en la misma fila. Se usan
+  checkboxes clasicos de Tk para que el click en el texto del label tambien
+  conmute. `New account` y `Update` son mutuamente excluyentes y van
+  desmarcados por defecto.
+  - `New account` muestra tres campos obligatorios: `ownerId`, `path` y
+    `startInitDate` (`YYYY-MM-DD`). Genera `--new-account` en el renombrador.
+  - `Update` muestra solo `ownerId` y `path` (cuentas ya existentes en la BBDD
+    maestra). Registra id y ruta en `account_history` del orquestador sin
+    marcar la cuenta como nueva ni generar `--new-account`. No pisa
+    `field2`/startInitDate si ya existía.
+  - `path` es un combobox editable con los valores `DISTINCT` historicos de
+    `account_history.field1`.
 - `Start date`: input por defecto hoy. Tras `Agregar/Actualizar`, el editor
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea. Tras `Pegar` o `Normalizar`,
@@ -207,8 +213,12 @@ Zona superior de recuperacion:
   limpia la tabla y el editor para registrar uno distinto.
 - El guardado se presenta como `Registrar lote nuevo` o `Actualizar lote`
   segun el contexto.
-- `Lotes / ejecuciones (N)` abre un maestro con `batch date`, `batch name`,
-  `batch id`, estado, total de **URLs** de entrada del lote y resumen de cuentas.
+- `Lotes / ejecuciones (N)` abre un maestro con pestañas:
+  - **Activos**: `batch date`, `batch name`, `batch id`, estado, total de
+    **URLs** de entrada y resumen de cuentas (GUARDADO, ejecuciones,
+    POR RENOMBRAR).
+  - **Históricos**: lotes `COMPLETED` (carga al seleccionar la pestaña). Solo
+    **Abrir (solo lectura)** y **Exportar**.
 - Los lotes registrados quedan `DRAFT` y permiten recuperar/modificar, borrar,
   exportar o ejecutar. Al ejecutarlos cambian a `IMPORTED` y ya no se pueden
   editar. Al cerrar descargas pasan a `AWAITING_RENAME` (`POR RENOMBRAR`).
@@ -219,12 +229,19 @@ Zona superior de recuperacion:
   el lote POR RENOMBRAR.
 - `Renombrar` (dialogo o boton principal) y `Finalizar sin renombrar` cierran
   el ciclo: tras renombrar OK o finalizar, el batch pasa a `COMPLETED` y sale
-  del selector.
+  de Activos (aparece en Históricos).
+- Abrir un histórico carga el lote en la ventana principal en modo
+  `HISTÓRICO · solo lectura` (sin editar/ejecutar/renombrar). Se puede
+  inspeccionar cuentas, URLs y carpetas; **Nuevo lote** sale del modo.
 - Durante la ejecucion, `Lote actual` muestra por color cuentas completadas,
   en reintento, en curso, pendientes y fallidas.
 - En cuentas `Reintento` o `Fallida`, doble click o menú contextual abre una
   modal no bloqueante con las URLs afectadas; doble click en una URL la abre
   en Chrome.
+- En cuentas `Completada` (también con el lote aún en curso), el menú ofrece
+  `Ver URLs completadas…` y `Abrir carpeta` (Explorer en
+  `working_folder/username` o la ruta persistida). El doble click en una
+  cuenta completada abre el listado de URLs completadas.
 - Al comenzar se ordena como se procesa (solo stories primero y despues menor
   numero de URLs), mantiene la seleccion durante los refrescos y permite
   eliminar una cuenta pendiente/en curso marcando sus jobs no terminales

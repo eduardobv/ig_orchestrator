@@ -1,5 +1,93 @@
 # Changelog
 
+## v1.28.2 - Patch - GUI: pestaña Históricos y solo lectura
+
+Fecha: 2026-08-11
+
+### Creado
+
+* `tasks/Patch_v1.28.2.md`.
+* `list_historical_batches` para lotes `COMPLETED`.
+* Modo `history_readonly` en la GUI principal.
+
+### Modificado
+
+* Modal **Lotes / ejecuciones** con pestañas **Activos** e **Históricos**
+  (carga lazy del histórico).
+* Abrir histórico: inspección de cuentas/URLs/carpetas sin editar ni ejecutar.
+* Docs alineados; versión `1.28.2`.
+
+### Resumen
+
+Los lotes cerrados ya no desaparecen del alcance operativo: se consultan en
+Históricos y se abren en solo lectura.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k historical`
+* `python -m pytest -q tests/test_gui_services.py`
+* `python -m pytest -q`
+
+## v1.28.1 - Patch - GUI: checkbox Update y catálogo ownerId/path
+
+Fecha: 2026-08-11
+
+### Creado
+
+* `tasks/Patch_v1.28.1.md`.
+* `AccountDraft.is_catalog_update` y validación `validate_catalog_update_details`.
+* `AccountHistoryRepository.update_identity_and_path` (id+path sin tocar field2).
+* `save_catalog_metadata_to_history` unifica New account y Update.
+
+### Modificado
+
+* Editor: checkbox **Update** junto a New account (mutuamente excluyentes).
+* Registrar/export/import persisten `ownerId`+`path` sin `is_new_account`.
+* Estado de preparación en tabla: `Catálogo` para cuentas Update.
+* Docs alineados; versión `1.28.1`.
+
+### Resumen
+
+Cuentas ya presentes en la BBDD maestra se pueden registrar en el orquestador
+con id y ruta sin pasar por el renombrador como cuenta nueva, y la metadata
+sobrevive export/import y el ciclo multi-instancia.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k "catalog_update or rename_parameters or export_import"`
+* `python -m pytest -q tests/test_gui_services.py`
+* `python -m pytest -q`
+
+## v1.28.0 - Patch - GUI: Abrir carpeta y Ver URLs completadas
+
+Fecha: 2026-08-11
+
+### Creado
+
+* `tasks/Patch_v1.28.0.md` documenta el menú contextual ampliado.
+* `resolve_account_download_folder` en `batch_resume_service.py`.
+* `list_account_problem_urls(..., kind="completed")` para jobs `COMPLETED`.
+
+### Modificado
+
+* Menú contextual de `Cuentas del lote actual`:
+  * **Ver URLs completadas…** (habilitado si hay jobs completados).
+  * **Abrir carpeta** (habilitado si la cuenta está `COMPLETED`).
+* Doble click en una cuenta Completada abre el listado de URLs completadas.
+* Docs alineados (`README.md`, `PLAN.md`, `tasks/task-gui.md`).
+* Versión `1.28.0`.
+
+### Resumen
+
+Durante un lote en ejecución, una cuenta ya terminada permite inspeccionar sus
+URLs completadas y abrir su carpeta de descarga en el explorador.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k "problem_urls or download_folder"`
+* `python -m pytest -q tests/test_gui_services.py`
+* `python -m pytest -q`
+
 ## v1.27.2 - Patch - Catálogo: cuenta exacta primero en el grupo de carpeta
 
 Fecha: 2026-08-08

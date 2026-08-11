@@ -285,17 +285,24 @@ resto de la carpeta después (en su orden original). Sin match exacto se
 mantiene el filtro por substring. Una cuenta inactiva vuelve automaticamente a `ENABLED`
 cuando participa en un lote real; un dry-run no modifica este estado.
 
-`Lotes / ejecuciones (N)` abre un maestro ordenado por fecha con columnas
-Fecha, Nombre, Batch ID, Estado, **URLs** (total de URLs de entrada del lote,
-suma de todas las cuentas; no incluye stories generadas) y Cuentas. Un lote
-registrado queda en estado `DRAFT` (`GUARDADO` en pantalla): se puede recuperar,
-exportar, borrar o ejecutar. Al ejecutarlo cambia a `IMPORTED` y queda
-bloqueado para edicion. Las ejecuciones con trabajo pendiente se reanudan;
-cuando las descargas terminan (o se marca **Ejecutado en otra instancia**) el
-lote pasa a `AWAITING_RENAME` (`POR RENOMBRAR`): se puede **Renombrar** o
-**Finalizar sin renombrar**. Solo entonces pasa a `COMPLETED` y desaparece del
-selector. **Exportar** genera un JSON portable; **Importar** crea un DRAFT
-nuevo en la instancia actual (nombre unico si hay colision).
+`Lotes / ejecuciones (N)` abre un maestro con dos pestañas:
+
+* **Activos** — GUARDADO, ejecuciones pendientes y POR RENOMBRAR. Columnas
+  Fecha, Nombre, Batch ID, Estado, **URLs** (total de URLs de entrada del lote;
+  no incluye stories generadas) y Cuentas. Un lote registrado queda `DRAFT`
+  (`GUARDADO`): se puede recuperar, exportar, borrar o ejecutar. Al ejecutarlo
+  cambia a `IMPORTED` y queda bloqueado para edición. Las ejecuciones con
+  trabajo pendiente se reanudan; cuando las descargas terminan (o se marca
+  **Ejecutado en otra instancia**) el lote pasa a `AWAITING_RENAME`
+  (`POR RENOMBRAR`): se puede **Renombrar** o **Finalizar sin renombrar**.
+  Solo entonces pasa a `COMPLETED` y sale de Activos. **Exportar** genera un
+  JSON portable; **Importar** crea un DRAFT nuevo (nombre único si hay
+  colisión).
+* **Históricos** — lotes `COMPLETED` (carga al abrir la pestaña). Solo se
+  pueden **Abrir (solo lectura)** o **Exportar**. Al abrir, la ventana
+  principal muestra `HISTÓRICO · solo lectura` con las cuentas y progreso;
+  se pueden inspeccionar URLs y abrir carpetas, pero no editar ni ejecutar.
+  **Nuevo lote** sale del modo histórico.
 
 `Nuevo lote` cierra el contexto editable actual sin tocarlo en SQLite, vacia
 las cuentas y el editor, desvincula su ID y propone un nombre nuevo. Es la
@@ -306,16 +313,25 @@ caso la eliminacion queda en el borrador de pantalla y se persiste al pulsar
 `Actualizar lote`. Un borrador registrado puede quedar temporalmente sin
 cuentas y recuperarse despues, pero `Ejecutar` rechaza siempre un lote vacio.
 
-El editor incluye `New account`, desmarcado por defecto. Al marcarlo aparecen
-los campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`) y `path`.
-`Agregar/Actualizar` incorpora la cuenta al lote y la registra inmediatamente
-en el catalogo global. En `account_history`, estos datos se guardan como
-`user_ig_id = ownerId`, `field1 = path` y `field2 = startInitDate`.
+El editor incluye `New account` y `Update`, desmarcados por defecto y
+mutuamente excluyentes.
+
+* **New account**: campos obligatorios `ownerId`, `startInitDate` (`YYYY-MM-DD`)
+  y `path`. Se registra en el catálogo global y, al renombrar, genera bloques
+  `--new-account`. En `account_history`: `user_ig_id = ownerId`,
+  `field1 = path`, `field2 = startInitDate`.
+* **Update**: solo `ownerId` y `path`. Sirve para cuentas que ya existen en la
+  BBDD maestra pero faltan (o están incompletas) en el orquestador. Se registra
+  de inmediato en `account_history` (id + path) **sin** pisar `field2` y **sin**
+  generar `--new-account`. Los datos se guardan en el lote
+  (`rename_owner_id` / `rename_destination_path` con `is_new_account=0`) y
+  viajan en export/import, de modo que sobreviven al flujo multi-instancia
+  (Registrar → Exportar → Ejecutado en otra instancia → Renombrar).
+
 `path` es un combobox editable que propone, sin duplicados, los paths ya
-guardados en `account_history.field1`.
-Además, la GUI guarda dentro de las cuentas del batch si eran nuevas y sus
-parámetros de renombrado. Así, al recuperar un lote, el botón `Renombrar`
-conserva exactamente los bloques `--new-account` que le correspondían.
+guardados en `account_history.field1`. Al recuperar un lote, el botón
+`Renombrar` conserva exactamente los bloques `--new-account` de las cuentas
+marcadas como nuevas.
 
 La salida se transmite al cuadro inferior sin congelar la ventana. Cada linea
 se presenta con fecha y hora local hasta milisegundos, por ejemplo
@@ -333,6 +349,10 @@ contextual `Ver URLs en reintento…` / `Ver URLs fallidas…`) abre una ventana
 bloqueante con la lista de URLs afectadas (estado, error y reintentos). El
 doble click sobre una fila de esa lista abre la URL en Chrome. Mientras el
 lote sigue en ejecución, la lista se actualiza ~cada segundo.
+Si la cuenta ya está **Completada** (aunque el lote siga con otras cuentas), el
+menú contextual habilita `Ver URLs completadas…` y `Abrir carpeta` (abre en el
+explorador la carpeta de descarga de esa cuenta, sin crearla si no existe). El
+doble click en una fila Completada abre el listado de URLs completadas.
 Al iniciar el lote, sus filas adoptan el orden persistido de procesamiento:
 primero cuentas que solo descargan stories y despues menor numero de URLs. Los
 refrescos conservan la seleccion. Durante una ejecucion, `Eliminar` permanece

@@ -73,10 +73,11 @@ def save_batch_draft(
     )
     stored_accounts = {account.username.casefold(): account for account in result.accounts}
     for account in draft.accounts:
-        save_new_account_to_catalog(account, connection)
+        save_catalog_metadata_to_history(account, connection)
         stored = stored_accounts.get(_normalize_username(account.username).casefold())
         if stored is None or stored.id is None:
             continue
+        has_catalog_meta = account.is_new_account or account.is_catalog_update
         connection.execute(
             """
             UPDATE accounts
@@ -89,9 +90,9 @@ def save_batch_draft(
             """,
             (
                 int(account.is_new_account),
-                account.owner_id.strip() if account.is_new_account else None,
+                account.owner_id.strip() if has_catalog_meta else None,
                 account.start_init_date.strip() if account.is_new_account else None,
-                account.destination_path.strip() if account.is_new_account else None,
+                account.destination_path.strip() if has_catalog_meta else None,
                 stored.id,
             ),
         )
@@ -104,18 +105,40 @@ def save_new_account_to_catalog(
     connection: Connection,
 ) -> None:
     """Persist a checked new account in the global catalog immediately."""
-    if not account.is_new_account:
+    save_catalog_metadata_to_history(account, connection)
+
+
+def save_catalog_metadata_to_history(
+    account: AccountDraft,
+    connection: Connection,
+) -> None:
+    """Persist New account or Update metadata into account_history."""
+    if account.is_new_account and account.is_catalog_update:
+        raise BatchDraftValidationError(
+            "New account and Update cannot be enabled at the same time"
+        )
+    if account.is_new_account:
+        username = _normalize_username(account.username)
+        if not username:
+            raise BatchDraftValidationError("username must not be blank")
+        details = validate_new_account_details(account)
+        AccountHistoryRepository(connection).update_rename_metadata(
+            username,
+            owner_id=details.owner_id,
+            destination_path=details.destination_path,
+            start_init_date=details.start_init_date,
+        )
         return
-    username = _normalize_username(account.username)
-    if not username:
-        raise BatchDraftValidationError("username must not be blank")
-    details = validate_new_account_details(account)
-    AccountHistoryRepository(connection).update_rename_metadata(
-        username,
-        owner_id=details.owner_id,
-        destination_path=details.destination_path,
-        start_init_date=details.start_init_date,
-    )
+    if account.is_catalog_update:
+        username = _normalize_username(account.username)
+        if not username:
+            raise BatchDraftValidationError("username must not be blank")
+        details = validate_catalog_update_details(account)
+        AccountHistoryRepository(connection).update_identity_and_path(
+            username,
+            owner_id=details.owner_id,
+            destination_path=details.destination_path,
+        )
 
 
 def validate_batch_draft(
@@ -179,9 +202,18 @@ def _validate_account(
     if not username:
         raise BatchDraftValidationError(f"{context}: username must not be blank")
 
+    if account.is_new_account and account.is_catalog_update:
+        raise BatchDraftValidationError(
+            f"{context}: New account and Update cannot be enabled at the same time"
+        )
     if account.is_new_account:
         try:
             validate_new_account_details(account)
+        except BatchDraftValidationError as exc:
+            raise BatchDraftValidationError(f"{context}: {exc}") from exc
+    elif account.is_catalog_update:
+        try:
+            validate_catalog_update_details(account)
         except BatchDraftValidationError as exc:
             raise BatchDraftValidationError(f"{context}: {exc}") from exc
 
@@ -228,6 +260,27 @@ def validate_new_account_details(account: AccountDraft) -> NewAccountDetails:
     return NewAccountDetails(
         owner_id=owner_id,
         start_init_date=start_init_date,
+        destination_path=destination_path,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogUpdateDetails:
+    owner_id: str
+    destination_path: str
+
+
+def validate_catalog_update_details(account: AccountDraft) -> CatalogUpdateDetails:
+    owner_id = account.owner_id.strip()
+    if not owner_id:
+        raise BatchDraftValidationError("ownerId is required for Update")
+
+    destination_path = account.destination_path.strip()
+    if not destination_path:
+        raise BatchDraftValidationError("path is required for Update")
+
+    return CatalogUpdateDetails(
+        owner_id=owner_id,
         destination_path=destination_path,
     )
 
@@ -312,11 +365,14 @@ def _validate_instagram_domain(url: str) -> None:
 __all__ = [
     "AccountDraftValidation",
     "BatchDraftValidationError",
+    "CatalogUpdateDetails",
     "NewAccountDetails",
     "inspect_account_draft",
     "normalize_url_lines",
+    "save_catalog_metadata_to_history",
     "save_new_account_to_catalog",
     "save_batch_draft",
+    "validate_catalog_update_details",
     "validate_new_account_details",
     "validate_batch_draft",
 ]

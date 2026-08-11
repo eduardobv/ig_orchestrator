@@ -46,6 +46,7 @@ def export_batch_payload(connection: Connection, batch_id: int) -> dict[str, Any
                     "start_now_date": account.start_now_date,
                     "urls": list(account.urls),
                     "is_new_account": bool(account.is_new_account),
+                    "is_catalog_update": bool(account.is_catalog_update),
                     "owner_id": account.owner_id,
                     "start_init_date": account.start_init_date,
                     "destination_path": account.destination_path,
@@ -175,16 +176,29 @@ def _draft_from_payload(
         start_now = raw.get("start_now_date") or default_date
         if not isinstance(start_now, str) or not start_now.strip():
             start_now = default_date
+        is_new_account = bool(raw.get("is_new_account", False))
+        owner_id = str(raw.get("owner_id") or "")
+        destination_path = str(raw.get("destination_path") or "")
+        if "is_catalog_update" in raw:
+            is_catalog_update = bool(raw.get("is_catalog_update"))
+        else:
+            # Back-compat: metadata without new-account means catalog update.
+            is_catalog_update = (
+                not is_new_account and bool(owner_id.strip() or destination_path.strip())
+            )
+        if is_new_account and is_catalog_update:
+            is_catalog_update = False
         accounts.append(
             AccountDraft(
                 username=username.strip(),
                 download_stories=bool(raw.get("download_stories", False)),
                 urls=urls,
                 start_now_date=start_now.strip(),
-                is_new_account=bool(raw.get("is_new_account", False)),
-                owner_id=str(raw.get("owner_id") or ""),
+                is_new_account=is_new_account,
+                is_catalog_update=is_catalog_update,
+                owner_id=owner_id,
                 start_init_date=str(raw.get("start_init_date") or ""),
-                destination_path=str(raw.get("destination_path") or ""),
+                destination_path=destination_path,
             )
         )
 
