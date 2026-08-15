@@ -122,7 +122,9 @@ Panel izquierdo: catalogo de cuentas
   `Activar` devuelve una cuenta `DISABLED` o `INACTIVE` a `ENABLED`.
 - Las cuentas que ya estan en la tabla del lote actual se resaltan en amarillo
   mas intenso (temporal, solo UI de la sesion) para no volver a agregarlas.
-  Prioridad de color: disabled > en lote actual > inactivo > favorito.
+  Las cuentas agregadas a un lote o descargadas hoy se pintan en amarillo
+  claro (se verifica al iniciar la app y al refrescar el catalogo).
+  Prioridad de color: disabled > en lote actual > hoy > inactivo > favorito.
 - Al refrescar el catalogo (favorito, delete, activar, etc.) se conserva la
   seleccion y la posicion de scroll.
 - El orden es: favoritas; activas agrupadas por `account_history.field1`;
@@ -227,9 +229,15 @@ Zona superior de recuperacion:
 - `Exportar` / `Importar` mueven la definicion del lote en JSON entre
   instancias. `Ejecutado en otra instancia` cierra la descarga local y deja
   el lote POR RENOMBRAR.
+- En Activos se pueden seleccionar 2+ lotes, asignar orden en la **Cola de
+  ejecución**, lanzarlos en secuencia y quitar los que aún no han empezado.
+  Al terminar, **Renombrar** une los parámetros de todos los lotes de la cola
+  (`--startNowDate` más reciente + todos los `--new-account` +
+  `--move-renamed`). La cola se persiste en SQLite para otra instancia.
 - `Renombrar` (dialogo o boton principal) y `Finalizar sin renombrar` cierran
-  el ciclo: tras renombrar OK o finalizar, el batch pasa a `COMPLETED` y sale
-  de Activos (aparece en Históricos).
+  el ciclo: tras renombrar OK **y** no quedar carpetas en `WORKING_FOLDER`, o
+  al finalizar, el batch pasa a `COMPLETED` y sale de Activos (aparece en
+  Históricos). Si quedan carpetas sin mover, Renombrar sigue activo.
 - Abrir un histórico carga el lote en la ventana principal en modo
   `HISTÓRICO · solo lectura` (sin editar/ejecutar/renombrar). Se puede
   inspeccionar cuentas, URLs y carpetas; **Nuevo lote** sale del modo.
@@ -317,6 +325,8 @@ src/ig_orchestrator/gui/
   account_catalog_service.py
   process_runner.py
   batch_resume_service.py
+  rename_folder_status.py
+  batch_queue_service.py
 ```
 
 Responsabilidades:

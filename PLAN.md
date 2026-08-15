@@ -1552,7 +1552,9 @@ El catalogo persiste su clasificacion en `account_history`: `status` admite
 `is_favorite` conserva el tag favorito. Primero muestra las favoritas en verde;
 despues las activas con `field1`, agrupadas por ruta y ordenadas por username;
 luego las activas sin ruta; las inactivas en amarillo; y las desactivadas en
-rojo. Las bajas logicas siguen visibles al final aunque aparezcan en fuentes
+rojo. Las cuentas agregadas a un lote o descargadas en el dia local se
+resaltan en amarillo claro (prioridad por debajo del lote actual y de
+disabled). Las bajas logicas siguen visibles al final aunque aparezcan en fuentes
 JSON. El buscador, ante un username exacto con `field1`, devuelve el grupo
 completo de esa carpeta con la cuenta buscada primero. Los paths historicos de `account_history.field1`
 tambien alimentan un combobox editable para las cuentas nuevas. Al comenzar a
@@ -1563,9 +1565,13 @@ Los batches creados desde GUI se registran inicialmente como `DRAFT`. El
 maestro de lotes (pestaña Activos) permite recuperar, modificar y borrar
 únicamente ese estado, y muestra el total de URLs de entrada del lote. Al
 ejecutar un draft cambia a `IMPORTED` y queda bloqueado para edición; desde ese
-punto pasa al flujo normal de recuperación de ejecuciones. La pestaña
-Históricos lista los lotes `COMPLETED` y permite abrirlos en solo lectura para
-inspección (sin editar, ejecutar ni renombrar).
+punto pasa al flujo normal de recuperación de ejecuciones. Activos también
+permite armar una cola persistida de 2 o más lotes, ejecutarlos en secuencia,
+quitar pendientes mientras corre otro, y renombrar al final con los parámetros
+unidos. La pestaña Históricos lista los lotes `COMPLETED` y permite abrirlos en
+solo lectura para inspección (sin editar, ejecutar ni renombrar). Tras
+Renombrar, si `WORKING_FOLDER` aún tiene carpetas de cuenta, el lote no se
+cierra y el botón permanece activo.
 
 La GUI diferencia de forma permanente el contexto de trabajo: lote nuevo sin
 ID, lote `DRAFT` registrado en edición y lote cuya ejecución ya comenzó. Al

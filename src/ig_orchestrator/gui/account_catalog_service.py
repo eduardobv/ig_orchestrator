@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from pathlib import Path
 from sqlite3 import Connection
 from typing import Iterable
@@ -83,6 +84,9 @@ class AccountCatalogService:
     ) -> list[AccountCatalogEntry]:
         """Filter catalog rows; exact username match expands same-folder peers."""
         return filter_catalog_entries(entries, query)
+
+    def list_usernames_active_on_date(self, day: date) -> set[str]:
+        return list_usernames_active_on_date(self.connection, day)
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
         for record in AccountHistoryRepository(self.connection).list_all():
@@ -215,8 +219,62 @@ def filter_catalog_entries(
     ]
 
 
+def _iso_to_local_date(value: object) -> date | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone().date()
+
+
+def list_usernames_active_on_date(connection: Connection, day: date) -> set[str]:
+    """Usernames added to a batch or downloaded (non dry-run) on *day* (local)."""
+
+    active: set[str] = set()
+    for row in connection.execute(
+        "SELECT username, created_at FROM accounts"
+    ):
+        username = str(row["username"] or "").strip()
+        if not username:
+            continue
+        if _iso_to_local_date(row["created_at"]) == day:
+            active.add(username.casefold())
+
+    for row in connection.execute(
+        """
+        SELECT a.username, r.started_at, r.summary
+        FROM runs r
+        JOIN accounts a ON (
+            (r.account_id IS NOT NULL AND a.id = r.account_id)
+            OR (r.account_id IS NULL AND r.batch_id IS NOT NULL
+                AND a.batch_id = r.batch_id)
+        )
+        """
+    ):
+        username = str(row["username"] or "").strip()
+        if not username:
+            continue
+        summary = str(row["summary"] or "")
+        if summary.startswith("Dry-run batch"):
+            continue
+        if _iso_to_local_date(row["started_at"]) == day:
+            active.add(username.casefold())
+    return active
+
+
 __all__ = [
     "AccountCatalogEntry",
     "AccountCatalogService",
     "filter_catalog_entries",
+    "list_usernames_active_on_date",
 ]

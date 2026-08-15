@@ -68,6 +68,50 @@ def apply_migrations(connection: Connection) -> None:
         ON input_batches(batch_name)
         """
     )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS batch_run_queues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS batch_run_queue_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            queue_id INTEGER NOT NULL,
+            batch_id INTEGER NOT NULL,
+            sort_order INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(queue_id) REFERENCES batch_run_queues(id),
+            FOREIGN KEY(batch_id) REFERENCES input_batches(id),
+            UNIQUE(queue_id, batch_id)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_batch_run_queues_status
+        ON batch_run_queues(status)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_batch_run_queue_items_queue_id
+        ON batch_run_queue_items(queue_id)
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_batch_run_queue_items_status
+        ON batch_run_queue_items(status)
+        """
+    )
     connection.commit()
 
 

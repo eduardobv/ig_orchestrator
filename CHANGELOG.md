@@ -1,5 +1,70 @@
 # Changelog
 
+## v1.31.0 - GUI: cola de lotes y rename combinado
+
+Fecha: 2026-08-15
+
+### Creado
+
+* `tasks/Tarea_GUI_03.md`.
+* `src/ig_orchestrator/gui/batch_queue_service.py`.
+* Tablas `batch_run_queues` y `batch_run_queue_items`.
+
+### Modificado
+
+* Modal **Lotes / ejecuciones** deja de ser modal; pestaña Activos con
+  selección múltiple y panel **Cola de ejecución**.
+* Se pueden encadenar 2+ lotes, reordenar, quitar pendientes en caliente y
+  renombrar juntos (parámetros unidos, `--move-renamed`).
+* La cola persiste en SQLite para ejecutar en una instancia y renombrar en otra.
+* Versión `1.31.0`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k "queue or rename or catalog"`
+* `python -m pytest -q tests/test_gui_services.py`
+* `python -m pytest -q`
+
+## v1.30.0 - GUI: catálogo, historial de un día
+
+Fecha: 2026-08-15
+
+### Creado
+
+* `list_usernames_active_on_date` en `account_catalog_service.py`.
+
+### Modificado
+
+* Cuentas agregadas a un lote o descargadas hoy se pintan en amarillo claro
+  (`#fff59d`) al iniciar la app y en cada refresh del catálogo.
+* Prioridad de color: disabled > lote actual > hoy > inactivo > favorito.
+* Dry-run no cuenta como descarga.
+* Versión `1.30.0`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k "catalog or today or active_on_date"`
+
+## v1.29.0 - GUI: Renombrar activo si quedan carpetas
+
+Fecha: 2026-08-15
+
+### Creado
+
+* `src/ig_orchestrator/gui/rename_folder_status.py`.
+
+### Modificado
+
+* Tras Renombrar se inspecciona `WORKING_FOLDER`. Si quedan subcarpetas, el
+  lote no pasa a `COMPLETED` y el botón sigue activo. La llamada conserva
+  `--move-renamed`.
+* `__version__` alineado con `pyproject.toml`.
+* Versión `1.29.0`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_services.py -k "unmoved or decide_rename or move-renamed or move_renamed"`
+
 ## v1.28.2 - Patch - GUI: pestaña Históricos y solo lectura
 
 Fecha: 2026-08-11

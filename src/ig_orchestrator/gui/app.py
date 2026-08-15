@@ -15,6 +15,7 @@ from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
     AccountCatalogService,
     filter_catalog_entries,
+    list_usernames_active_on_date,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -24,6 +25,20 @@ from ig_orchestrator.gui.batch_draft_service import (
     save_catalog_metadata_to_history,
     save_new_account_to_catalog,
     save_batch_draft,
+)
+from ig_orchestrator.gui.batch_queue_service import (
+    BatchQueueError,
+    QueueStatus,
+    add_batches_to_open_queue,
+    collect_queue_rename_parameters,
+    collect_rename_parameters,
+    finish_queue_after_rename,
+    get_open_queue,
+    mark_current_item_completed,
+    move_queue_item,
+    pause_queue,
+    remove_pending_item,
+    start_or_resume_queue,
 )
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
@@ -56,6 +71,10 @@ from ig_orchestrator.gui.process_runner import (
     build_run_continue_command,
     format_manual_rename_command_preview,
 )
+from ig_orchestrator.gui.rename_folder_status import (
+    decide_rename_completion,
+    list_unmoved_account_folders,
+)
 from ig_orchestrator.settings import Settings
 from ig_orchestrator.models import AccountHistoryStatus
 
@@ -64,6 +83,7 @@ _CATALOG_COLORS = {
     "favorite": "#d9ead3",
     "inactive": "#fff2cc",
     "in_batch": "#f5c08c",
+    "today": "#fff59d",
     "disabled": "#f4cccc",
 }
 
@@ -101,6 +121,9 @@ class InstagramOrchestratorApp:
             batch_json_path=batch_json_path,
         )
         self.catalog_entries = self.catalog_service.list_entries()
+        self.today_catalog_usernames = list_usernames_active_on_date(
+            connection, date.today()
+        )
         self.destination_paths = self.catalog_service.list_destination_paths()
         self.accounts: list[AccountDraft] = []
         self.selected_index: int | None = None
@@ -111,8 +134,11 @@ class InstagramOrchestratorApp:
         self.rename_new_accounts: tuple[NewAccountRenameParameters, ...] = ()
         self.last_run_was_dry_run = False
         self.active_batch_id: int | None = None
+        self.active_queue_id: int | None = None
         self.cancel_requested = False
         self.active_process_kind: str | None = None
+        self._batches_dialog: tk.Toplevel | None = None
+        self._refresh_queue_panel = None
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
@@ -153,6 +179,23 @@ class InstagramOrchestratorApp:
         self._refresh_table()
         self._update_pending_button_label()
         self._update_batch_context()
+        self._restore_open_queue()
+
+    def _restore_open_queue(self) -> None:
+        """Pick up a sequence persisted by this or another instance."""
+        queue = get_open_queue(self.connection)
+        if queue is None:
+            return
+        self.active_queue_id = queue.id
+        if queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
+            self.batch_ready_for_rename = True
+            self.rename_button.configure(state="normal")
+            try:
+                params = collect_queue_rename_parameters(self.connection, queue.id)
+            except (BatchQueueError, ValueError):
+                return
+            self.default_date_var.set(params.start_now_date)
+            self.rename_new_accounts = params.new_accounts
 
     def _build_widgets(self) -> None:
         ttk.Style(self.root).configure("Visible.Vertical.TScrollbar", width=14)
@@ -584,6 +627,7 @@ class InstagramOrchestratorApp:
 
         query = self.catalog_filter_var.get()
         in_batch = self._batch_usernames()
+        today = self.today_catalog_usernames
         visible: list[str] = []
         self.catalog_list.delete(0, tk.END)
         for entry in filter_catalog_entries(self.catalog_entries, query):
@@ -591,6 +635,7 @@ class InstagramOrchestratorApp:
             colors = _catalog_entry_colors(
                 entry,
                 in_batch=entry.username.casefold() in in_batch,
+                today=entry.username.casefold() in today,
             )
             if colors:
                 self.catalog_list.itemconfig(tk.END, **colors)
@@ -683,8 +728,14 @@ class InstagramOrchestratorApp:
             return
         self._reload_catalog()
 
+    def _refresh_today_catalog(self) -> None:
+        self.today_catalog_usernames = list_usernames_active_on_date(
+            self.connection, date.today()
+        )
+
     def _reload_catalog(self) -> None:
         self.catalog_entries = self.catalog_service.list_entries()
+        self._refresh_today_catalog()
         self.username_combo.configure(
             values=[entry.username for entry in self.catalog_entries]
         )
@@ -1444,18 +1495,26 @@ class InstagramOrchestratorApp:
     def _open_pending_batches(self) -> None:
         dialog = tk.Toplevel(self.root)
         dialog.title("Lotes guardados y ejecuciones")
-        dialog.geometry("1060x480")
+        dialog.geometry("1100x620")
         dialog.transient(self.root)
-        dialog.grab_set()
         dialog.columnconfigure(0, weight=1)
         dialog.rowconfigure(1, weight=1)
+        self._batches_dialog = dialog
+
+        def _clear_dialog_ref(_event=None) -> None:
+            if self._batches_dialog is dialog:
+                self._batches_dialog = None
+                self._refresh_queue_panel = None
+
+        dialog.bind("<Destroy>", _clear_dialog_ref)
 
         ttk.Label(
             dialog,
             text=(
                 "Activos: GUARDADO, ejecuciones y POR RENOMBRAR. "
                 "Históricos: lotes COMPLETED (solo lectura). "
-                "Importar crea un lote nuevo en esta instancia."
+                "Selecciona 2 o más lotes para armar una cola y ejecutarlos "
+                "en secuencia. Importar crea un lote nuevo en esta instancia."
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
@@ -1481,12 +1540,12 @@ class InstagramOrchestratorApp:
             ("progress", "Cuentas", 250, "w"),
         )
 
-        def make_tree(parent: ttk.Frame) -> ttk.Treeview:
+        def make_tree(parent: ttk.Frame, *, selectmode: str = "browse") -> ttk.Treeview:
             tree = ttk.Treeview(
                 parent,
                 columns=columns,
                 show="headings",
-                selectmode="browse",
+                selectmode=selectmode,
             )
             for column, title, width, anchor in column_defs:
                 tree.heading(column, text=title)
@@ -1502,7 +1561,7 @@ class InstagramOrchestratorApp:
             tree.configure(yscrollcommand=scroll.set)
             return tree
 
-        active_tree = make_tree(active_tab)
+        active_tree = make_tree(active_tab, selectmode="extended")
         history_tree = make_tree(history_tab)
         active_empty = ttk.Label(
             active_tab,
@@ -1584,6 +1643,17 @@ class InstagramOrchestratorApp:
                 )
                 return None
             return int(selection[0])
+
+        def selected_active_batch_ids() -> list[int]:
+            selection = active_tree.selection()
+            if not selection:
+                messagebox.showwarning(
+                    "Cola",
+                    "Selecciona uno o más lotes activos.",
+                    parent=dialog,
+                )
+                return []
+            return [int(item_id) for item_id in selection]
 
         def selected_active_summary():
             batch_id = selected_batch_id_from(active_tree)
@@ -1867,17 +1937,223 @@ class InstagramOrchestratorApp:
             dialog.destroy()
             self._load_historical_batch(summary.batch_id, draft)
 
+        queue_frame = ttk.LabelFrame(dialog, text="Cola de ejecución", padding=8)
+        queue_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 4))
+        queue_frame.columnconfigure(0, weight=1)
+        queue_tree = ttk.Treeview(
+            queue_frame,
+            columns=("order", "name", "id", "item_status", "batch_status"),
+            show="headings",
+            height=4,
+            selectmode="browse",
+        )
+        for column, title, width, anchor in (
+            ("order", "#", 40, "e"),
+            ("name", "Lote", 280, "w"),
+            ("id", "ID", 60, "e"),
+            ("item_status", "En cola", 110, "w"),
+            ("batch_status", "Lote", 130, "w"),
+        ):
+            queue_tree.heading(column, text=title)
+            queue_tree.column(column, width=width, anchor=anchor)
+        queue_tree.grid(row=0, column=0, sticky="nsew")
+        queue_scroll = ttk.Scrollbar(
+            queue_frame,
+            orient=tk.VERTICAL,
+            command=queue_tree.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        queue_scroll.grid(row=0, column=1, sticky="ns")
+        queue_tree.configure(yscrollcommand=queue_scroll.set)
+        queue_buttons = ttk.Frame(queue_frame)
+        queue_buttons.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+        def selected_queue_item_id() -> int | None:
+            selection = queue_tree.selection()
+            if not selection:
+                messagebox.showwarning(
+                    "Cola",
+                    "Selecciona un lote de la cola.",
+                    parent=dialog,
+                )
+                return None
+            return int(selection[0])
+
+        def refresh_queue_panel() -> None:
+            for item in queue_tree.get_children():
+                queue_tree.delete(item)
+            queue = get_open_queue(self.connection)
+            if queue is None:
+                self.active_queue_id = None
+                return
+            self.active_queue_id = queue.id
+            visible_index = 0
+            for item in queue.items:
+                if item.is_removed:
+                    continue
+                visible_index += 1
+                queue_tree.insert(
+                    "",
+                    tk.END,
+                    iid=str(item.id),
+                    values=(
+                        visible_index,
+                        item.batch_name,
+                        item.batch_id,
+                        item.status,
+                        item.batch_status,
+                    ),
+                )
+
+        self._refresh_queue_panel = refresh_queue_panel
+
+        def add_selected_to_queue() -> None:
+            batch_ids = selected_active_batch_ids()
+            if not batch_ids:
+                return
+            try:
+                queue = add_batches_to_open_queue(self.connection, batch_ids)
+            except BatchQueueError as exc:
+                messagebox.showerror("Cola", str(exc), parent=dialog)
+                return
+            self.active_queue_id = queue.id
+            refresh_queue_panel()
+            self._write_console(
+                f"Cola {queue.id}: {len(queue.items)} lote(s) en secuencia.\n"
+            )
+
+        def remove_selected_from_queue() -> None:
+            item_id = selected_queue_item_id()
+            if item_id is None:
+                return
+            try:
+                remove_pending_item(self.connection, item_id)
+            except BatchQueueError as exc:
+                messagebox.showerror("Cola", str(exc), parent=dialog)
+                return
+            refresh_queue_panel()
+            if self.process_runner.is_running() and self.active_queue_id is not None:
+                self._write_console(
+                    "Lote pendiente quitado de la cola; la secuencia "
+                    "continuará con los que queden.\n"
+                )
+
+        def move_selected_queue_item(direction: int) -> None:
+            item_id = selected_queue_item_id()
+            if item_id is None:
+                return
+            try:
+                move_queue_item(self.connection, item_id, direction=direction)
+            except BatchQueueError as exc:
+                messagebox.showerror("Cola", str(exc), parent=dialog)
+                return
+            refresh_queue_panel()
+            queue_tree.selection_set(str(item_id))
+
+        def run_queue_selected() -> None:
+            queue = get_open_queue(self.connection)
+            if queue is None or not queue.pending_items and queue.running_item is None:
+                messagebox.showwarning(
+                    "Ejecutar secuencia",
+                    "Añade al menos un lote ejecutable a la cola.",
+                    parent=dialog,
+                )
+                return
+            try:
+                self._start_queue_sequence(queue.id)
+            except BatchQueueError as exc:
+                messagebox.showerror("Ejecutar secuencia", str(exc), parent=dialog)
+
+        def rename_queue_selected() -> None:
+            queue = get_open_queue(self.connection)
+            batch_ids: list[int] = []
+            if queue is not None and queue.rename_batch_ids:
+                batch_ids = list(queue.rename_batch_ids)
+                self.active_queue_id = queue.id
+            else:
+                selected = selected_active_batch_ids()
+                if len(selected) < 2:
+                    messagebox.showwarning(
+                        "Renombrar cola",
+                        "Selecciona una cola o al menos dos lotes POR RENOMBRAR.",
+                        parent=dialog,
+                    )
+                    return
+                try:
+                    queue = add_batches_to_open_queue(self.connection, selected)
+                except BatchQueueError as exc:
+                    messagebox.showerror("Renombrar cola", str(exc), parent=dialog)
+                    return
+                batch_ids = list(queue.rename_batch_ids)
+                self.active_queue_id = queue.id
+            if not batch_ids:
+                messagebox.showwarning(
+                    "Renombrar cola",
+                    "No hay lotes en la cola listos para renombrar.",
+                    parent=dialog,
+                )
+                return
+            for batch_id in batch_ids:
+                if not is_batch_ready_for_rename(self.connection, batch_id):
+                    messagebox.showwarning(
+                        "Renombrar cola",
+                        f"El lote {batch_id} aún no está listo para renombrar.",
+                        parent=dialog,
+                    )
+                    return
+            try:
+                draft = load_batch_draft(self.connection, batch_ids[0])
+            except ValueError as exc:
+                messagebox.showerror("Renombrar cola", str(exc), parent=dialog)
+                return
+            self._load_persisted_draft(batch_ids[0], draft)
+            self.saved_batch_id = None
+            self.saved_draft_signature = None
+            self.active_batch_id = batch_ids[0]
+            self.batch_ready_for_rename = True
+            self._update_batch_context()
+            self.rename_button.configure(state="normal")
+            refresh_queue_panel()
+            self._write_console(
+                f"Cola {self.active_queue_id}: renombrado combinado de "
+                f"{len(batch_ids)} lote(s). Pulsa Renombrar o espera el arranque.\n"
+            )
+            self._rename_manual_files()
+
+        ttk.Button(
+            queue_buttons, text="Añadir a cola", command=add_selected_to_queue
+        ).pack(side=tk.LEFT)
+        ttk.Button(
+            queue_buttons, text="Quitar de cola", command=remove_selected_from_queue
+        ).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(
+            queue_buttons, text="Subir", command=lambda: move_selected_queue_item(-1)
+        ).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(
+            queue_buttons, text="Bajar", command=lambda: move_selected_queue_item(1)
+        ).pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Button(
+            queue_buttons, text="Ejecutar secuencia", command=run_queue_selected
+        ).pack(side=tk.RIGHT)
+        ttk.Button(
+            queue_buttons,
+            text="Renombrar cola / selección",
+            command=rename_queue_selected,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+
         active_actions = ttk.Frame(dialog, padding=10)
         history_actions = ttk.Frame(dialog, padding=10)
-        active_actions.grid(row=2, column=0, sticky="ew")
+        active_actions.grid(row=3, column=0, sticky="ew")
 
         def show_active_actions() -> None:
             history_actions.grid_remove()
-            active_actions.grid(row=2, column=0, sticky="ew")
+            active_actions.grid(row=3, column=0, sticky="ew")
+            queue_frame.grid()
 
         def show_history_actions() -> None:
             active_actions.grid_remove()
-            history_actions.grid(row=2, column=0, sticky="ew")
+            queue_frame.grid_remove()
+            history_actions.grid(row=3, column=0, sticky="ew")
             if not history_loaded["done"]:
                 reload_history()
 
@@ -1938,6 +2214,7 @@ class InstagramOrchestratorApp:
         managed = reload_active()
         notebook.tab(1, text="Históricos")
         show_active_actions()
+        refresh_queue_panel()
         if not managed:
             active_empty.place(relx=0.48, rely=0.48, anchor="center")
 
@@ -2076,6 +2353,8 @@ class InstagramOrchestratorApp:
         self.active_batch_id = result.batch.id
         self.saved_draft_signature = _draft_signature(draft)
         self._refresh_runtime_progress()
+        self._refresh_today_catalog()
+        self._refresh_catalog()
         self._update_batch_context()
         self._write_console(
             f"Lote guardado: {result.batch.batch_name} (id={result.batch.id}, estado=DRAFT)\n"
@@ -2153,6 +2432,7 @@ class InstagramOrchestratorApp:
         self.batch_name_var.set(_suggest_batch_name())
         self._clear_editor()
         self._refresh_table()
+        self._refresh_today_catalog()
         self._refresh_catalog()
         self._update_batch_context()
         self._update_pending_button_label()
@@ -2197,6 +2477,74 @@ class InstagramOrchestratorApp:
             return
 
         self._start_batch(batch_id)
+
+    def _start_queue_sequence(self, queue_id: int) -> None:
+        if self.process_runner.is_running():
+            raise BatchQueueError("Ya hay un proceso en ejecución")
+        item = start_or_resume_queue(self.connection, queue_id)
+        self.active_queue_id = queue_id
+        self._write_console(
+            f"Secuencia de cola {queue_id}: ejecutando lote "
+            f"{item.batch_id} ({item.batch_name}).\n"
+        )
+        if self._refresh_queue_panel is not None:
+            self._refresh_queue_panel()
+        self._start_batch(item.batch_id)
+
+    def _continue_queue_after_batch(self, *, cancelled: bool, exit_code: int) -> bool:
+        """Advance the persisted queue. Return True if another batch was started."""
+        if self.active_queue_id is None:
+            return False
+        queue_id = self.active_queue_id
+        if cancelled or exit_code != 0:
+            pause_queue(self.connection, queue_id)
+            if self._refresh_queue_panel is not None:
+                self._refresh_queue_panel()
+            self._write_console(
+                f"Cola {queue_id} en pausa. Los lotes pendientes se pueden "
+                "quitar o la secuencia se puede reanudar.\n"
+            )
+            return False
+        if self.last_run_was_dry_run:
+            pause_queue(self.connection, queue_id)
+            if self._refresh_queue_panel is not None:
+                self._refresh_queue_panel()
+            return False
+        next_item = mark_current_item_completed(self.connection, queue_id)
+        if self._refresh_queue_panel is not None:
+            self._refresh_queue_panel()
+        if next_item is None:
+            self.batch_ready_for_rename = True
+            self.rename_button.configure(state="normal")
+            try:
+                params = collect_queue_rename_parameters(self.connection, queue_id)
+            except BatchQueueError as exc:
+                self._write_console(f"Cola {queue_id} lista para renombrar: {exc}\n")
+                return False
+            self.rename_new_accounts = params.new_accounts
+            self.default_date_var.set(params.start_now_date)
+            self._write_console(
+                f"Cola {queue_id} terminada. Renombrar usará "
+                f"{len(params.batch_ids)} lote(s), startNowDate "
+                f"{params.start_now_date} y {len(params.new_accounts)} "
+                "cuenta(s) nueva(s).\n"
+            )
+            if params.has_mixed_dates:
+                self._write_console(
+                    "Aviso: los lotes tenían startNowDate distintos; "
+                    "se usó la fecha más reciente.\n"
+                )
+            return False
+        self._write_console(
+            f"Cola {queue_id}: siguiente lote {next_item.batch_id} "
+            f"({next_item.batch_name}).\n"
+        )
+        try:
+            self._start_queue_sequence(queue_id)
+        except BatchQueueError as exc:
+            self._write_console(f"No se pudo continuar la cola: {exc}\n")
+            return False
+        return True
 
     def _start_batch(self, batch_id: int) -> None:
         if self.process_runner.is_running():
@@ -2290,8 +2638,20 @@ class InstagramOrchestratorApp:
             and not self.cancel_requested
             and is_batch_ready_for_rename(self.connection, batch_id)
         )
+        queued = self.active_queue_id is not None
+        cancelled = self.cancel_requested
+        self.cancel_requested = False
+        self.active_process_kind = None
+        if queued:
+            continued = self._continue_queue_after_batch(
+                cancelled=cancelled,
+                exit_code=exit_code,
+            )
+            if continued:
+                self._update_pending_button_label()
+                return
         self._set_process_running(False)
-        if self.cancel_requested:
+        if cancelled:
             self._set_status(f"Lote {batch_id} interrumpido; queda pendiente")
             self._write_console(
                 f"Lote {batch_id} detenido. SQLite conserva el trabajo y el batch "
@@ -2316,8 +2676,6 @@ class InstagramOrchestratorApp:
             self._write_console(
                 f"Lote {batch_id} finalizado con codigo de salida {exit_code}.\n"
             )
-        self.cancel_requested = False
-        self.active_process_kind = None
         self._update_pending_button_label()
         _play_completion_sound(self.root)
 
@@ -2372,6 +2730,29 @@ class InstagramOrchestratorApp:
         """Return start date, new-account args and optional warning notes."""
 
         notes: list[str] = []
+        if self.active_queue_id is not None:
+            try:
+                params = collect_queue_rename_parameters(
+                    self.connection, self.active_queue_id
+                )
+            except (BatchQueueError, ValueError) as exc:
+                notes.append(f"No se pudo leer la cola {self.active_queue_id}: {exc}")
+            else:
+                notes.append(
+                    f"Parámetros unidos de la cola id={self.active_queue_id} "
+                    f"({len(params.batch_ids)} lote(s))."
+                )
+                if params.has_mixed_dates:
+                    notes.append(
+                        "Los lotes tenían startNowDate distintos; "
+                        f"se usa {params.start_now_date}."
+                    )
+                if not MANUAL_RENAME_SCRIPT.is_file():
+                    notes.append(
+                        f"Aviso: no se encontró el script en {MANUAL_RENAME_SCRIPT}."
+                    )
+                return params.start_now_date, params.new_accounts, notes
+
         start_now_date = self.default_date_var.get().strip()
         accounts = self.accounts
         batch_id = self.active_batch_id or self.saved_batch_id
@@ -2477,21 +2858,37 @@ class InstagramOrchestratorApp:
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
 
-        if self.active_batch_id is None:
+        if self.active_queue_id is None and self.active_batch_id is None:
             messagebox.showerror("Renombrar", "No hay un batch activo para renombrar.")
             return
-        try:
-            persisted_draft = load_batch_draft(
-                self.connection,
-                self.active_batch_id,
+        if self.active_queue_id is not None:
+            try:
+                params = collect_queue_rename_parameters(
+                    self.connection, self.active_queue_id
+                )
+            except (BatchQueueError, ValueError) as exc:
+                messagebox.showerror("Renombrar", str(exc))
+                return
+            self.default_date_var.set(params.start_now_date)
+            self.rename_new_accounts = params.new_accounts
+            if params.has_mixed_dates:
+                self._write_console(
+                    "Aviso: startNowDate combinado = "
+                    f"{params.start_now_date} (la más reciente de la cola).\n"
+                )
+        else:
+            try:
+                persisted_draft = load_batch_draft(
+                    self.connection,
+                    self.active_batch_id,
+                )
+            except ValueError as exc:
+                messagebox.showerror("Renombrar", str(exc))
+                return
+            self.default_date_var.set(persisted_draft.default_start_now_date)
+            self.rename_new_accounts = _new_account_rename_parameters(
+                persisted_draft.accounts
             )
-        except ValueError as exc:
-            messagebox.showerror("Renombrar", str(exc))
-            return
-        self.default_date_var.set(persisted_draft.default_start_now_date)
-        self.rename_new_accounts = _new_account_rename_parameters(
-            persisted_draft.accounts
-        )
 
         start_now_date = self.default_date_var.get().strip()
         try:
@@ -2536,10 +2933,26 @@ class InstagramOrchestratorApp:
             messagebox.showerror("Renombrar", str(exc))
 
     def _handle_rename_complete(self, exit_code: int) -> None:
+        leftovers = list_unmoved_account_folders(self.settings.working_folder)
+        decision = decide_rename_completion(
+            exit_code=exit_code,
+            leftover_folders=leftovers,
+        )
         self.active_process_kind = None
-        self._set_process_running(False)
-        if exit_code == 0:
-            if self.active_batch_id is not None:
+        if decision.mark_completed:
+            if self.active_queue_id is not None:
+                try:
+                    finish_queue_after_rename(self.connection, self.active_queue_id)
+                    self._write_console(
+                        f"Cola {self.active_queue_id} y sus lotes marcados "
+                        "COMPLETED tras renombrar.\n"
+                    )
+                    self.active_queue_id = None
+                except (BatchQueueError, ValueError) as exc:
+                    self._write_console(
+                        f"No se pudo marcar COMPLETED la cola: {exc}\n"
+                    )
+            elif self.active_batch_id is not None:
                 try:
                     finish_batch(self.connection, self.active_batch_id)
                     self._write_console(
@@ -2550,11 +2963,24 @@ class InstagramOrchestratorApp:
                     self._write_console(
                         f"No se pudo marcar COMPLETED tras renombrar: {exc}\n"
                     )
-            self.batch_ready_for_rename = False
-            self.rename_button.configure(state="disabled")
+        self.batch_ready_for_rename = decision.keep_rename_enabled
+        self._set_process_running(False)
+        if leftovers:
+            names = ", ".join(path.name for path in leftovers)
+            self._write_console(
+                "Quedan carpetas sin mover en "
+                f"{self.settings.working_folder}: {names}. "
+                "Renombrar permanece activo (la llamada usa --move-renamed).\n"
+            )
+        if exit_code == 0 and not leftovers:
             self._update_pending_button_label()
             self._set_status("Renombrado finalizado correctamente")
             self._write_console("Renombrado finalizado correctamente.\n")
+        elif leftovers:
+            self._update_pending_button_label()
+            self._set_status(
+                f"Renombrado incompleto: {len(leftovers)} carpeta(s) pendiente(s)"
+            )
         else:
             self._set_status(f"Renombrado finalizado con codigo {exit_code}")
             self._write_console(
@@ -2572,7 +2998,12 @@ class InstagramOrchestratorApp:
         self._set_descendants_enabled(self.body_region, not running)
         button_state = "disabled" if running else "normal"
         self.register_button.configure(state=button_state)
-        self.pending_button.configure(state=button_state)
+        # The lots dialog stays reachable during a batch/sequence so pending
+        # queue items can be removed before they start.
+        if running and self.active_process_kind == "rename":
+            self.pending_button.configure(state="disabled")
+        else:
+            self.pending_button.configure(state="normal")
         self.execute_button.configure(state=button_state)
         self.save_selection_button.configure(state=button_state)
         if running and self.active_process_kind == "batch":
@@ -2622,11 +3053,14 @@ def _catalog_entry_colors(
     entry: AccountCatalogEntry,
     *,
     in_batch: bool = False,
+    today: bool = False,
 ) -> dict[str, str]:
     if entry.status is AccountHistoryStatus.DISABLED:
         return {"background": _CATALOG_COLORS["disabled"]}
     if in_batch:
         return {"background": _CATALOG_COLORS["in_batch"]}
+    if today:
+        return {"background": _CATALOG_COLORS["today"]}
     if entry.status is AccountHistoryStatus.INACTIVE:
         return {"background": _CATALOG_COLORS["inactive"]}
     if entry.is_favorite:

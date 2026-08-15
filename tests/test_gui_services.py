@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sys
@@ -41,6 +41,7 @@ from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogEntry,
     AccountCatalogService,
     filter_catalog_entries,
+    list_usernames_active_on_date,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
 from ig_orchestrator.gui.batch_draft_service import (
@@ -78,6 +79,11 @@ from ig_orchestrator.gui.process_runner import (
     build_run_continue_command,
     format_command_for_shell,
     format_manual_rename_command_preview,
+)
+from ig_orchestrator.gui.rename_folder_status import (
+    decide_rename_completion,
+    has_unmoved_account_folders,
+    list_unmoved_account_folders,
 )
 from ig_orchestrator.input import DuplicateBatchNameError
 from ig_orchestrator.models import (
@@ -298,6 +304,107 @@ def test_catalog_colors_follow_favorite_and_account_status() -> None:
         ),
         in_batch=True,
     ) == {"background": "#f4cccc"}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry("today_user", is_favorite=True),
+        today=True,
+    ) == {"background": "#fff59d"}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry("today_in_batch"),
+        in_batch=True,
+        today=True,
+    ) == {"background": "#f5c08c"}
+    assert _catalog_entry_colors(
+        AccountCatalogEntry("today_inactive", status=AccountHistoryStatus.INACTIVE),
+        today=True,
+    ) == {"background": "#fff59d"}
+
+
+def test_list_usernames_active_on_date_includes_added_or_downloaded_today(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    yesterday_dt = datetime(
+        yesterday.year, yesterday.month, yesterday.day, 15, 0, tzinfo=timezone.utc
+    )
+
+    with connect(db_path) as connection:
+        added_today = save_batch_draft(
+            BatchDraft(
+                batch_name="added_today",
+                default_start_now_date=today.isoformat(),
+                accounts=[
+                    AccountDraft(
+                        username="AddedToday",
+                        urls=["https://www.instagram.com/reel/TODAY1/"],
+                    )
+                ],
+            ),
+            connection,
+        )
+        added_yesterday = save_batch_draft(
+            BatchDraft(
+                batch_name="added_yesterday",
+                default_start_now_date=yesterday.isoformat(),
+                accounts=[
+                    AccountDraft(
+                        username="added_yesterday",
+                        urls=["https://www.instagram.com/reel/YDAY1/"],
+                    ),
+                    AccountDraft(
+                        username="downloaded_today",
+                        urls=["https://www.instagram.com/reel/RUN1/"],
+                    ),
+                    AccountDraft(
+                        username="dry_run_today",
+                        urls=["https://www.instagram.com/reel/DRY1/"],
+                    ),
+                ],
+            ),
+            connection,
+        )
+        yesterday_accounts = {
+            account.username: account.id for account in added_yesterday.accounts
+        }
+        connection.execute(
+            "UPDATE accounts SET created_at = ?, updated_at = ? WHERE batch_id = ?",
+            (
+                yesterday_dt.isoformat(),
+                yesterday_dt.isoformat(),
+                added_yesterday.batch.id,
+            ),
+        )
+        RunRepository(connection).create(
+            RunSummary(
+                status=RunStatus.COMPLETED,
+                total_urls=1,
+                completed_urls=1,
+                summary="Processed downloaded_today",
+            ),
+            batch_id=added_yesterday.batch.id,
+            account_id=yesterday_accounts["downloaded_today"],
+        )
+        RunRepository(connection).create(
+            RunSummary(
+                status=RunStatus.COMPLETED,
+                total_urls=1,
+                completed_urls=1,
+                summary="Dry-run batch added_yesterday: would process 1 accounts",
+            ),
+            batch_id=added_yesterday.batch.id,
+            account_id=yesterday_accounts["dry_run_today"],
+        )
+        connection.commit()
+
+        active = list_usernames_active_on_date(connection, today)
+
+    assert "addedtoday" in active
+    assert "downloaded_today" in active
+    assert "added_yesterday" not in active
+    assert "dry_run_today" not in active
+    assert added_today.batch.id is not None
 
 
 def test_catalog_filter_exact_match_returns_same_folder_peers() -> None:
@@ -1091,6 +1198,53 @@ def test_gui_manual_rename_command_preview_includes_shell_line_and_params() -> N
     assert "--no-duplicated" in preview
     assert "--move-renamed" in preview
     assert "[0]" in preview
+
+
+def test_list_unmoved_account_folders_ignores_files_and_hidden_dirs(tmp_path: Path) -> None:
+    working = tmp_path / "working"
+    working.mkdir()
+    (working / "readme.txt").write_text("x", encoding="utf-8")
+    (working / ".hidden").mkdir()
+    leftover = working / "Some-Renamed-Account"
+    leftover.mkdir()
+    (working / "another_user").mkdir()
+
+    leftovers = list_unmoved_account_folders(working)
+
+    assert [path.name for path in leftovers] == ["another_user", "Some-Renamed-Account"]
+    assert has_unmoved_account_folders(working) is True
+    assert list_unmoved_account_folders(tmp_path / "missing") == []
+    assert has_unmoved_account_folders(None) is False
+
+
+def test_list_unmoved_account_folders_empty_when_only_files(tmp_path: Path) -> None:
+    working = tmp_path / "working"
+    working.mkdir()
+    (working / "telegram_media.jpg").write_bytes(b"x")
+
+    assert list_unmoved_account_folders(working) == []
+    assert has_unmoved_account_folders(working) is False
+
+
+def test_decide_rename_completion_keeps_button_when_folders_remain(tmp_path: Path) -> None:
+    leftover = tmp_path / "still_here"
+    leftover.mkdir()
+
+    with_leftovers = decide_rename_completion(
+        exit_code=0,
+        leftover_folders=[leftover],
+    )
+    assert with_leftovers.mark_completed is False
+    assert with_leftovers.keep_rename_enabled is True
+    assert with_leftovers.leftover_folders == (leftover,)
+
+    clean_success = decide_rename_completion(exit_code=0, leftover_folders=[])
+    assert clean_success.mark_completed is True
+    assert clean_success.keep_rename_enabled is False
+
+    failed = decide_rename_completion(exit_code=1, leftover_folders=[])
+    assert failed.mark_completed is False
+    assert failed.keep_rename_enabled is True
 
 
 def test_gui_rename_parameters_only_include_checked_new_accounts() -> None:
@@ -2261,3 +2415,196 @@ def test_gui_initial_batch_name_falls_back_to_latest_saved_batch(tmp_path: Path)
         )
 
         assert _latest_executed_batch_name(connection) == "saved_batch"
+
+
+def _draft_with_name(name: str, username: str, *, new_account: bool = False) -> BatchDraft:
+    return BatchDraft(
+        batch_name=name,
+        default_start_now_date="2026-08-15",
+        accounts=[
+            AccountDraft(
+                username=username,
+                urls=["https://www.instagram.com/reel/QUEUE1/"],
+                is_new_account=new_account,
+                owner_id="111" if new_account else "",
+                start_init_date="2025-01-01" if new_account else "",
+                destination_path=r"G:\4K Stogram\00.MODELS-A" if new_account else "",
+            )
+        ],
+    )
+
+
+def test_batch_queue_add_remove_and_reject_running_removal(tmp_path: Path) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        BatchQueueError,
+        QueueItemStatus,
+        add_batches_to_open_queue,
+        get_queue,
+        remove_pending_item,
+        start_or_resume_queue,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("q1", "user_one"), connection)
+        second = save_batch_draft(_draft_with_name("q2", "user_two"), connection)
+        third = save_batch_draft(_draft_with_name("q3", "user_three"), connection)
+        queue = add_batches_to_open_queue(
+            connection,
+            [first.batch.id, second.batch.id, third.batch.id],
+        )
+        assert [item.batch_id for item in queue.items] == [
+            first.batch.id,
+            second.batch.id,
+            third.batch.id,
+        ]
+        start_or_resume_queue(connection, queue.id)
+        running = get_queue(connection, queue.id).running_item
+        assert running is not None
+        with pytest.raises(BatchQueueError, match="aún no han empezado"):
+            remove_pending_item(connection, running.id)
+        pending_third = next(
+            item for item in get_queue(connection, queue.id).items
+            if item.batch_id == third.batch.id
+        )
+        updated = remove_pending_item(connection, pending_third.id)
+        assert updated.items[-1].status == QueueItemStatus.REMOVED.value
+        assert updated.pending_items[0].batch_id == second.batch.id
+
+
+def test_batch_queue_advance_then_awaiting_rename_after_last_pending_removed(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueStatus,
+        add_batches_to_open_queue,
+        get_queue,
+        mark_current_item_completed,
+        remove_pending_item,
+        start_or_resume_queue,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("seq1", "alpha"), connection)
+        second = save_batch_draft(_draft_with_name("seq2", "beta"), connection)
+        third = save_batch_draft(_draft_with_name("seq3", "gamma"), connection)
+        queue = add_batches_to_open_queue(
+            connection,
+            [first.batch.id, second.batch.id, third.batch.id],
+        )
+        start_or_resume_queue(connection, queue.id)
+        next_item = mark_current_item_completed(connection, queue.id)
+        assert next_item is not None
+        assert next_item.batch_id == second.batch.id
+        start_or_resume_queue(connection, queue.id)
+        third_item = next(
+            item for item in get_queue(connection, queue.id).items
+            if item.batch_id == third.batch.id
+        )
+        remove_pending_item(connection, third_item.id)
+        assert mark_current_item_completed(connection, queue.id) is None
+        closed = get_queue(connection, queue.id)
+        assert closed.status == QueueStatus.AWAITING_RENAME.value
+        assert closed.rename_batch_ids == (first.batch.id, second.batch.id)
+
+
+def test_collect_rename_parameters_merges_new_accounts_and_latest_date(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.gui.batch_queue_service import collect_rename_parameters
+    from ig_orchestrator.gui.process_runner import build_manual_rename_command
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    earlier = BatchDraft(
+        batch_name="rename_a",
+        default_start_now_date="2026-08-14",
+        accounts=[
+            AccountDraft(
+                username="new_a",
+                urls=["https://www.instagram.com/reel/A1/"],
+                is_new_account=True,
+                owner_id="10",
+                start_init_date="2025-01-01",
+                destination_path=r"G:\4K Stogram\00.MODELS-A",
+            )
+        ],
+    )
+    later = BatchDraft(
+        batch_name="rename_b",
+        default_start_now_date="2026-08-15",
+        accounts=[
+            AccountDraft(
+                username="new_b",
+                urls=["https://www.instagram.com/reel/B1/"],
+                is_new_account=True,
+                owner_id="20",
+                start_init_date="2025-02-02",
+                destination_path=r"G:\4K Stogram\00.MODELS-B",
+            )
+        ],
+    )
+    with connect(db_path) as connection:
+        first = save_batch_draft(earlier, connection)
+        second = save_batch_draft(later, connection)
+        params = collect_rename_parameters(
+            connection, [first.batch.id, second.batch.id]
+        )
+
+    assert params.start_now_date == "2026-08-15"
+    assert params.has_mixed_dates is True
+    assert [account.username for account in params.new_accounts] == ["new_a", "new_b"]
+    command = build_manual_rename_command(
+        params.start_now_date,
+        new_accounts=params.new_accounts,
+    )
+    assert command.count("--new-account") == 2
+    assert "--move-renamed" in command
+
+
+def test_finish_queue_after_rename_respects_leftovers_decision(tmp_path: Path) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueStatus,
+        add_batches_to_open_queue,
+        finish_queue_after_rename,
+        get_queue,
+        mark_current_item_completed,
+        start_or_resume_queue,
+    )
+    from ig_orchestrator.gui.rename_folder_status import decide_rename_completion
+    from ig_orchestrator.models import InputBatchStatus
+
+    leftover = tmp_path / "still_here"
+    leftover.mkdir()
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("fin1", "one"), connection)
+        second = save_batch_draft(_draft_with_name("fin2", "two"), connection)
+        queue = add_batches_to_open_queue(
+            connection, [first.batch.id, second.batch.id]
+        )
+        start_or_resume_queue(connection, queue.id)
+        mark_current_item_completed(connection, queue.id)
+        start_or_resume_queue(connection, queue.id)
+        mark_current_item_completed(connection, queue.id)
+
+        blocked = decide_rename_completion(
+            exit_code=0, leftover_folders=[leftover]
+        )
+        assert blocked.mark_completed is False
+        assert get_queue(connection, queue.id).status == QueueStatus.AWAITING_RENAME.value
+
+        finish_queue_after_rename(connection, queue.id)
+        assert get_queue(connection, queue.id).status == QueueStatus.COMPLETED.value
+        assert (
+            BatchRepository(connection).get_by_id(first.batch.id).status
+            is InputBatchStatus.COMPLETED
+        )
+        assert (
+            BatchRepository(connection).get_by_id(second.batch.id).status
+            is InputBatchStatus.COMPLETED
+        )
