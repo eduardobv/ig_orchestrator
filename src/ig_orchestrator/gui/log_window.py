@@ -17,23 +17,34 @@ class LogWindow:
 
     def append(self, text: str) -> None:
         self._buffer.append(text)
-        if self._text is not None:
-            self._text.configure(state="normal")
-            self._text.insert(tk.END, text)
-            self._text.see(tk.END)
-            self._text.configure(state="normal")
+        widget = self._live_text()
+        if widget is None:
+            return
+        try:
+            widget.configure(state="normal")
+            widget.insert(tk.END, text)
+            widget.see(tk.END)
+            widget.configure(state="disabled")
+        except tk.TclError:
+            self._forget_window()
 
     def clear(self) -> None:
         self._buffer.clear()
-        if self._text is not None:
-            self._text.configure(state="normal")
-            self._text.delete("1.0", tk.END)
+        widget = self._live_text()
+        if widget is None:
+            return
+        try:
+            widget.configure(state="normal")
+            widget.delete("1.0", tk.END)
+            widget.configure(state="disabled")
+        except tk.TclError:
+            self._forget_window()
 
     def toggle(self) -> None:
-        if self._window is not None and self._window.winfo_exists():
-            if self._window.state() == "iconic":
-                self._window.deiconify()
-            self._window.lift()
+        window = self._live_window()
+        if window is not None:
+            window.deiconify()
+            window.lift()
             return
         self._open()
 
@@ -52,26 +63,58 @@ class LogWindow:
         scroll.grid(row=0, column=1, sticky="ns")
         text.configure(yscrollcommand=scroll.set)
         text.insert("1.0", "".join(self._buffer))
+        text.configure(state="disabled")
         menu = tk.Menu(window, tearoff=False)
         menu.add_command(label=t("log.copy"), command=lambda: self._copy(False))
         menu.add_command(label=t("log.copy_all"), command=lambda: self._copy(True))
         menu.add_separator()
         menu.add_command(label=t("log.clear"), command=self.clear)
         text.bind("<Button-3>", lambda event: menu.tk_popup(event.x_root, event.y_root))
-        window.protocol("WM_DELETE_WINDOW", window.destroy)
+        window.protocol("WM_DELETE_WINDOW", self._hide)
         self._window = window
         self._text = text
 
+    def _hide(self) -> None:
+        window = self._live_window()
+        if window is None:
+            return
+        window.withdraw()
+
+    def _live_window(self) -> tk.Toplevel | None:
+        window = self._window
+        if window is None:
+            return None
+        try:
+            if window.winfo_exists():
+                return window
+        except tk.TclError:
+            pass
+        self._forget_window()
+        return None
+
+    def _live_text(self) -> tk.Text | None:
+        if self._live_window() is None:
+            return None
+        return self._text
+
+    def _forget_window(self) -> None:
+        self._window = None
+        self._text = None
+
     def _copy(self, entire: bool) -> None:
-        if self._text is None:
+        widget = self._live_text()
+        if widget is None:
             return
         try:
-            selected = self._text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            selected = widget.get(tk.SEL_FIRST, tk.SEL_LAST)
         except tk.TclError:
             selected = ""
-        payload = self._text.get("1.0", tk.END) if entire or not selected else selected
-        self._master.clipboard_clear()
-        self._master.clipboard_append(payload)
+        try:
+            payload = widget.get("1.0", tk.END) if entire or not selected else selected
+            self._master.clipboard_clear()
+            self._master.clipboard_append(payload)
+        except tk.TclError:
+            self._forget_window()
 
 
 __all__ = ["LogWindow"]

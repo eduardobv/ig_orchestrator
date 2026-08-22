@@ -83,3 +83,5 @@ logs/old/old.zip
 reports/old/old.7z
 data/orchestrator.sqlite-shm
 data/orchestrator.sqlite-wal
+data/orchestrator_gui.sqlite-wal
+data/orchestrator_gui.sqlite-shm

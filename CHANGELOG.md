@@ -14,12 +14,19 @@ Fecha: 2026-08-22
   `lookups.py`, `schema_mode.py`, `compat_views_v2.sql`.
 * `src/ig_orchestrator/input/gui_batch_creation.py` (inserts en una transacción).
 * `tests/test_gui_database.py`, `tests/test_catalog_importer.py`,
-  `tests/test_gui_repositories.py`.
+  `tests/test_gui_repositories.py`, `tests/test_gui_theme.py`,
+  `tests/test_log_window.py`.
 * `tasks/Tarea_v2_D1.md` … `Tarea_v2_D6.md`.
 * Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
 
 ### Modificado
 
+* Ventana de log: cerrar la oculta (`withdraw`) en vez de destruir el
+  `Text`; `append` ignora widgets ya destruidos. Evita
+  `TclError: invalid command name ".!toplevel...!text"` al pulsar
+  Renombrar después de cerrar el log.
+* Tema GUI: `option_add("*Font")` usa `{Segoe UI} 10`. Sin llaves Tk
+  interpretaba `UI` como tamaño y `tk.Menu` fallaba al abrir `ejecutar_gui.bat`.
 * `connect()` usa WAL + `synchronous=NORMAL`.
 * Setting opcional `SQLITE_GUI_DB_PATH` (default `data\orchestrator_gui.sqlite`).
 * Repositorios v1 despachan a adaptadores v2 si `user_version >= 100`.
@@ -41,6 +48,7 @@ Fecha: 2026-08-22
 
 ### Pruebas ejecutadas
 
+* `python -m pytest -q tests/test_log_window.py tests/test_gui_theme.py`
 * `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
 * `python -m pytest -q`
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import ttk
 
 
@@ -9,6 +10,33 @@ PANEL = "#FFFFFF"
 INK = "#1F2933"
 ACCENT = "#2563EB"
 BORDER = "#E2E5EA"
+UI_FONT_FAMILY = "Segoe UI"
+UI_FONT_SIZE = 10
+
+
+def ui_font_option(family: str = UI_FONT_FAMILY, size: int = UI_FONT_SIZE) -> str:
+    """Tk option-database font spec. Multi-word families must be braced.
+
+    ``"Segoe UI 10"`` is parsed as family ``Segoe`` and size ``UI``, which
+    raises ``TclError: expected integer but got "UI"`` when a Menu is created.
+    """
+
+    return f"{{{family}}} {int(size)}"
+
+
+def _apply_ui_font(root: tk.Tk) -> None:
+    spec = ui_font_option()
+    try:
+        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
+            try:
+                tkfont.nametofont(name).configure(
+                    family=UI_FONT_FAMILY, size=UI_FONT_SIZE
+                )
+            except tk.TclError:
+                continue
+        root.option_add("*Font", spec)
+    except tk.TclError:
+        pass
 
 
 def apply_light_theme(root: tk.Tk) -> None:
@@ -37,10 +65,7 @@ def apply_light_theme(root: tk.Tk) -> None:
         style.configure("TNotebook", background=SURFACE)
         style.configure("TNotebook.Tab", background=SURFACE)
     root.configure(bg=SURFACE)
-    try:
-        root.option_add("*Font", "Segoe UI 10")
-    except tk.TclError:
-        pass
+    _apply_ui_font(root)
     ttk.Style(root).configure("Visible.Vertical.TScrollbar", width=14)
 
 
@@ -92,4 +117,10 @@ def icon_button(
     return button
 
 
-__all__ = ["SURFACE", "Tooltip", "apply_light_theme", "icon_button"]
+__all__ = [
+    "SURFACE",
+    "Tooltip",
+    "apply_light_theme",
+    "icon_button",
+    "ui_font_option",
+]

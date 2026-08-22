@@ -3212,21 +3212,29 @@ class InstagramOrchestratorApp:
         if log is not None:
             log.append(stamped)
         console = getattr(self, "console", None)
-        if console is not None:
+        if console is None:
+            return
+        try:
             console.configure(state="normal")
             console.insert(tk.END, stamped)
             console.see(tk.END)
             console.configure(state="disabled")
+        except tk.TclError:
+            pass
 
     def _clear_console(self) -> None:
         log = getattr(self, "log_window", None)
         if log is not None:
             log.clear()
         console = getattr(self, "console", None)
-        if console is not None:
+        if console is None:
+            return
+        try:
             console.configure(state="normal")
             console.delete("1.0", tk.END)
             console.configure(state="disabled")
+        except tk.TclError:
+            pass
 
     def _set_status(self, text: str) -> None:
         self.status_var.set(text)
