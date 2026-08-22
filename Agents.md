@@ -35,6 +35,10 @@ v1.2.1, v1.2.2, ...
 
 Objetivo general de la serie `v1.x`: estabilizar descarga, persistencia, reintentos y reportes.
 
+La serie `v2.x` (rama `v2/orchestrator`, tag final `v2.0.0`) rediseña la GUI y usa
+`data/orchestrator_gui.sqlite`. La CLI y `data/orchestrator.sqlite` de `v1.31.0`
+siguen siendo el rollback. No escribir en el SQLite v1 desde la GUI v2.
+
 No implementar en `v1.0.1`:
 
 * integracion con el script de renombrado;

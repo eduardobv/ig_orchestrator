@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased - v2.0.0 (en progreso)
+
+Fecha: 2026-08-22
+
+### Creado
+
+* `src/ig_orchestrator/db/schema_v2.sql` con diccionarios de estados/tipos,
+  `bot_errors`, `path_roots`, catálogo, lotes, URLs y ficheros relativos.
+* `src/ig_orchestrator/db/gui_migrations.py` (`user_version = 100`).
+* `src/ig_orchestrator/db/catalog_importer.py` (solo catálogo, ids conservados).
+* `tests/test_gui_database.py`, `tests/test_catalog_importer.py`.
+* `tasks/Tarea_v2_D1.md`, `tasks/Tarea_v2_D2.md`, `tasks/Tarea_v2_D3.md`.
+* Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
+
+### Modificado
+
+* `connect()` usa WAL + `synchronous=NORMAL`.
+* Setting opcional `SQLITE_GUI_DB_PATH` (default `data\orchestrator_gui.sqlite`).
+* `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
+  `v1.31.0`.
+* La GUI **aún** abre `SQLITE_DB_PATH`; el diálogo Lotes no se toca.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_gui_database.py tests/test_catalog_importer.py tests/test_settings.py tests/test_db_repositories.py`
+* `python -m pytest -q`
+
 ## v1.31.0 - GUI: cola de lotes y rename combinado
 
 Fecha: 2026-08-15

@@ -33,6 +33,9 @@ class Settings:
     final_base_folder: Path | None = None
     manual_rename_bat_path: Path | None = None
     manual_rename_config_path: Path | None = None
+    sqlite_gui_db_path: Path = field(
+        default_factory=lambda: Path(r"data\orchestrator_gui.sqlite")
+    )
 
 
 _ENV_TO_FIELD = {
@@ -44,6 +47,7 @@ _ENV_TO_FIELD = {
     "WORKING_FOLDER": "working_folder",
     "REPORTS_FOLDER": "reports_folder",
     "SQLITE_DB_PATH": "sqlite_db_path",
+    "SQLITE_GUI_DB_PATH": "sqlite_gui_db_path",
     "MAX_RETRIES": "max_retries",
     "RETRY_BASE_SECONDS": "retry_base_seconds",
     "RETRY_MAX_SECONDS": "retry_max_seconds",
@@ -66,6 +70,7 @@ _REQUIRED_ENV_VARS = tuple(
         "POST_PROCESS_COMMAND",
         "MANUAL_RENAME_BAT_PATH",
         "MANUAL_RENAME_CONFIG_PATH",
+        "SQLITE_GUI_DB_PATH",
     }
 )
 
@@ -108,6 +113,10 @@ def load_settings(env_file: str | Path = ".env") -> Settings:
             working_folder=_parse_path(raw_values, "WORKING_FOLDER"),
             reports_folder=_parse_path(raw_values, "REPORTS_FOLDER"),
             sqlite_db_path=_parse_path(raw_values, "SQLITE_DB_PATH"),
+            sqlite_gui_db_path=_parse_optional_path(
+                raw_values, "SQLITE_GUI_DB_PATH"
+            )
+            or Path(r"data\orchestrator_gui.sqlite"),
             max_retries=_parse_int(raw_values, "MAX_RETRIES"),
             retry_base_seconds=_parse_int(raw_values, "RETRY_BASE_SECONDS"),
             retry_max_seconds=_parse_int(raw_values, "RETRY_MAX_SECONDS"),
