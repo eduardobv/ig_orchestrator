@@ -77,5 +77,21 @@
   "settings.purge_files": "Vaciar tabla de ficheros descargados",
   "settings.purge_confirm": "¿Eliminar todas las filas de ficheros descargados? Los estados de las URLs no se tocan.",
   "settings.purged": "Se eliminaron {count} fila(s).",
-  "settings.close": "Cerrar"
+  "settings.close": "Cerrar",
+  "label.unrouted": "Sin ruta",
+  "settings.colors": "Colores del catálogo",
+  "settings.color_favorite": "Favorito",
+  "settings.color_in_batch": "En lote",
+  "settings.color_today": "Hoy",
+  "settings.color_inactive": "Inactivo",
+  "settings.color_disabled": "Disabled",
+  "settings.notify": "Aviso Telegram",
+  "settings.notify_enable": "Activar avisos",
+  "settings.notify_target": "Destino (me, @usuario o id)",
+  "settings.notify_template": "Plantilla de fin de lote",
+  "settings.notify_template_default": "Instagram Orchestrator\nLote {batch_name} (id={batch_id}) completado\nCuentas: {accounts_done}/{accounts_total} · URLs ok: {urls_ok} · fallidas: {urls_failed}",
+  "settings.notify_save": "Guardar aviso",
+  "settings.notify_test": "Enviar prueba",
+  "settings.notify_test_ok": "Mensaje de prueba enviado.",
+  "settings.notify_errors": "Avisar si el bot responde con estos errores"
 }

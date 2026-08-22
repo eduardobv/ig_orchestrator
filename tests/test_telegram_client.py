@@ -123,6 +123,18 @@ async def _assert_send_message_to_configured_bot() -> None:
     ]
 
 
+def test_send_message_to_saved_messages() -> None:
+    asyncio.run(_assert_send_message_to_saved_messages())
+
+
+async def _assert_send_message_to_saved_messages() -> None:
+    fake_client = FakeTelethonClient()
+    wrapper = TelethonTelegramClient(_config(), client_factory=lambda *_args: fake_client)
+    await wrapper.start()
+    await wrapper.send_message_to("me", " batch done ")
+    assert fake_client.sent_messages == [("me", "batch done")]
+
+
 def test_get_latest_bot_messages() -> None:
     asyncio.run(_assert_get_latest_bot_messages())
 

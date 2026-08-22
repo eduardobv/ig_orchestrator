@@ -54,6 +54,7 @@ class BatchOrchestratorConfig:
     progress_callback: Callable[[int, int, Account], None] | None = None
     telegram_download_folder: Path | None = None
     default_working_folder: Path | None = None
+    telegram_client: object | None = None
 
 
 class BatchOrchestrator:
@@ -191,12 +192,14 @@ class BatchOrchestrator:
                 summary.downloaded_files,
             )
             self._cleanup_batch(accounts)
-            return BatchOrchestratorResult(
+            result = BatchOrchestratorResult(
                 batch=batch,
                 run=run,
                 summary=summary,
                 account_results=tuple(account_results),
             )
+            await self._notify_complete(result)
+            return result
         except Exception as exc:
             logger.exception(
                 "Infrastructure failure while processing batch {}: {}",
@@ -225,6 +228,24 @@ class BatchOrchestrator:
                 account_results=tuple(account_results),
                 error=str(exc),
             )
+
+    async def _notify_complete(self, result: BatchOrchestratorResult) -> None:
+        if self._config.dry_run or self._config.telegram_client is None:
+            return
+        try:
+            from ig_orchestrator.telegram.notify_service import notify_batch_complete
+            from ig_orchestrator.telegram.telegram_client import TelethonTelegramClient
+
+            client = self._config.telegram_client
+            if not isinstance(client, TelethonTelegramClient):
+                return
+            await notify_batch_complete(
+                self._batch_repository.connection,
+                client,
+                result,
+            )
+        except Exception:
+            logger.warning("Batch completion notify failed", exc_info=True)
 
     def _cleanup_batch(self, accounts: list[Account]) -> None:
         account_folders = [

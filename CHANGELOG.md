@@ -32,12 +32,16 @@ Fecha: 2026-08-22
   Renombrar/Detener en la toolbar. Configuración: idioma (reinicia) y vaciar
   ficheros descargados. `finish_batch` limpia `downloaded_files` si retention
   es `on_complete`.
+* Catálogo lista/árbol (`G:\4K Stogram\…` + username hoja). Colores
+  configurables con paleta. Orden A↔Z visual en cuentas del lote y URLs.
+* Aviso Telegram a `me` u otro chat al terminar un lote y si un error del
+  bot está marcado; plantilla y destino en Configuración.
 * `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
   `v1.31.0`.
 
 ### Pruebas ejecutadas
 
-* `python -m pytest -q tests/test_i18n.py tests/test_downloaded_files_cleanup.py tests/test_gui_services.py`
+* `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
 * `python -m pytest -q`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado

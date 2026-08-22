@@ -8,7 +8,7 @@ import re
 from sqlite3 import Connection
 import tkinter as tk
 from tkinter import font as tkfont
-from tkinter import filedialog, messagebox, ttk
+from tkinter import colorchooser, filedialog, messagebox, ttk
 import webbrowser
 
 from ig_orchestrator.gui.account_catalog_service import (
@@ -80,10 +80,17 @@ from ig_orchestrator.models import AccountHistoryStatus
 from ig_orchestrator import __version__
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
+from ig_orchestrator.gui.catalog_colors import (
+    colors_for_entry,
+    load_catalog_colors,
+    save_color,
+)
+from ig_orchestrator.gui.catalog_tree import build_catalog_tree
 from ig_orchestrator.gui.i18n import current_language, load_language, t
 from ig_orchestrator.gui.icons import IconSet
 from ig_orchestrator.gui.log_window import LogWindow
 from ig_orchestrator.gui.theme import apply_light_theme, icon_button
+from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 
 
 _CATALOG_COLORS = {
@@ -160,6 +167,15 @@ class InstagramOrchestratorApp:
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
         self.history_readonly = False
+        self.catalog_view_mode = "list"
+        self.catalog_colors = dict(_CATALOG_COLORS)
+        if is_gui_schema(connection):
+            row = connection.execute(
+                "SELECT value FROM app_settings WHERE key = 'ui.catalog_view'"
+            ).fetchone()
+            if row is not None and str(row["value"]) in {"list", "tree"}:
+                self.catalog_view_mode = str(row["value"])
+            self.catalog_colors = load_catalog_colors(connection)
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -322,7 +338,16 @@ class InstagramOrchestratorApp:
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
         parent.rowconfigure(2, weight=1)
         parent.columnconfigure(0, weight=1)
-        ttk.Label(parent, text=t("label.catalog")).grid(row=0, column=0, sticky="w")
+        header = ttk.Frame(parent)
+        header.grid(row=0, column=0, sticky="ew")
+        ttk.Label(header, text=t("label.catalog")).pack(side=tk.LEFT)
+        self.catalog_view_button = icon_button(
+            header,
+            image=self.icons.get("tree" if self.catalog_view_mode == "list" else "list"),
+            command=self._toggle_catalog_view,
+            tooltip=t("tooltip.catalog_view"),
+        )
+        self.catalog_view_button.pack(side=tk.RIGHT)
         filter_row = ttk.Frame(parent)
         filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
         filter_row.columnconfigure(0, weight=1)
@@ -348,6 +373,18 @@ class InstagramOrchestratorApp:
             "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
         )
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
+        self.catalog_tree = ttk.Treeview(
+            parent, show="tree", selectmode="browse"
+        )
+        self.catalog_tree.grid(row=2, column=0, sticky="nsew")
+        self.catalog_tree.bind(
+            "<<TreeviewSelect>>", lambda _event: self._load_catalog()
+        )
+        self.catalog_tree.bind(
+            "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
+        )
+        self.catalog_tree.bind("<Button-3>", self._show_catalog_menu)
+        self._apply_catalog_view_visibility()
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
         self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
         self.catalog_menu.add_separator()
@@ -391,15 +428,13 @@ class InstagramOrchestratorApp:
         )
         for column, title in _BATCH_COLUMNS:
             width = tree_font.measure(column_samples[column]) + 16
-            if column == "username":
-                self.tree.heading(
-                    column,
-                    text=_username_heading_title(self._username_sort_ascending),
-                    command=self._toggle_username_sort,
-                )
-            else:
-                self.tree.heading(column, text=title)
+            self.tree.heading(column, text=title)
             self.tree.column(column, width=width, minwidth=width, anchor="w")
+        bind_treeview_sort(
+            self.tree,
+            tuple(column for column, _title in _BATCH_COLUMNS),
+            title_for=lambda column: dict(_BATCH_COLUMNS)[column],
+        )
         self.tree.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
         batch_scroll = ttk.Scrollbar(
             parent,
@@ -627,6 +662,43 @@ class InstagramOrchestratorApp:
     def _clear_catalog_filter(self) -> None:
         self.catalog_filter_var.set("")
 
+    def _toggle_catalog_view(self) -> None:
+        self._set_catalog_view("tree" if self.catalog_view_mode == "list" else "list")
+
+    def _set_catalog_view(self, mode: str) -> None:
+        next_mode = "list" if mode == "list" else "tree"
+        if next_mode == self.catalog_view_mode:
+            return
+        self.catalog_view_mode = next_mode
+        self._persist_catalog_view()
+
+    def _persist_catalog_view(self) -> None:
+        if is_gui_schema(self.connection):
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('ui.catalog_view', ?, 'TEXT', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (self.catalog_view_mode,),
+            )
+            self.connection.commit()
+        self.catalog_view_button.configure(
+            image=self.icons.get("tree" if self.catalog_view_mode == "list" else "list")
+        )
+        self._apply_catalog_view_visibility()
+        self._refresh_catalog()
+
+    def _apply_catalog_view_visibility(self) -> None:
+        if self.catalog_view_mode == "tree":
+            self.catalog_list.grid_remove()
+            self.catalog_tree.grid()
+        else:
+            self.catalog_tree.grid_remove()
+            self.catalog_list.grid()
+
     def _batch_usernames(self) -> set[str]:
         return {account.username.casefold() for account in self.accounts}
 
@@ -641,17 +713,21 @@ class InstagramOrchestratorApp:
         in_batch = self._batch_usernames()
         today = self.today_catalog_usernames
         visible: list[str] = []
+        filtered = filter_catalog_entries(self.catalog_entries, query)
         self.catalog_list.delete(0, tk.END)
-        for entry in filter_catalog_entries(self.catalog_entries, query):
+        palette = getattr(self, "catalog_colors", _CATALOG_COLORS)
+        for entry in filtered:
             self.catalog_list.insert(tk.END, entry.username)
             colors = _catalog_entry_colors(
                 entry,
                 in_batch=entry.username.casefold() in in_batch,
                 today=entry.username.casefold() in today,
+                palette=palette,
             )
             if colors:
                 self.catalog_list.itemconfig(tk.END, **colors)
             visible.append(entry.username)
+        self._refresh_catalog_tree(filtered, query=query, in_batch=in_batch, today=today)
 
         if selected_username is not None:
             try:
@@ -664,7 +740,76 @@ class InstagramOrchestratorApp:
         if yview:
             self.catalog_list.yview_moveto(yview[0])
 
+    def _refresh_catalog_tree(
+        self,
+        entries,
+        *,
+        query: str,
+        in_batch: set[str],
+        today: set[str],
+    ) -> None:
+        tree = getattr(self, "catalog_tree", None)
+        if tree is None:
+            return
+        selected = self._selected_catalog_username()
+        tree.delete(*tree.get_children())
+        for key, color in self.catalog_colors.items():
+            if color:
+                tree.tag_configure(key, background=color)
+        roots = build_catalog_tree(list(entries), unrouted_label=t("label.unrouted"))
+        match = query.strip().casefold()
+
+        def insert_nodes(parent: str, nodes) -> None:
+            for node in nodes:
+                if node.is_leaf and node.username:
+                    tags: list[str] = []
+                    entry = node.entry
+                    if entry is not None:
+                        colors = _catalog_entry_colors(
+                            entry,
+                            in_batch=entry.username.casefold() in in_batch,
+                            today=entry.username.casefold() in today,
+                            palette=self.catalog_colors,
+                        )
+                        if colors.get("background") == self.catalog_colors.get("disabled"):
+                            tags.append("disabled")
+                        elif colors.get("background") == self.catalog_colors.get("in_batch"):
+                            tags.append("in_batch")
+                        elif colors.get("background") == self.catalog_colors.get("today"):
+                            tags.append("today")
+                        elif colors.get("background") == self.catalog_colors.get("inactive"):
+                            tags.append("inactive")
+                        elif colors.get("background") == self.catalog_colors.get("favorite"):
+                            tags.append("favorite")
+                    tree.insert(
+                        parent,
+                        tk.END,
+                        iid=f"user:{node.username}",
+                        text=node.username,
+                        tags=tuple(tags),
+                    )
+                    continue
+                folder_id = f"folder:{node.path or node.name}"
+                tree.insert(parent, tk.END, iid=folder_id, text=node.name)
+                insert_nodes(folder_id, node.children)
+                if match:
+                    tree.item(folder_id, open=True)
+
+        insert_nodes("", roots)
+        if selected:
+            leaf = f"user:{selected}"
+            if tree.exists(leaf):
+                tree.selection_set(leaf)
+                tree.see(leaf)
+
     def _show_catalog_menu(self, event: tk.Event) -> None:
+        if self.catalog_view_mode == "tree":
+            row = self.catalog_tree.identify_row(event.y)
+            if not row.startswith("user:"):
+                return
+            self.catalog_tree.selection_set(row)
+            self.catalog_menu.tk_popup(event.x_root, event.y_root)
+            return
         index = self.catalog_list.nearest(event.y)
         if index < 0 or index >= self.catalog_list.size():
             return
@@ -674,6 +819,17 @@ class InstagramOrchestratorApp:
         self.catalog_menu.tk_popup(event.x_root, event.y_root)
 
     def _selected_catalog_username(self) -> str | None:
+        if getattr(self, "catalog_view_mode", "list") == "tree":
+            tree = getattr(self, "catalog_tree", None)
+            if tree is None:
+                return None
+            selection = tree.selection()
+            if not selection:
+                return None
+            iid = str(selection[0])
+            if iid.startswith("user:"):
+                return iid[5:]
+            return None
         selection = self.catalog_list.curselection()
         if not selection:
             return None
@@ -843,10 +999,9 @@ class InstagramOrchestratorApp:
             self.progress_poll_id = None
 
     def _load_catalog(self) -> None:
-        selection = self.catalog_list.curselection()
-        if not selection:
+        username = self._selected_catalog_username()
+        if not username:
             return
-        username = self.catalog_list.get(selection[0])
         self.username_var.set(username)
         self._apply_catalog_date()
 
@@ -1101,6 +1256,12 @@ class InstagramOrchestratorApp:
                 anchor="w" if column != "retries" else "e",
                 stretch=stretch,
             )
+        bind_treeview_sort(tree, columns, title_for=lambda c: {
+            "url": "URL",
+            "status": "Estado",
+            "error": "Error",
+            "retries": "Reintentos",
+        }[c])
         tree.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(
             table_frame,
@@ -2440,11 +2601,7 @@ class InstagramOrchestratorApp:
         self.runtime_progress = {}
         self.selected_index = None
         self._username_sort_ascending = None
-        self.tree.heading(
-            "username",
-            text=_username_heading_title(None),
-            command=self._toggle_username_sort,
-        )
+        self.tree.heading("username", text="Username")
         self.batch_name_var.set(_suggest_batch_name())
         self._clear_editor()
         self._refresh_table()
@@ -3110,6 +3267,15 @@ class InstagramOrchestratorApp:
 
         view_menu = tk.Menu(menubar, tearoff=False)
         view_menu.add_command(label=t("menu.view.log"), command=self.log_window.toggle)
+        view_menu.add_separator()
+        view_menu.add_command(
+            label=t("menu.view.catalog_list"),
+            command=lambda: self._set_catalog_view("list"),
+        )
+        view_menu.add_command(
+            label=t("menu.view.catalog_tree"),
+            command=lambda: self._set_catalog_view("tree"),
+        )
         menubar.add_cascade(label=t("menu.view"), menu=view_menu)
 
         batch_menu = tk.Menu(menubar, tearoff=False)
@@ -3213,8 +3379,157 @@ class InstagramOrchestratorApp:
             text=t("settings.purge_files"),
             command=lambda: self._purge_downloaded_files(window),
         ).grid(row=5, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.colors")).grid(
+            row=7, column=0, sticky="w", pady=(16, 4)
+        )
+        color_row = ttk.Frame(frame)
+        color_row.grid(row=8, column=0, sticky="w")
+        for index, (key, label_key) in enumerate(
+            (
+                ("favorite", "settings.color_favorite"),
+                ("in_batch", "settings.color_in_batch"),
+                ("today", "settings.color_today"),
+                ("inactive", "settings.color_inactive"),
+                ("disabled", "settings.color_disabled"),
+            )
+        ):
+            ttk.Button(
+                color_row,
+                text=t(label_key),
+                command=lambda k=key: self._pick_catalog_color(window, k),
+            ).grid(row=0, column=index, padx=(0, 4))
+
+        ttk.Label(frame, text=t("settings.notify")).grid(
+            row=9, column=0, sticky="w", pady=(16, 4)
+        )
+        notify_enabled = tk.BooleanVar(
+            value=_gui_setting(self.connection, "notify.enabled", "0") in {"1", "true"}
+        )
+        ttk.Checkbutton(
+            frame, text=t("settings.notify_enable"), variable=notify_enabled
+        ).grid(row=10, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.notify_target")).grid(
+            row=11, column=0, sticky="w", pady=(6, 0)
+        )
+        target_var = tk.StringVar(
+            value=_gui_setting(self.connection, "notify.target", "me")
+        )
+        ttk.Entry(frame, textvariable=target_var, width=32).grid(
+            row=12, column=0, sticky="w"
+        )
+        ttk.Label(frame, text=t("settings.notify_template")).grid(
+            row=13, column=0, sticky="w", pady=(6, 0)
+        )
+        template_var = tk.StringVar(
+            value=_gui_setting(
+                self.connection,
+                "notify.template_batch_done",
+                t("settings.notify_template_default"),
+            )
+        )
+        ttk.Entry(frame, textvariable=template_var, width=64).grid(
+            row=14, column=0, sticky="ew"
+        )
+        ttk.Label(frame, text=t("settings.notify_errors")).grid(
+            row=15, column=0, sticky="w", pady=(8, 2)
+        )
+        error_vars: dict[str, tk.BooleanVar] = {}
+        error_frame = ttk.Frame(frame)
+        error_frame.grid(row=16, column=0, sticky="w")
+        if is_gui_schema(self.connection):
+            error_rows = self.connection.execute(
+                """
+                SELECT code, description, notify_on_match
+                FROM bot_errors
+                WHERE is_active = 1
+                ORDER BY sort_order, id
+                """
+            ).fetchall()
+            for index, row in enumerate(error_rows):
+                var = tk.BooleanVar(value=bool(row["notify_on_match"]))
+                error_vars[str(row["code"])] = var
+                ttk.Checkbutton(
+                    error_frame,
+                    text=f"{row['code']}",
+                    variable=var,
+                ).grid(row=index, column=0, sticky="w")
+
+        def save_notify() -> None:
+            if not is_gui_schema(self.connection):
+                return
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('notify.enabled', ?, 'BOOLEAN', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value, updated_at = excluded.updated_at
+                """,
+                ("1" if notify_enabled.get() else "0",),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('notify.target', ?, 'TEXT', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value, updated_at = excluded.updated_at
+                """,
+                (target_var.get().strip() or "me",),
+            )
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('notify.template_batch_done', ?, 'TEXT', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value, updated_at = excluded.updated_at
+                """,
+                (template_var.get() or " ",),
+            )
+            for code, var in error_vars.items():
+                self.connection.execute(
+                    """
+                    UPDATE bot_errors
+                    SET notify_on_match = ?
+                    WHERE code = ?
+                    """,
+                    (int(var.get()), code),
+                )
+            self.connection.commit()
+
+        ttk.Button(frame, text=t("settings.notify_save"), command=save_notify).grid(
+            row=17, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Button(
+            frame,
+            text=t("settings.notify_test"),
+            command=lambda: self._send_test_notification(
+                window, target_var.get().strip() or "me"
+            ),
+        ).grid(row=18, column=0, sticky="w", pady=(4, 0))
         ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
-            row=6, column=0, sticky="e", pady=(16, 0)
+            row=19, column=0, sticky="e", pady=(16, 0)
+        )
+
+    def _pick_catalog_color(self, parent: tk.Toplevel, key: str) -> None:
+        current = self.catalog_colors.get(key) or "#ffffff"
+        _rgb, hex_color = colorchooser.askcolor(color=current, parent=parent)
+        if not hex_color:
+            return
+        save_color(self.connection, key, hex_color)
+        self.catalog_colors = load_catalog_colors(self.connection)
+        self._refresh_catalog()
+
+    def _send_test_notification(self, parent: tk.Toplevel, target: str) -> None:
+        import asyncio
+
+        try:
+            asyncio.run(
+                _send_test_telegram(self.settings, target)
+            )
+        except Exception as exc:
+            messagebox.showerror(t("settings.notify_test"), str(exc), parent=parent)
+            return
+        messagebox.showinfo(
+            t("settings.notify_test"), t("settings.notify_test_ok"), parent=parent
         )
 
     def _purge_downloaded_files(self, parent: tk.Toplevel) -> None:
@@ -3230,6 +3545,29 @@ class InstagramOrchestratorApp:
         )
 
 
+def _gui_setting(connection: Connection, key: str, default: str) -> str:
+    if not is_gui_schema(connection):
+        return default
+    try:
+        row = connection.execute(
+            "SELECT value FROM app_settings WHERE key = ?",
+            (key,),
+        ).fetchone()
+    except Exception:
+        return default
+    if row is None or not str(row["value"]).strip():
+        return default
+    return str(row["value"])
+
+
+async def _send_test_telegram(settings: Settings, target: str) -> None:
+    from ig_orchestrator.telegram.notify_service import send_ephemeral_notification
+
+    await send_ephemeral_notification(
+        settings, "Instagram Orchestrator: prueba de notificación", target=target
+    )
+
+
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
 
@@ -3239,18 +3577,14 @@ def _catalog_entry_colors(
     *,
     in_batch: bool = False,
     today: bool = False,
+    palette: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    if entry.status is AccountHistoryStatus.DISABLED:
-        return {"background": _CATALOG_COLORS["disabled"]}
-    if in_batch:
-        return {"background": _CATALOG_COLORS["in_batch"]}
-    if today:
-        return {"background": _CATALOG_COLORS["today"]}
-    if entry.status is AccountHistoryStatus.INACTIVE:
-        return {"background": _CATALOG_COLORS["inactive"]}
-    if entry.is_favorite:
-        return {"background": _CATALOG_COLORS["favorite"]}
-    return {}
+    return colors_for_entry(
+        entry,
+        palette or _CATALOG_COLORS,
+        in_batch=in_batch,
+        today=today,
+    )
 
 
 def _batch_mode_details(

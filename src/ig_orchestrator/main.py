@@ -165,6 +165,17 @@ def _run_gui(batch_json_path: Path) -> int:
     return 0
 
 
+def _make_error_notifier(connection, telegram_client):
+    async def _notify(job, username: str) -> None:
+        from ig_orchestrator.telegram.notify_service import notify_bot_error
+
+        await notify_bot_error(
+            connection, telegram_client, job, username=username
+        )
+
+    return _notify
+
+
 def _import_v1_catalog_if_empty(settings: Settings, gui_connection) -> None:
     count = int(
         gui_connection.execute("SELECT COUNT(*) FROM catalog_accounts").fetchone()[0]
@@ -307,6 +318,7 @@ def _run_batch(
             conversation_service=conversation_service,
             config=UrlJobProcessorConfig(
                 default_working_folder=settings.working_folder,
+                error_notifier=_make_error_notifier(connection, telegram_client),
             ),
         )
         account_orchestrator = AccountOrchestrator(
@@ -341,6 +353,7 @@ def _run_batch(
                 progress_callback=_print_account_progress,
                 telegram_download_folder=settings.telegram_desktop_download_folder,
                 default_working_folder=settings.working_folder,
+                telegram_client=telegram_client,
             ),
         )
         if imported.batch.id is None:
@@ -462,6 +475,7 @@ def _run_continue(
                 conversation_service=conversation_service,
                 config=UrlJobProcessorConfig(
                     default_working_folder=settings.working_folder,
+                    error_notifier=_make_error_notifier(connection, telegram_client),
                 ),
             )
         account_orchestrator = AccountOrchestrator(
@@ -498,6 +512,7 @@ def _run_continue(
                 progress_callback=_print_account_progress,
                 telegram_download_folder=settings.telegram_desktop_download_folder,
                 default_working_folder=settings.working_folder,
+                telegram_client=telegram_client,
             ),
         )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -29,9 +29,13 @@ FileMover = Callable[
 ]
 
 
+ErrorNotifier = Callable[[UrlJob, str], Awaitable[None]]
+
+
 @dataclass(frozen=True, slots=True)
 class UrlJobProcessorConfig:
     default_working_folder: Path | None = None
+    error_notifier: ErrorNotifier | None = None
 
     def __post_init__(self) -> None:
         if self.default_working_folder is not None and not isinstance(
@@ -97,6 +101,7 @@ class UrlJobProcessor:
                 processed_job.status.value,
                 processed_job.last_error_type or "-",
             )
+            await self._notify_error(processed_job, account.username)
             return UrlJobProcessorResult(job=processed_job, files=tuple(detected_files))
 
         if not detected_files:
@@ -108,6 +113,7 @@ class UrlJobProcessor:
                 last_error_type="NO_FILES_DETECTED",
                 non_retryable=False,
             )
+            await self._notify_error(failed_job, account.username)
             return UrlJobProcessorResult(job=failed_job)
 
         working_base = _working_base_folder(
@@ -151,6 +157,7 @@ class UrlJobProcessor:
                 last_error_type="MOVE_FILES_FAILED",
                 non_retryable=False,
             )
+            await self._notify_error(failed_job, account.username)
             return UrlJobProcessorResult(job=failed_job, files=tuple(detected_files))
 
         stored_files = tuple(
@@ -173,6 +180,19 @@ class UrlJobProcessor:
             completed_job.status.value,
         )
         return UrlJobProcessorResult(job=completed_job, files=stored_files)
+
+    async def _notify_error(self, job: UrlJob, username: str) -> None:
+        notifier = self._config.error_notifier
+        if notifier is None or not job.last_error_type:
+            return
+        try:
+            await notifier(job, username)
+        except Exception:
+            logger.warning(
+                "URL job error notifier failed: job_id={} error_type={}",
+                job.id,
+                job.last_error_type,
+            )
 
 
 def _working_base_folder(

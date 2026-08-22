@@ -77,5 +77,21 @@
   "settings.purge_files": "Clear downloaded files table",
   "settings.purge_confirm": "Delete every downloaded-file row? URL statuses are kept.",
   "settings.purged": "Deleted {count} row(s).",
-  "settings.close": "Close"
+  "settings.close": "Close",
+  "label.unrouted": "No path",
+  "settings.colors": "Catalog colors",
+  "settings.color_favorite": "Favorite",
+  "settings.color_in_batch": "In batch",
+  "settings.color_today": "Today",
+  "settings.color_inactive": "Inactive",
+  "settings.color_disabled": "Disabled",
+  "settings.notify": "Telegram notify",
+  "settings.notify_enable": "Enable notifications",
+  "settings.notify_target": "Target (me, @user or id)",
+  "settings.notify_template": "Batch-complete template",
+  "settings.notify_template_default": "Instagram Orchestrator\nBatch {batch_name} (id={batch_id}) completed\nAccounts: {accounts_done}/{accounts_total} · URLs ok: {urls_ok} · failed: {urls_failed}",
+  "settings.notify_save": "Save notify settings",
+  "settings.notify_test": "Send test",
+  "settings.notify_test_ok": "Test message sent.",
+  "settings.notify_errors": "Notify when the bot returns these errors"
 }
