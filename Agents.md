@@ -39,6 +39,10 @@ La serie `v2.x` (rama `v2/orchestrator`, tag final `v2.0.0`) rediseña la GUI y 
 `data/orchestrator_gui.sqlite`. La CLI y `data/orchestrator.sqlite` de `v1.31.0`
 siguen siendo el rollback. No escribir en el SQLite v1 desde la GUI v2.
 
+Cierre v2.0.0 (PR a `master` + tag): `tasks/Tarea_v2_0_0_release.md`.
+Pendiente de validación manual del flujo. No ejecutar hasta que el usuario
+lo pida (p. ej. «ejecuta la tarea pendiente»).
+
 No implementar en `v1.0.1`:
 
 * integracion con el script de renombrado;

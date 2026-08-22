@@ -17,6 +17,8 @@ Fecha: 2026-08-22
   `tests/test_gui_repositories.py`, `tests/test_gui_theme.py`,
   `tests/test_log_window.py`.
 * `tasks/Tarea_v2_D1.md` … `Tarea_v2_D6.md`.
+* `tasks/Tarea_v2_0_0_release.md` (PR a `master` + tag `v2.0.0`, pendiente
+  de validación).
 * Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
 
 ### Modificado
