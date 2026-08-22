@@ -2601,6 +2601,9 @@ class InstagramOrchestratorApp:
                 on_complete=lambda exit_code: self.root.after(
                     0, self._handle_process_complete, batch_id, exit_code
                 ),
+                extra_env={
+                    "SQLITE_DB_PATH": str(self.settings.sqlite_gui_db_path),
+                },
             )
             self._schedule_progress_poll()
         except (OSError, RuntimeError) as exc:

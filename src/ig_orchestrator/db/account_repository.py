@@ -14,6 +14,16 @@ from ig_orchestrator.models import Account, AccountStatus
 
 
 class AccountRepository:
+    def __new__(cls, connection: Connection):
+        if cls is AccountRepository:
+            from ig_orchestrator.db.schema_mode import is_gui_schema
+
+            if is_gui_schema(connection):
+                from ig_orchestrator.db.gui_adapters import GuiAccountRepository
+
+                cls = GuiAccountRepository
+        return super().__new__(cls)
+
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 

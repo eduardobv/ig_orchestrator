@@ -246,11 +246,14 @@ CREATE TABLE IF NOT EXISTS downloaded_files (
     batch_url_id INTEGER NOT NULL REFERENCES batch_urls(id),
     root_id INTEGER NOT NULL REFERENCES path_roots(id),
     relative_path TEXT NOT NULL,
+    working_relative_path TEXT,
     media_type_id INTEGER NOT NULL REFERENCES media_types(id),
     extension TEXT NOT NULL,
     file_size INTEGER,
+    sha256 TEXT,
     status_id INTEGER NOT NULL REFERENCES downloaded_file_statuses(id),
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_downloaded_files_url ON downloaded_files(batch_url_id);
 CREATE INDEX IF NOT EXISTS idx_downloaded_files_root ON downloaded_files(root_id);
@@ -348,7 +351,8 @@ INSERT OR IGNORE INTO batch_url_statuses (id, code, name, description, sort_orde
     (5, 'RETRY_PENDING', 'Retry pending', 'Temporary failure; will retry later.', 5),
     (6, 'FAILED_TEMPORARY', 'Failed temporary', 'Retryable error recorded.', 6),
     (7, 'FAILED_FINAL', 'Failed final', 'Retries exhausted or non-retryable error.', 7),
-    (8, 'COMPLETED', 'Completed', 'URL fully processed.', 8);
+    (8, 'CLASSIFIED', 'Classified', 'Files were classified after download.', 8),
+    (9, 'COMPLETED', 'Completed', 'URL fully processed.', 9);
 
 INSERT OR IGNORE INTO batch_run_statuses (id, code, name, description, sort_order) VALUES
     (1, 'PROCESSING', 'Processing', 'This execution is running.', 1),

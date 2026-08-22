@@ -10,21 +10,29 @@ Fecha: 2026-08-22
   `bot_errors`, `path_roots`, catálogo, lotes, URLs y ficheros relativos.
 * `src/ig_orchestrator/db/gui_migrations.py` (`user_version = 100`).
 * `src/ig_orchestrator/db/catalog_importer.py` (solo catálogo, ids conservados).
-* `tests/test_gui_database.py`, `tests/test_catalog_importer.py`.
-* `tasks/Tarea_v2_D1.md`, `tasks/Tarea_v2_D2.md`, `tasks/Tarea_v2_D3.md`.
+* `src/ig_orchestrator/db/gui_catalog_repository.py`, `gui_adapters.py`,
+  `lookups.py`, `schema_mode.py`, `compat_views_v2.sql`.
+* `src/ig_orchestrator/input/gui_batch_creation.py` (inserts en una transacción).
+* `tests/test_gui_database.py`, `tests/test_catalog_importer.py`,
+  `tests/test_gui_repositories.py`.
+* `tasks/Tarea_v2_D1.md` … `Tarea_v2_D6.md`.
 * Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
 
 ### Modificado
 
 * `connect()` usa WAL + `synchronous=NORMAL`.
 * Setting opcional `SQLITE_GUI_DB_PATH` (default `data\orchestrator_gui.sqlite`).
+* Repositorios v1 despachan a adaptadores v2 si `user_version >= 100`.
+* `create_batch` / `save_batch_draft` en esquema GUI usan `executemany`.
+* La GUI arranca contra `orchestrator_gui.sqlite`, importa el catálogo v1
+  en solo lectura y lanza `run_continue` con `SQLITE_DB_PATH` apuntando al
+  fichero GUI. El diálogo Lotes no se rediseña (vistas de compatibilidad).
 * `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
   `v1.31.0`.
-* La GUI **aún** abre `SQLITE_DB_PATH`; el diálogo Lotes no se toca.
 
 ### Pruebas ejecutadas
 
-* `python -m pytest -q tests/test_gui_database.py tests/test_catalog_importer.py tests/test_settings.py tests/test_db_repositories.py`
+* `python -m pytest -q tests/test_gui_database.py tests/test_catalog_importer.py tests/test_gui_repositories.py tests/test_settings.py tests/test_db_repositories.py`
 * `python -m pytest -q`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado

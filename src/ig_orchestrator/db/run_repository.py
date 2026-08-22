@@ -26,6 +26,16 @@ class RunRecord:
 
 
 class RunRepository:
+    def __new__(cls, connection: Connection):
+        if cls is RunRepository:
+            from ig_orchestrator.db.schema_mode import is_gui_schema
+
+            if is_gui_schema(connection):
+                from ig_orchestrator.db.gui_adapters import GuiRunRepository
+
+                cls = GuiRunRepository
+        return super().__new__(cls)
+
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 

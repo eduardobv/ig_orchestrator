@@ -124,6 +124,7 @@ class ProcessRunner:
         *,
         on_output: Callable[[str], None],
         on_complete: Callable[[int], None],
+        extra_env: dict[str, str] | None = None,
     ) -> None:
         if self.is_running():
             raise RuntimeError("A GUI process is already running")
@@ -132,6 +133,8 @@ class ProcessRunner:
         environment["PYTHONUNBUFFERED"] = "1"
         environment["PYTHONIOENCODING"] = "utf-8"
         environment["IG_ORCHESTRATOR_GUI_PROGRESS"] = "1"
+        if extra_env:
+            environment.update(extra_env)
         self.process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,

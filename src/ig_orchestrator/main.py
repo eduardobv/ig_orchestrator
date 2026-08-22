@@ -16,7 +16,11 @@ from ig_orchestrator.db import (
     RunRepository,
     UrlJobRepository,
     connect,
+    connect_readonly,
+    import_catalog_from_v1,
     init_database,
+    init_gui_database,
+    prepare_sqlite,
 )
 from ig_orchestrator.input.batch_importer import import_batch_json
 from ig_orchestrator.input import (
@@ -40,7 +44,7 @@ from ig_orchestrator.orchestration import (
     UrlJobProcessorResult,
 )
 from ig_orchestrator.reports import MarkdownReportBuilder
-from ig_orchestrator.settings import SettingsError, load_settings
+from ig_orchestrator.settings import Settings, SettingsError, load_settings
 from ig_orchestrator.telegram import (
     BotConversationConfig,
     BotConversationService,
@@ -144,9 +148,11 @@ def _run_gui(batch_json_path: Path) -> int:
         print(f"Cannot open GUI: {exc}")
         return 2
 
-    init_database(settings.sqlite_db_path)
-    connection = connect(settings.sqlite_db_path)
+    gui_path = settings.sqlite_gui_db_path
+    init_gui_database(gui_path)
+    connection = connect(gui_path)
     try:
+        _import_v1_catalog_if_empty(settings, connection)
         from ig_orchestrator.gui import launch_gui
 
         launch_gui(
@@ -157,6 +163,22 @@ def _run_gui(batch_json_path: Path) -> int:
     finally:
         connection.close()
     return 0
+
+
+def _import_v1_catalog_if_empty(settings: Settings, gui_connection) -> None:
+    count = int(
+        gui_connection.execute("SELECT COUNT(*) FROM catalog_accounts").fetchone()[0]
+    )
+    if count:
+        return
+    v1_path = settings.sqlite_db_path
+    if not v1_path.exists() or v1_path.stat().st_size == 0:
+        return
+    v1_connection = connect_readonly(v1_path)
+    try:
+        import_catalog_from_v1(v1_connection, gui_connection)
+    finally:
+        v1_connection.close()
 
 
 class _DryRunUrlJobProcessor:
@@ -393,7 +415,7 @@ def _run_continue(
         print(f"Cannot continue run: {exc}")
         return 2
 
-    init_database(settings.sqlite_db_path)
+    prepare_sqlite(settings.sqlite_db_path)
     connection = connect(settings.sqlite_db_path)
     telegram_client = (
         None
@@ -495,12 +517,15 @@ def _run_continue(
             return results
 
         results = asyncio.run(_process_all())
-        report_builder = MarkdownReportBuilder(connection)
-        for result in results:
-            if result.run.id is not None:
-                report_paths.append(
-                    report_builder.write(result.run.id, settings.reports_folder)
-                )
+        from ig_orchestrator.db.schema_mode import is_gui_schema
+
+        if not is_gui_schema(connection):
+            report_builder = MarkdownReportBuilder(connection)
+            for result in results:
+                if result.run.id is not None:
+                    report_paths.append(
+                        report_builder.write(result.run.id, settings.reports_folder)
+                    )
     except TelegramClientError as exc:
         print(f"Telegram client failed: {exc}")
         return 1
@@ -518,7 +543,7 @@ def _run_continue(
         print(f"Markdown report: {report_path}")
     post_process_result = (
         None
-        if dry_run
+        if dry_run or not report_paths
         else _run_post_process_if_ready(
             settings=settings,
             results=results,

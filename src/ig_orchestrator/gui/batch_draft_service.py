@@ -63,14 +63,27 @@ def save_batch_draft(
             connection,
             settings=settings,
         )
-    connection.execute(
-        """
-        UPDATE input_batches
-        SET default_start_now_date = ?, updated_at = datetime('now')
-        WHERE id = ?
-        """,
-        (draft.default_start_now_date.strip(), result.batch.id),
-    )
+    start_date = draft.default_start_now_date.strip()
+    from ig_orchestrator.db.schema_mode import is_gui_schema
+
+    if is_gui_schema(connection):
+        connection.execute(
+            """
+            UPDATE batches
+            SET start_date = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (start_date, result.batch.id),
+        )
+    else:
+        connection.execute(
+            """
+            UPDATE input_batches
+            SET default_start_now_date = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (start_date, result.batch.id),
+        )
     stored_accounts = {account.username.casefold(): account for account in result.accounts}
     for account in draft.accounts:
         save_catalog_metadata_to_history(account, connection)
@@ -78,24 +91,39 @@ def save_batch_draft(
         if stored is None or stored.id is None:
             continue
         has_catalog_meta = account.is_new_account or account.is_catalog_update
-        connection.execute(
-            """
-            UPDATE accounts
-            SET is_new_account = ?,
-                rename_owner_id = ?,
-                rename_start_init_date = ?,
-                rename_destination_path = ?,
-                updated_at = datetime('now')
-            WHERE id = ?
-            """,
-            (
-                int(account.is_new_account),
-                account.owner_id.strip() if has_catalog_meta else None,
-                account.start_init_date.strip() if account.is_new_account else None,
-                account.destination_path.strip() if has_catalog_meta else None,
-                stored.id,
-            ),
+        rename_values = (
+            int(account.is_new_account),
+            account.owner_id.strip() if has_catalog_meta else None,
+            account.start_init_date.strip() if account.is_new_account else None,
+            account.destination_path.strip() if has_catalog_meta else None,
+            stored.id,
         )
+        if is_gui_schema(connection):
+            connection.execute(
+                """
+                UPDATE batch_accounts
+                SET is_new_account = ?,
+                    rename_owner_id = ?,
+                    rename_start_init_date = ?,
+                    rename_destination_path = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                rename_values,
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE accounts
+                SET is_new_account = ?,
+                    rename_owner_id = ?,
+                    rename_start_init_date = ?,
+                    rename_destination_path = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                rename_values,
+            )
     connection.commit()
     return result
 
