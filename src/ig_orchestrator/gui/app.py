@@ -77,6 +77,13 @@ from ig_orchestrator.gui.rename_folder_status import (
 )
 from ig_orchestrator.settings import Settings
 from ig_orchestrator.models import AccountHistoryStatus
+from ig_orchestrator import __version__
+from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
+from ig_orchestrator.db.schema_mode import is_gui_schema
+from ig_orchestrator.gui.i18n import current_language, load_language, t
+from ig_orchestrator.gui.icons import IconSet
+from ig_orchestrator.gui.log_window import LogWindow
+from ig_orchestrator.gui.theme import apply_light_theme, icon_button
 
 
 _CATALOG_COLORS = {
@@ -94,7 +101,16 @@ def launch_gui(
     settings: Settings,
     batch_json_path: Path = Path("config/batch.json"),
 ) -> None:
+    language = "es"
+    if is_gui_schema(connection):
+        row = connection.execute(
+            "SELECT value FROM app_settings WHERE key = 'ui.language'"
+        ).fetchone()
+        if row is not None and str(row["value"]).strip():
+            language = str(row["value"]).strip()
+    load_language(language)
     root = tk.Tk()
+    apply_light_theme(root)
     InstagramOrchestratorApp(
         root,
         connection=connection,
@@ -133,6 +149,7 @@ class InstagramOrchestratorApp:
         self.batch_ready_for_rename = False
         self.rename_new_accounts: tuple[NewAccountRenameParameters, ...] = ()
         self.last_run_was_dry_run = False
+        self.dry_run_var = tk.BooleanVar(value=False)
         self.active_batch_id: int | None = None
         self.active_queue_id: int | None = None
         self.cancel_requested = False
@@ -149,7 +166,6 @@ class InstagramOrchestratorApp:
             value=_latest_executed_batch_name(connection) or _suggest_batch_name()
         )
         self.default_date_var = tk.StringVar(value=today)
-        self.dry_run_var = tk.BooleanVar(value=False)
         self.catalog_filter_var = tk.StringVar()
         self.username_var = tk.StringVar()
         self.account_date_var = tk.StringVar(value=today)
@@ -160,12 +176,15 @@ class InstagramOrchestratorApp:
         self.start_init_date_var = tk.StringVar()
         self.destination_path_var = tk.StringVar()
         self.batch_context_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="Ready")
+        self.status_var = tk.StringVar(value=t("status.ready"))
         self.account_progress_var = tk.StringVar(value="Cuentas: -")
         self.item_progress_var = tk.StringVar(value="Items: -")
+        self.status_bar_var = tk.StringVar(value=t("status.ready"))
         self.indicators_var = tk.StringVar(value="URLs: 0")
+        self.icons = IconSet(self.root)
+        self.log_window = LogWindow(self.root)
 
-        self.root.title("Instagram Orchestrator")
+        self.root.title(t("app.name"))
         self.root.geometry(
             _half_screen_geometry(
                 self.root.winfo_screenwidth(),
@@ -198,45 +217,74 @@ class InstagramOrchestratorApp:
             self.rename_new_accounts = params.new_accounts
 
     def _build_widgets(self) -> None:
-        ttk.Style(self.root).configure("Visible.Vertical.TScrollbar", width=14)
+        self._build_menubar()
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
-        top = ttk.Frame(self.root, padding=8)
+        top = ttk.Frame(self.root, padding=(8, 6))
         self.top_region = top
         top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(1, weight=1)
+        top.columnconfigure(9, weight=1)
 
-        ttk.Label(top, text="Batch name").grid(row=0, column=0, sticky="w")
-        ttk.Entry(top, textvariable=self.batch_name_var).grid(
-            row=0, column=1, sticky="ew", padx=(6, 12)
-        )
-        ttk.Label(top, text="Start date").grid(row=0, column=2, sticky="w")
-        ttk.Entry(top, textvariable=self.default_date_var, width=12).grid(
-            row=0, column=3, sticky="w", padx=(6, 12)
-        )
-        ttk.Checkbutton(top, text="Dry-run", variable=self.dry_run_var).grid(
-            row=0, column=4, sticky="w", padx=(0, 12)
-        )
-        self.new_batch_button = ttk.Button(
-            top, text="Nuevo lote", command=self._start_new_batch
-        )
-        self.new_batch_button.grid(row=0, column=5, padx=(0, 6))
-        self.register_button = ttk.Button(top, command=self._save_batch)
-        self.register_button.grid(row=0, column=6, padx=(0, 6))
-        self.pending_button = ttk.Button(
+        self.new_batch_button = icon_button(
             top,
-            text="Recuperar ejecucion",
+            image=self.icons.get("new"),
+            command=self._start_new_batch,
+            tooltip=t("tooltip.new"),
+        )
+        self.new_batch_button.grid(row=0, column=0, padx=(0, 2))
+        self.register_button = icon_button(
+            top,
+            image=self.icons.get("save"),
+            command=self._save_batch,
+            tooltip=t("tooltip.save"),
+        )
+        self.register_button.grid(row=0, column=1, padx=(0, 2))
+        self.pending_button = icon_button(
+            top,
+            image=self.icons.get("folder-open"),
             command=self._open_pending_batches,
+            tooltip=t("tooltip.open_batches"),
         )
-        self.pending_button.grid(row=0, column=7, padx=(0, 6))
-        self.execute_button = ttk.Button(top, text="Ejecutar", command=self._execute)
-        self.execute_button.grid(row=0, column=8)
-        ttk.Label(
+        self.pending_button.grid(row=0, column=2, padx=(0, 8))
+        self.execute_button = icon_button(
             top,
-            textvariable=self.batch_context_var,
-            font=("TkDefaultFont", 9, "bold"),
-        ).grid(row=1, column=0, columnspan=9, sticky="w", pady=(7, 0))
+            image=self.icons.get("play"),
+            command=self._execute,
+            tooltip=t("tooltip.execute"),
+        )
+        self.execute_button.grid(row=0, column=3, padx=(0, 2))
+        self.cancel_button = icon_button(
+            top,
+            image=self.icons.get("stop"),
+            command=self._cancel_process,
+            tooltip=t("tooltip.stop"),
+        )
+        self.cancel_button.grid(row=0, column=4, padx=(0, 8))
+        self.cancel_button.state(["disabled"])
+        self.rename_button = icon_button(
+            top,
+            image=self.icons.get("rename"),
+            command=self._rename_manual_files,
+            tooltip=t("tooltip.rename"),
+        )
+        self.rename_button.grid(row=0, column=5, padx=(0, 2))
+        self.rename_button.state(["disabled"])
+        self.rename_manual_button = icon_button(
+            top,
+            image=self.icons.get("terminal"),
+            command=self._show_manual_rename_command,
+            tooltip=t("tooltip.rename_manual"),
+        )
+        self.rename_manual_button.grid(row=0, column=6, padx=(0, 12))
+        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=7, sticky="w")
+        ttk.Entry(top, textvariable=self.batch_name_var, width=28).grid(
+            row=0, column=8, sticky="ew", padx=(6, 12)
+        )
+        ttk.Label(top, text=t("label.date")).grid(row=0, column=9, sticky="e")
+        ttk.Label(top, textvariable=self.default_date_var).grid(
+            row=0, column=10, sticky="w", padx=(6, 0)
+        )
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.body_region = body
@@ -252,8 +300,8 @@ class InstagramOrchestratorApp:
         workspace = ttk.PanedWindow(body, orient=tk.VERTICAL)
         editor = ttk.Frame(workspace, padding=6)
         batch = ttk.Frame(workspace, padding=6)
-        workspace.add(editor, weight=3)
-        workspace.add(batch, weight=2)
+        workspace.add(editor, weight=1)
+        workspace.add(batch, weight=1)
         body.add(workspace, weight=4)
 
         self._build_editor(editor)
@@ -262,60 +310,19 @@ class InstagramOrchestratorApp:
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
         bottom.columnconfigure(0, weight=1)
-        bottom.rowconfigure(0, weight=1)
-        self.console = tk.Text(bottom, height=8, state="disabled", wrap="word")
-        self.console.grid(row=0, column=0, sticky="nsew")
-        console_scroll = ttk.Scrollbar(
+        self.status_button = ttk.Button(
             bottom,
-            orient=tk.VERTICAL,
-            command=self.console.yview,
-            style="Visible.Vertical.TScrollbar",
+            textvariable=self.status_bar_var,
+            command=self.log_window.toggle,
         )
-        console_scroll.grid(row=0, column=1, sticky="ns")
-        self.console.configure(yscrollcommand=console_scroll.set)
-        progress = ttk.Frame(bottom)
-        progress.grid(row=1, column=0, sticky="ew", pady=(4, 0))
-        progress.columnconfigure(2, weight=1)
-        ttk.Label(progress, textvariable=self.account_progress_var).grid(
-            row=0, column=0, sticky="w"
-        )
-        ttk.Label(progress, textvariable=self.item_progress_var).grid(
-            row=0, column=1, sticky="w", padx=(18, 0)
-        )
-        ttk.Label(progress, textvariable=self.status_var).grid(
-            row=0, column=2, sticky="w", padx=(18, 0)
-        )
-        self.cancel_button = ttk.Button(
-            progress,
-            text="Detener proceso",
-            command=self._cancel_process,
-            state="disabled",
-        )
-        self.rename_button = ttk.Button(
-            progress,
-            text="Renombrar",
-            command=self._rename_manual_files,
-            state="disabled",
-        )
-        self.rename_button.grid(row=0, column=3, sticky="e", padx=(0, 6))
-        self.rename_manual_button = ttk.Button(
-            progress,
-            text="Renombrar Manual",
-            command=self._show_manual_rename_command,
-        )
-        self.rename_manual_button.grid(row=0, column=4, sticky="e", padx=(0, 6))
-        self.clean_console_button = ttk.Button(
-            progress,
-            text="Clean",
-            command=self._clear_console,
-        )
-        self.clean_console_button.grid(row=0, column=5, sticky="e", padx=(0, 6))
-        self.cancel_button.grid(row=0, column=6, sticky="e")
+        self.status_button.grid(row=0, column=0, sticky="ew")
+        self.console = tk.Text(bottom, height=1)
+        self.clean_console_button = ttk.Button(bottom, command=self._clear_console)
 
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
         parent.rowconfigure(2, weight=1)
         parent.columnconfigure(0, weight=1)
-        ttk.Label(parent, text="Catalogo").grid(row=0, column=0, sticky="w")
+        ttk.Label(parent, text=t("label.catalog")).grid(row=0, column=0, sticky="w")
         filter_row = ttk.Frame(parent)
         filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
         filter_row.columnconfigure(0, weight=1)
@@ -365,7 +372,7 @@ class InstagramOrchestratorApp:
         parent.columnconfigure(0, weight=1)
         parent.columnconfigure(1, weight=1)
         parent.columnconfigure(2, weight=1)
-        ttk.Label(parent, text="Cuentas del lote actual").grid(
+        ttk.Label(parent, text=t("label.batch_accounts")).grid(
             row=0, column=0, columnspan=3, sticky="w"
         )
         self.tree = ttk.Treeview(
@@ -455,78 +462,83 @@ class InstagramOrchestratorApp:
         self.delete_all_button.grid(row=2, column=2, columnspan=2, sticky="ew")
 
     def _build_editor(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(1, weight=1)
-        parent.columnconfigure(1, weight=1)
-        ttk.Label(parent, text="Editor").grid(row=0, column=0, columnspan=2, sticky="w")
-
-        actions = ttk.Frame(parent)
-        actions.grid(row=1, column=0, sticky="nsw", padx=(0, 10), pady=(8, 0))
-        ttk.Button(
+        parent.rowconfigure(2, weight=1)
+        parent.columnconfigure(0, weight=1)
+        header = ttk.Frame(parent)
+        header.grid(row=0, column=0, sticky="ew")
+        ttk.Label(header, text=t("label.editor")).pack(side=tk.LEFT)
+        actions = ttk.Frame(header)
+        actions.pack(side=tk.RIGHT)
+        icon_button(
             actions,
-            text="Agregar/Actualizar",
-            command=self._upsert_account,
-        ).grid(row=0, column=0, sticky="ew")
-        ttk.Button(
-            actions,
-            text="Pegar/Agregar",
+            image=self.icons.get("clipboard-plus"),
             command=self._paste_and_upsert,
-        ).grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ttk.Button(actions, text="Pegar", command=self._paste_urls).grid(
-            row=2, column=0, sticky="ew", pady=(6, 0)
-        )
-        ttk.Separator(actions, orient=tk.HORIZONTAL).grid(
-            row=3, column=0, sticky="ew", pady=10
-        )
-        ttk.Button(actions, text="Normalizar", command=self._normalize_urls).grid(
-            row=4, column=0, sticky="ew"
-        )
-        ttk.Button(actions, text="Limpiar editor", command=self._clear_editor).grid(
-            row=5, column=0, sticky="ew", pady=(6, 0)
-        )
+            tooltip=t("tooltip.paste_add"),
+        ).pack(side=tk.LEFT, padx=1)
+        icon_button(
+            actions,
+            image=self.icons.get("plus"),
+            command=self._upsert_account,
+            tooltip=t("tooltip.add_update"),
+        ).pack(side=tk.LEFT, padx=1)
+        icon_button(
+            actions,
+            image=self.icons.get("clipboard"),
+            command=self._paste_urls,
+            tooltip=t("tooltip.paste"),
+        ).pack(side=tk.LEFT, padx=1)
+        icon_button(
+            actions,
+            image=self.icons.get("wand"),
+            command=self._normalize_urls,
+            tooltip=t("tooltip.normalize"),
+        ).pack(side=tk.LEFT, padx=1)
+        icon_button(
+            actions,
+            image=self.icons.get("eraser"),
+            command=self._clear_editor,
+            tooltip=t("tooltip.clear_editor"),
+        ).pack(side=tk.LEFT, padx=1)
 
         fields = ttk.Frame(parent)
-        fields.grid(row=1, column=1, sticky="nsew", pady=(8, 0))
+        fields.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        parent.rowconfigure(1, weight=1)
         fields.rowconfigure(4, weight=1)
         fields.columnconfigure(1, weight=1)
-        ttk.Label(fields, text="Username").grid(row=0, column=0, sticky="w")
+        ttk.Label(fields, text=t("label.username")).grid(row=0, column=0, sticky="w")
         self.username_combo = ttk.Combobox(
             fields,
             textvariable=self.username_var,
+            width=28,
             values=[entry.username for entry in self.catalog_entries],
         )
-        self.username_combo.grid(row=0, column=1, columnspan=2, sticky="ew")
+        self.username_combo.grid(row=0, column=1, sticky="w")
         self.username_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_catalog_date())
         flags = ttk.Frame(fields)
-        flags.grid(row=1, column=1, columnspan=2, sticky="w", pady=(8, 0))
+        flags.grid(row=1, column=1, sticky="w", pady=(8, 0))
         # tk.Checkbutton (not ttk): the label text toggles reliably on Windows.
         tk.Checkbutton(
             flags,
-            text="Stories",
+            text=t("label.stories"),
             variable=self.stories_var,
             command=self._update_indicators,
         ).pack(side=tk.LEFT)
         tk.Checkbutton(
             flags,
-            text="New account",
+            text=t("label.new_account"),
             variable=self.new_account_var,
             command=self._on_new_account_toggle,
         ).pack(side=tk.LEFT, padx=(12, 0))
         tk.Checkbutton(
             flags,
-            text="Update",
+            text=t("label.update"),
             variable=self.catalog_update_var,
             command=self._on_catalog_update_toggle,
         ).pack(side=tk.LEFT, padx=(12, 0))
-        ttk.Label(fields, text="Start date").grid(
-            row=2, column=0, sticky="w", pady=(8, 0)
-        )
-        ttk.Entry(fields, textvariable=self.account_date_var, width=12).grid(
-            row=2, column=1, sticky="w", pady=(8, 0)
-        )
 
         self.new_account_frame = ttk.LabelFrame(
             fields,
-            text="Datos de cuenta nueva",
+            text=t("label.new_account_frame"),
             padding=6,
         )
         self.new_account_frame.columnconfigure(1, weight=1)
@@ -564,7 +576,7 @@ class InstagramOrchestratorApp:
         )
         self.new_account_frame.grid_remove()
 
-        ttk.Label(fields, text="URLs").grid(
+        ttk.Label(fields, text=t("label.urls")).grid(
             row=4, column=0, sticky="nw", pady=(8, 0)
         )
         self.urls_text = tk.Text(fields, height=9, wrap="none")
@@ -2220,7 +2232,8 @@ class InstagramOrchestratorApp:
 
     def _update_pending_button_label(self) -> None:
         total = len(list_managed_batches(self.connection))
-        self.pending_button.configure(text=f"Lotes / ejecuciones ({total})")
+        # Icon button: count stays in the frozen Lotes dialog title, not here.
+        _ = total
 
     def _update_batch_context(self) -> None:
         if self.history_readonly:
@@ -2230,12 +2243,16 @@ class InstagramOrchestratorApp:
             self.batch_context_var.set(
                 f"HISTÓRICO · solo lectura · {name}{id_part} · COMPLETED"
             )
-            self.register_button.configure(text="Registrar lote", state="disabled")
-            self.execute_button.configure(text="Ejecutar", state="disabled")
+            self.register_button.configure(state="disabled")
+            self.execute_button.configure(state="disabled")
             self.delete_all_button.configure(state="disabled")
             self.save_selection_button.configure(state="disabled")
             self.delete_button.configure(state="disabled")
             self.rename_button.configure(state="disabled")
+            self.root.title(
+                f"{t('app.name')} - "
+                + t("mode.history", name=name, id=batch_id or "-")
+            )
             return
 
         context, register_text, execute_text, actions_enabled = _batch_mode_details(
@@ -2244,12 +2261,11 @@ class InstagramOrchestratorApp:
             batch_name=self.batch_name_var.get(),
         )
         self.batch_context_var.set(context)
+        self.root.title(f"{t('app.name')} - {_window_mode_title(context, self.batch_name_var.get(), self.history_readonly, self.saved_batch_id, self.active_batch_id)}")
         self.register_button.configure(
-            text=register_text,
             state="normal" if actions_enabled else "disabled",
         )
         self.execute_button.configure(
-            text=execute_text,
             state="normal" if actions_enabled else "disabled",
         )
         self.delete_all_button.configure(
@@ -2579,7 +2595,7 @@ class InstagramOrchestratorApp:
 
         self.batch_ready_for_rename = False
         self.rename_new_accounts = _new_account_rename_parameters(self.accounts)
-        self.last_run_was_dry_run = self.dry_run_var.get()
+        self.last_run_was_dry_run = False
         self.active_batch_id = batch_id
         self._update_batch_context()
         self.cancel_requested = False
@@ -3034,18 +3050,184 @@ class InstagramOrchestratorApp:
             self._set_descendants_enabled(child, enabled)
 
     def _write_console(self, text: str) -> None:
-        self.console.configure(state="normal")
-        self.console.insert(tk.END, _timestamp_console_text(text))
-        self.console.see(tk.END)
-        self.console.configure(state="disabled")
+        stamped = _timestamp_console_text(text)
+        log = getattr(self, "log_window", None)
+        if log is not None:
+            log.append(stamped)
+        console = getattr(self, "console", None)
+        if console is not None:
+            console.configure(state="normal")
+            console.insert(tk.END, stamped)
+            console.see(tk.END)
+            console.configure(state="disabled")
 
     def _clear_console(self) -> None:
-        self.console.configure(state="normal")
-        self.console.delete("1.0", tk.END)
-        self.console.configure(state="disabled")
+        log = getattr(self, "log_window", None)
+        if log is not None:
+            log.clear()
+        console = getattr(self, "console", None)
+        if console is not None:
+            console.configure(state="normal")
+            console.delete("1.0", tk.END)
+            console.configure(state="disabled")
 
     def _set_status(self, text: str) -> None:
         self.status_var.set(text)
+        bar = getattr(self, "status_bar_var", None)
+        if bar is not None:
+            accounts = getattr(self, "account_progress_var", None)
+            items = getattr(self, "item_progress_var", None)
+            parts = []
+            if accounts is not None:
+                parts.append(accounts.get())
+            if items is not None:
+                parts.append(items.get())
+            parts.append(text)
+            bar.set("  ·  ".join(part for part in parts if part))
+
+    def _build_menubar(self) -> None:
+        menubar = tk.Menu(self.root)
+        file_menu = tk.Menu(menubar, tearoff=False)
+        file_menu.add_command(label=t("menu.file.new"), command=self._start_new_batch)
+        file_menu.add_command(label=t("menu.file.save"), command=self._save_batch)
+        file_menu.add_command(
+            label=t("menu.file.open_batches"), command=self._open_pending_batches
+        )
+        file_menu.add_separator()
+        file_menu.add_command(label=t("menu.file.exit"), command=self.root.destroy)
+        menubar.add_cascade(label=t("menu.file"), menu=file_menu)
+
+        edit_menu = tk.Menu(menubar, tearoff=False)
+        edit_menu.add_command(label=t("menu.edit.paste_add"), command=self._paste_and_upsert)
+        edit_menu.add_command(label=t("menu.edit.add_update"), command=self._upsert_account)
+        edit_menu.add_command(label=t("menu.edit.paste"), command=self._paste_urls)
+        edit_menu.add_command(label=t("menu.edit.normalize"), command=self._normalize_urls)
+        edit_menu.add_command(label=t("menu.edit.clear_editor"), command=self._clear_editor)
+        edit_menu.add_separator()
+        edit_menu.add_command(label=t("menu.edit.delete"), command=self._delete_selected)
+        edit_menu.add_command(label=t("menu.edit.delete_all"), command=self._delete_all_accounts)
+        menubar.add_cascade(label=t("menu.edit"), menu=edit_menu)
+
+        view_menu = tk.Menu(menubar, tearoff=False)
+        view_menu.add_command(label=t("menu.view.log"), command=self.log_window.toggle)
+        menubar.add_cascade(label=t("menu.view"), menu=view_menu)
+
+        batch_menu = tk.Menu(menubar, tearoff=False)
+        batch_menu.add_command(label=t("menu.batch.execute"), command=self._execute)
+        batch_menu.add_command(label=t("menu.batch.stop"), command=self._cancel_process)
+        batch_menu.add_separator()
+        batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
+        batch_menu.add_command(
+            label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command
+        )
+        menubar.add_cascade(label=t("menu.batch"), menu=batch_menu)
+
+        catalog_menu = tk.Menu(menubar, tearoff=False)
+        catalog_menu.add_command(label=t("menu.catalog.open"), command=self._open_catalog_account)
+        catalog_menu.add_command(
+            label=t("menu.catalog.favorite"),
+            command=lambda: self._set_catalog_account_favorite(True),
+        )
+        catalog_menu.add_command(
+            label=t("menu.catalog.unfavorite"),
+            command=lambda: self._set_catalog_account_favorite(False),
+        )
+        catalog_menu.add_command(
+            label=t("menu.catalog.inactive"), command=self._set_catalog_account_inactive
+        )
+        catalog_menu.add_command(
+            label=t("menu.catalog.delete"), command=self._disable_catalog_account
+        )
+        catalog_menu.add_command(
+            label=t("menu.catalog.enable"), command=self._enable_catalog_account
+        )
+        menubar.add_cascade(label=t("menu.catalog"), menu=catalog_menu)
+
+        settings_menu = tk.Menu(menubar, tearoff=False)
+        settings_menu.add_command(
+            label=t("menu.settings.open"), command=self._open_settings
+        )
+        menubar.add_cascade(label=t("menu.settings"), menu=settings_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=False)
+        help_menu.add_command(
+            label=t("menu.help.about"),
+            command=lambda: messagebox.showinfo(
+                t("menu.help.about"), t("app.about", version=__version__)
+            ),
+        )
+        menubar.add_cascade(label=t("menu.help"), menu=help_menu)
+        self.root.config(menu=menubar)
+
+    def _open_settings(self) -> None:
+        window = tk.Toplevel(self.root)
+        window.title(t("settings.title"))
+        window.transient(self.root)
+        frame = ttk.Frame(window, padding=12)
+        frame.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(frame, text=t("settings.language")).grid(row=0, column=0, sticky="w")
+        language = tk.StringVar(value=current_language())
+        ttk.Radiobutton(
+            frame,
+            text=t("settings.language.es"),
+            value="es",
+            variable=language,
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ttk.Radiobutton(
+            frame,
+            text=t("settings.language.en"),
+            value="en",
+            variable=language,
+        ).grid(row=2, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.language_restart")).grid(
+            row=3, column=0, sticky="w", pady=(6, 10)
+        )
+
+        def apply_language() -> None:
+            chosen = language.get()
+            if chosen == current_language():
+                return
+            if is_gui_schema(self.connection):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES ('ui.language', ?, 'TEXT', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (chosen,),
+                )
+                self.connection.commit()
+            self.root.destroy()
+            import subprocess
+            import sys
+
+            subprocess.Popen([sys.executable, "-m", "ig_orchestrator", "gui"])
+
+        ttk.Button(frame, text=t("settings.language.es") + " / EN", command=apply_language).grid(
+            row=4, column=0, sticky="w", pady=(0, 12)
+        )
+        ttk.Button(
+            frame,
+            text=t("settings.purge_files"),
+            command=lambda: self._purge_downloaded_files(window),
+        ).grid(row=5, column=0, sticky="w")
+        ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
+            row=6, column=0, sticky="e", pady=(16, 0)
+        )
+
+    def _purge_downloaded_files(self, parent: tk.Toplevel) -> None:
+        if not messagebox.askyesno(
+            t("settings.purge_files"), t("settings.purge_confirm"), parent=parent
+        ):
+            return
+        count = purge_downloaded_files(self.connection)
+        messagebox.showinfo(
+            t("settings.purge_files"),
+            t("settings.purged", count=count),
+            parent=parent,
+        )
 
 
 def _suggest_batch_name() -> str:
@@ -3103,6 +3285,23 @@ def _batch_mode_details(
         "Ejecutar lote nuevo",
         True,
     )
+
+
+def _window_mode_title(
+    context: str,
+    batch_name: str,
+    history_readonly: bool,
+    saved_batch_id: int | None,
+    active_batch_id: int | None,
+) -> str:
+    name = batch_name.strip() or "-"
+    if history_readonly:
+        return t("mode.history", name=name, id=active_batch_id or "-")
+    if saved_batch_id is not None:
+        return t("mode.editing", name=name, id=saved_batch_id)
+    if active_batch_id is not None:
+        return t("mode.running", name=name, id=active_batch_id)
+    return t("mode.new")
 
 
 def _half_screen_geometry(screen_width: int, screen_height: int) -> str:

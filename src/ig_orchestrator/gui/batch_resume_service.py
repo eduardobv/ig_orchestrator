@@ -412,8 +412,18 @@ def resolve_account_download_folder(
     return None
 
 
+def _require_batch_id(connection: Connection, batch_id: int) -> None:
+    row = connection.execute(
+        "SELECT id FROM input_batches WHERE id = ?",
+        (batch_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Batch not found: {batch_id}")
+
+
 def finish_batch(connection: Connection, batch_id: int) -> None:
-    cursor = connection.execute(
+    _require_batch_id(connection, batch_id)
+    connection.execute(
         """
         UPDATE input_batches
         SET status = ?, updated_at = datetime('now')
@@ -421,15 +431,21 @@ def finish_batch(connection: Connection, batch_id: int) -> None:
         """,
         (InputBatchStatus.COMPLETED.value, batch_id),
     )
-    if cursor.rowcount == 0:
-        raise ValueError(f"Batch not found: {batch_id}")
     connection.commit()
+    from ig_orchestrator.db.downloaded_files_cleanup import (
+        maybe_purge_downloaded_files_for_batch,
+    )
+    from ig_orchestrator.db.schema_mode import is_gui_schema
+
+    if is_gui_schema(connection):
+        maybe_purge_downloaded_files_for_batch(connection, batch_id)
 
 
 def mark_batch_awaiting_rename(connection: Connection, batch_id: int) -> None:
     """Mark a batch as ready for rename / finalize without more downloads."""
 
-    cursor = connection.execute(
+    _require_batch_id(connection, batch_id)
+    connection.execute(
         """
         UPDATE input_batches
         SET status = ?, updated_at = datetime('now')
@@ -437,8 +453,6 @@ def mark_batch_awaiting_rename(connection: Connection, batch_id: int) -> None:
         """,
         (InputBatchStatus.AWAITING_RENAME.value, batch_id),
     )
-    if cursor.rowcount == 0:
-        raise ValueError(f"Batch not found: {batch_id}")
     connection.commit()
 
 

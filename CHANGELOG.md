@@ -27,12 +27,17 @@ Fecha: 2026-08-22
 * La GUI arranca contra `orchestrator_gui.sqlite`, importa el catálogo v1
   en solo lectura y lanza `run_continue` con `SQLITE_DB_PATH` apuntando al
   fichero GUI. El diálogo Lotes no se rediseña (vistas de compatibilidad).
+* GUI: menú, i18n es/en, tema claro, toolbar de iconos, Start date de solo
+  lectura, sin Dry-run, editor compacto, barra de estado + log en ventana,
+  Renombrar/Detener en la toolbar. Configuración: idioma (reinicia) y vaciar
+  ficheros descargados. `finish_batch` limpia `downloaded_files` si retention
+  es `on_complete`.
 * `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
   `v1.31.0`.
 
 ### Pruebas ejecutadas
 
-* `python -m pytest -q tests/test_gui_database.py tests/test_catalog_importer.py tests/test_gui_repositories.py tests/test_settings.py tests/test_db_repositories.py`
+* `python -m pytest -q tests/test_i18n.py tests/test_downloaded_files_cleanup.py tests/test_gui_services.py`
 * `python -m pytest -q`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado
