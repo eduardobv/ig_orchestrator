@@ -406,12 +406,17 @@ monitor 1920x1080). El catalogo permanece a la izquierda; a su derecha, el
 `Editor` ocupa la zona superior y `Cuentas del lote actual` la inferior, justo
 antes de la caja de estado. `URLs`, `Cuentas del lote actual` y la caja de
 estado muestran scroll vertical permanente y visible. El ancho inicial del
-catalogo se ajusta al username mas largo. La tabla presenta `Username`, `URLs`,
-`Estado`, `Stories` y `Start date`: username usa el mismo maximo del catalogo y
-el resto reserva solo su contenido maximo esperado. El encabezado `Username`
-ordena A-Z / Z-A. Se pueden seleccionar varias cuentas (Ctrl/Shift) y usar
-`Guardar selección` para registrar solo esas en un lote DRAFT; las demas
-permanecen en la mesa de trabajo. `Registrar lote` sigue guardando todas.
+catalogo se ajusta al username mas largo. En vista árbol, el buscador del
+catalogo selecciona la cuenta buscada (sin cargar el editor) para no tener que
+localizarla a ojo entre las hermanas de carpeta. La tabla presenta `Username`,
+`URLs`, `Estado`, `Stories` y `Start date`: username usa el mismo maximo del
+catalogo, `Stories` muestra ✅/❌, y el resto reserva solo su contenido maximo
+esperado. Encima de la tabla hay un buscador y un contador de cuentas. Al
+agregar una cuenta, la tabla hace scroll y foco a esa fila sin seleccionarla,
+para que el editor siga vacío. El encabezado `Username` ordena A-Z / Z-A. Se
+pueden seleccionar varias cuentas (Ctrl/Shift) y usar `Guardar selección` para
+registrar solo esas en un lote DRAFT; las demas permanecen en la mesa de
+trabajo. `Registrar lote` sigue guardando todas.
 
 Cuando el subproceso de un lote termina, la GUI reproduce el sonido de
 finalizacion de Windows. Si no esta disponible, utiliza la campana de Tk.
@@ -437,9 +442,10 @@ guardado agrega una cuenta nueva en vez de actualizar la anterior.
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
 y comas. Tras `Pegar` o `Normalizar`, el foco queda al final del listado.
 `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
-`Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Todas las
-acciones quedan en una columna a la izquierda del editor, en este orden:
-`Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, separador, `Normalizar` y
+`Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Tras
+`Agregar/Actualizar`, el Username se limpia también con el catálogo en árbol.
+Todas las acciones quedan en una columna a la izquierda del editor, en este
+orden: `Pegar/Agregar`, `Agregar/Actualizar`, `Pegar`, `Normalizar` y
 `Limpiar editor`. El boton `Normalizar` convierte entradas como:
 
 ```text

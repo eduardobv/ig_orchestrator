@@ -11,3 +11,13 @@ def test_load_language_formats_values() -> None:
     assert "Instagram Orchestrator" in t("app.about", version="2.0.0")
     load_language("es")
     assert t("mode.new") == "Nuevo lote"
+
+
+def test_batch_count_locale_formats_total_and_filtered() -> None:
+    load_language("es")
+    assert t("label.batch_count", count=3) == "Cuentas: 3"
+    assert t("label.batch_count_filtered", visible=1, count=12) == "Cuentas: 1 / 12"
+    load_language("en")
+    assert t("label.batch_count", count=3) == "Accounts: 3"
+    assert t("label.batch_count_filtered", visible=1, count=12) == "Accounts: 1 / 12"
+    load_language("es")

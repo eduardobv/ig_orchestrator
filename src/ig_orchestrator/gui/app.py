@@ -166,6 +166,7 @@ class InstagramOrchestratorApp:
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
+        self._catalog_silent_token = 0
         self.history_readonly = False
         self.catalog_view_mode = "list"
         self.catalog_colors = dict(_CATALOG_COLORS)
@@ -183,6 +184,8 @@ class InstagramOrchestratorApp:
         )
         self.default_date_var = tk.StringVar(value=today)
         self.catalog_filter_var = tk.StringVar()
+        self.batch_filter_var = tk.StringVar()
+        self.batch_count_var = tk.StringVar(value=t("label.batch_count", count=0))
         self.username_var = tk.StringVar()
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
@@ -405,13 +408,28 @@ class InstagramOrchestratorApp:
         )
 
     def _build_batch_table(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(1, weight=1)
+        parent.rowconfigure(2, weight=1)
         parent.columnconfigure(0, weight=1)
         parent.columnconfigure(1, weight=1)
         parent.columnconfigure(2, weight=1)
-        ttk.Label(parent, text=t("label.batch_accounts")).grid(
-            row=0, column=0, columnspan=3, sticky="w"
+        header = ttk.Frame(parent)
+        header.grid(row=0, column=0, columnspan=4, sticky="ew")
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text=t("label.batch_accounts")).pack(side=tk.LEFT)
+        ttk.Label(header, textvariable=self.batch_count_var).pack(side=tk.RIGHT)
+        filter_row = ttk.Frame(parent)
+        filter_row.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        filter_row.columnconfigure(0, weight=1)
+        ttk.Entry(filter_row, textvariable=self.batch_filter_var).grid(
+            row=0, column=0, sticky="ew"
         )
+        ttk.Button(
+            filter_row,
+            text="❌",
+            width=3,
+            command=self._clear_batch_filter,
+        ).grid(row=0, column=1, sticky="e", padx=(4, 0))
+        self.batch_filter_var.trace_add("write", lambda *_: self._refresh_table())
         self.tree = ttk.Treeview(
             parent,
             columns=tuple(column for column, _title in _BATCH_COLUMNS),
@@ -435,14 +453,14 @@ class InstagramOrchestratorApp:
             tuple(column for column, _title in _BATCH_COLUMNS),
             title_for=lambda column: dict(_BATCH_COLUMNS)[column],
         )
-        self.tree.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
+        self.tree.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
         batch_scroll = ttk.Scrollbar(
             parent,
             orient=tk.VERTICAL,
             command=self.tree.yview,
             style="Visible.Vertical.TScrollbar",
         )
-        batch_scroll.grid(row=1, column=3, sticky="ns", pady=(6, 6))
+        batch_scroll.grid(row=2, column=3, sticky="ns", pady=(6, 6))
         self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
         self.tree.bind("<Button-3>", self._show_batch_menu)
@@ -482,62 +500,61 @@ class InstagramOrchestratorApp:
         self.delete_button = ttk.Button(
             parent, text="Eliminar", command=self._delete_selected
         )
-        self.delete_button.grid(row=2, column=0, sticky="ew", padx=(0, 4))
+        self.delete_button.grid(row=3, column=0, sticky="ew", padx=(0, 4))
         self.save_selection_button = ttk.Button(
             parent,
             text="Guardar selección",
             command=self._save_selected_accounts_as_batch,
         )
-        self.save_selection_button.grid(row=2, column=1, sticky="ew", padx=(0, 4))
+        self.save_selection_button.grid(row=3, column=1, sticky="ew", padx=(0, 4))
         self.delete_all_button = ttk.Button(
             parent,
             text="Eliminar todo",
             command=self._delete_all_accounts,
         )
-        self.delete_all_button.grid(row=2, column=2, columnspan=2, sticky="ew")
+        self.delete_all_button.grid(row=3, column=2, columnspan=2, sticky="ew")
 
     def _build_editor(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(2, weight=1)
-        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(1, weight=1)
+        parent.columnconfigure(1, weight=1)
         header = ttk.Frame(parent)
-        header.grid(row=0, column=0, sticky="ew")
+        header.grid(row=0, column=0, columnspan=2, sticky="ew")
         ttk.Label(header, text=t("label.editor")).pack(side=tk.LEFT)
-        actions = ttk.Frame(header)
-        actions.pack(side=tk.RIGHT)
+        actions = ttk.Frame(parent)
+        actions.grid(row=1, column=0, sticky="n", padx=(0, 8), pady=(8, 0))
         icon_button(
             actions,
             image=self.icons.get("clipboard-plus"),
             command=self._paste_and_upsert,
             tooltip=t("tooltip.paste_add"),
-        ).pack(side=tk.LEFT, padx=1)
+        ).pack(side=tk.TOP, pady=1)
         icon_button(
             actions,
             image=self.icons.get("plus"),
             command=self._upsert_account,
             tooltip=t("tooltip.add_update"),
-        ).pack(side=tk.LEFT, padx=1)
+        ).pack(side=tk.TOP, pady=1)
         icon_button(
             actions,
             image=self.icons.get("clipboard"),
             command=self._paste_urls,
             tooltip=t("tooltip.paste"),
-        ).pack(side=tk.LEFT, padx=1)
+        ).pack(side=tk.TOP, pady=1)
         icon_button(
             actions,
             image=self.icons.get("wand"),
             command=self._normalize_urls,
             tooltip=t("tooltip.normalize"),
-        ).pack(side=tk.LEFT, padx=1)
+        ).pack(side=tk.TOP, pady=1)
         icon_button(
             actions,
             image=self.icons.get("eraser"),
             command=self._clear_editor,
             tooltip=t("tooltip.clear_editor"),
-        ).pack(side=tk.LEFT, padx=1)
+        ).pack(side=tk.TOP, pady=1)
 
         fields = ttk.Frame(parent)
-        fields.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
-        parent.rowconfigure(1, weight=1)
+        fields.grid(row=1, column=1, sticky="nsew", pady=(8, 0))
         fields.rowconfigure(4, weight=1)
         fields.columnconfigure(1, weight=1)
         ttk.Label(fields, text=t("label.username")).grid(row=0, column=0, sticky="w")
@@ -662,6 +679,9 @@ class InstagramOrchestratorApp:
     def _clear_catalog_filter(self) -> None:
         self.catalog_filter_var.set("")
 
+    def _clear_batch_filter(self) -> None:
+        self.batch_filter_var.set("")
+
     def _toggle_catalog_view(self) -> None:
         self._set_catalog_view("tree" if self.catalog_view_mode == "list" else "list")
 
@@ -714,6 +734,7 @@ class InstagramOrchestratorApp:
         today = self.today_catalog_usernames
         visible: list[str] = []
         filtered = filter_catalog_entries(self.catalog_entries, query)
+        focus_username = catalog_focus_username(query, filtered, selected_username)
         self.catalog_list.delete(0, tk.END)
         palette = getattr(self, "catalog_colors", _CATALOG_COLORS)
         for entry in filtered:
@@ -727,17 +748,28 @@ class InstagramOrchestratorApp:
             if colors:
                 self.catalog_list.itemconfig(tk.END, **colors)
             visible.append(entry.username)
-        self._refresh_catalog_tree(filtered, query=query, in_batch=in_batch, today=today)
+        self._refresh_catalog_tree(
+            filtered,
+            query=query,
+            in_batch=in_batch,
+            today=today,
+            focus_username=focus_username,
+        )
 
-        if selected_username is not None:
+        scrolled_to_match = False
+        if focus_username is not None:
             try:
-                index = visible.index(selected_username)
+                index = visible.index(focus_username)
             except ValueError:
                 index = None
             if index is not None:
+                self.catalog_list.selection_clear(0, tk.END)
                 self.catalog_list.selection_set(index)
                 self.catalog_list.activate(index)
-        if yview:
+                if query.strip():
+                    self.catalog_list.see(index)
+                    scrolled_to_match = True
+        if yview and not scrolled_to_match:
             self.catalog_list.yview_moveto(yview[0])
 
     def _refresh_catalog_tree(
@@ -747,11 +779,11 @@ class InstagramOrchestratorApp:
         query: str,
         in_batch: set[str],
         today: set[str],
+        focus_username: str | None = None,
     ) -> None:
         tree = getattr(self, "catalog_tree", None)
         if tree is None:
             return
-        selected = self._selected_catalog_username()
         tree.delete(*tree.get_children())
         for key, color in self.catalog_colors.items():
             if color:
@@ -796,11 +828,31 @@ class InstagramOrchestratorApp:
                     tree.item(folder_id, open=True)
 
         insert_nodes("", roots)
-        if selected:
-            leaf = f"user:{selected}"
-            if tree.exists(leaf):
-                tree.selection_set(leaf)
-                tree.see(leaf)
+        self._select_catalog_tree_leaf(focus_username)
+
+    def _select_catalog_tree_leaf(self, username: str | None) -> None:
+        """Select a catalog leaf without loading it into the editor."""
+        tree = getattr(self, "catalog_tree", None)
+        if tree is None or not username:
+            return
+        leaf = f"user:{username}"
+        if not tree.exists(leaf):
+            return
+        self._catalog_silent_token = getattr(self, "_catalog_silent_token", 0) + 1
+        token = self._catalog_silent_token
+        try:
+            tree.selection_set(leaf)
+            tree.focus(leaf)
+            tree.see(leaf)
+        finally:
+            def _release() -> None:
+                if self._catalog_silent_token == token:
+                    self._catalog_silent_token = 0
+
+            try:
+                self.root.after_idle(_release)
+            except tk.TclError:
+                _release()
 
     def _show_catalog_menu(self, event: tk.Event) -> None:
         if self.catalog_view_mode == "tree":
@@ -910,12 +962,16 @@ class InstagramOrchestratorApp:
         self._refresh_catalog()
 
     def _refresh_table(self) -> None:
+        if getattr(self, "tree", None) is None:
+            return
         selected_usernames = self._selected_batch_usernames()
-        expected_ids = {str(index) for index in range(len(self.accounts))}
+        query = self.batch_filter_var.get() if getattr(self, "batch_filter_var", None) else ""
+        visible = filter_batch_accounts(self.accounts, query)
+        visible_ids = {str(index) for index, _account in visible}
         for item_id in self.tree.get_children():
-            if item_id not in expected_ids:
+            if item_id not in visible_ids:
                 self.tree.delete(item_id)
-        for index, account in enumerate(self.accounts):
+        for display_order, (index, account) in enumerate(visible):
             runtime = self.runtime_progress.get(account.username.casefold())
             status, tag = _account_display_status(account, runtime)
             iid = str(index)
@@ -923,20 +979,42 @@ class InstagramOrchestratorApp:
                 account.username,
                 len([url for url in account.urls if url.strip()]),
                 status,
-                "si" if account.download_stories else "no",
+                stories_cell_text(account.download_stories),
                 account.start_now_date or self.default_date_var.get(),
             )
             if self.tree.exists(iid):
                 self.tree.item(iid, values=values, tags=(tag,))
-                self.tree.move(iid, "", index)
+                self.tree.move(iid, "", display_order)
             else:
                 self.tree.insert("", tk.END, iid=iid, values=values, tags=(tag,))
         self.tree.selection_remove(*self.tree.selection())
-        for index, account in enumerate(self.accounts):
+        for index, account in visible:
             if account.username.casefold() in selected_usernames:
                 self.tree.selection_add(str(index))
+        self._update_batch_count()
         if not self.runtime_progress:
             self._set_status(f"{len(self.accounts)} account(s) in draft")
+
+    def _update_batch_count(self) -> None:
+        total = len(self.accounts)
+        visible = len(self.tree.get_children()) if getattr(self, "tree", None) else total
+        query = ""
+        if getattr(self, "batch_filter_var", None) is not None:
+            query = self.batch_filter_var.get().strip()
+        if query and visible != total:
+            self.batch_count_var.set(
+                t("label.batch_count_filtered", visible=visible, count=total)
+            )
+            return
+        self.batch_count_var.set(t("label.batch_count", count=total))
+
+    def _reveal_batch_row(self, index: int) -> None:
+        """Scroll to a batch row and focus it without selecting (editor stays empty)."""
+        iid = str(index)
+        if not getattr(self, "tree", None) or not self.tree.exists(iid):
+            return
+        self.tree.focus(iid)
+        self.tree.see(iid)
 
     def _selected_batch_indices(self) -> list[int]:
         return sorted(int(item_id) for item_id in self.tree.selection())
@@ -965,8 +1043,9 @@ class InstagramOrchestratorApp:
         self.selected_index = None
         self._refresh_table()
         for index, account in enumerate(self.accounts):
-            if account.username.casefold() in selected:
-                self.tree.selection_add(str(index))
+            iid = str(index)
+            if account.username.casefold() in selected and self.tree.exists(iid):
+                self.tree.selection_add(iid)
         if self.tree.selection():
             focus_id = self.tree.selection()[-1]
             self.tree.focus(focus_id)
@@ -999,6 +1078,8 @@ class InstagramOrchestratorApp:
             self.progress_poll_id = None
 
     def _load_catalog(self) -> None:
+        if getattr(self, "_catalog_silent_token", 0):
+            return
         username = self._selected_catalog_username()
         if not username:
             return
@@ -1429,8 +1510,10 @@ class InstagramOrchestratorApp:
             return
         if self.selected_index is None:
             self.accounts.append(stored)
+            reveal_index = len(self.accounts) - 1
         else:
             self.accounts[self.selected_index] = stored
+            reveal_index = self.selected_index
         if stored.is_new_account or stored.is_catalog_update:
             self.catalog_entries = self.catalog_service.list_entries()
             self.destination_paths = self.catalog_service.list_destination_paths()
@@ -1438,9 +1521,13 @@ class InstagramOrchestratorApp:
                 values=[entry.username for entry in self.catalog_entries]
             )
             self.destination_path_combo.configure(values=self.destination_paths)
+        query = self.batch_filter_var.get() if getattr(self, "batch_filter_var", None) else ""
+        if not batch_username_matches_filter(stored.username, query):
+            self.batch_filter_var.set("")
         self._refresh_table()
         self._refresh_catalog()
         self._clear_editor()
+        self._reveal_batch_row(reveal_index)
 
     def _move_selected(self, direction: int) -> None:
         if self.selected_index is None:
@@ -3659,6 +3746,55 @@ _BATCH_COLUMNS = (
     ("stories", "Stories"),
     ("start_date", "Start date"),
 )
+
+
+def catalog_focus_username(
+    query: str,
+    filtered: list[AccountCatalogEntry],
+    previous: str | None,
+) -> str | None:
+    """Username to highlight after filtering the catalog.
+
+    An exact query match (case-insensitive) wins so the searched account is
+    selected in tree view even when folder peers are also shown. A single
+    remaining match is highlighted next. Otherwise the previous selection is
+    kept if it is still visible.
+    """
+    materialized = list(filtered)
+    normalized = query.strip().casefold()
+    if normalized:
+        for entry in materialized:
+            if entry.username.casefold() == normalized:
+                return entry.username
+        if len(materialized) == 1:
+            return materialized[0].username
+    if previous is None:
+        return None
+    visible = {entry.username for entry in materialized}
+    if previous in visible:
+        return previous
+    return None
+
+
+def batch_username_matches_filter(username: str, query: str) -> bool:
+    normalized = query.strip().casefold()
+    return not normalized or normalized in username.strip().casefold()
+
+
+def filter_batch_accounts(
+    accounts: list[AccountDraft],
+    query: str,
+) -> list[tuple[int, AccountDraft]]:
+    """Return ``(original_index, account)`` pairs matching *query* on username."""
+    return [
+        (index, account)
+        for index, account in enumerate(accounts)
+        if batch_username_matches_filter(account.username, query)
+    ]
+
+
+def stories_cell_text(download_stories: bool) -> str:
+    return "✅" if download_stories else "❌"
 
 
 def _username_heading_title(ascending: bool | None) -> str:

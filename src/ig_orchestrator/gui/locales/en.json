@@ -56,6 +56,8 @@
   "label.catalog": "Catalog",
   "label.editor": "Editor",
   "label.batch_accounts": "Accounts in current batch",
+  "label.batch_count": "Accounts: {count}",
+  "label.batch_count_filtered": "Accounts: {visible} / {count}",
   "label.username": "Username",
   "label.urls": "URLs",
   "label.stories": "Stories",

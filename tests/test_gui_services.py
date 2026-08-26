@@ -24,8 +24,11 @@ from ig_orchestrator.gui.app import (
     _account_display_status,
     _batch_column_samples,
     _batch_mode_details,
+    batch_username_matches_filter,
+    catalog_focus_username,
     _catalog_entry_colors,
     _catalog_width_chars,
+    filter_batch_accounts,
     _half_screen_geometry,
     _instagram_profile_url,
     _open_chrome_tab,
@@ -34,6 +37,7 @@ from ig_orchestrator.gui.app import (
     _latest_executed_batch_name,
     _new_account_rename_parameters,
     _sort_accounts_by_username,
+    stories_cell_text,
     _timestamp_console_text,
     _username_heading_title,
 )
@@ -479,6 +483,55 @@ def test_catalog_filter_empty_query_returns_all() -> None:
     assert filter_catalog_entries(entries, "   ") == entries
 
 
+def test_catalog_focus_username_selects_exact_match_among_folder_peers() -> None:
+    folder = r"G:\4K Stogram\00.FAVORITES\Valeria-Makusheva"
+    filtered = [
+        AccountCatalogEntry("lerabuns", destination_path=folder),
+        AccountCatalogEntry("alpha_peer", destination_path=folder),
+        AccountCatalogEntry("zeta_peer", destination_path=folder),
+    ]
+
+    assert catalog_focus_username("lerabuns", filtered, previous="zeta_peer") == "lerabuns"
+    assert catalog_focus_username("LERABUNS", filtered, previous=None) == "lerabuns"
+
+
+def test_catalog_focus_username_keeps_previous_when_query_empty() -> None:
+    filtered = [
+        AccountCatalogEntry("alpha"),
+        AccountCatalogEntry("beta"),
+    ]
+    assert catalog_focus_username("", filtered, previous="beta") == "beta"
+    assert catalog_focus_username("   ", filtered, previous="missing") is None
+    assert catalog_focus_username("zz", [], previous="alpha") is None
+
+
+def test_catalog_focus_username_selects_single_substring_match() -> None:
+    filtered = [AccountCatalogEntry("lerabuns")]
+    assert catalog_focus_username("bun", filtered, previous=None) == "lerabuns"
+
+
+def test_filter_batch_accounts_matches_username_substring() -> None:
+    accounts = [
+        AccountDraft(username="alpha", download_stories=True),
+        AccountDraft(username="lerabuns", download_stories=False),
+        AccountDraft(username="beta", download_stories=True),
+    ]
+
+    visible = filter_batch_accounts(accounts, "lera")
+    assert [(index, account.username) for index, account in visible] == [
+        (1, "lerabuns")
+    ]
+    assert filter_batch_accounts(accounts, "") == list(enumerate(accounts))
+    assert filter_batch_accounts(accounts, "   ") == list(enumerate(accounts))
+    assert batch_username_matches_filter("lerabuns", "BUNS")
+    assert not batch_username_matches_filter("alpha", "lera")
+
+
+def test_stories_cell_text_uses_icons() -> None:
+    assert stories_cell_text(True) == "✅"
+    assert stories_cell_text(False) == "❌"
+
+
 def test_catalog_enable_reactivates_disabled_account(tmp_path: Path) -> None:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)
@@ -632,6 +685,36 @@ def test_gui_catalog_single_selection_only_loads_username() -> None:
 
     assert app.username_var.value == "single_click_user"
     assert applied_dates == [True]
+
+
+def test_gui_catalog_silent_tree_select_does_not_load_editor() -> None:
+    applied_dates: list[bool] = []
+
+    class FakeCatalogList:
+        @staticmethod
+        def curselection() -> tuple[int]:
+            return (0,)
+
+        @staticmethod
+        def get(index: int) -> str:
+            return "silent_user"
+
+    class FakeStringVar:
+        value = "kept"
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.catalog_list = FakeCatalogList()
+    app.username_var = FakeStringVar()
+    app._catalog_silent_token = 1
+    app._apply_catalog_date = lambda: applied_dates.append(True)
+
+    app._load_catalog()
+
+    assert app.username_var.value == "kept"
+    assert applied_dates == []
 
 
 def test_gui_treeview_state_uses_ttk_state_api() -> None:

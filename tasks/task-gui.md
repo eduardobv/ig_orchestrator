@@ -114,6 +114,10 @@ Panel izquierdo: catalogo de cuentas
   todas las cuentas de la misma carpeta (peers), con la cuenta buscada
   **primera** y el resto en su orden original. Sin match exacto, el filtro
   es por substring de username.
+- En vista árbol, la cuenta buscada (match exacto, o único resultado) queda
+  seleccionada y visible. Esa selección programática no carga el editor;
+  un click del usuario sí lo hace. Tras `Agregar/Actualizar`, Username se
+  limpia igual que en vista lista.
 - Click derecho ofrece `Abrir`, `Inactivo`, `Favorito`, `Quitar favorito`,
   `Delete` y `Activar`. `Abrir` abre el perfil en una nueva pestaña del
   navegador; `Inactivo` la mueve a la seccion amarilla suave; `Favorito` la
@@ -139,14 +143,18 @@ Zona derecha inferior: lote actual
   - username;
   - urls: contador;
   - estado de validacion.
-  - stories: si/no;
+  - stories: ✅ / ❌;
   - start date.
+- Buscador incremental por username (boton `❌` para limpiar) y contador
+  `Cuentas: N` (`visible / total` si el filtro oculta filas).
+- Al agregar una cuenta, la tabla hace scroll y foco a esa fila **sin**
+  seleccionarla, para que el editor no se rellene.
 - El ancho de `username` se ajusta a la cuenta mas larga del catalogo. `urls`
   reserva cuatro digitos, `estado` reserva `Completada 9999/9999`, `stories`
   queda compacto y `start date` reserva diez caracteres.
 - Click en el encabezado `Username` ordena A-Z / Z-A (indicador ▲/▼).
-- Seleccion multiple (`extended`: Ctrl/Shift + click). Una fila enfocada carga
-  sus datos en el editor.
+- Seleccion multiple (`extended`: Ctrl/Shift + click). Una fila seleccionada
+  carga sus datos en el editor.
 - Botones:
   - `Subir`;
   - `Bajar`;
@@ -177,12 +185,12 @@ Zona derecha superior: editor de cuenta
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea. Tras `Pegar` o `Normalizar`,
   el caret y el viewport quedan al final del texto.
-- Los botones forman una columna a la izquierda, nunca al pie del editor:
-  - `Agregar/Actualizar`;
+- Los botones forman una columna a la izquierda, nunca al pie ni a la
+  derecha del editor, en este orden:
   - `Pegar/Agregar`, que pega el portapapeles y ejecuta
     `Agregar/Actualizar`;
+  - `Agregar/Actualizar`;
   - `Pegar`;
-  - separador;
   - `Normalizar`;
   - `Limpiar editor`, que tambien deselecciona la fila de `Lote actual` para
     que la siguiente accion agregue una cuenta en vez de reemplazarla.

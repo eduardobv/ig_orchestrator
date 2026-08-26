@@ -19,6 +19,7 @@ Fecha: 2026-08-22
 * `tasks/Tarea_v2_D1.md` … `Tarea_v2_D6.md`.
 * `tasks/Tarea_v2_0_0_release.md` (PR a `master` + tag `v2.0.0`, pendiente
   de validación).
+* `tasks/Tarea_v2_GUI_batch_ux.md`.
 * Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
 
 ### Modificado
@@ -47,11 +48,24 @@ Fecha: 2026-08-22
   bot está marcado; plantilla y destino en Configuración.
 * `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
   `v1.31.0`.
+* Catálogo en árbol: al buscar un username, esa cuenta queda seleccionada
+  (y visible) entre los peers de carpeta. Tras Agregar/Actualizar, el
+  Username del editor se limpia también en vista árbol; la selección
+  programática del árbol no recarga el editor.
+* Cuentas del lote: buscador por username, contador `Cuentas: N` (y
+  `visible / total` si hay filtro), columna Stories con ✅/❌, y al agregar
+  se hace `focus`+`see` de la fila nueva sin seleccionarla (el editor no
+  se rellena).
+* Editor: botones en columna izquierda, mismo orden que antes en
+  horizontal (Pegar/Agregar, Agregar/Actualizar, Pegar, Normalizar,
+  Limpiar).
 
 ### Pruebas ejecutadas
 
 * `python -m pytest -q tests/test_log_window.py tests/test_gui_theme.py`
 * `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
+* `python -m pytest -q tests/test_gui_services.py -k "catalog_focus or filter_batch or stories_cell"`
+* `python -m pytest -q tests/test_i18n.py`
 * `python -m pytest -q`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado

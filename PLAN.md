@@ -1603,9 +1603,13 @@ username mas largo. Al finalizar la ejecucion de un lote, la GUI reproduce el
 sonido de finalizacion del sistema.
 
 El catalogo permanece a la izquierda y carga el username en el editor con una
-seleccion simple. La zona derecha apila el `Editor` arriba y `Cuentas del lote
-actual` abajo, antes del texto de estado. Las acciones del editor se muestran
-en una columna izquierda con `Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, un
-separador, `Normalizar` y `Limpiar editor`. El flag visible se denomina
-`Stories`, y `URLs`, el lote y el texto de estado mantienen scroll vertical
-permanente y visible.
+seleccion simple (click del usuario). En vista árbol, buscar un username exacto
+selecciona esa hoja entre los peers de carpeta sin volcarla al editor; el
+repintado del árbol no debe rellenar Username. La zona derecha apila el
+`Editor` arriba y `Cuentas del lote actual` abajo, antes del texto de estado.
+Las acciones del editor se muestran en una columna izquierda, en el mismo
+orden que los iconos: `Pegar/Agregar`, `Agregar/Actualizar`, `Pegar`,
+`Normalizar` y `Limpiar editor`. El flag visible se denomina `Stories` (en la
+tabla del lote: ✅/❌). El lote tiene buscador, contador de cuentas y, al
+agregar, enfoca la última fila sin seleccionarla. `URLs`, el lote y el texto
+de estado mantienen scroll vertical permanente y visible.
