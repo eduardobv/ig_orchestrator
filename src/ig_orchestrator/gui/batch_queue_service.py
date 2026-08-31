@@ -102,8 +102,16 @@ class BatchQueue:
         return tuple(item.batch_id for item in self.items if item.participates_in_rename)
 
     @property
+    def has_active_work(self) -> bool:
+        return bool(self.pending_items or self.running_item or self.rename_batch_ids)
+
+    @property
     def is_open(self) -> bool:
         return self.status in OPEN_QUEUE_STATUSES
+
+    def is_running_batch(self, batch_id: int) -> bool:
+        running = self.running_item
+        return running is not None and running.batch_id == batch_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,18 +142,22 @@ def _batch_row(connection: Connection, batch_id: int):
 
 
 def get_open_queue(connection: Connection) -> BatchQueue | None:
-    row = connection.execute(
+    rows = connection.execute(
         """
         SELECT id FROM batch_run_queues
         WHERE status IN (?, ?, ?, ?)
         ORDER BY updated_at DESC, id DESC
-        LIMIT 1
         """,
         tuple(OPEN_QUEUE_STATUSES),
-    ).fetchone()
-    if row is None:
-        return None
-    return get_queue(connection, int(row["id"]))
+    ).fetchall()
+    for row in rows:
+        queue = get_queue(connection, int(row["id"]))
+        if queue.has_active_work:
+            return queue
+        if not queue.items and queue.status == QueueStatus.DRAFT.value:
+            return queue
+        _set_queue_status(connection, queue.id, QueueStatus.CANCELLED.value)
+    return None
 
 
 def get_queue(connection: Connection, queue_id: int) -> BatchQueue:
@@ -187,6 +199,31 @@ def get_queue(connection: Connection, queue_id: int) -> BatchQueue:
     )
 
 
+def _set_queue_status(connection: Connection, queue_id: int, status: str) -> None:
+    connection.execute(
+        "UPDATE batch_run_queues SET status = ?, updated_at = ? WHERE id = ?",
+        (status, _now(), queue_id),
+    )
+    connection.commit()
+
+
+def reconcile_queue_status(connection: Connection, queue_id: int) -> BatchQueue:
+    """Close empty sequences; keep AWAITING_RENAME only when lots remain."""
+
+    queue = get_queue(connection, queue_id)
+    if queue.status in {QueueStatus.COMPLETED.value, QueueStatus.CANCELLED.value}:
+        return queue
+    if queue.running_item is not None or queue.pending_items:
+        return queue
+    if queue.rename_batch_ids:
+        if queue.status != QueueStatus.AWAITING_RENAME.value:
+            _set_queue_status(connection, queue_id, QueueStatus.AWAITING_RENAME.value)
+            return get_queue(connection, queue_id)
+        return queue
+    _set_queue_status(connection, queue_id, QueueStatus.CANCELLED.value)
+    return get_queue(connection, queue_id)
+
+
 def _create_empty_queue(connection: Connection) -> int:
     now = _now()
     cursor = connection.execute(
@@ -207,6 +244,16 @@ def ensure_open_queue(connection: Connection) -> BatchQueue:
     return get_queue(connection, _create_empty_queue(connection))
 
 
+def _queue_item_status_for_batch(status: str, batch_name: object, batch_id: int) -> str:
+    if status in EXECUTABLE_BATCH_STATUSES:
+        return QueueItemStatus.PENDING.value
+    if status in RENAME_BATCH_STATUSES:
+        return QueueItemStatus.COMPLETED.value
+    raise BatchQueueError(
+        f"El lote {batch_id} ({batch_name}) no se puede encolar en estado {status}"
+    )
+
+
 def add_batches_to_open_queue(
     connection: Connection,
     batch_ids: list[int] | tuple[int, ...],
@@ -214,24 +261,32 @@ def add_batches_to_open_queue(
     if not batch_ids:
         raise BatchQueueError("Selecciona al menos un lote para la cola")
     queue = ensure_open_queue(connection)
-    existing_ids = {item.batch_id for item in queue.items}
+    existing_items = {item.batch_id: item for item in queue.items}
     next_order = max((item.sort_order for item in queue.items), default=0)
     now = _now()
     added = 0
     for batch_id in batch_ids:
-        if batch_id in existing_ids:
-            continue
         row = _batch_row(connection, batch_id)
-        status = str(row["status"])
-        if status in EXECUTABLE_BATCH_STATUSES:
-            item_status = QueueItemStatus.PENDING.value
-        elif status in RENAME_BATCH_STATUSES:
-            item_status = QueueItemStatus.COMPLETED.value
-        else:
-            raise BatchQueueError(
-                f"El lote {batch_id} ({row['batch_name']}) no se puede "
-                f"encolar en estado {status}"
+        item_status = _queue_item_status_for_batch(
+            str(row["status"]), row["batch_name"], batch_id
+        )
+        existing = existing_items.get(batch_id)
+        if existing is not None:
+            if existing.status not in {
+                QueueItemStatus.REMOVED.value,
+                QueueItemStatus.SKIPPED.value,
+            }:
+                continue
+            connection.execute(
+                """
+                UPDATE batch_run_queue_items
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (item_status, now, existing.id),
             )
+            added += 1
+            continue
         next_order += 1
         connection.execute(
             """
@@ -242,38 +297,26 @@ def add_batches_to_open_queue(
             """,
             (queue.id, batch_id, next_order, item_status, now, now),
         )
-        existing_ids.add(batch_id)
         added += 1
-    if added == 0 and not queue.items:
+    if added == 0 and not any(item.participates_in_rename for item in queue.items):
         raise BatchQueueError("No se agregó ningún lote nuevo a la cola")
-    has_pending = connection.execute(
-        """
-        SELECT 1 FROM batch_run_queue_items
-        WHERE queue_id = ? AND status = ?
-        LIMIT 1
-        """,
-        (queue.id, QueueItemStatus.PENDING.value),
-    ).fetchone()
-    next_status = queue.status
-    if has_pending is not None and queue.status == QueueStatus.AWAITING_RENAME.value:
-        next_status = QueueStatus.DRAFT.value
-    connection.execute(
-        "UPDATE batch_run_queues SET status = ?, updated_at = ? WHERE id = ?",
-        (next_status, now, queue.id),
-    )
     connection.commit()
-    return get_queue(connection, queue.id)
+    updated = get_queue(connection, queue.id)
+    if updated.pending_items and updated.status == QueueStatus.AWAITING_RENAME.value:
+        _set_queue_status(connection, updated.id, QueueStatus.DRAFT.value)
+        return get_queue(connection, updated.id)
+    return reconcile_queue_status(connection, updated.id)
 
 
-def remove_pending_item(connection: Connection, item_id: int) -> BatchQueue:
+def remove_queue_item(connection: Connection, item_id: int) -> BatchQueue:
     row = connection.execute(
         "SELECT * FROM batch_run_queue_items WHERE id = ?",
         (item_id,),
     ).fetchone()
     if row is None:
         raise BatchQueueError(f"Ítem de cola no encontrado: {item_id}")
-    if str(row["status"]) != QueueItemStatus.PENDING.value:
-        raise BatchQueueError("Solo se pueden quitar lotes que aún no han empezado")
+    if str(row["status"]) == QueueItemStatus.RUNNING.value:
+        raise BatchQueueError("No se puede quitar un lote que se está ejecutando")
     now = _now()
     connection.execute(
         """
@@ -283,12 +326,50 @@ def remove_pending_item(connection: Connection, item_id: int) -> BatchQueue:
         """,
         (QueueItemStatus.REMOVED.value, now, item_id),
     )
-    connection.execute(
-        "UPDATE batch_run_queues SET updated_at = ? WHERE id = ?",
-        (now, int(row["queue_id"])),
-    )
     connection.commit()
-    return get_queue(connection, int(row["queue_id"]))
+    return reconcile_queue_status(connection, int(row["queue_id"]))
+
+
+def remove_pending_item(connection: Connection, item_id: int) -> BatchQueue:
+    return remove_queue_item(connection, item_id)
+
+
+def detach_batch_from_open_queues(connection: Connection, batch_id: int) -> None:
+    """Drop a batch from every open sequence so it no longer blocks rename."""
+
+    rows = connection.execute(
+        """
+        SELECT i.id, i.queue_id
+        FROM batch_run_queue_items i
+        JOIN batch_run_queues q ON q.id = i.queue_id
+        WHERE i.batch_id = ?
+          AND q.status IN (?, ?, ?, ?)
+          AND i.status NOT IN (?, ?)
+        """,
+        (
+            batch_id,
+            *tuple(OPEN_QUEUE_STATUSES),
+            QueueItemStatus.REMOVED.value,
+            QueueItemStatus.SKIPPED.value,
+        ),
+    ).fetchall()
+    if not rows:
+        return
+    now = _now()
+    queue_ids: set[int] = set()
+    for row in rows:
+        connection.execute(
+            """
+            UPDATE batch_run_queue_items
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (QueueItemStatus.REMOVED.value, now, int(row["id"])),
+        )
+        queue_ids.add(int(row["queue_id"]))
+    connection.commit()
+    for queue_id in queue_ids:
+        reconcile_queue_status(connection, queue_id)
 
 
 def move_queue_item(connection: Connection, item_id: int, *, direction: int) -> BatchQueue:
@@ -329,8 +410,8 @@ def move_queue_item(connection: Connection, item_id: int, *, direction: int) -> 
 
 def start_or_resume_queue(connection: Connection, queue_id: int) -> QueueItem:
     queue = get_queue(connection, queue_id)
-    if queue.status == QueueStatus.COMPLETED.value:
-        raise BatchQueueError("La cola ya está completada")
+    if queue.status in {QueueStatus.COMPLETED.value, QueueStatus.CANCELLED.value}:
+        raise BatchQueueError("La cola ya está cerrada")
     current = queue.running_item
     if current is None:
         if not queue.pending_items:
@@ -367,6 +448,7 @@ def mark_current_item_completed(connection: Connection, queue_id: int) -> QueueI
             """,
             (QueueItemStatus.COMPLETED.value, now, current.id),
         )
+        connection.commit()
     remaining = connection.execute(
         """
         SELECT 1 FROM batch_run_queue_items
@@ -376,11 +458,7 @@ def mark_current_item_completed(connection: Connection, queue_id: int) -> QueueI
         (queue_id, QueueItemStatus.PENDING.value),
     ).fetchone()
     if remaining is None:
-        connection.execute(
-            "UPDATE batch_run_queues SET status = ?, updated_at = ? WHERE id = ?",
-            (QueueStatus.AWAITING_RENAME.value, now, queue_id),
-        )
-        connection.commit()
+        reconcile_queue_status(connection, queue_id)
         return None
     connection.execute(
         "UPDATE batch_run_queues SET updated_at = ? WHERE id = ?",
@@ -402,16 +480,9 @@ def pause_queue(connection: Connection, queue_id: int) -> BatchQueue:
 
 def next_item_after_removal(connection: Connection, queue_id: int) -> QueueItem | None:
     """If the running item just finished and no PENDING remain, close for rename."""
-    queue = get_queue(connection, queue_id)
+    queue = reconcile_queue_status(connection, queue_id)
     if queue.pending_items:
         return queue.pending_items[0]
-    if queue.running_item is None:
-        now = _now()
-        connection.execute(
-            "UPDATE batch_run_queues SET status = ?, updated_at = ? WHERE id = ?",
-            (QueueStatus.AWAITING_RENAME.value, now, queue_id),
-        )
-        connection.commit()
     return None
 
 
@@ -443,20 +514,20 @@ def collect_queue_rename_parameters(
     connection: Connection,
     queue_id: int,
 ) -> CombinedRenameParameters:
-    queue = get_queue(connection, queue_id)
+    queue = reconcile_queue_status(connection, queue_id)
+    if not queue.rename_batch_ids:
+        raise BatchQueueError(
+            "La cola no tiene lotes activos para renombrar "
+            "(todos fueron quitados o finalizados por separado)"
+        )
     return collect_rename_parameters(connection, queue.rename_batch_ids)
 
 
 def finish_queue_after_rename(connection: Connection, queue_id: int) -> None:
     queue = get_queue(connection, queue_id)
     for batch_id in queue.rename_batch_ids:
-        finish_batch(connection, batch_id)
-    now = _now()
-    connection.execute(
-        "UPDATE batch_run_queues SET status = ?, updated_at = ? WHERE id = ?",
-        (QueueStatus.COMPLETED.value, now, queue_id),
-    )
-    connection.commit()
+        finish_batch(connection, batch_id, detach_from_queue=False)
+    _set_queue_status(connection, queue_id, QueueStatus.COMPLETED.value)
 
 
 def _append_new_account(
@@ -500,6 +571,7 @@ __all__ = [
     "add_batches_to_open_queue",
     "collect_queue_rename_parameters",
     "collect_rename_parameters",
+    "detach_batch_from_open_queues",
     "ensure_open_queue",
     "finish_queue_after_rename",
     "get_open_queue",
@@ -508,6 +580,8 @@ __all__ = [
     "move_queue_item",
     "next_item_after_removal",
     "pause_queue",
+    "reconcile_queue_status",
     "remove_pending_item",
+    "remove_queue_item",
     "start_or_resume_queue",
 ]

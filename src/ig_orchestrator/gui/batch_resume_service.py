@@ -421,7 +421,12 @@ def _require_batch_id(connection: Connection, batch_id: int) -> None:
         raise ValueError(f"Batch not found: {batch_id}")
 
 
-def finish_batch(connection: Connection, batch_id: int) -> None:
+def finish_batch(
+    connection: Connection,
+    batch_id: int,
+    *,
+    detach_from_queue: bool = True,
+) -> None:
     _require_batch_id(connection, batch_id)
     connection.execute(
         """
@@ -432,6 +437,10 @@ def finish_batch(connection: Connection, batch_id: int) -> None:
         (InputBatchStatus.COMPLETED.value, batch_id),
     )
     connection.commit()
+    if detach_from_queue:
+        from ig_orchestrator.gui.batch_queue_service import detach_batch_from_open_queues
+
+        detach_batch_from_open_queues(connection, batch_id)
     from ig_orchestrator.db.downloaded_files_cleanup import (
         maybe_purge_downloaded_files_for_batch,
     )
@@ -509,6 +518,9 @@ def mark_batch_executed_elsewhere(connection: Connection, batch_id: int) -> None
         (InputBatchStatus.AWAITING_RENAME.value, batch_id),
     )
     connection.commit()
+    from ig_orchestrator.gui.batch_queue_service import detach_batch_from_open_queues
+
+    detach_batch_from_open_queues(connection, batch_id)
 
 
 def activate_draft_batch(connection: Connection, batch_id: int) -> None:
@@ -545,6 +557,13 @@ def delete_draft_batch(connection: Connection, batch_id: int) -> None:
         "SELECT 1 FROM runs WHERE batch_id = ? LIMIT 1", (batch_id,)
     ).fetchone() is not None:
         raise ValueError("An executed batch cannot be deleted")
+    from ig_orchestrator.gui.batch_queue_service import detach_batch_from_open_queues
+
+    detach_batch_from_open_queues(connection, batch_id)
+    connection.execute(
+        "DELETE FROM batch_run_queue_items WHERE batch_id = ?",
+        (batch_id,),
+    )
     account_ids = [
         int(item["id"])
         for item in connection.execute(

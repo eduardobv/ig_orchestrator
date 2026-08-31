@@ -5,7 +5,7 @@ from datetime import date, datetime
 import os
 from pathlib import Path
 import re
-from sqlite3 import Connection
+from sqlite3 import Connection, IntegrityError
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
@@ -34,10 +34,11 @@ from ig_orchestrator.gui.batch_queue_service import (
     collect_rename_parameters,
     finish_queue_after_rename,
     get_open_queue,
+    get_queue,
     mark_current_item_completed,
     move_queue_item,
     pause_queue,
-    remove_pending_item,
+    remove_queue_item,
     start_or_resume_queue,
 )
 from ig_orchestrator.gui.batch_resume_service import (
@@ -76,6 +77,7 @@ from ig_orchestrator.gui.rename_folder_status import (
     list_unmoved_account_folders,
 )
 from ig_orchestrator.settings import Settings
+from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
 from ig_orchestrator.models import AccountHistoryStatus
 from ig_orchestrator import __version__
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
@@ -223,6 +225,7 @@ class InstagramOrchestratorApp:
         """Pick up a sequence persisted by this or another instance."""
         queue = get_open_queue(self.connection)
         if queue is None:
+            self.active_queue_id = None
             return
         self.active_queue_id = queue.id
         if queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
@@ -231,6 +234,7 @@ class InstagramOrchestratorApp:
             try:
                 params = collect_queue_rename_parameters(self.connection, queue.id)
             except (BatchQueueError, ValueError):
+                self.active_queue_id = None
                 return
             self.default_date_var.set(params.start_now_date)
             self.rename_new_accounts = params.new_accounts
@@ -2011,7 +2015,12 @@ class InstagramOrchestratorApp:
                 return
             if self.saved_batch_id == summary.batch_id:
                 self._start_new_batch()
+            if self.active_queue_id is not None:
+                open_queue = get_open_queue(self.connection)
+                if open_queue is None:
+                    self.active_queue_id = None
             reload_active()
+            refresh_queue_panel()
             self._update_pending_button_label()
 
         def finish_selected() -> None:
@@ -2044,10 +2053,15 @@ class InstagramOrchestratorApp:
             if self.active_batch_id == batch_id:
                 self.batch_ready_for_rename = False
                 self.rename_button.configure(state="disabled")
+            if self.active_queue_id is not None:
+                open_queue = get_open_queue(self.connection)
+                if open_queue is None:
+                    self.active_queue_id = None
             self._write_console(
                 f"Batch {batch_id} marcado como COMPLETED (sin renombrar).\n"
             )
             reload_active()
+            refresh_queue_panel()
             if history_loaded["done"]:
                 reload_history()
             self._update_pending_button_label()
@@ -2085,7 +2099,12 @@ class InstagramOrchestratorApp:
                 f"Batch {summary.batch_id} marcado como AWAITING_RENAME "
                 "(ejecutado en otra instancia).\n"
             )
+            if self.active_queue_id is not None:
+                open_queue = get_open_queue(self.connection)
+                if open_queue is None:
+                    self.active_queue_id = None
             reload_active()
+            refresh_queue_panel()
             self._update_pending_button_label()
 
         def rename_selected() -> None:
@@ -2112,6 +2131,7 @@ class InstagramOrchestratorApp:
             self.saved_batch_id = None
             self.saved_draft_signature = None
             self.active_batch_id = batch_id
+            self.active_queue_id = None
             self.batch_ready_for_rename = True
             self._update_batch_context()
             self.rename_button.configure(state="normal")
@@ -2287,14 +2307,19 @@ class InstagramOrchestratorApp:
             if item_id is None:
                 return
             try:
-                remove_pending_item(self.connection, item_id)
+                queue = remove_queue_item(self.connection, item_id)
             except BatchQueueError as exc:
                 messagebox.showerror("Cola", str(exc), parent=dialog)
                 return
             refresh_queue_panel()
-            if self.process_runner.is_running() and self.active_queue_id is not None:
+            if queue.status == QueueStatus.CANCELLED.value:
+                self.active_queue_id = None
                 self._write_console(
-                    "Lote pendiente quitado de la cola; la secuencia "
+                    "Lote quitado de la cola; la secuencia quedó vacía y se cerró.\n"
+                )
+            elif self.process_runner.is_running() and self.active_queue_id is not None:
+                self._write_console(
+                    "Lote quitado de la cola; la secuencia "
                     "continuará con los que queden.\n"
                 )
 
@@ -2609,6 +2634,17 @@ class InstagramOrchestratorApp:
         except BatchDraftValidationError as exc:
             messagebox.showerror("Validation", str(exc))
             return None
+        except DuplicateBatchNameError as exc:
+            messagebox.showerror("Guardar lote", str(exc))
+            return None
+        except IntegrityError as exc:
+            messagebox.showerror(
+                "Guardar lote",
+                "No se pudo guardar el lote por una restricción de SQLite. "
+                "Revisa que el nombre no esté repetido y que no haya "
+                f"cuentas duplicadas.\n\n{exc}",
+            )
+            return None
         except ValueError as exc:
             messagebox.showerror("SQLite", str(exc))
             return None
@@ -2673,6 +2709,17 @@ class InstagramOrchestratorApp:
             )
         except BatchDraftValidationError as exc:
             messagebox.showerror("Validation", str(exc))
+            return
+        except DuplicateBatchNameError as exc:
+            messagebox.showerror("Guardar selección", str(exc))
+            return
+        except IntegrityError as exc:
+            messagebox.showerror(
+                "Guardar selección",
+                "No se pudo guardar la selección por una restricción de SQLite. "
+                "Revisa que el nombre no esté repetido y que no haya "
+                f"cuentas duplicadas.\n\n{exc}",
+            )
             return
         except ValueError as exc:
             messagebox.showerror("SQLite", str(exc))
@@ -2774,11 +2821,20 @@ class InstagramOrchestratorApp:
         if self._refresh_queue_panel is not None:
             self._refresh_queue_panel()
         if next_item is None:
+            try:
+                queue = get_queue(self.connection, queue_id)
+            except BatchQueueError:
+                self.active_queue_id = None
+                return False
+            if queue.status == QueueStatus.CANCELLED.value or not queue.rename_batch_ids:
+                self.active_queue_id = None
+                return False
             self.batch_ready_for_rename = True
             self.rename_button.configure(state="normal")
             try:
                 params = collect_queue_rename_parameters(self.connection, queue_id)
             except BatchQueueError as exc:
+                self.active_queue_id = None
                 self._write_console(f"Cola {queue_id} lista para renombrar: {exc}\n")
                 return False
             self.rename_new_accounts = params.new_accounts
@@ -2901,7 +2957,16 @@ class InstagramOrchestratorApp:
             and not self.cancel_requested
             and is_batch_ready_for_rename(self.connection, batch_id)
         )
-        queued = self.active_queue_id is not None
+        queued = False
+        if self.active_queue_id is not None:
+            try:
+                queue = get_queue(self.connection, self.active_queue_id)
+            except BatchQueueError:
+                self.active_queue_id = None
+            else:
+                queued = queue.is_running_batch(batch_id)
+                if not queued and not queue.is_open:
+                    self.active_queue_id = None
         cancelled = self.cancel_requested
         self.cancel_requested = False
         self.active_process_kind = None
@@ -2995,11 +3060,25 @@ class InstagramOrchestratorApp:
         notes: list[str] = []
         if self.active_queue_id is not None:
             try:
+                queue = get_queue(self.connection, self.active_queue_id)
+            except BatchQueueError as exc:
+                notes.append(f"No se pudo leer la cola {self.active_queue_id}: {exc}")
+                self.active_queue_id = None
+            else:
+                if not queue.rename_batch_ids:
+                    notes.append(
+                        f"La cola {self.active_queue_id} no tiene lotes activos; "
+                        "se usará el lote seleccionado."
+                    )
+                    self.active_queue_id = None
+        if self.active_queue_id is not None:
+            try:
                 params = collect_queue_rename_parameters(
                     self.connection, self.active_queue_id
                 )
             except (BatchQueueError, ValueError) as exc:
                 notes.append(f"No se pudo leer la cola {self.active_queue_id}: {exc}")
+                self.active_queue_id = None
             else:
                 notes.append(
                     f"Parámetros unidos de la cola id={self.active_queue_id} "
@@ -3126,6 +3205,14 @@ class InstagramOrchestratorApp:
             return
         if self.active_queue_id is not None:
             try:
+                queue = get_queue(self.connection, self.active_queue_id)
+            except BatchQueueError as exc:
+                messagebox.showerror("Renombrar", str(exc))
+                return
+            if not queue.rename_batch_ids:
+                self.active_queue_id = None
+        if self.active_queue_id is not None:
+            try:
                 params = collect_queue_rename_parameters(
                     self.connection, self.active_queue_id
                 )
@@ -3222,6 +3309,8 @@ class InstagramOrchestratorApp:
                         f"Batch {self.active_batch_id} marcado COMPLETED "
                         "tras renombrar.\n"
                     )
+                    if self._refresh_queue_panel is not None:
+                        self._refresh_queue_panel()
                 except ValueError as exc:
                     self._write_console(
                         f"No se pudo marcar COMPLETED tras renombrar: {exc}\n"

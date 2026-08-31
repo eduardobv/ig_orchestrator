@@ -59,6 +59,20 @@ Fecha: 2026-08-22
 * Editor: botones en columna izquierda, mismo orden que antes en
   horizontal (Pegar/Agregar, Agregar/Actualizar, Pegar, Normalizar,
   Limpiar).
+* Cola zombi: una secuencia `AWAITING_RENAME` sin lotes activos (todos
+  `REMOVED`/`SKIPPED`) se cancela al abrirla y ya no secuestra el botón
+  **Renombrar** de un lote suelto. Causa del error
+  «No hay lotes para armar el comando de renombrado» con
+  `descargas_2026_08_31_amber` (el lote en sí estaba correcto).
+* Renombrar un lote desde Lotes usa ese lote, no la cola abierta.
+* Un lote independiente solo avanza la cola si es el ítem `RUNNING`.
+* **Quitar de cola** funciona con ítems `PENDING` y `COMPLETED` (no con
+  `RUNNING`). Si la secuencia queda vacía, pasa a `CANCELLED`.
+* `Finalizar sin renombrar`, `Ejecutado en otra instancia` y `Borrar lote`
+  desenganchan el lote de la secuencia abierta. El ítem desaparece; si no
+  queda nadie, la cola se cierra.
+* Guardar lote muestra el error de nombre duplicado / `IntegrityError`
+  en vez de un traceback.
 
 ### Pruebas ejecutadas
 
@@ -66,6 +80,7 @@ Fecha: 2026-08-22
 * `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
 * `python -m pytest -q tests/test_gui_services.py -k "catalog_focus or filter_batch or stories_cell"`
 * `python -m pytest -q tests/test_i18n.py`
+* `python -m pytest -q tests/test_gui_services.py -k "queue or rename or elsewhere or detach or zombie or reactivat"`
 * `python -m pytest -q`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado

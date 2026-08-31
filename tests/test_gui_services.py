@@ -2545,7 +2545,7 @@ def test_batch_queue_add_remove_and_reject_running_removal(tmp_path: Path) -> No
         start_or_resume_queue(connection, queue.id)
         running = get_queue(connection, queue.id).running_item
         assert running is not None
-        with pytest.raises(BatchQueueError, match="aún no han empezado"):
+        with pytest.raises(BatchQueueError, match="se está ejecutando"):
             remove_pending_item(connection, running.id)
         pending_third = next(
             item for item in get_queue(connection, queue.id).items
@@ -2691,3 +2691,185 @@ def test_finish_queue_after_rename_respects_leftovers_decision(tmp_path: Path) -
             BatchRepository(connection).get_by_id(second.batch.id).status
             is InputBatchStatus.COMPLETED
         )
+
+
+def test_removing_all_queue_items_cancels_zombie_sequence(tmp_path: Path) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueItemStatus,
+        QueueStatus,
+        add_batches_to_open_queue,
+        get_open_queue,
+        get_queue,
+        remove_queue_item,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("z1", "zeta_one"), connection)
+        second = save_batch_draft(_draft_with_name("z2", "zeta_two"), connection)
+        queue = add_batches_to_open_queue(
+            connection, [first.batch.id, second.batch.id]
+        )
+        for item in list(queue.items):
+            remove_queue_item(connection, item.id)
+        closed = get_queue(connection, queue.id)
+        assert closed.status == QueueStatus.CANCELLED.value
+        assert all(
+            item.status == QueueItemStatus.REMOVED.value for item in closed.items
+        )
+        assert get_open_queue(connection) is None
+
+
+def test_completed_queue_items_can_be_removed_and_do_not_block_rename(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueStatus,
+        add_batches_to_open_queue,
+        collect_rename_parameters,
+        get_open_queue,
+        get_queue,
+        mark_current_item_completed,
+        remove_queue_item,
+        start_or_resume_queue,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("done1", "done_one"), connection)
+        second = save_batch_draft(_draft_with_name("done2", "done_two"), connection)
+        amber = save_batch_draft(_draft_with_name("amber", "amber_user"), connection)
+        queue = add_batches_to_open_queue(
+            connection, [first.batch.id, second.batch.id]
+        )
+        start_or_resume_queue(connection, queue.id)
+        mark_current_item_completed(connection, queue.id)
+        start_or_resume_queue(connection, queue.id)
+        mark_current_item_completed(connection, queue.id)
+        waiting = get_queue(connection, queue.id)
+        assert waiting.status == QueueStatus.AWAITING_RENAME.value
+        for item in waiting.items:
+            remove_queue_item(connection, item.id)
+        assert get_queue(connection, queue.id).status == QueueStatus.CANCELLED.value
+        assert get_open_queue(connection) is None
+        params = collect_rename_parameters(connection, [amber.batch.id])
+        assert params.batch_ids == (amber.batch.id,)
+
+
+def test_finish_elsewhere_and_delete_detach_batch_from_sequence(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueItemStatus,
+        QueueStatus,
+        add_batches_to_open_queue,
+        get_open_queue,
+        get_queue,
+    )
+    from ig_orchestrator.gui.batch_resume_service import (
+        delete_draft_batch,
+        finish_batch,
+        mark_batch_executed_elsewhere,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("seq_a", "seq_alpha"), connection)
+        second = save_batch_draft(_draft_with_name("seq_b", "seq_beta"), connection)
+        third = save_batch_draft(_draft_with_name("seq_c", "seq_gamma"), connection)
+        queue = add_batches_to_open_queue(
+            connection,
+            [first.batch.id, second.batch.id, third.batch.id],
+        )
+
+        finish_batch(connection, first.batch.id)
+        after_finish = get_queue(connection, queue.id)
+        by_batch = {item.batch_id: item for item in after_finish.items}
+        assert by_batch[first.batch.id].status == QueueItemStatus.REMOVED.value
+        assert [item.batch_id for item in after_finish.pending_items] == [
+            second.batch.id,
+            third.batch.id,
+        ]
+
+        mark_batch_executed_elsewhere(connection, second.batch.id)
+        after_elsewhere = get_queue(connection, queue.id)
+        by_batch = {item.batch_id: item for item in after_elsewhere.items}
+        assert by_batch[second.batch.id].status == QueueItemStatus.REMOVED.value
+        assert [item.batch_id for item in after_elsewhere.pending_items] == [
+            third.batch.id
+        ]
+        stored_second = BatchRepository(connection).get_by_id(second.batch.id)
+        assert stored_second.status is InputBatchStatus.AWAITING_RENAME
+
+        delete_draft_batch(connection, third.batch.id)
+        remaining = get_queue(connection, queue.id)
+        assert remaining.status == QueueStatus.CANCELLED.value
+        assert get_open_queue(connection) is None
+        assert BatchRepository(connection).get_by_id(third.batch.id) is None
+
+
+def test_get_open_queue_cancels_awaiting_rename_with_only_removed_items(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueItemStatus,
+        QueueStatus,
+        add_batches_to_open_queue,
+        get_open_queue,
+        get_queue,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("ghost1", "ghost_one"), connection)
+        queue = add_batches_to_open_queue(connection, [first.batch.id])
+        now = "2026-08-31T06:55:07+00:00"
+        connection.execute(
+            """
+            UPDATE batch_run_queue_items
+            SET status = ?, updated_at = ?
+            WHERE queue_id = ?
+            """,
+            (QueueItemStatus.REMOVED.value, now, queue.id),
+        )
+        connection.execute(
+            """
+            UPDATE batch_run_queues
+            SET status = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (QueueStatus.AWAITING_RENAME.value, now, queue.id),
+        )
+        connection.commit()
+        assert get_open_queue(connection) is None
+        assert get_queue(connection, queue.id).status == QueueStatus.CANCELLED.value
+
+
+def test_add_batches_reactivates_removed_queue_item(tmp_path: Path) -> None:
+    from ig_orchestrator.gui.batch_queue_service import (
+        QueueItemStatus,
+        add_batches_to_open_queue,
+        get_queue,
+        remove_queue_item,
+    )
+
+    db_path = tmp_path / "orchestrator.db"
+    init_database(db_path)
+    with connect(db_path) as connection:
+        first = save_batch_draft(_draft_with_name("readd", "readd_user"), connection)
+        keeper = save_batch_draft(_draft_with_name("keep", "keep_user"), connection)
+        queue = add_batches_to_open_queue(
+            connection, [first.batch.id, keeper.batch.id]
+        )
+        remove_queue_item(connection, queue.items[0].id)
+        restored = add_batches_to_open_queue(connection, [first.batch.id])
+        assert restored.id == queue.id
+        by_batch = {item.batch_id: item for item in restored.items}
+        assert by_batch[first.batch.id].status == QueueItemStatus.PENDING.value
+        assert by_batch[keeper.batch.id].status == QueueItemStatus.PENDING.value
+        assert get_queue(connection, restored.id).id == restored.id
+
