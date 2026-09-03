@@ -25,6 +25,7 @@ _ICON_FILES = {
     "plus": "plus.png",
     "clipboard-plus": "clipboard-plus.png",
     "clipboard": "clipboard.png",
+    "clipboard-black": "clipboard_black.png",
     "wand": "wand.png",
     "eraser": "eraser.png",
     "list": "list.png",
@@ -53,6 +54,17 @@ class IconSet:
 
     def get(self, name: str) -> tk.PhotoImage:
         return self._images[name]
+
+    def get_compact(self, name: str) -> tk.PhotoImage:
+        """32px toolbar icon scaled to 24px, close to the compact ❌ buttons."""
+
+        key = f"{name}:compact"
+        cached = self._images.get(key)
+        if cached is not None:
+            return cached
+        compact = self._images[name].zoom(3, 3).subsample(4, 4)
+        self._images[key] = compact
+        return compact
 
 
 __all__ = ["IconSet"]

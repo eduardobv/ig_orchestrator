@@ -444,9 +444,14 @@ y comas. Tras `Pegar` o `Normalizar`, el foco queda al final del listado.
 `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
 `Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Tras
 `Agregar/Actualizar`, el Username se limpia también con el catálogo en árbol.
-Todas las acciones quedan en una columna a la izquierda del editor, en este
-orden: `Pegar/Agregar`, `Agregar/Actualizar`, `Pegar`, `Normalizar` y
-`Limpiar editor`. El boton `Normalizar` convierte entradas como:
+`Agregar/Actualizar` queda a la altura de Username. El resto de acciones
+(`Pegar/Agregar`, `Pegar`, `Normalizar` y `Limpiar editor`) se apilan a
+la altura del campo URLs. Junto al combobox Username hay un icono compacto
+de portapapeles (pega la primera linea del clipboard) y un ❌ del mismo
+tamaño que el del catálogo, que solo vacía Username. Click derecho en
+Lote, Username, URLs y los buscadores del catálogo y del lote abre un menú
+Cortar / Copiar / Pegar / Eliminar / Seleccionar todo. El boton
+`Normalizar` convierte entradas como:
 
 ```text
 "https://www.instagram.com/p/DaGP2rHuY0P/",

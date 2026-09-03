@@ -168,7 +168,10 @@ Zona derecha inferior: lote actual
 
 Zona derecha superior: editor de cuenta
 
-- `Username`: combobox editable con autocomplete.
+- `Username`: combobox editable con autocomplete. A su derecha, un icono
+  compacto de portapapeles pega la primera linea del clipboard y un ❌
+  (mismo tamaño que en catálogo y en cuentas del lote) limpia solo ese
+  campo.
 - `Stories`, `New account` y `Update` van juntos en la misma fila. Se usan
   checkboxes clasicos de Tk para que el click en el texto del label tambien
   conmute. `New account` y `Update` son mutuamente excluyentes y van
@@ -185,15 +188,15 @@ Zona derecha superior: editor de cuenta
   limpia username, stories y URLs, pero mantiene la fecha de hoy.
 - `URLs`: textarea multilinea, una URL por linea. Tras `Pegar` o `Normalizar`,
   el caret y el viewport quedan al final del texto.
-- Los botones forman una columna a la izquierda, nunca al pie ni a la
-  derecha del editor, en este orden:
+- Los botones de acción van a la izquierda, alineados con los campos:
+  - `Agregar/Actualizar` a la altura de Username;
   - `Pegar/Agregar`, que pega el portapapeles y ejecuta
-    `Agregar/Actualizar`;
-  - `Agregar/Actualizar`;
-  - `Pegar`;
-  - `Normalizar`;
-  - `Limpiar editor`, que tambien deselecciona la fila de `Lote actual` para
+    `Agregar/Actualizar`, a la altura de URLs;
+  - debajo: `Pegar`, `Normalizar` y `Limpiar editor`.
+  - `Limpiar editor` tambien deselecciona la fila de `Lote actual` para
     que la siguiente accion agregue una cuenta en vez de reemplazarla.
+- Click derecho en Lote, Username, URLs y los buscadores de catálogo/lote:
+  Cortar, Copiar, Pegar, Eliminar y Seleccionar todo.
 - Indicadores compactos:
   - total URLs;
   - duplicadas;

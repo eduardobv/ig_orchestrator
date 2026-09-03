@@ -91,7 +91,17 @@ from ig_orchestrator.gui.catalog_tree import build_catalog_tree
 from ig_orchestrator.gui.i18n import current_language, load_language, t
 from ig_orchestrator.gui.icons import IconSet
 from ig_orchestrator.gui.log_window import LogWindow
-from ig_orchestrator.gui.theme import apply_light_theme, icon_button
+from ig_orchestrator.gui.text_edit import (
+    bind_edit_context_menu,
+    first_clipboard_line,
+    read_clipboard,
+)
+from ig_orchestrator.gui.theme import (
+    Tooltip,
+    apply_light_theme,
+    compact_icon_button,
+    icon_button,
+)
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 
 
@@ -301,9 +311,11 @@ class InstagramOrchestratorApp:
         )
         self.rename_manual_button.grid(row=0, column=6, padx=(0, 12))
         ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=7, sticky="w")
-        ttk.Entry(top, textvariable=self.batch_name_var, width=28).grid(
-            row=0, column=8, sticky="ew", padx=(6, 12)
+        self.batch_name_entry = ttk.Entry(
+            top, textvariable=self.batch_name_var, width=28
         )
+        self.batch_name_entry.grid(row=0, column=8, sticky="ew", padx=(6, 12))
+        bind_edit_context_menu(self.batch_name_entry)
         ttk.Label(top, text=t("label.date")).grid(row=0, column=9, sticky="e")
         ttk.Label(top, textvariable=self.default_date_var).grid(
             row=0, column=10, sticky="w", padx=(6, 0)
@@ -358,8 +370,11 @@ class InstagramOrchestratorApp:
         filter_row = ttk.Frame(parent)
         filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
         filter_row.columnconfigure(0, weight=1)
-        filter_entry = ttk.Entry(filter_row, textvariable=self.catalog_filter_var)
-        filter_entry.grid(row=0, column=0, sticky="ew")
+        self.catalog_filter_entry = ttk.Entry(
+            filter_row, textvariable=self.catalog_filter_var
+        )
+        self.catalog_filter_entry.grid(row=0, column=0, sticky="ew")
+        bind_edit_context_menu(self.catalog_filter_entry)
         ttk.Button(
             filter_row,
             text="❌",
@@ -424,9 +439,11 @@ class InstagramOrchestratorApp:
         filter_row = ttk.Frame(parent)
         filter_row.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
         filter_row.columnconfigure(0, weight=1)
-        ttk.Entry(filter_row, textvariable=self.batch_filter_var).grid(
-            row=0, column=0, sticky="ew"
+        self.batch_filter_entry = ttk.Entry(
+            filter_row, textvariable=self.batch_filter_var
         )
+        self.batch_filter_entry.grid(row=0, column=0, sticky="ew")
+        bind_edit_context_menu(self.batch_filter_entry)
         ttk.Button(
             filter_row,
             text="❌",
@@ -519,59 +536,53 @@ class InstagramOrchestratorApp:
         self.delete_all_button.grid(row=3, column=2, columnspan=2, sticky="ew")
 
     def _build_editor(self, parent: ttk.Frame) -> None:
-        parent.rowconfigure(1, weight=1)
-        parent.columnconfigure(1, weight=1)
+        parent.rowconfigure(4, weight=1)
+        parent.columnconfigure(2, weight=1)
         header = ttk.Frame(parent)
-        header.grid(row=0, column=0, columnspan=2, sticky="ew")
+        header.grid(row=0, column=0, columnspan=4, sticky="ew")
         ttk.Label(header, text=t("label.editor")).pack(side=tk.LEFT)
-        actions = ttk.Frame(parent)
-        actions.grid(row=1, column=0, sticky="n", padx=(0, 8), pady=(8, 0))
-        icon_button(
-            actions,
-            image=self.icons.get("clipboard-plus"),
-            command=self._paste_and_upsert,
-            tooltip=t("tooltip.paste_add"),
-        ).pack(side=tk.TOP, pady=1)
-        icon_button(
-            actions,
+
+        self.add_update_button = icon_button(
+            parent,
             image=self.icons.get("plus"),
             command=self._upsert_account,
             tooltip=t("tooltip.add_update"),
-        ).pack(side=tk.TOP, pady=1)
-        icon_button(
-            actions,
-            image=self.icons.get("clipboard"),
-            command=self._paste_urls,
-            tooltip=t("tooltip.paste"),
-        ).pack(side=tk.TOP, pady=1)
-        icon_button(
-            actions,
-            image=self.icons.get("wand"),
-            command=self._normalize_urls,
-            tooltip=t("tooltip.normalize"),
-        ).pack(side=tk.TOP, pady=1)
-        icon_button(
-            actions,
-            image=self.icons.get("eraser"),
-            command=self._clear_editor,
-            tooltip=t("tooltip.clear_editor"),
-        ).pack(side=tk.TOP, pady=1)
-
-        fields = ttk.Frame(parent)
-        fields.grid(row=1, column=1, sticky="nsew", pady=(8, 0))
-        fields.rowconfigure(4, weight=1)
-        fields.columnconfigure(1, weight=1)
-        ttk.Label(fields, text=t("label.username")).grid(row=0, column=0, sticky="w")
+        )
+        self.add_update_button.grid(row=1, column=0, sticky="n", padx=(0, 8), pady=(8, 0))
+        ttk.Label(parent, text=t("label.username")).grid(
+            row=1, column=1, sticky="w", pady=(8, 0)
+        )
+        username_row = ttk.Frame(parent)
+        username_row.grid(row=1, column=2, columnspan=2, sticky="w", pady=(8, 0))
         self.username_combo = ttk.Combobox(
-            fields,
+            username_row,
             textvariable=self.username_var,
             width=28,
             values=[entry.username for entry in self.catalog_entries],
         )
-        self.username_combo.grid(row=0, column=1, sticky="w")
-        self.username_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_catalog_date())
-        flags = ttk.Frame(fields)
-        flags.grid(row=1, column=1, sticky="w", pady=(8, 0))
+        self.username_combo.grid(row=0, column=0, sticky="w")
+        self.username_combo.bind(
+            "<<ComboboxSelected>>", lambda _event: self._apply_catalog_date()
+        )
+        bind_edit_context_menu(self.username_combo)
+        self.paste_username_button = compact_icon_button(
+            username_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_username,
+            tooltip=t("tooltip.paste_username"),
+        )
+        self.paste_username_button.grid(row=0, column=1, sticky="e", padx=(4, 0))
+        self.clear_username_button = ttk.Button(
+            username_row,
+            text="❌",
+            width=3,
+            command=self._clear_username,
+        )
+        self.clear_username_button.grid(row=0, column=2, sticky="e", padx=(4, 0))
+        Tooltip(self.clear_username_button, t("tooltip.clear_username"))
+
+        flags = ttk.Frame(parent)
+        flags.grid(row=2, column=2, columnspan=2, sticky="w", pady=(8, 0))
         # tk.Checkbutton (not ttk): the label text toggles reliably on Windows.
         tk.Checkbutton(
             flags,
@@ -593,7 +604,7 @@ class InstagramOrchestratorApp:
         ).pack(side=tk.LEFT, padx=(12, 0))
 
         self.new_account_frame = ttk.LabelFrame(
-            fields,
+            parent,
             text=t("label.new_account_frame"),
             padding=6,
         )
@@ -628,19 +639,47 @@ class InstagramOrchestratorApp:
             row=2, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
         )
         self.new_account_frame.grid(
-            row=3, column=0, columnspan=4, sticky="ew", pady=(8, 0)
+            row=3, column=1, columnspan=3, sticky="ew", pady=(8, 0)
         )
         self.new_account_frame.grid_remove()
 
-        ttk.Label(fields, text=t("label.urls")).grid(
-            row=4, column=0, sticky="nw", pady=(8, 0)
+        self.url_actions = ttk.Frame(parent)
+        self.url_actions.grid(row=4, column=0, sticky="n", padx=(0, 8), pady=(8, 0))
+        self.paste_add_button = icon_button(
+            self.url_actions,
+            image=self.icons.get("clipboard-plus"),
+            command=self._paste_and_upsert,
+            tooltip=t("tooltip.paste_add"),
         )
-        self.urls_text = tk.Text(fields, height=9, wrap="none")
+        self.paste_add_button.pack(side=tk.TOP, pady=1)
+        icon_button(
+            self.url_actions,
+            image=self.icons.get("clipboard"),
+            command=self._paste_urls,
+            tooltip=t("tooltip.paste"),
+        ).pack(side=tk.TOP, pady=1)
+        icon_button(
+            self.url_actions,
+            image=self.icons.get("wand"),
+            command=self._normalize_urls,
+            tooltip=t("tooltip.normalize"),
+        ).pack(side=tk.TOP, pady=1)
+        icon_button(
+            self.url_actions,
+            image=self.icons.get("eraser"),
+            command=self._clear_editor,
+            tooltip=t("tooltip.clear_editor"),
+        ).pack(side=tk.TOP, pady=1)
+
+        ttk.Label(parent, text=t("label.urls")).grid(
+            row=4, column=1, sticky="nw", pady=(8, 0)
+        )
+        self.urls_text = tk.Text(parent, height=9, wrap="none", undo=True)
         self.urls_text.grid(
-            row=4, column=1, columnspan=2, sticky="nsew", pady=(8, 0)
+            row=4, column=2, sticky="nsew", pady=(8, 0)
         )
         urls_scroll = ttk.Scrollbar(
-            fields,
+            parent,
             orient=tk.VERTICAL,
             command=self.urls_text.yview,
             style="Visible.Vertical.TScrollbar",
@@ -648,8 +687,9 @@ class InstagramOrchestratorApp:
         urls_scroll.grid(row=4, column=3, sticky="ns", pady=(8, 0))
         self.urls_text.configure(yscrollcommand=urls_scroll.set)
         self.urls_text.bind("<KeyRelease>", lambda _event: self._update_indicators())
-        ttk.Label(fields, textvariable=self.indicators_var).grid(
-            row=5, column=1, columnspan=2, sticky="w", pady=(6, 0)
+        bind_edit_context_menu(self.urls_text, after_change=self._update_indicators)
+        ttk.Label(parent, textvariable=self.indicators_var).grid(
+            row=5, column=2, columnspan=2, sticky="w", pady=(6, 0)
         )
 
     def _on_new_account_toggle(self) -> None:
@@ -1685,6 +1725,25 @@ class InstagramOrchestratorApp:
             f"No se puede {action}.\n\n"
             "Usa «Nuevo lote» para salir del histórico.",
         )
+        return True
+
+    def _clear_username(self) -> None:
+        self.username_var.set("")
+        try:
+            self.username_combo.focus_set()
+        except (tk.TclError, AttributeError):
+            pass
+
+    def _paste_username(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        self.username_var.set(first_clipboard_line(text))
+        try:
+            self.username_combo.icursor(tk.END)
+            self.username_combo.focus_set()
+        except (tk.TclError, AttributeError):
+            pass
         return True
 
     def _clear_editor(self) -> None:

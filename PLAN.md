@@ -1607,9 +1607,12 @@ seleccion simple (click del usuario). En vista árbol, buscar un username exacto
 selecciona esa hoja entre los peers de carpeta sin volcarla al editor; el
 repintado del árbol no debe rellenar Username. La zona derecha apila el
 `Editor` arriba y `Cuentas del lote actual` abajo, antes del texto de estado.
-Las acciones del editor se muestran en una columna izquierda, en el mismo
-orden que los iconos: `Pegar/Agregar`, `Agregar/Actualizar`, `Pegar`,
-`Normalizar` y `Limpiar editor`. El flag visible se denomina `Stories` (en la
+Las acciones del editor se alinean con los campos: `Agregar/Actualizar` a
+la altura de Username; `Pegar/Agregar`, `Pegar`, `Normalizar` y
+`Limpiar editor` apilados a la altura de URLs. Username incluye un icono
+compacto para pegar el portapapeles y un ❌ que solo limpia ese campo.
+Lote, Username, URLs y los buscadores de catálogo/lote tienen menú
+contextual de edición (cortar, copiar, pegar, eliminar, seleccionar todo). El flag visible se denomina `Stories` (en la
 tabla del lote: ✅/❌). El lote tiene buscador, contador de cuentas y, al
 agregar, enfoca la última fila sin seleccionarla. `URLs`, el lote y el texto
 de estado mantienen scroll vertical permanente y visible.

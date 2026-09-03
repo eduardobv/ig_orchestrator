@@ -2,7 +2,7 @@
 
 ## Unreleased - v2.0.0 (en progreso)
 
-Fecha: 2026-08-22
+Fecha: 2026-09-03
 
 ### Creado
 
@@ -20,6 +20,10 @@ Fecha: 2026-08-22
 * `tasks/Tarea_v2_0_0_release.md` (PR a `master` + tag `v2.0.0`, pendiente
   de validación).
 * `tasks/Tarea_v2_GUI_batch_ux.md`.
+* `tasks/Tarea_v2_GUI_editor_clipboard.md`.
+* `src/ig_orchestrator/gui/text_edit.py`.
+* `src/ig_orchestrator/gui/static/icons/clipboard_black.png`.
+* `tests/test_text_edit.py`.
 * Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
 
 ### Modificado
@@ -56,9 +60,15 @@ Fecha: 2026-08-22
   `visible / total` si hay filtro), columna Stories con ✅/❌, y al agregar
   se hace `focus`+`see` de la fila nueva sin seleccionarla (el editor no
   se rellena).
-* Editor: botones en columna izquierda, mismo orden que antes en
-  horizontal (Pegar/Agregar, Agregar/Actualizar, Pegar, Normalizar,
-  Limpiar).
+* Editor: `Agregar/Actualizar` a la altura de Username; `Pegar/Agregar`,
+  `Pegar`, `Normalizar` y `Limpiar editor` apilados a la altura de URLs.
+  Junto al combobox Username: icono compacto `clipboard_black.png` (pega
+  el portapapeles) y ❌ (limpia solo Username), mismo tamaño que el
+  buscador del catálogo y el de cuentas del lote.
+* Click derecho en Lote, buscador del catálogo, Username, URLs y buscador
+  del lote: menú Cortar / Copiar / Pegar / Eliminar / Seleccionar todo
+  (i18n). No se usa el menú nativo de Windows para que sv-ttk y `tk.Text`
+  se comporten igual y el idioma coincida con la GUI.
 * Cola zombi: una secuencia `AWAITING_RENAME` sin lotes activos (todos
   `REMOVED`/`SKIPPED`) se cancela al abrirla y ya no secuestra el botón
   **Renombrar** de un lote suelto. Causa del error
@@ -76,6 +86,7 @@ Fecha: 2026-08-22
 
 ### Pruebas ejecutadas
 
+* `python -m pytest -q tests/test_text_edit.py tests/test_gui_theme.py tests/test_i18n.py tests/test_gui_services.py`
 * `python -m pytest -q tests/test_log_window.py tests/test_gui_theme.py`
 * `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
 * `python -m pytest -q tests/test_gui_services.py -k "catalog_focus or filter_batch or stories_cell"`

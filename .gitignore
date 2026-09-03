@@ -85,3 +85,5 @@ data/orchestrator.sqlite-shm
 data/orchestrator.sqlite-wal
 data/orchestrator_gui.sqlite-wal
 data/orchestrator_gui.sqlite-shm
+src/ig_orchestrator/gui/static/icons/iconos_negros.zip
+src/ig_orchestrator/gui/static/icons/icons_black.zip

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+import tkinter as tk
 
 import pytest
 
@@ -930,6 +931,96 @@ def test_gui_clear_editor_deselects_the_batch_account() -> None:
 
     assert app.selected_index is None
     assert removed == [("3",)]
+
+
+def test_gui_paste_username_uses_first_clipboard_line() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            return "  amberlure_\nignored\n"
+
+    class FakeCombo:
+        def __init__(self) -> None:
+            self.cursor = None
+            self.focused = False
+
+        def icursor(self, index: str) -> None:
+            self.cursor = index
+
+        def focus_set(self) -> None:
+            self.focused = True
+
+    class FakeVar:
+        def __init__(self) -> None:
+            self.value = "old"
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+        def get(self) -> str:
+            return self.value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.root = FakeRoot()
+    app.username_var = FakeVar()
+    app.username_combo = FakeCombo()
+
+    assert app._paste_username() is True
+    assert app.username_var.value == "amberlure_"
+    assert app.username_combo.cursor == "end"
+    assert app.username_combo.focused is True
+
+
+def test_gui_paste_username_returns_false_when_clipboard_empty() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            raise tk.TclError("CLIPBOARD")
+
+    class FakeVar:
+        def __init__(self) -> None:
+            self.value = "keep"
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.root = FakeRoot()
+    app.username_var = FakeVar()
+    app.username_combo = object()
+
+    assert app._paste_username() is False
+    assert app.username_var.value == "keep"
+
+
+def test_gui_clear_username_only_clears_the_username_field() -> None:
+    class FakeVar:
+        def __init__(self, value: str = "") -> None:
+            self.value = value
+
+        def set(self, value: str) -> None:
+            self.value = value
+
+        def get(self) -> str:
+            return self.value
+
+    class FakeCombo:
+        def __init__(self) -> None:
+            self.focused = False
+
+        def focus_set(self) -> None:
+            self.focused = True
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.username_var = FakeVar("amberlure_")
+    app.username_combo = FakeCombo()
+    app.stories_var = FakeVar("1")
+
+    app._clear_username()
+
+    assert app.username_var.value == ""
+    assert app.username_combo.focused is True
+    assert app.stories_var.value == "1"
 
 
 def test_gui_paste_and_add_only_upserts_after_a_successful_paste() -> None:

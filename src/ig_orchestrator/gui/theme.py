@@ -66,7 +66,9 @@ def apply_light_theme(root: tk.Tk) -> None:
         style.configure("TNotebook.Tab", background=SURFACE)
     root.configure(bg=SURFACE)
     _apply_ui_font(root)
-    ttk.Style(root).configure("Visible.Vertical.TScrollbar", width=14)
+    style = ttk.Style(root)
+    style.configure("Visible.Vertical.TScrollbar", width=14)
+    style.configure("Compact.TButton", padding=0)
 
 
 class Tooltip:
@@ -117,10 +119,31 @@ def icon_button(
     return button
 
 
+def compact_icon_button(
+    parent: tk.Widget,
+    *,
+    image: tk.PhotoImage,
+    command,
+    tooltip: str,
+) -> ttk.Button:
+    """Icon button sized like the catalog/batch ❌ clear controls."""
+
+    button = ttk.Button(
+        parent,
+        image=image,
+        command=command,
+        style="Compact.TButton",
+        width=3,
+    )
+    Tooltip(button, tooltip)
+    return button
+
+
 __all__ = [
     "SURFACE",
     "Tooltip",
     "apply_light_theme",
+    "compact_icon_button",
     "icon_button",
     "ui_font_option",
 ]
