@@ -99,6 +99,13 @@ def test_init_gui_database_is_idempotent_and_seeds_lookups(tmp_path: Path) -> No
         stories_not_found = connection.execute(
             "SELECT match_kind FROM bot_errors WHERE code = 'STORIES_NOT_FOUND'"
         ).fetchone()
+        account_status_codes = {
+            str(row["code"])
+            for row in connection.execute("SELECT code FROM batch_account_statuses")
+        }
+        stories_first = connection.execute(
+            "SELECT value FROM app_settings WHERE key = 'processing.stories_first'"
+        ).fetchone()[0]
 
     assert version == GUI_SCHEMA_USER_VERSION
     assert EXPECTED_TABLES.issubset(table_names)
@@ -109,10 +116,40 @@ def test_init_gui_database_is_idempotent_and_seeds_lookups(tmp_path: Path) -> No
     assert batch_count == 0
     assert account_count == 0
     assert language == "es"
+    assert "INCOMPLETE" in account_status_codes
+    assert str(stories_first) == "1"
     assert int(media_not_found["is_retryable"]) == 1
     assert int(media_not_found["max_retries_override"]) == 1
     assert str(media_not_found["match_kind"]) == "CONTAINS"
     assert str(stories_not_found["match_kind"]) == "REGEX"
+
+
+def test_gui_patch_restores_incomplete_status_and_stories_first_setting(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "orchestrator_gui.sqlite"
+    init_gui_database(db_path)
+    with connect(db_path) as connection:
+        connection.execute(
+            "DELETE FROM batch_account_statuses WHERE code = 'INCOMPLETE'"
+        )
+        connection.execute(
+            "DELETE FROM app_settings WHERE key = 'processing.stories_first'"
+        )
+        connection.commit()
+
+    init_gui_database(db_path)
+
+    with connect(db_path) as connection:
+        incomplete = connection.execute(
+            "SELECT name FROM batch_account_statuses WHERE code = 'INCOMPLETE'"
+        ).fetchone()
+        stories_first = connection.execute(
+            "SELECT value FROM app_settings WHERE key = 'processing.stories_first'"
+        ).fetchone()
+
+    assert incomplete is not None
+    assert str(stories_first["value"]) == "1"
 
 
 def test_init_gui_database_refuses_v1_orchestrator_file(tmp_path: Path) -> None:

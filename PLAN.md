@@ -502,7 +502,11 @@ PROCESSING
 COMPLETED
 FAILED
 PARTIAL
+INCOMPLETE
 ```
+
+`INCOMPLETE` se usa en el modo stories-first: las stories de la cuenta ya
+se procesaron y quedan jobs no-story pendientes para la segunda barrida.
 
 ### 9.4 Tabla `url_jobs`
 
@@ -1616,3 +1620,38 @@ contextual de edición (cortar, copiar, pegar, eliminar, seleccionar todo). El f
 tabla del lote: ✅/❌). El lote tiene buscador, contador de cuentas y, al
 agregar, enfoca la última fila sin seleccionarla. `URLs`, el lote y el texto
 de estado mantienen scroll vertical permanente y visible.
+
+---
+
+## 26. Procesamiento stories-first en dos barridas (v2)
+
+Las stories caducan. El modo por defecto ya no procesa una cuenta entera
+(stories + resto + reintentos) antes de pasar a la siguiente.
+
+El orden de importación se conserva: primero cuentas que solo descargan
+stories, después de menos a más URLs, empates estables.
+
+Encima de ese orden, el lote corre en dos barridas:
+
+1. Cuentas cuyos jobs son solo `STORY`.
+2. Resto de cuentas que tienen `STORY` (solo se envían esos jobs).
+3. Segunda barrida: cuentas cuyas stories ya se procesaron y quedan
+   `REEL` / `POST` / `HIGHLIGHTS`.
+4. Segunda barrida: cuentas sin stories.
+
+`STORY` incluye la URL generada (`download_stories`) y cualquier URL de
+entrada clasificada como story. Los highlights no son stories.
+
+Tras la primera barrida:
+
+* cuenta solo-stories → `COMPLETED`, `PARTIAL` o `FAILED`;
+* cuenta mixta con trabajo restante → `INCOMPLETE`.
+
+Los reintentos de cada barrida son FIFO y solo sobre jobs de ese alcance.
+No se reintentan reels mientras queden stories pendientes en el lote.
+
+Setting persistido `processing.stories_first` (boolean, default activo) en
+`app_settings` (GUI) o `app_config` (v1). Configuración → un check desactiva
+el modo y vuelve al procesamiento por cuenta completa.
+
+Detalle de fases: `tasks/Tarea_v2_stories_first.md`.

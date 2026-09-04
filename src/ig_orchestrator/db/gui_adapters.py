@@ -93,7 +93,7 @@ class GuiBatchRepository(BatchRepository):
                 JOIN batch_urls bu ON bu.batch_account_id = ba.id
                 JOIN batch_account_statuses bas ON bas.id = ba.status_id
                 JOIN batch_url_statuses bus ON bus.id = bu.status_id
-                WHERE bas.code IN ('PENDING', 'PROCESSING', 'PARTIAL')
+                WHERE bas.code IN ('PENDING', 'PROCESSING', 'PARTIAL', 'INCOMPLETE')
                   AND bus.code IN (
                       'PENDING', 'SENT_TO_BOT', 'WAITING_DOWNLOAD',
                       'RETRY_PENDING', 'FAILED_TEMPORARY'
@@ -113,7 +113,7 @@ class GuiBatchRepository(BatchRepository):
             JOIN batch_account_statuses bas ON bas.id = ba.status_id
             JOIN batch_url_statuses bus ON bus.id = bu.status_id
             WHERE ba.batch_id = ?
-              AND bas.code IN ('PENDING', 'PROCESSING', 'PARTIAL')
+              AND bas.code IN ('PENDING', 'PROCESSING', 'PARTIAL', 'INCOMPLETE')
               AND bus.code IN (
                   'PENDING', 'SENT_TO_BOT', 'WAITING_DOWNLOAD',
                   'RETRY_PENDING', 'FAILED_TEMPORARY'

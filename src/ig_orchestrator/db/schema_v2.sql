@@ -341,7 +341,8 @@ INSERT OR IGNORE INTO batch_account_statuses (id, code, name, description, sort_
     (2, 'PROCESSING', 'Processing', 'Currently being downloaded.', 2),
     (3, 'COMPLETED', 'Completed', 'All URLs for this account finished.', 3),
     (4, 'FAILED', 'Failed', 'The account ended with unrecoverable errors.', 4),
-    (5, 'PARTIAL', 'Partial', 'Some URLs remain or the run was interrupted.', 5);
+    (5, 'PARTIAL', 'Partial', 'Some URLs remain or the run was interrupted.', 5),
+    (6, 'INCOMPLETE', 'Incomplete', 'Stories finished; remaining non-story URLs are pending.', 6);
 
 INSERT OR IGNORE INTO batch_url_statuses (id, code, name, description, sort_order) VALUES
     (1, 'PENDING', 'Pending', 'Not sent to the bot yet.', 1),
@@ -426,6 +427,7 @@ INSERT OR IGNORE INTO app_settings (key, value, value_type, updated_at) VALUES
     ('notify.enabled', '0', 'BOOLEAN', datetime('now')),
     ('notify.target', 'me', 'TEXT', datetime('now')),
     ('notify.template_batch_done', 'Instagram Orchestrator' || char(10) || 'Lote {batch_name} (id={batch_id}) completado' || char(10) || 'Cuentas: {accounts_done}/{accounts_total} · URLs ok: {urls_ok} · fallidas: {urls_failed}', 'TEXT', datetime('now')),
-    ('retention.downloaded_files', 'on_complete', 'TEXT', datetime('now'));
+    ('retention.downloaded_files', 'on_complete', 'TEXT', datetime('now')),
+    ('processing.stories_first', '1', 'BOOLEAN', datetime('now'));
 
 PRAGMA user_version = 100;

@@ -93,6 +93,21 @@ def _patch_gui_schema(connection: Connection) -> None:
              'Files were classified after download.', 8, 1)
         """
     )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO batch_account_statuses
+            (id, code, name, description, sort_order, is_active)
+        VALUES
+            (6, 'INCOMPLETE', 'Incomplete',
+             'Stories finished; remaining non-story URLs are pending.', 6, 1)
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO app_settings (key, value, value_type, updated_at)
+        VALUES ('processing.stories_first', '1', 'BOOLEAN', datetime('now'))
+        """
+    )
     _add_column_if_missing(
         connection, "downloaded_files", "working_relative_path", "TEXT"
     )

@@ -86,6 +86,7 @@ def test_model_enums_expose_plan_values() -> None:
     }
     assert {item.value for item in UrlSource} == {"GENERATED_STORY", "INPUT_URL"}
     assert "RETRY_PENDING" in {item.value for item in UrlJobStatus}
+    assert "INCOMPLETE" in {item.value for item in AccountStatus}
     assert "CLASSIFIED_AS_HIGHLIGHTS" in {
         item.value for item in DownloadFileStatus
     }

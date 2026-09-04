@@ -119,7 +119,7 @@ def list_pending_batches(connection: Connection) -> list[PendingBatchSummary]:
               SELECT 1
               FROM accounts a JOIN url_jobs j ON j.account_id = a.id
               WHERE a.batch_id = b.id
-                AND a.status IN ('PENDING', 'PROCESSING', 'PARTIAL')
+                AND a.status IN ('PENDING', 'PROCESSING', 'PARTIAL', 'INCOMPLETE')
                 AND j.status IN ({placeholders})
           )
         ORDER BY b.created_at DESC, b.id DESC
@@ -609,9 +609,14 @@ def fail_account_manually(
     ).fetchone()
     if account is None:
         raise ValueError(f"Account {account_id} does not belong to batch {batch_id}")
-    if str(account["status"]) not in {"PENDING", "PROCESSING", "PARTIAL"}:
+    if str(account["status"]) not in {
+        "PENDING",
+        "PROCESSING",
+        "PARTIAL",
+        "INCOMPLETE",
+    }:
         raise ValueError(
-            "Only pending or processing accounts can be removed from a running batch"
+            "Only pending, processing, partial or incomplete accounts can be removed from a running batch"
         )
 
     cursor = connection.execute(

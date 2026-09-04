@@ -2,10 +2,14 @@
 
 ## Unreleased - v2.0.0 (en progreso)
 
-Fecha: 2026-09-03
+Fecha: 2026-09-04
 
 ### Creado
 
+* `src/ig_orchestrator/orchestration/processing_policy.py` (alcance
+  stories/resto, orden de barridas, setting `processing.stories_first`).
+* `tasks/Tarea_v2_stories_first.md`.
+* `tests/test_processing_policy.py`.
 * `src/ig_orchestrator/db/schema_v2.sql` con diccionarios de estados/tipos,
   `bot_errors`, `path_roots`, catálogo, lotes, URLs y ficheros relativos.
 * `src/ig_orchestrator/db/gui_migrations.py` (`user_version = 100`).
@@ -28,6 +32,15 @@ Fecha: 2026-09-03
 
 ### Modificado
 
+* Procesamiento de lote en dos barridas cuando `processing.stories_first`
+  está activo (default): primero todos los jobs `STORY` del lote (cuentas
+  solo-stories y después mixtas), cuentas mixtas → `INCOMPLETE`, segunda
+  barrida para reels/posts/highlights. Un check en Configuración restaura
+  el modo legado (cuenta entera y siguiente).
+* Estado de cuenta `INCOMPLETE` (lookup GUI id 6) y reanudable.
+* `AccountOrchestrator.process_account(..., scope=)` limita jobs y reintentos.
+* Dentro de una cuenta, cualquier URL `STORY` (generada o de entrada) va
+  antes que el resto.
 * Ventana de log: cerrar la oculta (`withdraw`) en vez de destruir el
   `Text`; `append` ignora widgets ya destruidos. Evita
   `TclError: invalid command name ".!toplevel...!text"` al pulsar

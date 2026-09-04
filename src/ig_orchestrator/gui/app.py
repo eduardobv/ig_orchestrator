@@ -77,6 +77,10 @@ from ig_orchestrator.gui.rename_folder_status import (
     list_unmoved_account_folders,
 )
 from ig_orchestrator.settings import Settings
+from ig_orchestrator.orchestration.processing_policy import (
+    read_stories_first_enabled,
+    write_stories_first_enabled,
+)
 from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
 from ig_orchestrator.models import AccountHistoryStatus
 from ig_orchestrator import __version__
@@ -3617,16 +3621,35 @@ class InstagramOrchestratorApp:
         ttk.Button(frame, text=t("settings.language.es") + " / EN", command=apply_language).grid(
             row=4, column=0, sticky="w", pady=(0, 12)
         )
+        ttk.Label(frame, text=t("settings.processing")).grid(
+            row=5, column=0, sticky="w", pady=(8, 4)
+        )
+        stories_first = tk.BooleanVar(
+            value=read_stories_first_enabled(self.connection)
+        )
+
+        def apply_stories_first() -> None:
+            write_stories_first_enabled(self.connection, stories_first.get())
+
+        ttk.Checkbutton(
+            frame,
+            text=t("settings.stories_first"),
+            variable=stories_first,
+            command=apply_stories_first,
+        ).grid(row=6, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=520).grid(
+            row=7, column=0, sticky="w", pady=(2, 12)
+        )
         ttk.Button(
             frame,
             text=t("settings.purge_files"),
             command=lambda: self._purge_downloaded_files(window),
-        ).grid(row=5, column=0, sticky="w")
+        ).grid(row=8, column=0, sticky="w")
         ttk.Label(frame, text=t("settings.colors")).grid(
-            row=7, column=0, sticky="w", pady=(16, 4)
+            row=9, column=0, sticky="w", pady=(16, 4)
         )
         color_row = ttk.Frame(frame)
-        color_row.grid(row=8, column=0, sticky="w")
+        color_row.grid(row=10, column=0, sticky="w")
         for index, (key, label_key) in enumerate(
             (
                 ("favorite", "settings.color_favorite"),
@@ -3643,25 +3666,25 @@ class InstagramOrchestratorApp:
             ).grid(row=0, column=index, padx=(0, 4))
 
         ttk.Label(frame, text=t("settings.notify")).grid(
-            row=9, column=0, sticky="w", pady=(16, 4)
+            row=11, column=0, sticky="w", pady=(16, 4)
         )
         notify_enabled = tk.BooleanVar(
             value=_gui_setting(self.connection, "notify.enabled", "0") in {"1", "true"}
         )
         ttk.Checkbutton(
             frame, text=t("settings.notify_enable"), variable=notify_enabled
-        ).grid(row=10, column=0, sticky="w")
+        ).grid(row=12, column=0, sticky="w")
         ttk.Label(frame, text=t("settings.notify_target")).grid(
-            row=11, column=0, sticky="w", pady=(6, 0)
+            row=13, column=0, sticky="w", pady=(6, 0)
         )
         target_var = tk.StringVar(
             value=_gui_setting(self.connection, "notify.target", "me")
         )
         ttk.Entry(frame, textvariable=target_var, width=32).grid(
-            row=12, column=0, sticky="w"
+            row=14, column=0, sticky="w"
         )
         ttk.Label(frame, text=t("settings.notify_template")).grid(
-            row=13, column=0, sticky="w", pady=(6, 0)
+            row=15, column=0, sticky="w", pady=(6, 0)
         )
         template_var = tk.StringVar(
             value=_gui_setting(
@@ -3671,14 +3694,14 @@ class InstagramOrchestratorApp:
             )
         )
         ttk.Entry(frame, textvariable=template_var, width=64).grid(
-            row=14, column=0, sticky="ew"
+            row=16, column=0, sticky="ew"
         )
         ttk.Label(frame, text=t("settings.notify_errors")).grid(
-            row=15, column=0, sticky="w", pady=(8, 2)
+            row=17, column=0, sticky="w", pady=(8, 2)
         )
         error_vars: dict[str, tk.BooleanVar] = {}
         error_frame = ttk.Frame(frame)
-        error_frame.grid(row=16, column=0, sticky="w")
+        error_frame.grid(row=18, column=0, sticky="w")
         if is_gui_schema(self.connection):
             error_rows = self.connection.execute(
                 """
@@ -3739,7 +3762,7 @@ class InstagramOrchestratorApp:
             self.connection.commit()
 
         ttk.Button(frame, text=t("settings.notify_save"), command=save_notify).grid(
-            row=17, column=0, sticky="w", pady=(6, 0)
+            row=19, column=0, sticky="w", pady=(6, 0)
         )
         ttk.Button(
             frame,
@@ -3747,9 +3770,9 @@ class InstagramOrchestratorApp:
             command=lambda: self._send_test_notification(
                 window, target_var.get().strip() or "me"
             ),
-        ).grid(row=18, column=0, sticky="w", pady=(4, 0))
+        ).grid(row=20, column=0, sticky="w", pady=(4, 0))
         ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
-            row=19, column=0, sticky="e", pady=(16, 0)
+            row=21, column=0, sticky="e", pady=(16, 0)
         )
 
     def _pick_catalog_color(self, parent: tk.Toplevel, key: str) -> None:
@@ -4118,6 +4141,11 @@ def _account_display_status(
         return "Vacia", "failed"
     if runtime.status == "COMPLETED":
         return f"Completada {runtime.completed_items}/{runtime.total_items}", "completed"
+    if runtime.status == "INCOMPLETE":
+        return (
+            f"Incompleta {runtime.completed_items}/{runtime.total_items}",
+            "processing",
+        )
     if runtime.retry_items:
         return f"Reintento ({runtime.retry_items})", "retry"
     if runtime.status == "PROCESSING":

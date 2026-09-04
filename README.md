@@ -26,8 +26,10 @@ El proceso manual original tiene muchas piezas dificiles de auditar: listas de U
 4. SQLite pasa a ser la fuente de verdad.
 5. Cada URL se guarda como un trabajo individual.
 6. Si una cuenta tiene `download_stories = true`, se genera automaticamente la URL de stories.
-7. Las stories generadas se procesan antes que las URLs manuales.
-8. Los errores temporales se reintentan por rondas, al final.
+7. Las stories (generadas o de entrada) se procesan antes que reels/posts/highlights.
+   Con `processing.stories_first` (default, Configuración) el lote hace dos
+   barridas: todas las stories de todas las cuentas, y después el resto.
+8. Los errores temporales se reintentan por rondas, al final de cada barrida.
 9. Los errores definitivos quedan guardados sin reintento.
 10. Los archivos descargados se asocian a la URL que los produjo.
 11. Los archivos se mueven a carpetas por tipo.
@@ -243,6 +245,10 @@ Reglas de validacion:
   solo descargan stories (`download_stories = true` y `urls: []`) y despues
   por numero ascendente de URLs procesables. Los empates mantienen el orden
   original del JSON.
+- Ese orden se conserva. Encima, el modo stories-first (activo por defecto)
+  descarga primero todos los enlaces `STORY` del lote y deja las cuentas mixtas
+  en `INCOMPLETE` hasta la segunda barrida (reels, posts, highlights). Se
+  desactiva con un check en Configuración.
 
 ## GUI de escritorio
 
@@ -765,7 +771,7 @@ Puedes inspeccionarla con cualquier visor SQLite o con la CLI de SQLite si la ti
 Estados relevantes:
 
 - Batch: `DRAFT`, `IMPORTED`, `PROCESSING`, `COMPLETED`, `PARTIAL`, `FAILED`.
-- Cuenta: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`.
+- Cuenta: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`, `INCOMPLETE`.
 - URL: `PENDING`, `SENT_TO_BOT`, `WAITING_DOWNLOAD`, `DOWNLOADED`, `RETRY_PENDING`, `FAILED_TEMPORARY`, `FAILED_FINAL`, `CLASSIFIED`, `COMPLETED`.
 - Archivo: `DETECTED`, `MOVED_TO_WORKING_FOLDER`, `CLASSIFIED_AS_REEL`, `CLASSIFIED_AS_POST`, `CLASSIFIED_AS_STORY`, `CLASSIFIED_AS_HIGHLIGHTS`, `FINALIZED`.
 

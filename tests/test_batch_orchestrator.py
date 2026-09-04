@@ -33,6 +33,12 @@ from ig_orchestrator.orchestration import BatchOrchestrator, BatchOrchestratorCo
 from ig_orchestrator.orchestration.account_orchestrator import (
     AccountOrchestratorResult,
 )
+from ig_orchestrator.orchestration.processing_policy import (
+    AccountJobScope,
+    account_status_after_scope,
+    account_status_from_jobs,
+    job_in_scope,
+)
 
 
 @dataclass
@@ -59,16 +65,22 @@ class FakeAccountOrchestrator:
         self.run_repo = run_repo
         self.statuses = statuses
         self.calls: list[int] = []
+        self.scopes: list[AccountJobScope] = []
 
-    async def process_account(self, account_id: int) -> AccountOrchestratorResult:
+    async def process_account(
+        self,
+        account_id: int,
+        *,
+        scope: AccountJobScope = AccountJobScope.ALL,
+    ) -> AccountOrchestratorResult:
         self.calls.append(account_id)
-        status = self.statuses[account_id]
-        account = self.account_repo.update_status(account_id, status)
+        self.scopes.append(scope)
+        desired = self.statuses[account_id]
         jobs = self.job_repo.list_by_account(account_id)
         for job in jobs:
-            if status is AccountStatus.COMPLETED:
-                self.job_repo.update_status(job.id, UrlJobStatus.COMPLETED)
-            elif status is AccountStatus.FAILED:
+            if not job_in_scope(job, scope):
+                continue
+            if desired is AccountStatus.FAILED:
                 self.job_repo.update_error(
                     job.id,
                     status=UrlJobStatus.FAILED_FINAL,
@@ -76,11 +88,25 @@ class FakeAccountOrchestrator:
                     last_error_type="FAILED",
                     non_retryable=True,
                 )
-        completed = 1 if status is AccountStatus.COMPLETED else 0
-        failed = 1 if status is AccountStatus.FAILED else 0
+            else:
+                self.job_repo.update_status(job.id, UrlJobStatus.COMPLETED)
+        jobs = self.job_repo.list_by_account(account_id)
+        status = account_status_after_scope(
+            jobs,
+            scope,
+            account_status_from_jobs(jobs),
+        )
+        account = self.account_repo.update_status(account_id, status)
+        completed = sum(1 for job in jobs if job.status is UrlJobStatus.COMPLETED)
+        failed = sum(1 for job in jobs if job.status is UrlJobStatus.FAILED_FINAL)
+        run_status = RunStatus.COMPLETED
+        if failed and completed != len(jobs):
+            run_status = RunStatus.PARTIAL
+        elif failed == len(jobs) and jobs:
+            run_status = RunStatus.FAILED
         summary = RunSummary(
-            status=RunStatus(status.value),
-            total_urls=1,
+            status=run_status,
+            total_urls=len(jobs),
             completed_urls=completed,
             failed_urls=failed,
         )
@@ -340,6 +366,133 @@ def test_batch_orchestrator_does_not_clean_artifacts_in_dry_run(tmp_path: Path) 
     assert temporary.is_file()
 
 
+def test_batch_orchestrator_stories_first_sweeps_stories_then_remaining(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_batch(tmp_path)
+    story_only = _create_account(stored, "story_only", AccountStatus.PENDING)
+    mixed = _create_account(stored, "mixed", AccountStatus.PENDING)
+    reels_only = _create_account(stored, "reels_only", AccountStatus.PENDING)
+    _create_job(
+        stored.job_repo,
+        story_only.id,
+        publication_type=PublicationType.STORY,
+        source=UrlSource.GENERATED_STORY,
+        url="https://www.instagram.com/stories/story_only/",
+    )
+    _create_job(
+        stored.job_repo,
+        mixed.id,
+        publication_type=PublicationType.STORY,
+        source=UrlSource.GENERATED_STORY,
+        url="https://www.instagram.com/stories/mixed/",
+    )
+    mixed_reel = _create_job(
+        stored.job_repo,
+        mixed.id,
+        url="https://www.instagram.com/reel/MIXED1/",
+    )
+    reels_job = _create_job(
+        stored.job_repo,
+        reels_only.id,
+        url="https://www.instagram.com/reel/ONLY1/",
+    )
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {
+            story_only.id: AccountStatus.COMPLETED,
+            mixed.id: AccountStatus.COMPLETED,
+            reels_only.id: AccountStatus.COMPLETED,
+        },
+    )
+    statuses_after_first: list[AccountStatus] = []
+
+    original = fake.process_account
+
+    async def tracking_process(account_id: int, *, scope=AccountJobScope.ALL):
+        result = await original(account_id, scope=scope)
+        if len(fake.calls) == 2:
+            statuses_after_first.append(
+                stored.account_repo.get_by_id(story_only.id).status
+            )
+            statuses_after_first.append(stored.account_repo.get_by_id(mixed.id).status)
+            statuses_after_first.append(
+                stored.account_repo.get_by_id(reels_only.id).status
+            )
+        return result
+
+    fake.process_account = tracking_process  # type: ignore[method-assign]
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(stories_first=True),
+    )
+
+    result = asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert fake.calls == [story_only.id, mixed.id, mixed.id, reels_only.id]
+    assert fake.scopes == [
+        AccountJobScope.STORIES,
+        AccountJobScope.STORIES,
+        AccountJobScope.NON_STORIES,
+        AccountJobScope.NON_STORIES,
+    ]
+    assert statuses_after_first == [
+        AccountStatus.COMPLETED,
+        AccountStatus.INCOMPLETE,
+        AccountStatus.PENDING,
+    ]
+    assert stored.account_repo.get_by_id(story_only.id).status is AccountStatus.COMPLETED
+    assert stored.account_repo.get_by_id(mixed.id).status is AccountStatus.COMPLETED
+    assert stored.account_repo.get_by_id(reels_only.id).status is AccountStatus.COMPLETED
+    assert stored.job_repo.get_by_id(mixed_reel.id).status is UrlJobStatus.COMPLETED
+    assert stored.job_repo.get_by_id(reels_job.id).status is UrlJobStatus.COMPLETED
+    assert result.batch.status is InputBatchStatus.AWAITING_RENAME
+
+
+def test_batch_orchestrator_legacy_mode_processes_each_account_once(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_batch(tmp_path)
+    mixed = _create_account(stored, "mixed", AccountStatus.PENDING)
+    reels_only = _create_account(stored, "reels_only", AccountStatus.PENDING)
+    _create_job(
+        stored.job_repo,
+        mixed.id,
+        publication_type=PublicationType.STORY,
+        source=UrlSource.GENERATED_STORY,
+        url="https://www.instagram.com/stories/mixed/",
+    )
+    _create_job(stored.job_repo, mixed.id, url="https://www.instagram.com/reel/MIXED1/")
+    _create_job(
+        stored.job_repo,
+        reels_only.id,
+        url="https://www.instagram.com/reel/ONLY1/",
+    )
+    fake = FakeAccountOrchestrator(
+        stored.account_repo,
+        stored.job_repo,
+        stored.run_repo,
+        {
+            mixed.id: AccountStatus.COMPLETED,
+            reels_only.id: AccountStatus.COMPLETED,
+        },
+    )
+    orchestrator = _batch_orchestrator(
+        stored,
+        fake,
+        config=BatchOrchestratorConfig(stories_first=False),
+    )
+
+    asyncio.run(orchestrator.process_batch(stored.batch.id))
+
+    assert fake.calls == [mixed.id, reels_only.id]
+    assert fake.scopes == [AccountJobScope.ALL, AccountJobScope.ALL]
+    assert stored.account_repo.get_by_id(mixed.id).status is AccountStatus.COMPLETED
+
+
 def _stored_batch(tmp_path: Path) -> StoredBatch:
     db_path = tmp_path / "orchestrator.db"
     init_database(db_path)
@@ -400,13 +553,25 @@ def _create_account(
     )
 
 
-def _create_job(job_repo: UrlJobRepository, account_id: int) -> UrlJob:
+def _create_job(
+    job_repo: UrlJobRepository,
+    account_id: int,
+    *,
+    publication_type: PublicationType = PublicationType.REEL,
+    source: UrlSource = UrlSource.INPUT_URL,
+    url: str | None = None,
+) -> UrlJob:
+    if url is None:
+        if publication_type is PublicationType.STORY:
+            url = "https://www.instagram.com/stories/example_user/"
+        else:
+            url = "https://www.instagram.com/reel/ABC123xyz/"
     return job_repo.create(
         UrlJob(
             account_id=account_id,
-            url="https://www.instagram.com/reel/ABC123xyz/",
-            publication_type=PublicationType.REEL,
-            source=UrlSource.INPUT_URL,
+            url=url,
+            publication_type=publication_type,
+            source=source,
             status=UrlJobStatus.PENDING,
             max_retries=5,
         )

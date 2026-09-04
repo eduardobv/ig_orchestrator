@@ -17,7 +17,6 @@ from ig_orchestrator.db import (
 )
 from ig_orchestrator.models import (
     Account,
-    AccountStatus,
     InputBatch,
     InputBatchStatus,
     RunStatus,
@@ -29,14 +28,28 @@ from ig_orchestrator.filesystem import cleanup_batch_artifacts
 from ig_orchestrator.orchestration.account_orchestrator import (
     AccountOrchestratorResult,
 )
+from ig_orchestrator.orchestration.processing_policy import (
+    AccountJobScope,
+    PROCESSABLE_ACCOUNT_STATUSES,
+    account_status_from_jobs,
+    is_open_job,
+    non_story_sweep_accounts,
+    read_stories_first_enabled,
+    stories_sweep_accounts,
+)
 
 
 logger = get_logger()
 
 
 class BatchAccountOrchestrator(Protocol):
-    async def process_account(self, account_id: int) -> AccountOrchestratorResult:
-        """Process one account by id."""
+    async def process_account(
+        self,
+        account_id: int,
+        *,
+        scope: AccountJobScope = AccountJobScope.ALL,
+    ) -> AccountOrchestratorResult:
+        """Process one account by id, optionally limited to a job scope."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +68,7 @@ class BatchOrchestratorConfig:
     telegram_download_folder: Path | None = None
     default_working_folder: Path | None = None
     telegram_client: object | None = None
+    stories_first: bool | None = None
 
 
 class BatchOrchestrator:
@@ -137,41 +151,14 @@ class BatchOrchestrator:
                 account
                 for account in accounts
                 if account.id is not None
-                and account.status in _PROCESSABLE_ACCOUNT_STATUSES
+                and account.status in PROCESSABLE_ACCOUNT_STATUSES
             ]
-            for account_index, account in enumerate(processable_accounts, start=1):
-                current_account = self._account_repository.get_by_id(account.id)
-                if (
-                    current_account is None
-                    or current_account.status not in _PROCESSABLE_ACCOUNT_STATUSES
-                ):
-                    logger.info(
-                        "Skipping batch account after external status change: "
-                        "batch_id={} account_id={} previous_status={} current_status={}",
-                        batch_id,
-                        account.id,
-                        account.status.value,
-                        current_account.status.value if current_account else "MISSING",
-                    )
-                    continue
-                if self._config.progress_callback is not None:
-                    self._config.progress_callback(
-                        account_index,
-                        len(processable_accounts),
-                        current_account,
-                    )
-                logger.info(
-                    "Processing batch account: batch_id={} account_id={} username={}",
-                    batch_id,
-                    account.id,
-                    current_account.username,
+            account_results.extend(
+                await self._process_accounts(
+                    batch_id=batch_id,
+                    accounts=processable_accounts,
                 )
-                self._account_history_repository.reactivate_if_inactive(
-                    current_account.username
-                )
-                account_results.append(
-                    await self._account_orchestrator.process_account(current_account.id)
-                )
+            )
 
             summary = self._build_batch_summary(batch_id)
             batch = self._batch_repository.update_status(
@@ -287,24 +274,14 @@ class BatchOrchestrator:
         pending_accounts = [
             account
             for account in accounts
-            if account.id is not None and account.status in _PROCESSABLE_ACCOUNT_STATUSES
+            if account.id is not None and account.status in PROCESSABLE_ACCOUNT_STATUSES
         ]
-        for account_index, account in enumerate(pending_accounts, start=1):
-            if self._config.progress_callback is not None:
-                self._config.progress_callback(
-                    account_index,
-                    len(pending_accounts),
-                    account,
-                )
-            logger.info(
-                "Dry-run would process batch account: batch_id={} account_id={} username={}",
-                batch_id,
-                account.id,
-                account.username,
+        account_results.extend(
+            await self._process_accounts(
+                batch_id=batch_id,
+                accounts=pending_accounts,
             )
-            account_results.append(
-                await self._account_orchestrator.process_account(account.id)
-            )
+        )
 
         total_urls = _count_batch_urls(
             self._url_job_repository,
@@ -339,6 +316,144 @@ class BatchOrchestrator:
             summary=summary,
             account_results=tuple(account_results),
         )
+
+    def _stories_first_enabled(self) -> bool:
+        if self._config.stories_first is not None:
+            return self._config.stories_first
+        return read_stories_first_enabled(self._batch_repository.connection)
+
+    def _jobs_by_account(self, accounts: list[Account]) -> dict[int, list]:
+        return {
+            account.id: self._url_job_repository.list_by_account(account.id)
+            for account in accounts
+            if account.id is not None
+        }
+
+    async def _process_accounts(
+        self,
+        *,
+        batch_id: int,
+        accounts: list[Account],
+    ) -> list[AccountOrchestratorResult]:
+        if self._stories_first_enabled():
+            return await self._process_accounts_stories_first(
+                batch_id=batch_id,
+                accounts=accounts,
+            )
+        return await self._process_account_passes(
+            batch_id=batch_id,
+            planned=[
+                (account, AccountJobScope.ALL) for account in accounts
+            ],
+        )
+
+    async def _process_accounts_stories_first(
+        self,
+        *,
+        batch_id: int,
+        accounts: list[Account],
+    ) -> list[AccountOrchestratorResult]:
+        jobs_by_account = self._jobs_by_account(accounts)
+        stories_pass = stories_sweep_accounts(accounts, jobs_by_account)
+        non_story_pass = non_story_sweep_accounts(accounts, jobs_by_account)
+        planned: list[tuple[Account, AccountJobScope]] = [
+            *[(account, AccountJobScope.STORIES) for account in stories_pass],
+            *[(account, AccountJobScope.NON_STORIES) for account in non_story_pass],
+        ]
+        visited_ids = {
+            account.id
+            for account, _scope in planned
+            if account.id is not None
+        }
+        leftovers = [
+            account
+            for account in accounts
+            if account.id is not None and account.id not in visited_ids
+        ]
+        logger.info(
+            "Stories-first batch plan: batch_id={} story_accounts={} "
+            "non_story_accounts={} leftover_accounts={}",
+            batch_id,
+            len(stories_pass),
+            len(non_story_pass),
+            len(leftovers),
+        )
+        results = await self._process_account_passes(
+            batch_id=batch_id,
+            planned=planned,
+        )
+        self._finalize_idle_accounts(leftovers)
+        return results
+
+    async def _process_account_passes(
+        self,
+        *,
+        batch_id: int,
+        planned: list[tuple[Account, AccountJobScope]],
+    ) -> list[AccountOrchestratorResult]:
+        results: list[AccountOrchestratorResult] = []
+        total = len(planned)
+        for account_index, (account, scope) in enumerate(planned, start=1):
+            current_account = self._account_repository.get_by_id(account.id)
+            if (
+                current_account is None
+                or current_account.status not in PROCESSABLE_ACCOUNT_STATUSES
+            ):
+                logger.info(
+                    "Skipping batch account after external status change: "
+                    "batch_id={} account_id={} previous_status={} current_status={} scope={}",
+                    batch_id,
+                    account.id,
+                    account.status.value,
+                    current_account.status.value if current_account else "MISSING",
+                    scope.value,
+                )
+                continue
+            if self._config.progress_callback is not None:
+                self._config.progress_callback(
+                    account_index,
+                    total,
+                    current_account,
+                )
+            logger.info(
+                "Processing batch account: batch_id={} account_id={} username={} scope={}",
+                batch_id,
+                account.id,
+                current_account.username,
+                scope.value,
+            )
+            if not self._config.dry_run:
+                self._account_history_repository.reactivate_if_inactive(
+                    current_account.username
+                )
+            results.append(
+                await self._account_orchestrator.process_account(
+                    current_account.id,
+                    scope=scope,
+                )
+            )
+        return results
+
+    def _finalize_idle_accounts(self, accounts: list[Account]) -> None:
+        for account in accounts:
+            if account.id is None:
+                continue
+            current = self._account_repository.get_by_id(account.id)
+            if current is None or current.status not in PROCESSABLE_ACCOUNT_STATUSES:
+                continue
+            jobs = self._url_job_repository.list_by_account(account.id)
+            if any(is_open_job(job) for job in jobs):
+                continue
+            status = account_status_from_jobs(jobs)
+            if current.status is not status:
+                logger.info(
+                    "Finalizing idle account after stories-first sweeps: "
+                    "account_id={} username={} status={}",
+                    account.id,
+                    current.username,
+                    status.value,
+                )
+                self._account_repository.update_status(account.id, status)
 
     def _build_batch_summary(self, batch_id: int) -> RunSummary:
         accounts = self._account_repository.list_by_batch(batch_id)
@@ -406,13 +521,6 @@ def _run_status_from_counts(*, total: int, completed: int, failed: int) -> RunSt
     if failed == total:
         return RunStatus.FAILED
     return RunStatus.PARTIAL
-
-
-_PROCESSABLE_ACCOUNT_STATUSES = {
-    AccountStatus.PENDING,
-    AccountStatus.PROCESSING,
-    AccountStatus.PARTIAL,
-}
 
 
 __all__ = [
