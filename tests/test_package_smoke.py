@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import ig_orchestrator
-from ig_orchestrator import main as app_main
+import ig_orchestrator.cli.main as app_main
 from ig_orchestrator.db import AccountRepository, BatchRepository, UrlJobRepository, connect, init_database
 from ig_orchestrator.models import DownloadFile, DownloadFileStatus, MediaType, UrlJobStatus
 from ig_orchestrator.models import Account, AccountStatus, InputBatch, InputBatchStatus, PublicationType, UrlJob, UrlSource

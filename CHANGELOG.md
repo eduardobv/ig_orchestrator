@@ -6,6 +6,15 @@ Fecha: 2026-09-04
 
 ### Creado
 
+* `docs/modularizacion_v2.md` y `tasks/Tarea_v2_modularize.md`.
+* Paquetes GUI: `gui/shell`, `chrome`, `catalog`, `editor`,
+  `batch_accounts`, `run`, `batches`, `queue`, `settings`, `draft`,
+  `shared` (cada uno con `MODULE.md`).
+* Persistencia v2 partida: `db/v2/adapters/`, `db/v2/catalog/`,
+  `db/v1/schema.sql`, `db/v2/schema.sql`.
+* Tests agrupados en `tests/gui`, `db`, `orchestration`, `telegram`,
+  `input`, `filesystem`, `reports`.
+* `src/ig_orchestrator/cli/main.py` (entry CLI; `main.py` es shim).
 * `src/ig_orchestrator/orchestration/processing_policy.py` (alcance
   stories/resto, orden de barridas, setting `processing.stories_first`).
 * `tasks/Tarea_v2_stories_first.md`.
@@ -32,6 +41,12 @@ Fecha: 2026-09-04
 
 ### Modificado
 
+* Modularización sin cambio de comportamiento: `gui/app.py` (~3900 líneas)
+  pasa a mixins por panel; servicios GUI y `gui_adapters.py` se trocean;
+  rutas viejas quedan como shims de reexport.
+* Pegar/Agregar no fallaba por `NameError` en el mixin del editor
+  (`batch_username_matches_filter` no se importaba). El mixin de
+  renombrado importa `MANUAL_RENAME_SCRIPT` y `NewAccountRenameParameters`.
 * Procesamiento de lote en dos barridas cuando `processing.stories_first`
   está activo (default): primero todos los jobs `STORY` del lote (cuentas
   solo-stories y después mixtas), cuentas mixtas → `INCOMPLETE`, segunda
@@ -106,6 +121,8 @@ Fecha: 2026-09-04
 * `python -m pytest -q tests/test_i18n.py`
 * `python -m pytest -q tests/test_gui_services.py -k "queue or rename or elsewhere or detach or zombie or reactivat"`
 * `python -m pytest -q`
+* Modularización v2: `python -m pytest -q` → 294 passed
+* `python -m pytest -q tests/gui/test_editor.py tests/gui/test_rename.py`
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado
 

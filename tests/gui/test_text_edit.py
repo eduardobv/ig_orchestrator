@@ -146,10 +146,11 @@ def test_read_clipboard_returns_none_when_empty() -> None:
 
 def test_clipboard_black_icon_asset_exists() -> None:
     path = (
-        Path(__file__).resolve().parents[1]
+        Path(__file__).resolve().parents[2]
         / "src"
         / "ig_orchestrator"
         / "gui"
+        / "shared"
         / "static"
         / "icons"
         / "clipboard_black.png"

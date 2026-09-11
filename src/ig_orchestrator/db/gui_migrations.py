@@ -6,8 +6,8 @@ from sqlite3 import Connection
 from ig_orchestrator.db.connection import connect
 
 
-SCHEMA_V2_PATH = Path(__file__).with_name("schema_v2.sql")
-COMPAT_VIEWS_PATH = Path(__file__).with_name("compat_views_v2.sql")
+SCHEMA_V2_PATH = Path(__file__).resolve().parent / "v2" / "schema.sql"
+COMPAT_VIEWS_PATH = Path(__file__).resolve().parent / "v2" / "compat_views.sql"
 GUI_SCHEMA_USER_VERSION = 100
 _V1_SCHEMA_USER_VERSIONS = frozenset({1, 2, 3})
 

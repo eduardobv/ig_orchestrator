@@ -165,6 +165,12 @@ subprocess
 
 ## 5. Estructura de carpetas del proyecto
 
+La estructura viva de `src/` y `tests/` (GUI por paneles, `db/v1`+`db/v2`,
+tests agrupados) está en `docs/modularizacion_v2.md`. Cada paquete GUI/db/cli
+tiene un `MODULE.md`.
+
+Estructura histórica de `v1.0.1` (referencia):
+
 ```text
 instagram_manual_orchestrator/
 |

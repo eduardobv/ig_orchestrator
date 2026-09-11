@@ -11,6 +11,11 @@ Cuando se pida implementar una tarea, leer primero:
 3. `tasks/TareaX.md`
 4. El codigo existente relacionado
 
+Si el cambio es de GUI, persistencia v2 o tests de esos paquetes, leer
+también `docs/modularizacion_v2.md` y el `MODULE.md` del paquete afectado
+(por ejemplo `src/ig_orchestrator/gui/catalog/MODULE.md`). No abrir
+`gui/app.py` salvo el shim: la clase vive en `gui/shell/app.py`.
+
 La IA debe implementar solo la tarea solicitada, salvo que sea imprescindible tocar soporte comun.
 
 ## Version activa

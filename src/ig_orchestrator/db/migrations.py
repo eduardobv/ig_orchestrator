@@ -6,7 +6,7 @@ from sqlite3 import Connection
 from ig_orchestrator.db.connection import connect
 
 
-SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+SCHEMA_PATH = Path(__file__).resolve().parent / "v1" / "schema.sql"
 
 
 def init_database(db_path: str | Path) -> None:
