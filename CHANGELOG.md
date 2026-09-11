@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased - v2.0.0 (en progreso)
+## v2.0.0 - GUI, sqlite v2 y aviso Telegram
 
-Fecha: 2026-09-04
+Fecha: 2026-09-11
 
 ### Creado
 
@@ -123,6 +123,7 @@ Fecha: 2026-09-04
 * `python -m pytest -q`
 * Modularización v2: `python -m pytest -q` → 294 passed
 * `python -m pytest -q tests/gui/test_editor.py tests/gui/test_rename.py`
+* Release v2.0.0: `python -m pytest -q` → 296 passed
 
 ## v1.31.0 - GUI: cola de lotes y rename combinado
 
