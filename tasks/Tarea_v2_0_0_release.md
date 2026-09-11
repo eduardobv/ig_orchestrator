@@ -1,7 +1,6 @@
 # T2.RELEASE — PR a master y tag v2.0.0
 
-Estado: **PENDIENTE**. No abrir PR ni crear el tag hasta que el usuario
-confirme que el flujo GUI v2 está validado.
+Estado: **HECHO**.
 
 ## Cómo pedir esta tarea (otra sesión)
 
@@ -189,6 +188,12 @@ Tag: v2.0.0 en <sha>
 ```
 
 Commit de ese apunte en `master` o en un patch posterior; no retaguear.
+
+## Hecho
+
+Fecha: 2026-09-11
+PR: https://github.com/eduardobv/ig_orchestrator/pull/1
+Tag: v2.0.0 en 6facb9791490402759d96cd16cdbfe6adead5152
 
 ## Respuesta final esperada
 
