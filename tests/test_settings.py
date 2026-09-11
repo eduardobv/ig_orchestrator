@@ -14,6 +14,7 @@ ENV_NAMES = (
     "WORKING_FOLDER",
     "REPORTS_FOLDER",
     "SQLITE_DB_PATH",
+    "SQLITE_GUI_DB_PATH",
     "MAX_RETRIES",
     "RETRY_BASE_SECONDS",
     "RETRY_MAX_SECONDS",
@@ -76,6 +77,7 @@ def test_load_settings_from_env_file(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     assert settings.reports_folder == Path("reports")
     assert settings.sqlite_db_path == Path(r"data\orchestrator.db")
+    assert settings.sqlite_gui_db_path == Path(r"data\orchestrator_gui.sqlite")
     assert settings.max_retries == 5
     assert settings.retry_base_seconds == 90
     assert settings.retry_max_seconds == 900
@@ -132,6 +134,26 @@ def test_reserved_future_variables_are_optional(
     assert settings.post_process_command is None
     assert settings.manual_rename_bat_path is None
     assert settings.manual_rename_config_path is None
+    assert settings.sqlite_gui_db_path == Path(r"data\orchestrator_gui.sqlite")
+
+
+def test_sqlite_gui_db_path_can_be_overridden(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_settings_environment(monkeypatch)
+    env_file = tmp_path / ".env"
+    write_env_file(env_file)
+    custom_path = tmp_path / "gui.sqlite"
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8")
+        + f"\nSQLITE_GUI_DB_PATH={custom_path}\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(env_file)
+
+    assert settings.sqlite_gui_db_path == custom_path
+    assert settings.sqlite_db_path == Path(r"data\orchestrator.db")
 
 
 def test_invalid_post_process_enabled_raises_clear_error(

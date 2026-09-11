@@ -26,8 +26,10 @@ El proceso manual original tiene muchas piezas dificiles de auditar: listas de U
 4. SQLite pasa a ser la fuente de verdad.
 5. Cada URL se guarda como un trabajo individual.
 6. Si una cuenta tiene `download_stories = true`, se genera automaticamente la URL de stories.
-7. Las stories generadas se procesan antes que las URLs manuales.
-8. Los errores temporales se reintentan por rondas, al final.
+7. Las stories (generadas o de entrada) se procesan antes que reels/posts/highlights.
+   Con `processing.stories_first` (default, Configuración) el lote hace dos
+   barridas: todas las stories de todas las cuentas, y después el resto.
+8. Los errores temporales se reintentan por rondas, al final de cada barrida.
 9. Los errores definitivos quedan guardados sin reintento.
 10. Los archivos descargados se asocian a la URL que los produjo.
 11. Los archivos se mueven a carpetas por tipo.
@@ -243,6 +245,10 @@ Reglas de validacion:
   solo descargan stories (`download_stories = true` y `urls: []`) y despues
   por numero ascendente de URLs procesables. Los empates mantienen el orden
   original del JSON.
+- Ese orden se conserva. Encima, el modo stories-first (activo por defecto)
+  descarga primero todos los enlaces `STORY` del lote y deja las cuentas mixtas
+  en `INCOMPLETE` hasta la segunda barrida (reels, posts, highlights). Se
+  desactiva con un check en Configuración.
 
 ## GUI de escritorio
 
@@ -406,12 +412,17 @@ monitor 1920x1080). El catalogo permanece a la izquierda; a su derecha, el
 `Editor` ocupa la zona superior y `Cuentas del lote actual` la inferior, justo
 antes de la caja de estado. `URLs`, `Cuentas del lote actual` y la caja de
 estado muestran scroll vertical permanente y visible. El ancho inicial del
-catalogo se ajusta al username mas largo. La tabla presenta `Username`, `URLs`,
-`Estado`, `Stories` y `Start date`: username usa el mismo maximo del catalogo y
-el resto reserva solo su contenido maximo esperado. El encabezado `Username`
-ordena A-Z / Z-A. Se pueden seleccionar varias cuentas (Ctrl/Shift) y usar
-`Guardar selección` para registrar solo esas en un lote DRAFT; las demas
-permanecen en la mesa de trabajo. `Registrar lote` sigue guardando todas.
+catalogo se ajusta al username mas largo. En vista árbol, el buscador del
+catalogo selecciona la cuenta buscada (sin cargar el editor) para no tener que
+localizarla a ojo entre las hermanas de carpeta. La tabla presenta `Username`,
+`URLs`, `Estado`, `Stories` y `Start date`: username usa el mismo maximo del
+catalogo, `Stories` muestra ✅/❌, y el resto reserva solo su contenido maximo
+esperado. Encima de la tabla hay un buscador y un contador de cuentas. Al
+agregar una cuenta, la tabla hace scroll y foco a esa fila sin seleccionarla,
+para que el editor siga vacío. El encabezado `Username` ordena A-Z / Z-A. Se
+pueden seleccionar varias cuentas (Ctrl/Shift) y usar `Guardar selección` para
+registrar solo esas en un lote DRAFT; las demas permanecen en la mesa de
+trabajo. `Registrar lote` sigue guardando todas.
 
 Cuando el subproceso de un lote termina, la GUI reproduce el sonido de
 finalizacion de Windows. Si no esta disponible, utiliza la campana de Tk.
@@ -437,10 +448,16 @@ guardado agrega una cuenta nueva en vez de actualizar la anterior.
 El campo `URLs` acepta una URL por linea y tambien listas pegadas con comillas
 y comas. Tras `Pegar` o `Normalizar`, el foco queda al final del listado.
 `Pegar/Agregar` pega el portapapeles y ejecuta inmediatamente
-`Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Todas las
-acciones quedan en una columna a la izquierda del editor, en este orden:
-`Agregar/Actualizar`, `Pegar/Agregar`, `Pegar`, separador, `Normalizar` y
-`Limpiar editor`. El boton `Normalizar` convierte entradas como:
+`Agregar/Actualizar`; `Pegar` conserva el flujo de revision manual. Tras
+`Agregar/Actualizar`, el Username se limpia también con el catálogo en árbol.
+`Agregar/Actualizar` queda a la altura de Username. El resto de acciones
+(`Pegar/Agregar`, `Pegar`, `Normalizar` y `Limpiar editor`) se apilan a
+la altura del campo URLs. Junto al combobox Username hay un icono compacto
+de portapapeles (pega la primera linea del clipboard) y un ❌ del mismo
+tamaño que el del catálogo, que solo vacía Username. Click derecho en
+Lote, Username, URLs y los buscadores del catálogo y del lote abre un menú
+Cortar / Copiar / Pegar / Eliminar / Seleccionar todo. El boton
+`Normalizar` convierte entradas como:
 
 ```text
 "https://www.instagram.com/p/DaGP2rHuY0P/",
@@ -754,7 +771,7 @@ Puedes inspeccionarla con cualquier visor SQLite o con la CLI de SQLite si la ti
 Estados relevantes:
 
 - Batch: `DRAFT`, `IMPORTED`, `PROCESSING`, `COMPLETED`, `PARTIAL`, `FAILED`.
-- Cuenta: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`.
+- Cuenta: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `PARTIAL`, `INCOMPLETE`.
 - URL: `PENDING`, `SENT_TO_BOT`, `WAITING_DOWNLOAD`, `DOWNLOADED`, `RETRY_PENDING`, `FAILED_TEMPORARY`, `FAILED_FINAL`, `CLASSIFIED`, `COMPLETED`.
 - Archivo: `DETECTED`, `MOVED_TO_WORKING_FOLDER`, `CLASSIFIED_AS_REEL`, `CLASSIFIED_AS_POST`, `CLASSIFIED_AS_STORY`, `CLASSIFIED_AS_HIGHLIGHTS`, `FINALIZED`.
 

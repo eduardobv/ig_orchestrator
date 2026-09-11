@@ -1,4 +1,15 @@
-from ig_orchestrator.db.connection import connect
+from ig_orchestrator.db.connection import connect, connect_readonly
+from ig_orchestrator.db.catalog_importer import (
+    CatalogImportResult,
+    import_catalog_from_v1,
+    split_destination_path,
+)
+from ig_orchestrator.db.gui_migrations import (
+    GUI_SCHEMA_USER_VERSION,
+    apply_gui_migrations,
+    init_gui_database,
+    prepare_sqlite,
+)
 from ig_orchestrator.db.migrations import apply_migrations, init_database
 from ig_orchestrator.db.account_repository import AccountRepository
 from ig_orchestrator.db.account_history_repository import AccountHistoryRepository
@@ -17,7 +28,15 @@ __all__ = [
     "RunRecord",
     "RunRepository",
     "UrlJobRepository",
+    "CatalogImportResult",
+    "GUI_SCHEMA_USER_VERSION",
+    "apply_gui_migrations",
     "apply_migrations",
     "connect",
+    "connect_readonly",
+    "import_catalog_from_v1",
     "init_database",
+    "init_gui_database",
+    "prepare_sqlite",
+    "split_destination_path",
 ]

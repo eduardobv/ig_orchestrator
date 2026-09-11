@@ -27,6 +27,7 @@ from ig_orchestrator.models import (
     UrlSource,
 )
 from ig_orchestrator.orchestration import (
+    AccountJobScope,
     AccountOrchestrator,
     AccountOrchestratorConfig,
     UrlJobProcessorResult,
@@ -140,6 +141,165 @@ def test_account_orchestrator_processes_generated_story_before_manual_urls(
     assert not (account_root / "highlights").exists()
     assert stored.job_repo.get_by_id(story.id).run_id == result.run.id
     assert stored.job_repo.get_by_id(manual.id).run_id == result.run.id
+
+
+def test_account_orchestrator_processes_input_story_before_other_manual_urls(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    reel = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    input_story = _create_job(
+        stored.job_repo,
+        stored.account.id,
+        UrlSource.INPUT_URL,
+        publication_type=PublicationType.STORY,
+        url="https://www.instagram.com/stories/example_user/123/",
+    )
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {
+            reel.id: [UrlJobStatus.COMPLETED],
+            input_story.id: [UrlJobStatus.COMPLETED],
+        },
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+    )
+
+    result = asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert processor.calls == [input_story.id, reel.id]
+    assert result.account.status is AccountStatus.COMPLETED
+
+
+def test_account_orchestrator_stories_scope_leaves_mixed_account_incomplete(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    reel = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    story = _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {
+            story.id: [UrlJobStatus.COMPLETED],
+            reel.id: [UrlJobStatus.COMPLETED],
+        },
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+    )
+
+    result = asyncio.run(
+        orchestrator.process_account(
+            stored.account.id,
+            scope=AccountJobScope.STORIES,
+        )
+    )
+
+    assert processor.calls == [story.id]
+    assert result.account.status is AccountStatus.INCOMPLETE
+    assert stored.job_repo.get_by_id(reel.id).status is UrlJobStatus.PENDING
+    assert stored.job_repo.get_by_id(story.id).status is UrlJobStatus.COMPLETED
+
+
+def test_account_orchestrator_stories_scope_completes_story_only_account(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    story = _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {story.id: [UrlJobStatus.COMPLETED]},
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+    )
+
+    result = asyncio.run(
+        orchestrator.process_account(
+            stored.account.id,
+            scope=AccountJobScope.STORIES,
+        )
+    )
+
+    assert processor.calls == [story.id]
+    assert result.account.status is AccountStatus.COMPLETED
+
+
+def test_account_orchestrator_non_stories_scope_skips_stories(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    reel = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    story = _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    stored.job_repo.update_status(story.id, UrlJobStatus.COMPLETED)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {reel.id: [UrlJobStatus.COMPLETED]},
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+    )
+
+    result = asyncio.run(
+        orchestrator.process_account(
+            stored.account.id,
+            scope=AccountJobScope.NON_STORIES,
+        )
+    )
+
+    assert processor.calls == [reel.id]
+    assert result.account.status is AccountStatus.COMPLETED
+
+
+def test_account_orchestrator_stories_scope_retries_story_before_leaving(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    reel = _create_job(stored.job_repo, stored.account.id, UrlSource.INPUT_URL)
+    story = _create_job(stored.job_repo, stored.account.id, UrlSource.GENERATED_STORY)
+    processor = FakeUrlJobProcessor(
+        stored.job_repo,
+        {
+            story.id: [UrlJobStatus.RETRY_PENDING, UrlJobStatus.COMPLETED],
+            reel.id: [UrlJobStatus.COMPLETED],
+        },
+    )
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        config=AccountOrchestratorConfig(max_retries=5),
+    )
+
+    result = asyncio.run(
+        orchestrator.process_account(
+            stored.account.id,
+            scope=AccountJobScope.STORIES,
+        )
+    )
+
+    assert processor.calls == [story.id, story.id]
+    assert result.account.status is AccountStatus.INCOMPLETE
+    assert stored.job_repo.get_by_id(reel.id).status is UrlJobStatus.PENDING
 
 
 def test_account_orchestrator_stops_after_manual_account_removal(
@@ -433,20 +593,26 @@ def _create_job(
     source: UrlSource,
     *,
     status: UrlJobStatus = UrlJobStatus.PENDING,
+    publication_type: PublicationType | None = None,
+    url: str | None = None,
 ) -> UrlJob:
+    if publication_type is None:
+        publication_type = (
+            PublicationType.STORY
+            if source is UrlSource.GENERATED_STORY
+            else PublicationType.REEL
+        )
+    if url is None:
+        url = (
+            "https://www.instagram.com/stories/example_user/"
+            if publication_type is PublicationType.STORY
+            else "https://www.instagram.com/reel/ABC123xyz/"
+        )
     return job_repo.create(
         UrlJob(
             account_id=account_id,
-            url=(
-                "https://www.instagram.com/stories/example_user/"
-                if source is UrlSource.GENERATED_STORY
-                else "https://www.instagram.com/reel/ABC123xyz/"
-            ),
-            publication_type=(
-                PublicationType.STORY
-                if source is UrlSource.GENERATED_STORY
-                else PublicationType.REEL
-            ),
+            url=url,
+            publication_type=publication_type,
             source=source,
             status=status,
             max_retries=5,

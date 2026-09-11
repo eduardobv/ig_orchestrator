@@ -27,7 +27,16 @@ from ig_orchestrator.models import (
     RunSummary,
     UrlJob,
     UrlJobStatus,
-    UrlSource,
+)
+from ig_orchestrator.orchestration.processing_policy import (
+    AccountJobScope,
+    RESUMABLE_RETRY_URL_STATUSES,
+    RETRYABLE_URL_STATUSES,
+    TERMINAL_URL_STATUSES,
+    account_status_after_scope,
+    existing_retry_jobs,
+    job_in_scope,
+    ordered_main_pass_jobs,
 )
 from ig_orchestrator.orchestration.retry_policy import (
     RetryQueue,
@@ -110,9 +119,16 @@ class AccountOrchestrator:
         self._url_job_processor = url_job_processor
         self._config = config or AccountOrchestratorConfig()
 
-    async def process_account(self, account_id: int) -> AccountOrchestratorResult:
+    async def process_account(
+        self,
+        account_id: int,
+        *,
+        scope: AccountJobScope = AccountJobScope.ALL,
+    ) -> AccountOrchestratorResult:
         if account_id <= 0:
             raise ValueError("account_id must be positive")
+        if not isinstance(scope, AccountJobScope):
+            raise ValueError("scope must be an AccountJobScope")
 
         account = self._account_repository.get_by_id(account_id)
         if account is None:
@@ -159,12 +175,14 @@ class AccountOrchestrator:
                         run=run,
                         processed_job_ids=processed_job_ids,
                         working_base=working_base,
+                        scope=scope,
                     )
                 logger.info(
-                    "Account processing started: account_id={} username={} total_urls={}",
+                    "Account processing started: account_id={} username={} total_urls={} scope={}",
                     account_id,
                     account.username,
                     len(jobs),
+                    scope.value,
                 )
                 return await self._process_account_with_logging(
                     account=account,
@@ -173,6 +191,7 @@ class AccountOrchestrator:
                     run=run,
                     processed_job_ids=processed_job_ids,
                     working_base=working_base,
+                    scope=scope,
                 )
         except Exception as exc:
             logger.exception(
@@ -213,6 +232,7 @@ class AccountOrchestrator:
         run: RunRecord,
         processed_job_ids: list[int],
         working_base: Path,
+        scope: AccountJobScope,
     ) -> AccountOrchestratorResult:
         if account.id is None:
             raise ValueError("Account.id is required")
@@ -224,18 +244,21 @@ class AccountOrchestrator:
         else:
             logger.info("Dry-run would ensure account folders: {}", target_folder)
 
-        ordered_jobs = _ordered_main_pass_jobs(jobs)
-        retry_jobs = _existing_retry_jobs(jobs)
+        ordered_jobs = ordered_main_pass_jobs(jobs, scope)
+        retry_jobs = existing_retry_jobs(jobs, scope)
         dry_run_jobs = [*ordered_jobs, *retry_jobs]
-        terminal_count = sum(1 for job in jobs if job.status in _TERMINAL_URL_STATUSES)
+        scoped_jobs = [job for job in jobs if job_in_scope(job, scope)]
+        terminal_count = sum(
+            1 for job in scoped_jobs if job.status in TERMINAL_URL_STATUSES
+        )
         for item_index, job in enumerate(dry_run_jobs, start=1):
             if self._config.item_progress_callback is not None:
                 self._config.item_progress_callback(
-                    min(terminal_count + item_index, len(jobs)),
-                    len(jobs),
+                    min(terminal_count + item_index, len(scoped_jobs)),
+                    len(scoped_jobs),
                     account,
                     job,
-                    job.status in _RESUMABLE_RETRY_URL_STATUSES,
+                    job.status in RESUMABLE_RETRY_URL_STATUSES,
                 )
             logger.info(
                 "Dry-run would process URL job: job_id={} type={} source={} status={} url={}",
@@ -285,6 +308,7 @@ class AccountOrchestrator:
         run: RunRecord,
         processed_job_ids: list[int],
         working_base: Path,
+        scope: AccountJobScope,
     ) -> AccountOrchestratorResult:
         try:
             if self._account_was_failed_externally(account_id):
@@ -311,7 +335,10 @@ class AccountOrchestrator:
             logger.info("Account folders ready: {}", working_base / account.username)
 
             retry_queue: RetryQueue[int] = RetryQueue()
-            terminal_count = sum(1 for job in jobs if job.status in _TERMINAL_URL_STATUSES)
+            scoped_jobs = [job for job in jobs if job_in_scope(job, scope)]
+            terminal_count = sum(
+                1 for job in scoped_jobs if job.status in TERMINAL_URL_STATUSES
+            )
             visited_job_ids: set[int] = set()
 
             def notify_progress(job: UrlJob, *, is_retry: bool) -> None:
@@ -319,18 +346,18 @@ class AccountOrchestrator:
                 visited_job_ids.add(job_id)
                 if self._config.item_progress_callback is not None:
                     self._config.item_progress_callback(
-                        min(terminal_count + len(visited_job_ids), len(jobs)),
-                        len(jobs),
+                        min(terminal_count + len(visited_job_ids), len(scoped_jobs)),
+                        len(scoped_jobs),
                         account,
                         job,
                         is_retry,
                     )
 
-            for job in _ordered_main_pass_jobs(jobs):
+            for job in ordered_main_pass_jobs(jobs, scope):
                 if self._account_was_failed_externally(account_id):
                     break
                 current_job = self._url_job_repository.get_by_id(_require_job_id(job))
-                if current_job is None or current_job.status in _TERMINAL_URL_STATUSES:
+                if current_job is None or current_job.status in TERMINAL_URL_STATUSES:
                     continue
                 notify_progress(current_job, is_retry=False)
                 logger.info(
@@ -348,7 +375,7 @@ class AccountOrchestrator:
                 self._enqueue_or_finalize_retry(result.job, retry_queue)
 
             if not self._account_was_failed_externally(account_id):
-                for job in _existing_retry_jobs(jobs):
+                for job in existing_retry_jobs(jobs, scope):
                     self._enqueue_or_finalize_retry(job, retry_queue)
 
             while retry_queue:
@@ -358,7 +385,7 @@ class AccountOrchestrator:
                 if job_id is None:
                     break
                 job = self._url_job_repository.get_by_id(job_id)
-                if job is None or job.status in _TERMINAL_URL_STATUSES:
+                if job is None or job.status in TERMINAL_URL_STATUSES:
                     continue
 
                 notify_progress(job, is_retry=True)
@@ -395,7 +422,7 @@ class AccountOrchestrator:
                 if self._account_was_failed_externally(account_id):
                     self._mark_manually_removed_job(result.job)
                     break
-                if result.job.status in _RETRYABLE_URL_STATUSES:
+                if result.job.status in RETRYABLE_URL_STATUSES:
                     failed_retry = self._increment_retry_failure(result.job)
                     retry_decision = self._retry_decision(failed_retry)
                     if retry_decision.is_final_failure:
@@ -419,10 +446,15 @@ class AccountOrchestrator:
                         retry_queue.requeue(_require_job_id(failed_retry))
 
             summary = self._build_account_summary(account_id)
+            latest_jobs = self._url_job_repository.list_by_account(account_id)
             account_status = (
                 AccountStatus.FAILED
                 if self._account_was_failed_externally(account_id)
-                else _account_status_from_summary(summary)
+                else account_status_after_scope(
+                    latest_jobs,
+                    scope,
+                    _account_status_from_summary(summary),
+                )
             )
             account = self._account_repository.update_status(account_id, account_status)
             run = self._run_repository.update_summary(
@@ -466,7 +498,7 @@ class AccountOrchestrator:
         job: UrlJob,
         retry_queue: RetryQueue[int],
     ) -> None:
-        if job.status not in _RESUMABLE_RETRY_URL_STATUSES:
+        if job.status not in RESUMABLE_RETRY_URL_STATUSES:
             return
 
         decision = self._retry_decision(job)
@@ -566,34 +598,6 @@ class AccountOrchestrator:
                 f"failed final {failed}; files {downloaded_files}."
             ),
         )
-
-
-_RETRYABLE_URL_STATUSES = {
-    UrlJobStatus.RETRY_PENDING,
-    UrlJobStatus.FAILED_TEMPORARY,
-}
-_RESUMABLE_RETRY_URL_STATUSES = {
-    *_RETRYABLE_URL_STATUSES,
-    UrlJobStatus.SENT_TO_BOT,
-    UrlJobStatus.WAITING_DOWNLOAD,
-}
-_TERMINAL_URL_STATUSES = {
-    UrlJobStatus.COMPLETED,
-    UrlJobStatus.FAILED_FINAL,
-}
-
-
-def _ordered_main_pass_jobs(jobs: list[UrlJob]) -> list[UrlJob]:
-    pending = [job for job in jobs if job.status is UrlJobStatus.PENDING]
-    generated_stories = [
-        job for job in pending if job.source is UrlSource.GENERATED_STORY
-    ]
-    manual_urls = [job for job in pending if job.source is not UrlSource.GENERATED_STORY]
-    return [*generated_stories, *manual_urls]
-
-
-def _existing_retry_jobs(jobs: list[UrlJob]) -> list[UrlJob]:
-    return [job for job in jobs if job.status in _RESUMABLE_RETRY_URL_STATUSES]
 
 
 def _working_base_folder(account: Account, default_working_folder: Path | None) -> Path:

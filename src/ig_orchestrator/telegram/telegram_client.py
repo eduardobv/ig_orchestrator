@@ -86,12 +86,17 @@ class TelethonTelegramClient:
     async def send_message_to_bot(self, text: str) -> Any:
         """Send a message to the configured Telegram download bot."""
 
+        return await self.send_message_to(self._config.bot_username, text)
+
+    async def send_message_to(self, target: str, text: str) -> Any:
+        """Send a message to Saved Messages (`me`) or another chat."""
+
         message = text.strip()
         if not message:
             raise ValueError("message text must not be blank")
-
+        destination = (target or "me").strip() or "me"
         client = self._require_started_client()
-        return await client.send_message(self._config.bot_username, message)
+        return await client.send_message(destination, message)
 
     async def get_latest_bot_messages(self, *, limit: int = 10) -> list[Any]:
         """Return the latest messages from the configured bot."""

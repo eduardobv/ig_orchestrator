@@ -11,6 +11,11 @@ Cuando se pida implementar una tarea, leer primero:
 3. `tasks/TareaX.md`
 4. El codigo existente relacionado
 
+Si el cambio es de GUI, persistencia v2 o tests de esos paquetes, leer
+también `docs/modularizacion_v2.md` y el `MODULE.md` del paquete afectado
+(por ejemplo `src/ig_orchestrator/gui/catalog/MODULE.md`). No abrir
+`gui/app.py` salvo el shim: la clase vive en `gui/shell/app.py`.
+
 La IA debe implementar solo la tarea solicitada, salvo que sea imprescindible tocar soporte comun.
 
 ## Version activa
@@ -34,6 +39,12 @@ v1.2.1, v1.2.2, ...
 ```
 
 Objetivo general de la serie `v1.x`: estabilizar descarga, persistencia, reintentos y reportes.
+
+La serie `v2.x` (rama `v2/orchestrator`, tag final `v2.0.0`) rediseña la GUI y usa
+`data/orchestrator_gui.sqlite`. La CLI y `data/orchestrator.sqlite` de `v1.31.0`
+siguen siendo el rollback. No escribir en el SQLite v1 desde la GUI v2.
+
+Cierre v2.0.0 (PR a `master` + tag): `tasks/Tarea_v2_0_0_release.md`.
 
 No implementar en `v1.0.1`:
 
@@ -102,6 +113,12 @@ Cada ejecucion debe poder reconstruirse desde SQLite y generar un reporte Markdo
 7. Si `download_stories = true`, generar `https://www.instagram.com/stories/{username}/`.
 8. Procesar primero stories.
 9. Procesar despues las URLs manuales en orden.
+
+En v2, si `processing.stories_first` está activo (default), el lote no
+termina cada cuenta antes de pasar a la siguiente. Primero se procesan
+todos los jobs `STORY` del lote (cuentas solo-stories y después las mixtas),
+las cuentas mixtas quedan `INCOMPLETE`, y una segunda barrida procesa
+reels/posts/highlights. El check en Configuración restaura el modo legado.
 10. Si una URL falla temporalmente, pasar a la siguiente y reintentar al final.
 11. Si una URL falla con error definitivo, guardar error y no reintentar.
 12. Mover archivos a carpeta correcta.

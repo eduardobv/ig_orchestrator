@@ -12,6 +12,7 @@ class AccountStatus(StrEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     PARTIAL = "PARTIAL"
+    INCOMPLETE = "INCOMPLETE"
 
 
 def utc_now() -> datetime:

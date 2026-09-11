@@ -1,5 +1,130 @@
 # Changelog
 
+## v2.0.0 - GUI, sqlite v2 y aviso Telegram
+
+Fecha: 2026-09-11
+
+### Creado
+
+* `docs/modularizacion_v2.md` y `tasks/Tarea_v2_modularize.md`.
+* Paquetes GUI: `gui/shell`, `chrome`, `catalog`, `editor`,
+  `batch_accounts`, `run`, `batches`, `queue`, `settings`, `draft`,
+  `shared` (cada uno con `MODULE.md`).
+* Persistencia v2 partida: `db/v2/adapters/`, `db/v2/catalog/`,
+  `db/v1/schema.sql`, `db/v2/schema.sql`.
+* Tests agrupados en `tests/gui`, `db`, `orchestration`, `telegram`,
+  `input`, `filesystem`, `reports`.
+* `src/ig_orchestrator/cli/main.py` (entry CLI; `main.py` es shim).
+* `src/ig_orchestrator/orchestration/processing_policy.py` (alcance
+  stories/resto, orden de barridas, setting `processing.stories_first`).
+* `tasks/Tarea_v2_stories_first.md`.
+* `tests/test_processing_policy.py`.
+* `src/ig_orchestrator/db/schema_v2.sql` con diccionarios de estados/tipos,
+  `bot_errors`, `path_roots`, catálogo, lotes, URLs y ficheros relativos.
+* `src/ig_orchestrator/db/gui_migrations.py` (`user_version = 100`).
+* `src/ig_orchestrator/db/catalog_importer.py` (solo catálogo, ids conservados).
+* `src/ig_orchestrator/db/gui_catalog_repository.py`, `gui_adapters.py`,
+  `lookups.py`, `schema_mode.py`, `compat_views_v2.sql`.
+* `src/ig_orchestrator/input/gui_batch_creation.py` (inserts en una transacción).
+* `tests/test_gui_database.py`, `tests/test_catalog_importer.py`,
+  `tests/test_gui_repositories.py`, `tests/test_gui_theme.py`,
+  `tests/test_log_window.py`.
+* `tasks/Tarea_v2_D1.md` … `Tarea_v2_D6.md`.
+* `tasks/Tarea_v2_0_0_release.md` (PR a `master` + tag `v2.0.0`, pendiente
+  de validación).
+* `tasks/Tarea_v2_GUI_batch_ux.md`.
+* `tasks/Tarea_v2_GUI_editor_clipboard.md`.
+* `src/ig_orchestrator/gui/text_edit.py`.
+* `src/ig_orchestrator/gui/static/icons/clipboard_black.png`.
+* `tests/test_text_edit.py`.
+* Copia local `data/old/orchestrator.v1.31.0.sqlite` (no se commitea).
+
+### Modificado
+
+* Modularización sin cambio de comportamiento: `gui/app.py` (~3900 líneas)
+  pasa a mixins por panel; servicios GUI y `gui_adapters.py` se trocean;
+  rutas viejas quedan como shims de reexport.
+* Pegar/Agregar no fallaba por `NameError` en el mixin del editor
+  (`batch_username_matches_filter` no se importaba). El mixin de
+  renombrado importa `MANUAL_RENAME_SCRIPT` y `NewAccountRenameParameters`.
+* Procesamiento de lote en dos barridas cuando `processing.stories_first`
+  está activo (default): primero todos los jobs `STORY` del lote (cuentas
+  solo-stories y después mixtas), cuentas mixtas → `INCOMPLETE`, segunda
+  barrida para reels/posts/highlights. Un check en Configuración restaura
+  el modo legado (cuenta entera y siguiente).
+* Estado de cuenta `INCOMPLETE` (lookup GUI id 6) y reanudable.
+* `AccountOrchestrator.process_account(..., scope=)` limita jobs y reintentos.
+* Dentro de una cuenta, cualquier URL `STORY` (generada o de entrada) va
+  antes que el resto.
+* Ventana de log: cerrar la oculta (`withdraw`) en vez de destruir el
+  `Text`; `append` ignora widgets ya destruidos. Evita
+  `TclError: invalid command name ".!toplevel...!text"` al pulsar
+  Renombrar después de cerrar el log.
+* Tema GUI: `option_add("*Font")` usa `{Segoe UI} 10`. Sin llaves Tk
+  interpretaba `UI` como tamaño y `tk.Menu` fallaba al abrir `ejecutar_gui.bat`.
+* `connect()` usa WAL + `synchronous=NORMAL`.
+* Setting opcional `SQLITE_GUI_DB_PATH` (default `data\orchestrator_gui.sqlite`).
+* Repositorios v1 despachan a adaptadores v2 si `user_version >= 100`.
+* `create_batch` / `save_batch_draft` en esquema GUI usan `executemany`.
+* La GUI arranca contra `orchestrator_gui.sqlite`, importa el catálogo v1
+  en solo lectura y lanza `run_continue` con `SQLITE_DB_PATH` apuntando al
+  fichero GUI. El diálogo Lotes no se rediseña (vistas de compatibilidad).
+* GUI: menú, i18n es/en, tema claro, toolbar de iconos, Start date de solo
+  lectura, sin Dry-run, editor compacto, barra de estado + log en ventana,
+  Renombrar/Detener en la toolbar. Configuración: idioma (reinicia) y vaciar
+  ficheros descargados. `finish_batch` limpia `downloaded_files` si retention
+  es `on_complete`.
+* Catálogo lista/árbol (`G:\4K Stogram\…` + username hoja). Colores
+  configurables con paleta. Orden A↔Z visual en cuentas del lote y URLs.
+* Aviso Telegram a `me` u otro chat al terminar un lote y si un error del
+  bot está marcado; plantilla y destino en Configuración.
+* `.env.example` y `Agents.md` documentan el fichero GUI y el rollback a
+  `v1.31.0`.
+* Catálogo en árbol: al buscar un username, esa cuenta queda seleccionada
+  (y visible) entre los peers de carpeta. Tras Agregar/Actualizar, el
+  Username del editor se limpia también en vista árbol; la selección
+  programática del árbol no recarga el editor.
+* Cuentas del lote: buscador por username, contador `Cuentas: N` (y
+  `visible / total` si hay filtro), columna Stories con ✅/❌, y al agregar
+  se hace `focus`+`see` de la fila nueva sin seleccionarla (el editor no
+  se rellena).
+* Editor: `Agregar/Actualizar` a la altura de Username; `Pegar/Agregar`,
+  `Pegar`, `Normalizar` y `Limpiar editor` apilados a la altura de URLs.
+  Junto al combobox Username: icono compacto `clipboard_black.png` (pega
+  el portapapeles) y ❌ (limpia solo Username), mismo tamaño que el
+  buscador del catálogo y el de cuentas del lote.
+* Click derecho en Lote, buscador del catálogo, Username, URLs y buscador
+  del lote: menú Cortar / Copiar / Pegar / Eliminar / Seleccionar todo
+  (i18n). No se usa el menú nativo de Windows para que sv-ttk y `tk.Text`
+  se comporten igual y el idioma coincida con la GUI.
+* Cola zombi: una secuencia `AWAITING_RENAME` sin lotes activos (todos
+  `REMOVED`/`SKIPPED`) se cancela al abrirla y ya no secuestra el botón
+  **Renombrar** de un lote suelto. Causa del error
+  «No hay lotes para armar el comando de renombrado» con
+  `descargas_2026_08_31_amber` (el lote en sí estaba correcto).
+* Renombrar un lote desde Lotes usa ese lote, no la cola abierta.
+* Un lote independiente solo avanza la cola si es el ítem `RUNNING`.
+* **Quitar de cola** funciona con ítems `PENDING` y `COMPLETED` (no con
+  `RUNNING`). Si la secuencia queda vacía, pasa a `CANCELLED`.
+* `Finalizar sin renombrar`, `Ejecutado en otra instancia` y `Borrar lote`
+  desenganchan el lote de la secuencia abierta. El ítem desaparece; si no
+  queda nadie, la cola se cierra.
+* Guardar lote muestra el error de nombre duplicado / `IntegrityError`
+  en vez de un traceback.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/test_text_edit.py tests/test_gui_theme.py tests/test_i18n.py tests/test_gui_services.py`
+* `python -m pytest -q tests/test_log_window.py tests/test_gui_theme.py`
+* `python -m pytest -q tests/test_catalog_tree.py tests/test_notify_service.py tests/test_i18n.py tests/test_gui_services.py`
+* `python -m pytest -q tests/test_gui_services.py -k "catalog_focus or filter_batch or stories_cell"`
+* `python -m pytest -q tests/test_i18n.py`
+* `python -m pytest -q tests/test_gui_services.py -k "queue or rename or elsewhere or detach or zombie or reactivat"`
+* `python -m pytest -q`
+* Modularización v2: `python -m pytest -q` → 294 passed
+* `python -m pytest -q tests/gui/test_editor.py tests/gui/test_rename.py`
+* Release v2.0.0: `python -m pytest -q` → 296 passed
+
 ## v1.31.0 - GUI: cola de lotes y rename combinado
 
 Fecha: 2026-08-15

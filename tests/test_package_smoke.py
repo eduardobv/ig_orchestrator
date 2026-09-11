@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import ig_orchestrator
-from ig_orchestrator import main as app_main
+import ig_orchestrator.cli.main as app_main
 from ig_orchestrator.db import AccountRepository, BatchRepository, UrlJobRepository, connect, init_database
 from ig_orchestrator.models import DownloadFile, DownloadFileStatus, MediaType, UrlJobStatus
 from ig_orchestrator.models import Account, AccountStatus, InputBatch, InputBatchStatus, PublicationType, UrlJob, UrlSource
@@ -14,7 +14,7 @@ from ig_orchestrator.telegram import BotConversationResult
 
 
 def test_package_imports() -> None:
-    assert ig_orchestrator.__version__ == "1.31.0"
+    assert ig_orchestrator.__version__ == "2.0.0"
 
 
 def test_module_entrypoint_runs() -> None:
@@ -30,7 +30,7 @@ def test_module_entrypoint_runs() -> None:
         text=True,
     )
 
-    assert "ig_orchestrator v1.31.0" in result.stdout
+    assert "ig_orchestrator v2.0.0" in result.stdout
 
 
 def test_module_entrypoint_dry_run_imports_batch_without_telegram(tmp_path: Path) -> None:

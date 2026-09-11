@@ -71,6 +71,14 @@ def create_batch(
 ) -> BatchCreationResult:
     """Persist a validated batch request as SQLite batch, account and URL jobs."""
 
+    from ig_orchestrator.db.schema_mode import is_gui_schema
+    from ig_orchestrator.input.gui_batch_creation import create_gui_batch
+
+    if is_gui_schema(connection):
+        return create_gui_batch(
+            request, connection, settings=settings, status=status
+        )
+
     batch = _create_unique_batch(request, BatchRepository(connection), status=status)
     return _populate_batch(request, connection, batch=batch, settings=settings)
 
@@ -83,6 +91,14 @@ def update_draft_batch(
     settings: Settings | None = None,
 ) -> BatchCreationResult:
     """Replace an unexecuted GUI draft while preserving its stable batch id."""
+
+    from ig_orchestrator.db.schema_mode import is_gui_schema
+    from ig_orchestrator.input.gui_batch_creation import replace_gui_draft_batch
+
+    if is_gui_schema(connection):
+        return replace_gui_draft_batch(
+            batch_id, request, connection, settings=settings
+        )
 
     batch = BatchRepository(connection).get_by_id(batch_id)
     if batch is None:

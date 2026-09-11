@@ -12,6 +12,16 @@ from ig_orchestrator.models import InputBatch, InputBatchStatus
 
 
 class BatchRepository:
+    def __new__(cls, connection: Connection):
+        if cls is BatchRepository:
+            from ig_orchestrator.db.schema_mode import is_gui_schema
+
+            if is_gui_schema(connection):
+                from ig_orchestrator.db.gui_adapters import GuiBatchRepository
+
+                cls = GuiBatchRepository
+        return super().__new__(cls)
+
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
@@ -71,7 +81,7 @@ class BatchRepository:
             FROM input_batches
             JOIN accounts ON accounts.batch_id = input_batches.id
             JOIN url_jobs ON url_jobs.account_id = accounts.id
-            WHERE accounts.status IN ('PENDING', 'PROCESSING', 'PARTIAL')
+            WHERE accounts.status IN ('PENDING', 'PROCESSING', 'PARTIAL', 'INCOMPLETE')
               AND url_jobs.status IN (
                   'PENDING',
                   'SENT_TO_BOT',
@@ -91,7 +101,7 @@ class BatchRepository:
             FROM accounts
             JOIN url_jobs ON url_jobs.account_id = accounts.id
             WHERE accounts.batch_id = ?
-              AND accounts.status IN ('PENDING', 'PROCESSING', 'PARTIAL')
+              AND accounts.status IN ('PENDING', 'PROCESSING', 'PARTIAL', 'INCOMPLETE')
               AND url_jobs.status IN (
                   'PENDING',
                   'SENT_TO_BOT',
