@@ -106,7 +106,12 @@ from ig_orchestrator.gui.text_edit import (
     first_clipboard_line,
     read_clipboard,
 )
-from ig_orchestrator.gui.theme import Tooltip, compact_icon_button, icon_button
+from ig_orchestrator.gui.theme import (
+    STATUS_TONE_IDLE,
+    Tooltip,
+    compact_icon_button,
+    icon_button,
+)
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
 from ig_orchestrator.models import AccountHistoryStatus
@@ -149,6 +154,7 @@ class RunControllerMixin:
         self.rename_button.configure(state="disabled")
         self._update_batch_context()
         self._set_status("Nuevo lote sin registrar")
+        self._set_status_tone(STATUS_TONE_IDLE)
         self._write_console(
             "Nuevo lote iniciado. El lote anterior permanece sin cambios en SQLite.\n"
         )
@@ -280,6 +286,7 @@ class RunControllerMixin:
         if batch_id is None:
             return
 
+        self._set_status_tone(STATUS_TONE_IDLE)
         self._start_batch(batch_id)
 
 

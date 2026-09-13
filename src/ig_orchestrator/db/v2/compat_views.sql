@@ -40,7 +40,10 @@ BEGIN
     DELETE FROM batches WHERE id = OLD.id;
 END;
 
-CREATE VIEW IF NOT EXISTS accounts AS
+DROP TRIGGER IF EXISTS accounts_update;
+DROP TRIGGER IF EXISTS accounts_delete;
+DROP VIEW IF EXISTS accounts;
+CREATE VIEW accounts AS
 SELECT
     ba.id,
     ba.batch_id,
@@ -59,6 +62,8 @@ SELECT
     ba.rename_start_init_date,
     ba.rename_destination_path,
     bas.code AS status,
+    ba.sort_order,
+    ba.priority,
     ba.created_at,
     ba.updated_at
 FROM batch_accounts ba

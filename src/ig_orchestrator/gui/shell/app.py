@@ -147,6 +147,7 @@ from ig_orchestrator.gui.editor.panel import EditorPanelMixin
 from ig_orchestrator.gui.run.controller import RunControllerMixin
 from ig_orchestrator.gui.run.rename import RenameMixin
 from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
+from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
 def launch_gui(
     *,
@@ -186,6 +187,7 @@ class InstagramOrchestratorApp(
     BatchesDialogMixin,
     RunControllerMixin,
     RenameMixin,
+    StoriesInboxMixin,
 ):
     def __init__(
         self,
@@ -246,10 +248,12 @@ class InstagramOrchestratorApp(
         self.batch_filter_var = tk.StringVar()
         self.batch_count_var = tk.StringVar(value=t("label.batch_count", count=0))
         self.username_var = tk.StringVar()
+        self._editor_bound_username = ""
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
         self.new_account_var = tk.BooleanVar(value=False)
         self.catalog_update_var = tk.BooleanVar(value=False)
+        self.priority_var = tk.BooleanVar(value=False)
         self.owner_id_var = tk.StringVar()
         self.start_init_date_var = tk.StringVar()
         self.destination_path_var = tk.StringVar()
@@ -306,7 +310,7 @@ class InstagramOrchestratorApp(
         top = ttk.Frame(self.root, padding=(8, 6))
         self.top_region = top
         top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(9, weight=1)
+        top.columnconfigure(10, weight=1)
 
         self.new_batch_button = icon_button(
             top,
@@ -358,16 +362,24 @@ class InstagramOrchestratorApp(
             command=self._show_manual_rename_command,
             tooltip=t("tooltip.rename_manual"),
         )
-        self.rename_manual_button.grid(row=0, column=6, padx=(0, 12))
-        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=7, sticky="w")
+        self.rename_manual_button.grid(row=0, column=6, padx=(0, 8))
+        self.stories_inbox_button = ttk.Button(
+            top,
+            text=t("label.stories_tool"),
+            command=self._open_stories_inbox,
+            width=8,
+        )
+        self.stories_inbox_button.grid(row=0, column=7, padx=(0, 12))
+        Tooltip(self.stories_inbox_button, t("tooltip.stories"))
+        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=8, sticky="w")
         self.batch_name_entry = ttk.Entry(
             top, textvariable=self.batch_name_var, width=28
         )
-        self.batch_name_entry.grid(row=0, column=8, sticky="ew", padx=(6, 12))
+        self.batch_name_entry.grid(row=0, column=9, sticky="ew", padx=(6, 12))
         bind_edit_context_menu(self.batch_name_entry)
-        ttk.Label(top, text=t("label.date")).grid(row=0, column=9, sticky="e")
+        ttk.Label(top, text=t("label.date")).grid(row=0, column=10, sticky="e")
         ttk.Label(top, textvariable=self.default_date_var).grid(
-            row=0, column=10, sticky="w", padx=(6, 0)
+            row=0, column=11, sticky="w", padx=(6, 0)
         )
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -394,12 +406,20 @@ class InstagramOrchestratorApp(
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
         bottom.columnconfigure(0, weight=1)
-        self.status_button = ttk.Button(
+        self.status_button = tk.Button(
             bottom,
             textvariable=self.status_bar_var,
             command=self.log_window.toggle,
+            anchor="w",
+            padx=8,
+            pady=4,
+            relief="groove",
+            bd=1,
         )
         self.status_button.grid(row=0, column=0, sticky="ew")
+        self._status_idle_bg = str(self.status_button.cget("bg"))
+        self._status_idle_fg = str(self.status_button.cget("fg"))
+        self.status_tone = "idle"
         self.console = tk.Text(bottom, height=1)
         self.clean_console_button = ttk.Button(bottom, command=self._clear_console)
 

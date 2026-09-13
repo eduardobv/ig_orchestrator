@@ -14,7 +14,10 @@ Lee: `connection`, `catalog_entries`, `catalog_view_mode`, `catalog_colors`, `ac
 Escribe: `username_var`, selección de lista/árbol, `catalog_entries`
 
 ## Habla con
-- editor: `self._load_catalog` rellena username
+- editor: `self._load_catalog` rellena username y llama
+  `_apply_username_identity` (resetea checks si el username cambió).
+  Pegar en el buscador (botón, menú, Ctrl+V) escribe el texto en
+  Username y selecciona el match en lista/árbol.
 - settings: colores (`save_color` → `_refresh_catalog`)
 
 ## No debe

@@ -71,6 +71,7 @@ def test_editor_layout_places_add_update_on_username_row() -> None:
         app.stories_var = tk.BooleanVar(value=False)
         app.new_account_var = tk.BooleanVar(value=False)
         app.catalog_update_var = tk.BooleanVar(value=False)
+        app.priority_var = tk.BooleanVar(value=False)
         app.owner_id_var = tk.StringVar()
         app.start_init_date_var = tk.StringVar()
         app.destination_path_var = tk.StringVar()

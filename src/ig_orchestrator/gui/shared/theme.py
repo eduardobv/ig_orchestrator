@@ -10,6 +10,25 @@ PANEL = "#FFFFFF"
 INK = "#1F2933"
 ACCENT = "#2563EB"
 BORDER = "#E2E5EA"
+STATUS_SUCCESS = "#238636"
+STATUS_WARNING_BG = "#fff2cc"
+STATUS_WARNING_FG = "#7a4f00"
+STATUS_ERROR = "#cf222e"
+
+STATUS_TONE_IDLE = "idle"
+STATUS_TONE_BUSY = "busy"
+STATUS_TONE_SUCCESS = "success"
+STATUS_TONE_WARNING = "warning"
+STATUS_TONE_ERROR = "error"
+
+# (background, foreground). idle uses the widget's original colors.
+STATUS_TONE_COLORS: dict[str, tuple[str, str] | None] = {
+    STATUS_TONE_IDLE: None,
+    STATUS_TONE_BUSY: (ACCENT, "#ffffff"),
+    STATUS_TONE_SUCCESS: (STATUS_SUCCESS, "#ffffff"),
+    STATUS_TONE_WARNING: (STATUS_WARNING_BG, STATUS_WARNING_FG),
+    STATUS_TONE_ERROR: (STATUS_ERROR, "#ffffff"),
+}
 UI_FONT_FAMILY = "Segoe UI"
 UI_FONT_SIZE = 10
 

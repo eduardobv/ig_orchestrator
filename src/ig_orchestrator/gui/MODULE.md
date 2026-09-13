@@ -14,6 +14,7 @@
 | Cola de secuencia | `gui/queue` |
 | Configuración | `gui/settings` |
 | Draft en memoria/SQLite | `gui/draft` |
+| Organizar stories | `gui/stories` |
 | i18n, iconos, tema, helpers | `gui/shared` |
 
 `gui/app.py` es un shim. La clase vive en `gui/shell/app.py`.

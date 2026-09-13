@@ -14,6 +14,7 @@ class AccountDraft:
     owner_id: str = ""
     start_init_date: str = ""
     destination_path: str = ""
+    priority: int = 0
 
 
 @dataclass(slots=True)

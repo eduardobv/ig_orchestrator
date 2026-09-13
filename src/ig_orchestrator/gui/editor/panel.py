@@ -16,10 +16,17 @@ from ig_orchestrator.gui.account_catalog_service import (
     list_usernames_active_on_date,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
+from ig_orchestrator.gui.draft.priority import (
+    PRIORITY_HIGHEST,
+    PRIORITY_NONE,
+    assign_exclusive_priority,
+    ordered_accounts_for_display,
+)
 from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
     normalize_url_lines,
+    normalize_username,
     save_catalog_metadata_to_history,
     save_new_account_to_catalog,
     save_batch_draft,
@@ -147,9 +154,22 @@ class EditorPanelMixin:
         )
         self.username_combo.grid(row=0, column=0, sticky="w")
         self.username_combo.bind(
-            "<<ComboboxSelected>>", lambda _event: self._apply_catalog_date()
+            "<<ComboboxSelected>>", lambda _event: self._on_username_combo_selected()
         )
-        bind_edit_context_menu(self.username_combo)
+        bind_edit_context_menu(
+            self.username_combo,
+            after_change=lambda: self._apply_username_identity(
+                self.username_var.get()
+            ),
+        )
+        for sequence in ("<Control-v>", "<Control-V>", "<<Paste>>"):
+            self.username_combo.bind(
+                sequence,
+                lambda _event: self.root.after_idle(
+                    lambda: self._apply_username_identity(self.username_var.get())
+                ),
+                add="+",
+            )
         self.paste_username_button = compact_icon_button(
             username_row,
             image=self.icons.get_compact("clipboard-black"),
@@ -186,6 +206,12 @@ class EditorPanelMixin:
             text=t("label.update"),
             variable=self.catalog_update_var,
             command=self._on_catalog_update_toggle,
+        ).pack(side=tk.LEFT, padx=(12, 0))
+        tk.Checkbutton(
+            flags,
+            text=t("label.priority"),
+            variable=self.priority_var,
+            command=self._update_indicators,
         ).pack(side=tk.LEFT, padx=(12, 0))
 
         self.new_account_frame = ttk.LabelFrame(
@@ -278,6 +304,43 @@ class EditorPanelMixin:
         )
 
 
+    def _editor_username_identity(self, username: str) -> str:
+        return normalize_username(username).casefold()
+
+
+    def _reset_editor_account_flags(self) -> None:
+        """Return Stories / New account / Update / Priority to the empty-editor state."""
+        self.stories_var.set(False)
+        self.new_account_var.set(False)
+        self.catalog_update_var.set(False)
+        priority_var = getattr(self, "priority_var", None)
+        if priority_var is not None:
+            priority_var.set(False)
+        self.owner_id_var.set("")
+        self.start_init_date_var.set("")
+        self.destination_path_var.set("")
+        self._toggle_catalog_metadata_fields()
+
+
+    def _apply_username_identity(self, username: str, *, hydrate: bool = False) -> None:
+        """Bind editor flags to *username*. Reset them when the identity changes.
+
+        ``hydrate=True`` is for loading a batch row: the caller sets the flags
+        from that account afterwards.
+        """
+        identity = self._editor_username_identity(username)
+        previous = getattr(self, "_editor_bound_username", "")
+        self._editor_bound_username = identity
+        if hydrate or previous == identity:
+            return
+        self._reset_editor_account_flags()
+
+
+    def _on_username_combo_selected(self) -> None:
+        self._apply_username_identity(self.username_var.get())
+        self._apply_catalog_date()
+
+
     def _on_new_account_toggle(self) -> None:
         if self.new_account_var.get():
             self.catalog_update_var.set(False)
@@ -295,6 +358,8 @@ class EditorPanelMixin:
 
 
     def _toggle_catalog_metadata_fields(self) -> None:
+        if getattr(self, "new_account_frame", None) is None:
+            return
         if self.new_account_var.get():
             self.new_account_frame.configure(text="Datos de cuenta nueva")
             self.start_init_date_label.grid()
@@ -314,6 +379,7 @@ class EditorPanelMixin:
         urls = self.urls_text.get("1.0", tk.END).splitlines()
         is_new = self.new_account_var.get()
         is_update = self.catalog_update_var.get() and not is_new
+        priority_var = getattr(self, "priority_var", None)
         return AccountDraft(
             username=self.username_var.get(),
             download_stories=self.stories_var.get(),
@@ -324,6 +390,9 @@ class EditorPanelMixin:
             owner_id=self.owner_id_var.get(),
             start_init_date=self.start_init_date_var.get(),
             destination_path=self.destination_path_var.get(),
+            priority=PRIORITY_HIGHEST
+            if priority_var is not None and priority_var.get()
+            else PRIORITY_NONE,
         )
 
 
@@ -354,6 +423,7 @@ class EditorPanelMixin:
             owner_id=account.owner_id.strip(),
             start_init_date=account.start_init_date.strip(),
             destination_path=account.destination_path.strip(),
+            priority=account.priority,
         )
         try:
             save_catalog_metadata_to_history(stored, self.connection)
@@ -362,10 +432,19 @@ class EditorPanelMixin:
             return
         if self.selected_index is None:
             self.accounts.append(stored)
-            reveal_index = len(self.accounts) - 1
         else:
             self.accounts[self.selected_index] = stored
-            reveal_index = self.selected_index
+        if stored.priority > 0:
+            self.accounts = assign_exclusive_priority(
+                self.accounts, stored.username, stored.priority
+            )
+        else:
+            self.accounts = ordered_accounts_for_display(self.accounts)
+        reveal_index = next(
+            index
+            for index, item in enumerate(self.accounts)
+            if item.username.casefold() == stored.username.casefold()
+        )
         if stored.is_new_account or stored.is_catalog_update:
             self.catalog_entries = self.catalog_service.list_entries()
             self.destination_paths = self.catalog_service.list_destination_paths()
@@ -397,6 +476,7 @@ class EditorPanelMixin:
 
     def _clear_username(self) -> None:
         self.username_var.set("")
+        self._apply_username_identity("")
         try:
             self.username_combo.focus_set()
         except (tk.TclError, AttributeError):
@@ -407,7 +487,9 @@ class EditorPanelMixin:
         text = read_clipboard(self.root)
         if text is None:
             return False
-        self.username_var.set(first_clipboard_line(text))
+        pasted = first_clipboard_line(text)
+        self.username_var.set(pasted)
+        self._apply_username_identity(pasted)
         try:
             self.username_combo.icursor(tk.END)
             self.username_combo.focus_set()
@@ -422,10 +504,13 @@ class EditorPanelMixin:
         if selection:
             self.tree.selection_remove(*selection)
         self.username_var.set("")
+        self._editor_bound_username = ""
         self.account_date_var.set(date.today().isoformat())
         self.stories_var.set(False)
         self.new_account_var.set(False)
         self.catalog_update_var.set(False)
+        if getattr(self, "priority_var", None) is not None:
+            self.priority_var.set(False)
         self.owner_id_var.set("")
         self.start_init_date_var.set("")
         self.destination_path_var.set("")

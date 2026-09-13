@@ -53,6 +53,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
     normalize_url_lines,
+    normalize_username,
     save_batch_draft,
     validate_batch_draft,
 )
@@ -174,6 +175,36 @@ def test_gui_clear_editor_deselects_the_batch_account() -> None:
     assert removed == [("3",)]
 
 
+def test_normalize_username_strips_at_and_space() -> None:
+    assert normalize_username("  @Alpha  ") == "Alpha"
+    assert normalize_username("beta") == "beta"
+    assert normalize_username("") == ""
+
+
+class _FlagVar:
+    def __init__(self, value="") -> None:
+        self.value = value
+
+    def set(self, value) -> None:
+        self.value = value
+
+    def get(self):
+        return self.value
+
+
+def _editor_identity_app(*, username: str = "", stories: bool = False) -> InstagramOrchestratorApp:
+    app = object.__new__(InstagramOrchestratorApp)
+    app.username_var = _FlagVar(username)
+    app.stories_var = _FlagVar(stories)
+    app.new_account_var = _FlagVar(False)
+    app.catalog_update_var = _FlagVar(False)
+    app.owner_id_var = _FlagVar("owner")
+    app.start_init_date_var = _FlagVar("2026-01-01")
+    app.destination_path_var = _FlagVar(r"G:\4K Stogram")
+    app._editor_bound_username = app._editor_username_identity(username)
+    return app
+
+
 def test_gui_paste_username_uses_first_clipboard_line() -> None:
     class FakeRoot:
         @staticmethod
@@ -191,25 +222,16 @@ def test_gui_paste_username_uses_first_clipboard_line() -> None:
         def focus_set(self) -> None:
             self.focused = True
 
-    class FakeVar:
-        def __init__(self) -> None:
-            self.value = "old"
-
-        def set(self, value: str) -> None:
-            self.value = value
-
-        def get(self) -> str:
-            return self.value
-
-    app = object.__new__(InstagramOrchestratorApp)
+    app = _editor_identity_app(username="old", stories=True)
     app.root = FakeRoot()
-    app.username_var = FakeVar()
     app.username_combo = FakeCombo()
 
     assert app._paste_username() is True
     assert app.username_var.value == "amberlure_"
     assert app.username_combo.cursor == "end"
     assert app.username_combo.focused is True
+    assert app.stories_var.value is False
+    assert app.owner_id_var.value == ""
 
 
 def test_gui_paste_username_returns_false_when_clipboard_empty() -> None:
@@ -234,17 +256,7 @@ def test_gui_paste_username_returns_false_when_clipboard_empty() -> None:
     assert app.username_var.value == "keep"
 
 
-def test_gui_clear_username_only_clears_the_username_field() -> None:
-    class FakeVar:
-        def __init__(self, value: str = "") -> None:
-            self.value = value
-
-        def set(self, value: str) -> None:
-            self.value = value
-
-        def get(self) -> str:
-            return self.value
-
+def test_gui_clear_username_resets_editor_flags() -> None:
     class FakeCombo:
         def __init__(self) -> None:
             self.focused = False
@@ -252,16 +264,82 @@ def test_gui_clear_username_only_clears_the_username_field() -> None:
         def focus_set(self) -> None:
             self.focused = True
 
-    app = object.__new__(InstagramOrchestratorApp)
-    app.username_var = FakeVar("amberlure_")
+    app = _editor_identity_app(username="amberlure_", stories=True)
     app.username_combo = FakeCombo()
-    app.stories_var = FakeVar("1")
+    app.new_account_var.set(True)
+    app.catalog_update_var.set(True)
 
     app._clear_username()
 
     assert app.username_var.value == ""
     assert app.username_combo.focused is True
-    assert app.stories_var.value == "1"
+    assert app.stories_var.value is False
+    assert app.new_account_var.value is False
+    assert app.catalog_update_var.value is False
+    assert app.owner_id_var.value == ""
+
+
+def test_apply_username_identity_resets_flags_when_username_changes() -> None:
+    app = _editor_identity_app(username="alpha", stories=True)
+    app.new_account_var.set(True)
+
+    app._apply_username_identity("beta")
+
+    assert app.stories_var.value is False
+    assert app.new_account_var.value is False
+    assert app.catalog_update_var.value is False
+    assert app.owner_id_var.value == ""
+    assert app.start_init_date_var.value == ""
+    assert app.destination_path_var.value == ""
+    assert app._editor_bound_username == "beta"
+
+
+def test_apply_username_identity_keeps_flags_for_equivalent_username() -> None:
+    app = _editor_identity_app(username="Alpha", stories=True)
+    app.catalog_update_var.set(True)
+    app.owner_id_var.set("keep-owner")
+
+    app._apply_username_identity("  @alpha  ")
+
+    assert app.stories_var.value is True
+    assert app.catalog_update_var.value is True
+    assert app.owner_id_var.value == "keep-owner"
+
+
+def test_apply_username_identity_hydrate_does_not_reset_flags() -> None:
+    app = _editor_identity_app(username="old", stories=False)
+    app.stories_var.set(True)
+    app.catalog_update_var.set(True)
+
+    app._apply_username_identity("loaded_user", hydrate=True)
+
+    assert app.stories_var.value is True
+    assert app.catalog_update_var.value is True
+    assert app._editor_bound_username == "loaded_user"
+
+
+def test_paste_username_keeps_flags_when_pasting_same_identity() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            return "@amberlure_\n"
+
+    class FakeCombo:
+        def icursor(self, _index: str) -> None:
+            pass
+
+        def focus_set(self) -> None:
+            pass
+
+    app = _editor_identity_app(username="amberlure_", stories=True)
+    app.root = FakeRoot()
+    app.username_combo = FakeCombo()
+    app.owner_id_var.set("keep")
+
+    assert app._paste_username() is True
+    assert app.username_var.value == "@amberlure_"
+    assert app.stories_var.value is True
+    assert app.owner_id_var.value == "keep"
 
 
 def test_gui_paste_and_add_only_upserts_after_a_successful_paste() -> None:

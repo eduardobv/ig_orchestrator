@@ -1661,3 +1661,23 @@ Setting persistido `processing.stories_first` (boolean, default activo) en
 el modo y vuelve al procesamiento por cuenta completa.
 
 Detalle de fases: `tasks/Tarea_v2_stories_first.md`.
+
+---
+
+## 27. GUI v2.1 — editor, catálogo, rename y organizador de stories
+
+Rama `v2/gui-ux-stories`. Detalle: `tasks/Tarea_v2_1_GUI_ux.md`.
+
+* Los checks del editor (Stories, New account, Update, Priority) van
+  ligados al username normalizado. Si cambia, vuelven al estado inicial.
+* Check **Priority** (rank 1 exclusivo): esa cuenta queda primera en el
+  lote. El modelo `priority: int` admite ranks 2, 3… más adelante. La
+  ejecución sigue siendo stories-first; el rank solo reordena cuentas.
+* Pegar en el buscador del catálogo selecciona el username y lo copia al
+  editor.
+* La barra de estado se pinta tras Renombrar: rojo error, amarillo
+  incompleto, verde éxito; azul mientras corre.
+* **Organizar stories** (toolbar + menú Lote) mueve
+  `{username}-….jpeg/mp4` desde una carpeta inbox a
+  `{accounts_dir.path}\story` según una BD SQLite externa. Las rutas se
+  recuerdan en `app_settings`.

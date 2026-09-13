@@ -8,7 +8,8 @@ Composition root: `launch_gui` e `InstagramOrchestratorApp` (estado de sesión +
 
 ## Estado que posee
 `connection`, `settings`, `accounts`, `saved_batch_id`, `active_batch_id`,
-`active_queue_id`, `process_runner`, `runtime_progress`, StringVars, widgets.
+`active_queue_id`, `process_runner`, `runtime_progress`, StringVars, widgets,
+`_editor_bound_username`.
 
 ## Habla con
 Mixins de catalog/editor/batch_accounts/chrome/run/batches/settings.

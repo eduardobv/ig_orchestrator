@@ -20,6 +20,7 @@ from ig_orchestrator.gui.shared.helpers import (
     batch_username_matches_filter,
     catalog_focus_username,
     filter_batch_accounts,
+    priority_cell_text,
     stories_cell_text,
 )
 from ig_orchestrator.gui.shell.app import InstagramOrchestratorApp, launch_gui
@@ -46,5 +47,6 @@ __all__ = [
     "batch_username_matches_filter",
     "catalog_focus_username",
     "filter_batch_accounts",
+    "priority_cell_text",
     "stories_cell_text",
 ]

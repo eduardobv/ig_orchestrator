@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS batch_accounts (
     working_folder_rel TEXT,
     status_id INTEGER NOT NULL REFERENCES batch_account_statuses(id),
     sort_order INTEGER NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(batch_id, catalog_account_id)

@@ -99,6 +99,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _window_mode_title,
     catalog_focus_username,
     filter_batch_accounts,
+    priority_cell_text,
     stories_cell_text,
 )
 from ig_orchestrator.gui.text_edit import (
@@ -249,6 +250,7 @@ class BatchAccountsPanelMixin:
             iid = str(index)
             values = (
                 account.username,
+                priority_cell_text(account.priority),
                 len([url for url in account.urls if url.strip()]),
                 status,
                 stories_cell_text(account.download_stories),
@@ -348,7 +350,10 @@ class BatchAccountsPanelMixin:
         if was_disabled:
             self.urls_text.configure(state="normal")
         self.username_var.set(account.username)
+        self._apply_username_identity(account.username, hydrate=True)
         self.stories_var.set(account.download_stories)
+        if getattr(self, "priority_var", None) is not None:
+            self.priority_var.set(bool(account.priority))
         self.new_account_var.set(account.is_new_account)
         self.catalog_update_var.set(
             account.is_catalog_update and not account.is_new_account

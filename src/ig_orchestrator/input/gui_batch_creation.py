@@ -106,9 +106,10 @@ def create_gui_batch(
             """
             INSERT INTO batch_accounts (
                 batch_id, catalog_account_id, download_stories,
-                working_folder_rel, status_id, sort_order, created_at, updated_at
+                working_folder_rel, status_id, sort_order, priority,
+                created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 batch_id,
@@ -117,6 +118,7 @@ def create_gui_batch(
                 working_rel,
                 pending_account,
                 sort_order,
+                int(getattr(account_request, "priority", 0) or 0),
                 now,
                 now,
             ),

@@ -106,7 +106,14 @@ from ig_orchestrator.gui.text_edit import (
     first_clipboard_line,
     read_clipboard,
 )
-from ig_orchestrator.gui.theme import Tooltip, compact_icon_button, icon_button
+from ig_orchestrator.gui.theme import (
+    STATUS_TONE_BUSY,
+    STATUS_TONE_COLORS,
+    STATUS_TONE_IDLE,
+    Tooltip,
+    compact_icon_button,
+    icon_button,
+)
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
 from ig_orchestrator.models import AccountHistoryStatus
@@ -151,6 +158,35 @@ class StatusBarMixin:
             pass
 
 
+    def _set_status_tone(self, tone: str) -> None:
+        """Paint the clickable status bar. ``idle`` restores the default colors."""
+
+        self.status_tone = tone
+        button = getattr(self, "status_button", None)
+        if button is None:
+            return
+        pair = STATUS_TONE_COLORS.get(tone, STATUS_TONE_COLORS[STATUS_TONE_IDLE])
+        if pair is None:
+            bg = getattr(self, "_status_idle_bg", None)
+            fg = getattr(self, "_status_idle_fg", None)
+        else:
+            bg, fg = pair
+        kwargs: dict[str, str] = {}
+        if bg:
+            kwargs["bg"] = bg
+            kwargs["activebackground"] = bg
+        if fg:
+            kwargs["fg"] = fg
+            kwargs["activeforeground"] = fg
+            kwargs["disabledforeground"] = fg
+        if not kwargs:
+            return
+        try:
+            button.configure(**kwargs)
+        except tk.TclError:
+            pass
+
+
     def _set_status(self, text: str) -> None:
         self.status_var.set(text)
         bar = getattr(self, "status_bar_var", None)
@@ -187,6 +223,10 @@ class StatusBarMixin:
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
         )
+        if running and self.active_process_kind == "rename":
+            self._set_status_tone(STATUS_TONE_BUSY)
+        elif running:
+            self._set_status_tone(STATUS_TONE_IDLE)
         # Always available: only previews the rename command, never runs it.
         self.rename_manual_button.configure(state="normal")
         if not running:
