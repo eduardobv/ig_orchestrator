@@ -113,6 +113,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _catalog_entry_colors,
     _catalog_width_chars,
     _draft_signature,
+    _generate_default_batch_name,
     _gui_setting,
     _half_screen_geometry,
     _instagram_profile_url,
@@ -240,7 +241,7 @@ class InstagramOrchestratorApp(
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
-            value=_latest_executed_batch_name(connection) or _suggest_batch_name()
+            value=_generate_default_batch_name()
         )
         self.default_date_var = tk.StringVar(value=today)
         self.catalog_filter_var = tk.StringVar()

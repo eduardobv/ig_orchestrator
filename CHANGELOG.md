@@ -1,5 +1,46 @@
 # Changelog
 
+## v2.1.5 - Nombre de Batch por Defecto con Timestamp
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Nueva función `_generate_default_batch_name()` en helpers.py:
+  - Genera nombre de batch con timestamp actual
+  - Formato: `descargas_YYYY_MM_DD_HH_MM_SS`
+  - Garantiza nombre único para cada invocación (precisión a segundo)
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/helpers.py`:
+  - Agregada función `_generate_default_batch_name()` 
+  - Exportada en `__all__`
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Línea 243-245: Inicialización de `batch_name_var` cambió de usar último batch ejecutado a generar nombre por defecto con timestamp
+  - Agregada importación de `_generate_default_batch_name`
+
+* `src/ig_orchestrator/gui/run/controller.py`:
+  - Método `_start_new_batch()` línea 138: cambió a usar `_generate_default_batch_name()` en lugar de `_suggest_batch_name()`
+  - Agregada importación de `_generate_default_batch_name`
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en helpers.py, app.py, controller.py (todo OK)
+* Test unitario de `_generate_default_batch_name()`:
+  - Verifica formato correcto: descargas_YYYY_MM_DD_HH_MM_SS
+  - Verifica nombres diferentes en invocaciones separadas (1 segundo)
+  - Todos los tests pasaron
+
+### Comportamiento
+
+1. Al iniciar la app: nombre es `descargas_YYYY_MM_DD_HH_MM_SS` (timestamp actual)
+2. Cada vez que se abre la app: se genera nuevo nombre con timestamp diferente
+3. Click en "New Batch": genera nuevo nombre con timestamp actual
+4. Usuario puede editar nombre manualmente si lo desea
+5. Nombre se persiste en SQLite cuando se ejecuta batch
+
 ## v2.1.4 - Botón Pause/Resume en Ventana Principal
 
 Fecha: 2026-10-03

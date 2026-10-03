@@ -73,6 +73,10 @@ def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
 
 
+def _generate_default_batch_name() -> str:
+    return datetime.now().strftime("descargas_%Y_%m_%d_%H_%M_%S")
+
+
 def _catalog_entry_colors(
     entry: AccountCatalogEntry,
     *,
@@ -417,6 +421,7 @@ __all__ = [
     "_catalog_entry_colors",
     "_catalog_width_chars",
     "_draft_signature",
+    "_generate_default_batch_name",
     "_gui_setting",
     "_half_screen_geometry",
     "_instagram_profile_url",

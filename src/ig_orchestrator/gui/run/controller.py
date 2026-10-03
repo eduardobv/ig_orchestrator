@@ -84,6 +84,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _batch_mode_details,
     _catalog_entry_colors,
     _draft_signature,
+    _generate_default_batch_name,
     _gui_setting,
     _instagram_profile_url,
     _new_account_rename_parameters,
@@ -134,7 +135,7 @@ class RunControllerMixin:
         self.last_run_was_dry_run = False
         self.cancel_requested = False
         self.active_process_kind = None
-        self.batch_name_var.set(_suggest_batch_name())
+        self.batch_name_var.set(_generate_default_batch_name())
         today = date.today().isoformat()
         self.default_date_var.set(today)
         self.accounts.clear()
