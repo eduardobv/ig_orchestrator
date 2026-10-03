@@ -117,5 +117,10 @@
   "settings.window_position_left": "Izquierda",
   "settings.window_position_center": "Centro",
   "settings.window_position_right": "Derecha",
-  "settings.save_window_position": "Guardar posición"
+  "settings.save_window_position": "Guardar posición",
+  "problem_urls.copy": "Copiar",
+  "problem_urls.open_chrome": "Abrir en Chrome",
+  "problem_urls.copy_all": "Copiar todas",
+  "problem_urls.copied": "¡Copiado!",
+  "problem_urls.copy_failed": "Error al copiar"
 }

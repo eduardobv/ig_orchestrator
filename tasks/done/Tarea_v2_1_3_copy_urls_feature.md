@@ -7,8 +7,9 @@ En el panel "Accounts in Current Batch", cuando un account tiene URLs con errore
 Se requiere:
 1. Botón "Copy URL" junto al botón de Chrome
 2. Click derecho (context menu) en la URL para copiar
-3. Copiar múltiples URLs si hay más de una con error
-4. Notificación visual que confirme la copia ("Copied!")
+3. Permitir seleccionar más de una url a la vez y copiarla.
+4. Copiar múltiples URLs si hay más de una con error
+5. Notificación visual que confirme la copia ("Copied!")
 
 ## Contexto
 

@@ -1,5 +1,40 @@
 # Changelog
 
+## v2.1.3 - Copiar URLs al Portapapeles en Panel de Errores
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Funcionalidad de copia de URLs en modal de "URLs completadas/reintentos/fallidas":
+  - Botón "Copiar" en frame de acciones para copiar URL seleccionada
+  - Botón "Copiar todas" para copiar todas las URLs (una por línea)
+  - Context menu (click derecho) en URLs con opciones "Copiar", "Abrir en Chrome" y "Copiar todas"
+  - Atajo Ctrl+C para copiar URL seleccionada
+  - Notificación visual temporal "¡Copiado!" en verde al copiar
+
+### Modificado
+
+* `src/ig_orchestrator/gui/batch_accounts/problem_urls.py`:
+  - `_open_account_problem_urls()`: agregadas funciones `copy_to_clipboard()`, `_show_copied_notification()`,
+    `copy_selected_url()`, `copy_all_urls()`, `show_context_menu()`, `on_ctrl_c()`
+  - Frame de acciones: nuevos botones "Copiar" y "Copiar todas"
+  - Tree binding: `<Button-3>` para context menu, `<Control-c>` para Ctrl+C
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`: nuevas claves
+  `problem_urls.copy`, `problem_urls.open_chrome`, `problem_urls.copy_all`,
+  `problem_urls.copied`, `problem_urls.copy_failed`
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (suite completa)
+* Verificación manual en GUI: 
+  - Crear batch con URLs que generen errores
+  - Abrir modal de URLs fallidas/reintentos
+  - Click en botón "Copiar" → verifica portapapeles
+  - Click derecho en URL → verifica context menu
+  - Ctrl+C en URL seleccionada → verifica copia
+  - Botón "Copiar todas" → verifica copia de todas
+
 ## v2.1.2 - Settings Modal con Pestañas
 
 Fecha: 2026-10-03
