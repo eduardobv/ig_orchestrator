@@ -182,13 +182,22 @@ Leer primero:
 
 ### Changelog y Commits
 
-Cada tarea actualiza `CHANGELOG.md` con:
-- Versión/tarea
-- Fecha
-- Archivos creados
-- Archivos modificados
-- Resumen de comportamiento agregado
-- Pruebas ejecutadas
+**REGLA OBLIGATORIA**: Cada tarea que modifique código o archivos debe:
+1. Actualizar `CHANGELOG.md` con:
+   - Versión/tarea
+   - Fecha
+   - Archivos creados
+   - Archivos modificados
+   - Resumen de comportamiento agregado
+   - Pruebas ejecutadas
+
+2. Actualizar documentación afectada:
+   - `CLAUDE.md`: si cambian reglas, arquitectura o guías de desarrollo
+   - `MODULE.md` correspondiente: si cambian interfaces o responsabilidades de módulo
+   - `tasks/Tarea_X.md` o directorio `tasks/done/`: registrar estado de las tareas
+   - `README.md`: si cambia comportamiento visible al usuario o flujos operativos
+
+3. Las tareas completadas se mueven de `tasks/` a `tasks/done/`
 
 Formato de commit al terminar:
 

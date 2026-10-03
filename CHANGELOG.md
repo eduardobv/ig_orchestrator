@@ -1,5 +1,32 @@
 # Changelog
 
+## v2.1.2 - Settings Modal con Pestañas
+
+Fecha: 2026-10-03
+
+### Creado
+
+* `SettingsDialogWithTabs` clase para refactorizar modal de settings con interfaz por tabs.
+* 5 pestañas: General (idioma), Interfaz (posición ventana), Procesamiento (stories first, limpiar ficheros), 
+  Catálogo (colores) y Notificaciones (avisos Telegram, test, errores).
+* Botones "Guardar" y "Cancelar" en lugar de guardado automático.
+* Nuevas claves de i18n: `settings.save`, `settings.cancel`, `settings.tabs.*`.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/settings/dialog.py`: refactorización completa de `_open_settings()` en
+  `SettingsDialogWithTabs`, mixin `SettingsDialogMixin` ahora usa la nueva clase.
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`: nuevas claves de traducción para
+  botones y nombres de tabs.
+* Comportamiento: cambios se aplican solo al presionar "Guardar"; "Cancelar" descarta cambios.
+* Idioma: al cambiar, la app se reinicia automáticamente (comportamiento previo conservado).
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/gui/` (suite de GUI)
+* `python -m pytest -q` (suite completa)
+* Verificación manual en GUI con `python -m ig_orchestrator gui`
+
 ## v2.0.0 - GUI, sqlite v2 y aviso Telegram
 
 Fecha: 2026-09-11
