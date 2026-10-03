@@ -139,10 +139,20 @@ def _window_mode_title(
     return t("mode.new")
 
 
-def _half_screen_geometry(screen_width: int, screen_height: int) -> str:
+def _half_screen_geometry(
+    screen_width: int,
+    screen_height: int,
+    position: str = "left",
+) -> str:
     width = max(860, screen_width // 2)
     height = max(680, screen_height - 80)
-    return f"{width}x{height}+0+0"
+    if position == "center":
+        x_offset = (screen_width - width) // 2
+    elif position == "right":
+        x_offset = screen_width - width
+    else:
+        x_offset = 0
+    return f"{width}x{height}+{x_offset}+0"
 
 
 def catalog_focus_username(
@@ -383,6 +393,19 @@ def _account_display_status(
     return f"Pendiente ({runtime.pending_items})", "pending"
 
 
+def center_modal_on_parent(
+    modal: tk.Toplevel,
+    parent: tk.Tk | tk.Toplevel,
+    is_parent_maximized: bool = False,
+) -> None:
+    modal.update_idletasks()
+    screen_width = modal.winfo_screenwidth()
+    screen_height = modal.winfo_screenheight()
+    x = (screen_width - modal.winfo_width()) // 2
+    y = (screen_height - modal.winfo_height()) // 2
+    modal.geometry(f"+{x}+{y}")
+
+
 __all__ = [
     "_ACCOUNT_PROGRESS_RE",
     "_BATCH_COLUMNS",
@@ -411,6 +434,7 @@ __all__ = [
     "_window_mode_title",
     "batch_username_matches_filter",
     "catalog_focus_username",
+    "center_modal_on_parent",
     "filter_batch_accounts",
     "stories_cell_text",
 ]

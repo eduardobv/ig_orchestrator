@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -318,9 +319,43 @@ class SettingsDialogMixin:
                 window, target_var.get().strip() or "me"
             ),
         ).grid(row=20, column=0, sticky="w", pady=(4, 0))
-        ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
-            row=21, column=0, sticky="e", pady=(16, 0)
+        ttk.Label(frame, text=t("settings.window_position")).grid(
+            row=22, column=0, sticky="w", pady=(16, 4)
         )
+        window_position = tk.StringVar(
+            value=_gui_setting(self.connection, "ui.window_position", "left")
+        )
+        positions_row = ttk.Frame(frame)
+        positions_row.grid(row=23, column=0, sticky="w")
+        for index, position in enumerate(("left", "center", "right")):
+            ttk.Radiobutton(
+                positions_row,
+                text=t(f"settings.window_position_{position}"),
+                value=position,
+                variable=window_position,
+            ).grid(row=0, column=index, sticky="w", padx=(0, 16))
+
+        def save_window_position() -> None:
+            if is_gui_schema(self.connection):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES ('ui.window_position', ?, 'TEXT', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (window_position.get(),),
+                )
+                self.connection.commit()
+
+        ttk.Button(frame, text=t("settings.save_window_position"), command=save_window_position).grid(
+            row=24, column=0, sticky="w", pady=(4, 0)
+        )
+        ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
+            row=25, column=0, sticky="e", pady=(16, 0)
+        )
+        center_modal_on_parent(window, self.root, self.root.state() == "zoomed")
 
 
     def _pick_catalog_color(self, parent: tk.Toplevel, key: str) -> None:

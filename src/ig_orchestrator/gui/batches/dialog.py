@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -865,4 +866,5 @@ class BatchesDialogMixin:
         refresh_queue_panel()
         if not managed:
             active_empty.place(relx=0.48, rely=0.48, anchor="center")
+        center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
 

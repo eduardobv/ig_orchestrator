@@ -100,6 +100,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -262,6 +263,7 @@ class RenameMixin:
         ttk.Button(actions, text="Copiar comando", command=copy_command).pack(
             side=tk.RIGHT
         )
+        center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
         dialog.focus_set()
 
 

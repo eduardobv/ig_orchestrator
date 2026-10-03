@@ -130,6 +130,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _window_mode_title,
     batch_username_matches_filter,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -263,10 +264,12 @@ class InstagramOrchestratorApp(
         self.log_window = LogWindow(self.root)
 
         self.root.title(t("app.name"))
+        window_pos = _gui_setting(self.connection, "ui.window_position", "left")
         self.root.geometry(
             _half_screen_geometry(
                 self.root.winfo_screenwidth(),
                 self.root.winfo_screenheight(),
+                window_pos,
             )
         )
         self.root.minsize(860, 680)

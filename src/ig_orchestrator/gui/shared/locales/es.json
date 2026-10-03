@@ -105,5 +105,10 @@
   "settings.notify_save": "Guardar aviso",
   "settings.notify_test": "Enviar prueba",
   "settings.notify_test_ok": "Mensaje de prueba enviado.",
-  "settings.notify_errors": "Avisar si el bot responde con estos errores"
+  "settings.notify_errors": "Avisar si el bot responde con estos errores",
+  "settings.window_position": "Posición de ventana principal",
+  "settings.window_position_left": "Izquierda",
+  "settings.window_position_center": "Centro",
+  "settings.window_position_right": "Derecha",
+  "settings.save_window_position": "Guardar posición"
 }

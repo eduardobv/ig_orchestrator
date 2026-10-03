@@ -105,5 +105,10 @@
   "settings.notify_save": "Save notify settings",
   "settings.notify_test": "Send test",
   "settings.notify_test_ok": "Test message sent.",
-  "settings.notify_errors": "Notify when the bot returns these errors"
+  "settings.notify_errors": "Notify when the bot returns these errors",
+  "settings.window_position": "Main window position",
+  "settings.window_position_left": "Left",
+  "settings.window_position_center": "Center",
+  "settings.window_position_right": "Right",
+  "settings.save_window_position": "Save position"
 }
