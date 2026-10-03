@@ -1,6 +1,8 @@
 {
   "app.name": "Instagram Orchestrator",
   "app.about": "Instagram Orchestrator {version}",
+  "warning": "Advertencia",
+  "error": "Error",
   "mode.new": "Nuevo lote",
   "mode.editing": "Editando lote · {name} (id={id})",
   "mode.running": "En ejecución · {name} (id={id})",
@@ -45,6 +47,8 @@
   "tooltip.stop": "Detener proceso",
   "tooltip.rename": "Renombrar",
   "tooltip.rename_manual": "Renombrar manual",
+  "tooltip.pause": "Pausar",
+  "tooltip.resume": "Reanudar",
   "tooltip.paste_add": "Pegar/Agregar",
   "tooltip.add_update": "Agregar/Actualizar",
   "tooltip.paste": "Pegar",

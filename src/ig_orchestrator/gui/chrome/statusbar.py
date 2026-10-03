@@ -184,6 +184,9 @@ class StatusBarMixin:
             self.delete_button.configure(state="normal")
             self.save_selection_button.configure(state="disabled")
         self.cancel_button.configure(state="normal" if running else "disabled")
+        self.pause_button.configure(
+            state="normal" if running and self.active_process_kind == "batch" else "disabled"
+        )
         self.rename_button.configure(
             state="normal" if not running and self.batch_ready_for_rename else "disabled"
         )

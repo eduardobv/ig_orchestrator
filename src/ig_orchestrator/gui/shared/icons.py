@@ -20,6 +20,7 @@ _ICON_FILES = {
     "folder-open": "folder-open.png",
     "play": "play.png",
     "stop": "stop.png",
+    "pause": "pause.png",
     "rename": "rename.png",
     "terminal": "terminal.png",
     "plus": "plus.png",

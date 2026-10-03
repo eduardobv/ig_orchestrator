@@ -9,6 +9,7 @@ Actualmente para pausar y reanudar una ejecución de batch, el usuario debe:
 4. Hacer click en "Resume"
 
 Se requiere un botón "Pause" / "Resume" en la ventana principal que:
+- Si se tiene la capaidad de generar un icono para el botón nuevo hacerlo, siguiendo el estilo de los otros iconos. No indispensable.
 - Pause la ejecución actual (sin detener)
 - Permita reanudar desde donde se pausó
 - Cambie entre estados "Pause" ↔ "Resume" según estado actual

@@ -1,6 +1,8 @@
 {
   "app.name": "Instagram Orchestrator",
   "app.about": "Instagram Orchestrator {version}",
+  "warning": "Warning",
+  "error": "Error",
   "mode.new": "New batch",
   "mode.editing": "Editing batch · {name} (id={id})",
   "mode.running": "Running · {name} (id={id})",
@@ -45,6 +47,8 @@
   "tooltip.stop": "Stop process",
   "tooltip.rename": "Rename",
   "tooltip.rename_manual": "Manual rename",
+  "tooltip.pause": "Pause",
+  "tooltip.resume": "Resume",
   "tooltip.paste_add": "Paste/Add",
   "tooltip.add_update": "Add/Update",
   "tooltip.paste": "Paste",

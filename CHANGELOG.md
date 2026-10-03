@@ -1,5 +1,62 @@
 # Changelog
 
+## v2.1.4 - Botón Pause/Resume en Ventana Principal
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Botón Pause/Resume en toolbar junto a botones Run/Stop
+  - Ícono pause.png (dos barras verticales) para estado pausa
+  - Usa play icon para estado resume
+  - Botón deshabilitado cuando no hay batch en ejecución
+  - Botón habilitado solo cuando hay un batch ejecutándose
+  - Muestra "Pause" (ícono ⏸) cuando batch está ejecutándose
+  - Muestra "Resume" (ícono ▶) cuando batch está pausado
+  - Tooltip dinámico que cambia con el estado
+
+* Funcionalidad de toggle pause/resume:
+  - Click en botón pausa el batch actual sin cerrarlo
+  - Click nuevamente reanuda desde donde se pausó
+  - Estado sincronizado entre ventana principal y "Batches / runs"
+  - Logs muestran "Cola pausada" / "Cola reanudada"
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/icons.py`:
+  - Agregado "pause": "pause.png" a `_ICON_FILES`
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - `_build_widgets()`: agregado botón `pause_button` entre execute y cancel
+  - Actualización de grid positions para reflejar nueva columna
+  - `_restore_open_queue()`: sincroniza estado pause button si queue está pausada
+
+* `src/ig_orchestrator/gui/run/controller.py`:
+  - `_toggle_pause_resume()`: método que detecta estado actual y alterna entre pause/resume
+  - `_pause_batch()`: pausa la cola actual y actualiza UI
+  - `_resume_batch()`: reanuda la cola pausada y actualiza UI
+
+* `src/ig_orchestrator/gui/chrome/statusbar.py`:
+  - `_set_process_running()`: habilita/deshabilita pause button según estado de ejecución
+
+* `src/ig_orchestrator/gui/static/icons/pause.png`: nuevo ícono pause (32x32)
+
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`:
+  - Nuevas claves: `tooltip.pause`, `tooltip.resume`, `warning`, `error`
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en archivos modificados (todo OK)
+* Verificación manual (GUI):
+  - Crear batch con 10+ URLs
+  - Click en "Run" → comienza ejecución
+  - Esperar a que descargue 2-3 URLs
+  - Click en botón Pause → verifica que tooltip cambió a "Resume"
+  - Verifica que logs muestran "Cola pausada"
+  - Click en botón Resume → verifica que tooltip cambió a "Pause"
+  - Verifica que logs muestran "Cola reanudada"
+  - Verificar que descargas continúan desde donde se pausaron
+
 ## v2.1.3 - Copiar URLs al Portapapeles en Panel de Errores
 
 Fecha: 2026-10-03

@@ -516,3 +516,51 @@ class RunControllerMixin:
             self._set_status("Deteniendo proceso...")
             self._write_console("Detencion solicitada.\n")
 
+    def _toggle_pause_resume(self) -> None:
+        if self.active_queue_id is None:
+            messagebox.showwarning(
+                t("warning"),
+                "No hay cola en ejecución",
+                parent=self.root
+            )
+            return
+        queue = get_queue(self.connection, self.active_queue_id)
+        if queue.status == QueueStatus.PAUSED.value:
+            self._resume_batch()
+        else:
+            self._pause_batch()
+
+    def _pause_batch(self) -> None:
+        if self.active_queue_id is None:
+            return
+        try:
+            pause_queue(self.connection, self.active_queue_id)
+            self.pause_button.configure(
+                image=self.icons.get("play"),
+                tooltip=t("tooltip.resume")
+            )
+            self._write_console("Cola pausada.\n")
+        except Exception as e:
+            messagebox.showerror(
+                t("error"),
+                f"Error al pausar: {e}",
+                parent=self.root
+            )
+
+    def _resume_batch(self) -> None:
+        if self.active_queue_id is None:
+            return
+        try:
+            start_or_resume_queue(self.connection, self.active_queue_id)
+            self.pause_button.configure(
+                image=self.icons.get("pause"),
+                tooltip=t("tooltip.pause")
+            )
+            self._write_console("Cola reanudada.\n")
+        except Exception as e:
+            messagebox.showerror(
+                t("error"),
+                f"Error al reanudar: {e}",
+                parent=self.root
+            )
+

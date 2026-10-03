@@ -289,7 +289,13 @@ class InstagramOrchestratorApp(
             self.active_queue_id = None
             return
         self.active_queue_id = queue.id
-        if queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
+        if queue.status == QueueStatus.PAUSED.value:
+            self.pause_button.configure(
+                image=self.icons.get("play"),
+                tooltip=t("tooltip.resume"),
+                state="normal"
+            )
+        elif queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
             self.batch_ready_for_rename = True
             self.rename_button.configure(state="normal")
             try:
@@ -309,7 +315,7 @@ class InstagramOrchestratorApp(
         top = ttk.Frame(self.root, padding=(8, 6))
         self.top_region = top
         top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(9, weight=1)
+        top.columnconfigure(10, weight=1)
 
         self.new_batch_button = icon_button(
             top,
@@ -339,13 +345,21 @@ class InstagramOrchestratorApp(
             tooltip=t("tooltip.execute"),
         )
         self.execute_button.grid(row=0, column=3, padx=(0, 2))
+        self.pause_button = icon_button(
+            top,
+            image=self.icons.get("pause"),
+            command=self._toggle_pause_resume,
+            tooltip=t("tooltip.pause"),
+        )
+        self.pause_button.grid(row=0, column=4, padx=(0, 2))
+        self.pause_button.state(["disabled"])
         self.cancel_button = icon_button(
             top,
             image=self.icons.get("stop"),
             command=self._cancel_process,
             tooltip=t("tooltip.stop"),
         )
-        self.cancel_button.grid(row=0, column=4, padx=(0, 8))
+        self.cancel_button.grid(row=0, column=5, padx=(0, 8))
         self.cancel_button.state(["disabled"])
         self.rename_button = icon_button(
             top,
@@ -353,7 +367,7 @@ class InstagramOrchestratorApp(
             command=self._rename_manual_files,
             tooltip=t("tooltip.rename"),
         )
-        self.rename_button.grid(row=0, column=5, padx=(0, 2))
+        self.rename_button.grid(row=0, column=6, padx=(0, 2))
         self.rename_button.state(["disabled"])
         self.rename_manual_button = icon_button(
             top,
@@ -361,16 +375,16 @@ class InstagramOrchestratorApp(
             command=self._show_manual_rename_command,
             tooltip=t("tooltip.rename_manual"),
         )
-        self.rename_manual_button.grid(row=0, column=6, padx=(0, 12))
-        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=7, sticky="w")
+        self.rename_manual_button.grid(row=0, column=7, padx=(0, 12))
+        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=8, sticky="w")
         self.batch_name_entry = ttk.Entry(
             top, textvariable=self.batch_name_var, width=28
         )
-        self.batch_name_entry.grid(row=0, column=8, sticky="ew", padx=(6, 12))
+        self.batch_name_entry.grid(row=0, column=9, sticky="ew", padx=(6, 12))
         bind_edit_context_menu(self.batch_name_entry)
-        ttk.Label(top, text=t("label.date")).grid(row=0, column=9, sticky="e")
+        ttk.Label(top, text=t("label.date")).grid(row=0, column=10, sticky="e")
         ttk.Label(top, textvariable=self.default_date_var).grid(
-            row=0, column=10, sticky="w", padx=(6, 0)
+            row=0, column=11, sticky="w", padx=(6, 0)
         )
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
