@@ -1,5 +1,84 @@
 # Changelog
 
+## v2.1.6 - Stories Inbox Modal Restaurado
+
+Fecha: 2026-10-04
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/story_inbox.py` - Lógica de movimiento de archivos de stories:
+  - Función `username_from_story_filename()` - Extrae username del nombre de archivo
+  - Función `list_inbox_media()` - Lista archivos de media en la carpeta inbox
+  - Función `organize_story_inbox()` - Mueve archivos identificando por username
+  - Función `summarize_results()` - Cuenta archivos movidos y errores
+  - Clases: `StoryInboxStatus`, `StoryInboxResult`, `StoryInboxError`
+
+* `src/ig_orchestrator/gui/stories/` - Módulo GUI para Stories Inbox:
+  - `dialog.py` - `StoriesInboxMixin` con métodos para abrir modal y ejecutar
+  - `settings.py` - Funciones para cargar/guardar rutas en `app_settings`
+  - `__init__.py` - Exporta mixin
+  - `MODULE.md` - Documentación del módulo
+
+* Tests:
+  - `tests/gui/test_stories_dialog.py` - Tests de configuración
+  - `tests/filesystem/test_story_inbox.py` - Tests de movimiento de archivos
+
+### Modificado
+
+* `src/ig_orchestrator/gui/chrome/menubar.py`:
+  - Agregado comando `menu.batch.pause` (pausar/reanudar en menú)
+  - Agregado comando `menu.batch.stories` (organizar stories en menú)
+  - Separator antes y después de "Organizar Stories"
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Agregada importación de `StoriesInboxMixin`
+  - Agregado `StoriesInboxMixin` en herencia de clase `InstagramOrchestratorApp`
+
+* `src/ig_orchestrator/gui/shared/locales/es.json`:
+  - Nuevas claves: `menu.batch.pause`, `menu.batch.stories`
+  - Nuevas claves stories.* (15 strings) para UI y mensajes
+
+* `src/ig_orchestrator/gui/shared/locales/en.json`:
+  - Nuevas claves: `menu.batch.pause`, `menu.batch.stories`
+  - Nuevas claves stories.* (15 strings) para UI y mensajes
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en story_inbox.py, dialog.py, settings.py (todo OK)
+* `pytest tests/filesystem/test_story_inbox.py` - Todos los tests pasan:
+  - username_from_story_filename()
+  - organize_story_inbox() moves files correctly
+  - organize_story_inbox() reports missing username and path
+  - organize_story_inbox() does not overwrite
+  - organize_story_inbox() requires paths
+  - organize_story_inbox() requires accounts_dir table
+* `pytest tests/gui/test_stories_dialog.py` - Test de settings pass
+
+### Comportamiento
+
+1. Menú **Batch** ahora tiene:
+   - Execute
+   - Stop
+   - Pause (toggle pause/resume)
+   - ---
+   - Organize Stories (nuevo)
+   - ---
+   - Rename
+   - Manual Rename
+
+2. Click en "Organize Stories" abre modal con:
+   - Campo para ruta inbox (con Browse)
+   - Campo para ruta BD de cuentas (con Browse)
+   - Área de log para resultados
+   - Botones: Save (guarda rutas), Run (ejecuta), Close
+
+3. Flujo de uso:
+   - Usuario configura rutas (se guardan en app_settings)
+   - Click Run ejecuta `organize_story_inbox()`
+   - Cada archivo se mueve de `inbox_path` a `{account_path}/story/`
+   - Username se extrae del nombre de archivo (formato: `{username}-...`)
+   - Log muestra resultado: MOVED, USERNAME_NOT_FOUND, DESTINATION_EXISTS, etc.
+
 ## v2.1.5 - Nombre de Batch por Defecto con Timestamp
 
 Fecha: 2026-10-03

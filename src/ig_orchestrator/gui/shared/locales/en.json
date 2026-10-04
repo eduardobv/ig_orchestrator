@@ -27,6 +27,8 @@
   "menu.batch": "Batch",
   "menu.batch.execute": "Run",
   "menu.batch.stop": "Stop",
+  "menu.batch.pause": "Pause",
+  "menu.batch.stories": "Organize Stories",
   "menu.batch.rename": "Rename",
   "menu.batch.rename_manual": "Manual rename",
   "menu.catalog": "Catalog",
@@ -126,5 +128,16 @@
   "problem_urls.open_chrome": "Open in Chrome",
   "problem_urls.copy_all": "Copy all",
   "problem_urls.copied": "Copied!",
-  "problem_urls.copy_failed": "Failed to copy"
+  "problem_urls.copy_failed": "Failed to copy",
+  "stories.title": "Stories Inbox - Move files",
+  "stories.inbox": "Input folder (Inbox)",
+  "stories.db": "Accounts database",
+  "stories.browse": "Browse",
+  "stories.log": "Movement log",
+  "stories.save": "Save paths",
+  "stories.run": "Run",
+  "stories.close": "Close",
+  "stories.saved": "Paths saved",
+  "stories.paths_required": "Both paths required (inbox and database)",
+  "stories.summary": "Result: {moved} moved, {errors} errors (total: {total})"
 }

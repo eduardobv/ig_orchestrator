@@ -27,6 +27,8 @@
   "menu.batch": "Lote",
   "menu.batch.execute": "Ejecutar",
   "menu.batch.stop": "Detener",
+  "menu.batch.pause": "Pausar",
+  "menu.batch.stories": "Organizar Stories",
   "menu.batch.rename": "Renombrar",
   "menu.batch.rename_manual": "Renombrar manual",
   "menu.catalog": "Catálogo",
@@ -126,5 +128,16 @@
   "problem_urls.open_chrome": "Abrir en Chrome",
   "problem_urls.copy_all": "Copiar todas",
   "problem_urls.copied": "¡Copiado!",
-  "problem_urls.copy_failed": "Error al copiar"
+  "problem_urls.copy_failed": "Error al copiar",
+  "stories.title": "Stories Inbox - Mover archivos",
+  "stories.inbox": "Carpeta de entrada (Inbox)",
+  "stories.db": "Base de datos de cuentas",
+  "stories.browse": "Examinar",
+  "stories.log": "Log de movimientos",
+  "stories.save": "Guardar rutas",
+  "stories.run": "Ejecutar",
+  "stories.close": "Cerrar",
+  "stories.saved": "Rutas guardadas",
+  "stories.paths_required": "Se requieren ambas rutas (inbox y base de datos)",
+  "stories.summary": "Resultado: {moved} movidos, {errors} errores (total: {total})"
 }
