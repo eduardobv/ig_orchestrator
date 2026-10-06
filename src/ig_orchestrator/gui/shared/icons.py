@@ -21,6 +21,7 @@ _ICON_FILES = {
     "play": "play.png",
     "stop": "stop.png",
     "pause": "pause.png",
+    "stories": "stories.png",
     "rename": "rename.png",
     "terminal": "terminal.png",
     "plus": "plus.png",
