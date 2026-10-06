@@ -13,6 +13,7 @@ from ig_orchestrator.filesystem.story_inbox import (
     summarize_results,
 )
 from ig_orchestrator.gui.i18n import t
+from ig_orchestrator.gui.shared.helpers import bind_escape_close
 from ig_orchestrator.gui.stories.settings import (
     load_story_inbox_settings,
     save_story_inbox_settings,
@@ -103,6 +104,7 @@ class StoriesInboxMixin:
             window.destroy()
 
         window.protocol("WM_DELETE_WINDOW", _on_close)
+        bind_escape_close(window, on_close=_on_close)
 
     def _save_stories_inbox_paths(self, inbox: str, accounts_db: str) -> None:
         save_story_inbox_settings(

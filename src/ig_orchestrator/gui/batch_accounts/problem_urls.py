@@ -97,6 +97,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _timestamp_console_text,
     _username_heading_title,
     _window_mode_title,
+    bind_escape_close,
     catalog_focus_username,
     center_modal_on_parent,
     filter_batch_accounts,
@@ -514,5 +515,6 @@ class ProblemUrlsMixin:
         dialog.protocol("WM_DELETE_WINDOW", on_close)
         schedule_auto_refresh()
         center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
+        bind_escape_close(dialog, on_close=on_close)
         dialog.focus_set()
 

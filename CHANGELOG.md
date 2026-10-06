@@ -1,5 +1,81 @@
 # Changelog
 
+## v2.2.0 - GUI UX Improvements (En desarrollo)
+
+Fecha: 2026-10-06
+
+### Estado
+En desarrollo. Cambios completados hasta ahora:
+
+### Creado
+
+* `generate_stories_icon.py` - Script para generar icono stories.png (24x24, círculo con marca)
+* `src/ig_orchestrator/gui/shared/static/icons/stories.png` - Icono para botón Stories en toolbar
+
+### Modificado
+
+* `src/ig_orchestrator/gui/chrome/menubar.py`:
+  - Eliminada entrada duplicada "Organize stories…"
+
+* `src/ig_orchestrator/gui/editor/panel.py`:
+  - Agregados botones paste/clear para Owner Id, First Post Date, Path
+  - Implementados handlers: _paste_owner_id, _clear_owner_id, _paste_start_init_date, _clear_start_init_date, _paste_destination_path, _clear_destination_path
+  - Aplicado bind_edit_context_menu a los 3 campos nuevos
+  - Ajustados anchos: Owner Id (18), First Post Date (14), Path (40)
+  - Corregido layout: url_actions frame usa rowspan=2 para posición constante
+
+* `src/ig_orchestrator/gui/batch_accounts/panel.py`:
+  - Agregado botón paste en filtro de búsqueda de cuentas
+  - Limitado ancho del filtro a 30 caracteres
+  - Implementado handler _paste_batch_filter
+
+* `src/ig_orchestrator/gui/shared/log_window.py`:
+  - Agregados filtros por nivel (Warning, Error)
+  - Implementada colorización de logs (warning:#b58900, error:red)
+  - Agregados botones en barra inferior: Clear, Warning, Error, Close
+  - Aplicado bind_escape_close para cerrar con Escape
+  - Implementado renderizado dinámico del buffer según filtro
+
+* `src/ig_orchestrator/gui/shared/helpers.py`:
+  - Agregada función `bind_escape_close(window, on_close=None)` para cerrar modales con Esc
+  - Agregada función `classify_log_level(line)` para detectar WARNING/ERROR en logs
+
+* `src/ig_orchestrator/gui/shared/icons.py`:
+  - Registrado icono "stories" en _ICON_FILES
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Agregado botón stories_button en toolbar (columna 8, después de rename_manual)
+  - Ajustadas columnas de batch_name_entry y date (8→9→10→11)
+  - Actualizada columnconfigure para weight=1 en columna 11
+
+* `src/ig_orchestrator/gui/batches/dialog.py`:
+  - Importado bind_escape_close
+  - Aplicado bind_escape_close a diálogo de lotes
+
+* `src/ig_orchestrator/gui/settings/dialog.py`:
+  - Importado bind_escape_close
+  - Aplicado bind_escape_close a diálogo de configuración con callback _on_cancel
+
+* `src/ig_orchestrator/gui/shared/locales/es.json`:
+  - Nuevas claves i18n: label.owner_id, label.first_post_date, label.path, label.catalog_frame
+  - Nuevas claves tooltips: tooltip.paste_owner_id, tooltip.clear_owner_id, tooltip.paste_first_post_date, tooltip.clear_first_post_date, tooltip.paste_path, tooltip.clear_path, tooltip.paste_batch_filter
+  - Nuevas claves log: log.warning, log.error, log.close
+
+* `src/ig_orchestrator/gui/shared/locales/en.json`:
+  - Nuevas claves i18n equivalentes en inglés
+
+### Pendiente
+
+- Aplicar bind_escape_close a: problem_urls.py, run/rename.py, stories/dialog.py
+- Refactorizar reglas de habilitación de botones (Save/Update, Run, Rename, Rename manual)
+- Tests para nuevas funcionalidades (filtros de log, estados de botones)
+
+### Notas
+
+- Rama: v2/gui-ux-v2.2
+- Los cambios del editor y log_window mejoran la UX sin cambiar APIs
+- El icono stories.png fue generado con Python + zlib (PNG manual)
+
 ## v2.1.6 - Stories Inbox Modal Restaurado
 
 Fecha: 2026-10-04
