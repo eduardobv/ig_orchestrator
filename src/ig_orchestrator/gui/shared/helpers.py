@@ -420,6 +420,39 @@ def center_modal_on_parent(
     modal.geometry(f"+{x}+{y}")
 
 
+def bind_escape_close(window: tk.Toplevel, on_close: callable = None) -> None:
+    """Bind Escape key to close a modal window.
+
+    Args:
+        window: The Toplevel window to bind Escape to
+        on_close: Optional callback to execute before closing
+    """
+    def _on_escape(event):
+        if on_close:
+            on_close()
+        else:
+            window.withdraw()
+    window.bind("<Escape>", _on_escape)
+
+
+def classify_log_level(line: str) -> str:
+    """Classify a log line as 'warning', 'error', or 'normal'.
+
+    Detects the log level from the format: "| LEVELNAME |"
+
+    Args:
+        line: The log line to classify
+
+    Returns:
+        'warning', 'error', or 'normal'
+    """
+    if "| WARNING" in line:
+        return "warning"
+    if "| ERROR" in line or "| CRITICAL" in line:
+        return "error"
+    return "normal"
+
+
 __all__ = [
     "_ACCOUNT_PROGRESS_RE",
     "_BATCH_COLUMNS",
@@ -448,8 +481,10 @@ __all__ = [
     "_username_heading_title",
     "_window_mode_title",
     "batch_username_matches_filter",
+    "bind_escape_close",
     "catalog_focus_username",
     "center_modal_on_parent",
+    "classify_log_level",
     "filter_batch_accounts",
     "priority_cell_text",
     "stories_cell_text",
