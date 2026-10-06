@@ -97,6 +97,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _timestamp_console_text,
     _username_heading_title,
     _window_mode_title,
+    bind_escape_close,
     catalog_focus_username,
     center_modal_on_parent,
     filter_batch_accounts,
@@ -135,6 +136,7 @@ class BatchesDialogMixin:
                 self._refresh_queue_panel = None
 
         dialog.bind("<Destroy>", _clear_dialog_ref)
+        bind_escape_close(dialog, on_close=_clear_dialog_ref)
 
         ttk.Label(
             dialog,
