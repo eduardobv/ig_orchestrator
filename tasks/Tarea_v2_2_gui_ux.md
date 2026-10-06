@@ -13,6 +13,7 @@ Implementación de mejoras UX en la GUI Tkinter v2.1.x:
 - Creada: 2026-10-06
 - Rama: `v2/gui-ux-v2.2`
 - Versión destino: v2.2.0
+- Progreso: ~80% (implementados 5 de 6 puntos principales)
 
 ## Cambios principales
 

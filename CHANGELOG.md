@@ -5,7 +5,7 @@
 Fecha: 2026-10-06
 
 ### Estado
-En desarrollo. Cambios completados hasta ahora:
+~80% completado. Cambios implementados:
 
 ### Creado
 
