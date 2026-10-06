@@ -131,19 +131,25 @@ class BatchAccountsPanelMixin:
         ttk.Label(header, text=t("label.batch_accounts")).pack(side=tk.LEFT)
         ttk.Label(header, textvariable=self.batch_count_var).pack(side=tk.RIGHT)
         filter_row = ttk.Frame(parent)
-        filter_row.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        filter_row.columnconfigure(0, weight=1)
+        filter_row.grid(row=1, column=0, columnspan=4, sticky="w", pady=(6, 0))
         self.batch_filter_entry = ttk.Entry(
-            filter_row, textvariable=self.batch_filter_var
+            filter_row, textvariable=self.batch_filter_var, width=30
         )
-        self.batch_filter_entry.grid(row=0, column=0, sticky="ew")
+        self.batch_filter_entry.grid(row=0, column=0, sticky="w")
         bind_edit_context_menu(self.batch_filter_entry)
+        paste_filter_btn = compact_icon_button(
+            filter_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_batch_filter,
+            tooltip=t("tooltip.paste_batch_filter"),
+        )
+        paste_filter_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
         ttk.Button(
             filter_row,
             text="❌",
             width=3,
             command=self._clear_batch_filter,
-        ).grid(row=0, column=1, sticky="e", padx=(4, 0))
+        ).grid(row=0, column=2, sticky="w", padx=(4, 0))
         self.batch_filter_var.trace_add("write", lambda *_: self._refresh_table())
         self.tree = ttk.Treeview(
             parent,
@@ -233,6 +239,13 @@ class BatchAccountsPanelMixin:
     def _clear_batch_filter(self) -> None:
         self.batch_filter_var.set("")
 
+    def _paste_batch_filter(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        pasted = first_clipboard_line(text)
+        self.batch_filter_var.set(pasted)
+        return True
 
     def _refresh_table(self) -> None:
         if getattr(self, "tree", None) is None:
