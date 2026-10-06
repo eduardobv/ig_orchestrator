@@ -273,14 +273,13 @@ class EditorPanelMixin:
         Tooltip(self.clear_start_date_btn, t("tooltip.clear_first_post_date"))
 
         # Path row with paste/clear buttons
-        ttk.Label(self.new_account_frame, text=f"{t('label.path')} *").grid(
-            row=2, column=0, sticky="w", pady=(6, 0)
-        )
-        path_row = ttk.Frame(self.new_account_frame)
-        path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
-        path_row.columnconfigure(0, weight=1)
+        self.path_label = ttk.Label(self.new_account_frame, text=f"{t('label.path')} *")
+        self.path_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
+        self.path_row = ttk.Frame(self.new_account_frame)
+        self.path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
+        self.path_row.columnconfigure(0, weight=1)
         self.destination_path_combo = ttk.Combobox(
-            path_row,
+            self.path_row,
             textvariable=self.destination_path_var,
             values=self.destination_paths,
             width=56,
@@ -288,14 +287,14 @@ class EditorPanelMixin:
         self.destination_path_combo.grid(row=0, column=0, sticky="ew")
         bind_edit_context_menu(self.destination_path_combo)
         paste_path_btn = compact_icon_button(
-            path_row,
+            self.path_row,
             image=self.icons.get_compact("clipboard-black"),
             command=self._paste_destination_path,
             tooltip=t("tooltip.paste_path"),
         )
         paste_path_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
         clear_path_btn = ttk.Button(
-            path_row,
+            self.path_row,
             text="❌",
             width=3,
             command=self._clear_destination_path,
@@ -421,6 +420,11 @@ class EditorPanelMixin:
                 self.paste_start_date_btn.grid()
             if hasattr(self, "clear_start_date_btn"):
                 self.clear_start_date_btn.grid()
+            # Path back to row 2 for new account
+            if hasattr(self, "path_label"):
+                self.path_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
+            if hasattr(self, "path_row"):
+                self.path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
             self.new_account_frame.grid()
             return
         if self.catalog_update_var.get():
@@ -431,6 +435,11 @@ class EditorPanelMixin:
                 self.paste_start_date_btn.grid_remove()
             if hasattr(self, "clear_start_date_btn"):
                 self.clear_start_date_btn.grid_remove()
+            # Path moves to row 1 when updating (first_post_date is hidden)
+            if hasattr(self, "path_label"):
+                self.path_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
+            if hasattr(self, "path_row"):
+                self.path_row.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
             self.new_account_frame.grid()
             return
         self.new_account_frame.grid_remove()
@@ -518,6 +527,7 @@ class EditorPanelMixin:
             self.batch_filter_var.set("")
         self._refresh_table()
         self._refresh_catalog()
+        self._update_batch_context()
         self._clear_editor()
         self._reveal_batch_row(reveal_index)
 

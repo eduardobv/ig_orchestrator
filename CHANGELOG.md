@@ -48,6 +48,10 @@ Fecha: 2026-10-06
 * `src/ig_orchestrator/gui/shell/app.py`:
   - Agregado botón stories_button en toolbar (columna 8, después de rename_manual)
   - Ajustadas columnas de batch_name_entry y date (8→9→10→11)
+
+* `src/ig_orchestrator/gui/editor/panel.py` (Bugs arreglados):
+  - **Bug #1**: Botón "Save / update batch" no se habilitaba con 2+ cuentas. Agregada llamada a `_update_batch_context()` en `_upsert_account()` para recalcular estado de botones tras agregar cuentas.
+  - **Bug #2**: Al marcar "Update", los campos "Paste first post date" y "Clear date" se ocultaban pero dejaban espacio vacío. Ahora el campo Path se reposiciona de row 2 a row 1 cuando está en modo Update, eliminando el espacio hueco y manteniendo el layout compacto.
   - Actualizada columnconfigure para weight=1 en columna 11
 
 * `src/ig_orchestrator/gui/batches/dialog.py`:
