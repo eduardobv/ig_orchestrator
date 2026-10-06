@@ -219,43 +219,96 @@ class EditorPanelMixin:
             text=t("label.new_account_frame"),
             padding=6,
         )
-        self.new_account_frame.columnconfigure(1, weight=1)
-        ttk.Label(self.new_account_frame, text="ownerId *").grid(
-            row=0,
-            column=0,
-            sticky="w",
+        # Owner ID row with paste/clear buttons
+        ttk.Label(self.new_account_frame, text=f"{t('label.owner_id')} *").grid(
+            row=0, column=0, sticky="w"
         )
-        ttk.Entry(self.new_account_frame, textvariable=self.owner_id_var).grid(
-            row=0, column=1, sticky="ew", padx=(8, 0)
+        owner_id_row = ttk.Frame(self.new_account_frame)
+        owner_id_row.grid(row=0, column=1, columnspan=2, sticky="w", padx=(8, 0))
+        owner_id_entry = ttk.Entry(owner_id_row, textvariable=self.owner_id_var, width=18)
+        owner_id_entry.grid(row=0, column=0, sticky="w")
+        bind_edit_context_menu(owner_id_entry)
+        paste_owner_id_btn = compact_icon_button(
+            owner_id_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_owner_id,
+            tooltip=t("tooltip.paste_owner_id"),
         )
+        paste_owner_id_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
+        clear_owner_id_btn = ttk.Button(
+            owner_id_row,
+            text="❌",
+            width=3,
+            command=self._clear_owner_id,
+        )
+        clear_owner_id_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        Tooltip(clear_owner_id_btn, t("tooltip.clear_owner_id"))
+
+        # Start Init Date row with paste/clear buttons
         self.start_init_date_label = ttk.Label(
-            self.new_account_frame, text="startInitDate *"
+            self.new_account_frame, text=f"{t('label.first_post_date')} *"
         )
         self.start_init_date_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
+        start_date_row = ttk.Frame(self.new_account_frame)
+        start_date_row.grid(row=1, column=1, columnspan=2, sticky="w", padx=(8, 0), pady=(6, 0))
         self.start_init_date_entry = ttk.Entry(
-            self.new_account_frame, textvariable=self.start_init_date_var
+            start_date_row, textvariable=self.start_init_date_var, width=14
         )
-        self.start_init_date_entry.grid(
-            row=1, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
+        self.start_init_date_entry.grid(row=0, column=0, sticky="w")
+        bind_edit_context_menu(self.start_init_date_entry)
+        paste_start_date_btn = compact_icon_button(
+            start_date_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_start_init_date,
+            tooltip=t("tooltip.paste_first_post_date"),
         )
-        ttk.Label(self.new_account_frame, text="path *").grid(
+        paste_start_date_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
+        clear_start_date_btn = ttk.Button(
+            start_date_row,
+            text="❌",
+            width=3,
+            command=self._clear_start_init_date,
+        )
+        clear_start_date_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        Tooltip(clear_start_date_btn, t("tooltip.clear_first_post_date"))
+
+        # Path row with paste/clear buttons
+        ttk.Label(self.new_account_frame, text=f"{t('label.path')} *").grid(
             row=2, column=0, sticky="w", pady=(6, 0)
         )
+        path_row = ttk.Frame(self.new_account_frame)
+        path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
+        path_row.columnconfigure(0, weight=1)
         self.destination_path_combo = ttk.Combobox(
-            self.new_account_frame,
+            path_row,
             textvariable=self.destination_path_var,
             values=self.destination_paths,
+            width=40,
         )
-        self.destination_path_combo.grid(
-            row=2, column=1, sticky="ew", padx=(8, 0), pady=(6, 0)
+        self.destination_path_combo.grid(row=0, column=0, sticky="ew")
+        bind_edit_context_menu(self.destination_path_combo)
+        paste_path_btn = compact_icon_button(
+            path_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_destination_path,
+            tooltip=t("tooltip.paste_path"),
         )
+        paste_path_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
+        clear_path_btn = ttk.Button(
+            path_row,
+            text="❌",
+            width=3,
+            command=self._clear_destination_path,
+        )
+        clear_path_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        Tooltip(clear_path_btn, t("tooltip.clear_path"))
         self.new_account_frame.grid(
             row=3, column=1, columnspan=3, sticky="ew", pady=(8, 0)
         )
         self.new_account_frame.grid_remove()
 
         self.url_actions = ttk.Frame(parent)
-        self.url_actions.grid(row=4, column=0, sticky="n", padx=(0, 8), pady=(8, 0))
+        self.url_actions.grid(row=3, column=0, rowspan=2, sticky="n", padx=(0, 8), pady=(8, 0))
         self.paste_add_button = icon_button(
             self.url_actions,
             image=self.icons.get("clipboard-plus"),
@@ -495,6 +548,40 @@ class EditorPanelMixin:
             self.username_combo.focus_set()
         except (tk.TclError, AttributeError):
             pass
+        return True
+
+
+    def _clear_owner_id(self) -> None:
+        self.owner_id_var.set("")
+
+    def _paste_owner_id(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        pasted = first_clipboard_line(text)
+        self.owner_id_var.set(pasted)
+        return True
+
+    def _clear_start_init_date(self) -> None:
+        self.start_init_date_var.set("")
+
+    def _paste_start_init_date(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        pasted = first_clipboard_line(text)
+        self.start_init_date_var.set(pasted)
+        return True
+
+    def _clear_destination_path(self) -> None:
+        self.destination_path_var.set("")
+
+    def _paste_destination_path(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        pasted = first_clipboard_line(text)
+        self.destination_path_var.set(pasted)
         return True
 
 
