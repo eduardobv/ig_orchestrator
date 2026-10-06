@@ -256,21 +256,21 @@ class EditorPanelMixin:
         )
         self.start_init_date_entry.grid(row=0, column=0, sticky="w")
         bind_edit_context_menu(self.start_init_date_entry)
-        paste_start_date_btn = compact_icon_button(
+        self.paste_start_date_btn = compact_icon_button(
             start_date_row,
             image=self.icons.get_compact("clipboard-black"),
             command=self._paste_start_init_date,
             tooltip=t("tooltip.paste_first_post_date"),
         )
-        paste_start_date_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
-        clear_start_date_btn = ttk.Button(
+        self.paste_start_date_btn.grid(row=0, column=1, sticky="w", padx=(4, 0))
+        self.clear_start_date_btn = ttk.Button(
             start_date_row,
             text="❌",
             width=3,
             command=self._clear_start_init_date,
         )
-        clear_start_date_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
-        Tooltip(clear_start_date_btn, t("tooltip.clear_first_post_date"))
+        self.clear_start_date_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        Tooltip(self.clear_start_date_btn, t("tooltip.clear_first_post_date"))
 
         # Path row with paste/clear buttons
         ttk.Label(self.new_account_frame, text=f"{t('label.path')} *").grid(
@@ -283,7 +283,7 @@ class EditorPanelMixin:
             path_row,
             textvariable=self.destination_path_var,
             values=self.destination_paths,
-            width=40,
+            width=56,
         )
         self.destination_path_combo.grid(row=0, column=0, sticky="ew")
         bind_edit_context_menu(self.destination_path_combo)
@@ -417,12 +417,20 @@ class EditorPanelMixin:
             self.new_account_frame.configure(text="Datos de cuenta nueva")
             self.start_init_date_label.grid()
             self.start_init_date_entry.grid()
+            if hasattr(self, "paste_start_date_btn"):
+                self.paste_start_date_btn.grid()
+            if hasattr(self, "clear_start_date_btn"):
+                self.clear_start_date_btn.grid()
             self.new_account_frame.grid()
             return
         if self.catalog_update_var.get():
             self.new_account_frame.configure(text="Datos de catálogo (Update)")
             self.start_init_date_label.grid_remove()
             self.start_init_date_entry.grid_remove()
+            if hasattr(self, "paste_start_date_btn"):
+                self.paste_start_date_btn.grid_remove()
+            if hasattr(self, "clear_start_date_btn"):
+                self.clear_start_date_btn.grid_remove()
             self.new_account_frame.grid()
             return
         self.new_account_frame.grid_remove()
