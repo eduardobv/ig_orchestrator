@@ -75,6 +75,7 @@ src/ig_orchestrator/gui/
 |-- queue/                             # cola y secuencia
 |-- settings/                          # diálogo Configuración
 |-- draft/                             # AccountDraft / BatchDraft + persistencia
+|-- stories/                           # organizar stories (inbox → path/story)
 `-- shared/                            # i18n, theme, icons, helpers, locales, static
 ```
 
@@ -95,6 +96,7 @@ Mapa rápido “dónde está X”:
 | Guardar draft en SQLite | `gui/draft` | `models.py`, `service.py` |
 | Traducciones, iconos, tema | `gui/shared` | `i18n.py`, `icons.py`, `theme.py` |
 | Arranque de la ventana | `gui/shell` | `app.py` |
+| Organizar stories (inbox) | `gui/stories` + `filesystem/story_inbox.py` | `dialog.py`, `settings.py` |
 
 ## Árbol persistencia
 

@@ -268,6 +268,7 @@ def _validate_account(
         start_now_date=start_now_date,
         download_stories=account.download_stories,
         urls=tuple(urls),
+        priority=max(0, int(account.priority or 0)),
     )
 
 
@@ -313,8 +314,14 @@ def validate_catalog_update_details(account: AccountDraft) -> CatalogUpdateDetai
     )
 
 
-def _normalize_username(value: str) -> str:
+def normalize_username(value: str) -> str:
+    """Strip surrounding space and a leading ``@``. Comparison should casefold."""
+
     return value.strip().lstrip("@").strip()
+
+
+def _normalize_username(value: str) -> str:
+    return normalize_username(value)
 
 
 def _normalized_urls(values: list[str]) -> tuple[list[str], list[str]]:
@@ -397,6 +404,7 @@ __all__ = [
     "NewAccountDetails",
     "inspect_account_draft",
     "normalize_url_lines",
+    "normalize_username",
     "save_catalog_metadata_to_history",
     "save_new_account_to_catalog",
     "save_batch_draft",

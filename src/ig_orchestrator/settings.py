@@ -36,6 +36,7 @@ class Settings:
     sqlite_gui_db_path: Path = field(
         default_factory=lambda: Path(r"data\orchestrator_gui.sqlite")
     )
+    window_position: str = "left"
 
 
 _ENV_TO_FIELD = {
@@ -58,6 +59,7 @@ _ENV_TO_FIELD = {
     "FINAL_BASE_FOLDER": "final_base_folder",
     "MANUAL_RENAME_BAT_PATH": "manual_rename_bat_path",
     "MANUAL_RENAME_CONFIG_PATH": "manual_rename_config_path",
+    "WINDOW_POSITION": "window_position",
 }
 
 _REQUIRED_ENV_VARS = tuple(
@@ -71,6 +73,7 @@ _REQUIRED_ENV_VARS = tuple(
         "MANUAL_RENAME_BAT_PATH",
         "MANUAL_RENAME_CONFIG_PATH",
         "SQLITE_GUI_DB_PATH",
+        "WINDOW_POSITION",
     }
 )
 
@@ -137,6 +140,9 @@ def load_settings(env_file: str | Path = ".env") -> Settings:
             manual_rename_config_path=_parse_optional_path(
                 raw_values, "MANUAL_RENAME_CONFIG_PATH"
             ),
+            window_position=_parse_optional_window_position(
+                raw_values, "WINDOW_POSITION", default="left"
+            ),
         )
     except ValueError as exc:
         raise SettingsError(f"Invalid environment settings: {exc}") from exc
@@ -183,6 +189,21 @@ def _parse_optional_bool(
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
     raise ValueError(f"{env_name} must be a boolean")
+
+
+def _parse_optional_window_position(
+    raw_values: dict[str, str],
+    env_name: str,
+    *,
+    default: str,
+) -> str:
+    value = raw_values.get(env_name)
+    if value is None or not value.strip():
+        return default
+    normalized = value.strip().lower()
+    if normalized not in {"left", "center", "right"}:
+        raise ValueError(f"{env_name} must be 'left', 'center', or 'right'")
+    return normalized
 
 
 __all__ = ["Settings", "SettingsError", "load_settings"]

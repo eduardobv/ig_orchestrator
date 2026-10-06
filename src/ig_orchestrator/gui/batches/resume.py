@@ -238,8 +238,11 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
     ).fetchone()
     if batch is None:
         raise ValueError(f"Batch not found: {batch_id}")
+    from ig_orchestrator.db.schema_mode import is_gui_schema
+
+    order_sql = "sort_order, id" if is_gui_schema(connection) else "id"
     account_rows = connection.execute(
-        "SELECT * FROM accounts WHERE batch_id = ? ORDER BY id",
+        f"SELECT * FROM accounts WHERE batch_id = ? ORDER BY {order_sql}",
         (batch_id,),
     ).fetchall()
     if not account_rows and str(batch["status"]) != InputBatchStatus.DRAFT.value:
@@ -262,6 +265,11 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
         is_catalog_update = (
             not is_new_account and bool(owner_id.strip() or destination_path.strip())
         )
+        keys = set(row.keys())
+        try:
+            priority = int(row["priority"] or 0) if "priority" in keys else 0
+        except (KeyError, IndexError, TypeError, ValueError):
+            priority = 0
         accounts.append(
             AccountDraft(
                 username=str(row["username"]),
@@ -273,6 +281,7 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
                 owner_id=owner_id,
                 start_init_date=str(row["rename_start_init_date"] or ""),
                 destination_path=destination_path,
+                priority=priority if priority > 0 else 0,
             )
         )
 

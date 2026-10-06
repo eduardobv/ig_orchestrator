@@ -595,6 +595,14 @@ def test_gui_catalog_double_click_loads_username_and_opens_profile(
     app = object.__new__(InstagramOrchestratorApp)
     app.catalog_list = FakeCatalogList()
     app.username_var = FakeStringVar()
+    app.stories_var = FakeStringVar()
+    app.stories_var.value = True
+    app.new_account_var = FakeStringVar()
+    app.catalog_update_var = FakeStringVar()
+    app.owner_id_var = FakeStringVar()
+    app.start_init_date_var = FakeStringVar()
+    app.destination_path_var = FakeStringVar()
+    app._editor_bound_username = "previous_user"
     app._apply_catalog_date = lambda: applied_dates.append(True)
     monkeypatch.setattr(
         "ig_orchestrator.gui.catalog.panel._open_chrome_tab",
@@ -606,6 +614,7 @@ def test_gui_catalog_double_click_loads_username_and_opens_profile(
     assert app.username_var.value == "selected_user"
     assert applied_dates == [True]
     assert opened == ["https://www.instagram.com/selected_user/"]
+    assert app.stories_var.value is False
 
 
 def test_gui_catalog_single_selection_only_loads_username() -> None:
@@ -630,12 +639,64 @@ def test_gui_catalog_single_selection_only_loads_username() -> None:
     app = object.__new__(InstagramOrchestratorApp)
     app.catalog_list = FakeCatalogList()
     app.username_var = FakeStringVar()
+    app.stories_var = FakeStringVar()
+    app.stories_var.value = True
+    app.new_account_var = FakeStringVar()
+    app.new_account_var.value = True
+    app.catalog_update_var = FakeStringVar()
+    app.owner_id_var = FakeStringVar()
+    app.owner_id_var.value = "owner"
+    app.start_init_date_var = FakeStringVar()
+    app.destination_path_var = FakeStringVar()
+    app._editor_bound_username = "previous_user"
     app._apply_catalog_date = lambda: applied_dates.append(True)
 
     app._load_catalog()
 
     assert app.username_var.value == "single_click_user"
     assert applied_dates == [True]
+    assert app.stories_var.value is False
+    assert app.new_account_var.value is False
+    assert app.owner_id_var.value == ""
+
+
+def test_gui_catalog_same_username_keeps_editor_flags() -> None:
+    class FakeCatalogList:
+        @staticmethod
+        def curselection() -> tuple[int]:
+            return (0,)
+
+        @staticmethod
+        def get(index: int) -> str:
+            return "same_user"
+
+    class FakeStringVar:
+        def __init__(self, value="") -> None:
+            self.value = value
+
+        def set(self, value) -> None:
+            self.value = value
+
+        def get(self):
+            return self.value
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.catalog_list = FakeCatalogList()
+    app.username_var = FakeStringVar("same_user")
+    app.stories_var = FakeStringVar(True)
+    app.new_account_var = FakeStringVar(False)
+    app.catalog_update_var = FakeStringVar(True)
+    app.owner_id_var = FakeStringVar("keep-owner")
+    app.start_init_date_var = FakeStringVar("2026-01-01")
+    app.destination_path_var = FakeStringVar(r"G:\keep")
+    app._editor_bound_username = "same_user"
+    app._apply_catalog_date = lambda: None
+
+    app._load_catalog()
+
+    assert app.stories_var.value is True
+    assert app.catalog_update_var.value is True
+    assert app.owner_id_var.value == "keep-owner"
 
 
 def test_gui_catalog_silent_tree_select_does_not_load_editor() -> None:
@@ -666,5 +727,85 @@ def test_gui_catalog_silent_tree_select_does_not_load_editor() -> None:
 
     assert app.username_var.value == "kept"
     assert applied_dates == []
+
+
+class _CatalogPasteVar:
+    def __init__(self, value: str = "") -> None:
+        self.value = value
+
+    def set(self, value) -> None:
+        self.value = value
+
+    def get(self):
+        return self.value
+
+
+def _catalog_paste_app(*, username: str = "old", stories: bool = True) -> InstagramOrchestratorApp:
+    class FakeEntry:
+        def __init__(self) -> None:
+            self.cursor = None
+            self.focused = False
+
+        def icursor(self, index: str) -> None:
+            self.cursor = index
+
+        def focus_set(self) -> None:
+            self.focused = True
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.catalog_filter_var = _CatalogPasteVar()
+    app.catalog_filter_entry = FakeEntry()
+    app.username_var = _CatalogPasteVar(username)
+    app.stories_var = _CatalogPasteVar(stories)
+    app.new_account_var = _CatalogPasteVar(False)
+    app.catalog_update_var = _CatalogPasteVar(False)
+    app.priority_var = _CatalogPasteVar(True)
+    app.owner_id_var = _CatalogPasteVar("owner")
+    app.start_init_date_var = _CatalogPasteVar("2026-01-01")
+    app.destination_path_var = _CatalogPasteVar(r"G:\keep")
+    app._editor_bound_username = app._editor_username_identity(username)
+    return app
+
+
+def test_paste_catalog_filter_fills_editor_and_resets_flags() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            return "  @best.slips\nignored\n"
+
+    app = _catalog_paste_app()
+    app.root = FakeRoot()
+
+    assert app._paste_catalog_filter() is True
+    assert app.catalog_filter_var.value == "best.slips"
+    assert app.username_var.value == "best.slips"
+    assert app.stories_var.value is False
+    assert app.priority_var.value is False
+    assert app.catalog_filter_entry.focused is True
+
+
+def test_paste_catalog_filter_returns_false_when_clipboard_empty() -> None:
+    class FakeRoot:
+        @staticmethod
+        def clipboard_get() -> str:
+            raise tk.TclError("CLIPBOARD")
+
+    app = _catalog_paste_app()
+    app.root = FakeRoot()
+
+    assert app._paste_catalog_filter() is False
+    assert app.username_var.value == "old"
+    assert app.stories_var.value is True
+
+
+def test_apply_catalog_pasted_text_keeps_flags_for_same_identity() -> None:
+    app = _catalog_paste_app(username="best.slips", stories=True)
+    app.priority_var.value = True
+
+    app._apply_catalog_pasted_text("  @best.slips  ")
+
+    assert app.username_var.value == "best.slips"
+    assert app.stories_var.value is True
+    assert app.priority_var.value is True
 
 

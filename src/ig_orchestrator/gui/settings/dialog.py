@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from sqlite3 import IntegrityError
@@ -98,6 +99,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -116,87 +118,117 @@ from ig_orchestrator.orchestration.processing_policy import (
 )
 
 
-class SettingsDialogMixin:
-    """Mixin: configuration dialog."""
+class SettingsDialogWithTabs:
+    """Settings dialog with tabbed interface for organized configuration."""
 
-    def _open_settings(self) -> None:
-        window = tk.Toplevel(self.root)
-        window.title(t("settings.title"))
-        window.transient(self.root)
-        frame = ttk.Frame(window, padding=12)
-        frame.pack(fill=tk.BOTH, expand=True)
+    def __init__(self, parent: tk.Tk, connection, root_for_center):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(t("settings.title"))
+        self.dialog.transient(parent)
+        self.connection = connection
+        self.parent = parent
+        self.root_for_center = root_for_center
+        self.saved = False
+
+        # Main notebook
+        main_frame = ttk.Frame(self.dialog, padding=8)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 12))
+
+        # Build tabs
+        self._build_general_tab()
+        self._build_ui_tab()
+        self._build_processing_tab()
+        self._build_catalog_tab()
+        self._build_notify_tab()
+
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(0, 0))
+        ttk.Button(button_frame, text=t("settings.save"), command=self._on_save).pack(
+            side=tk.RIGHT, padx=(4, 0)
+        )
+        ttk.Button(button_frame, text=t("settings.cancel"), command=self._on_cancel).pack(
+            side=tk.RIGHT, padx=4
+        )
+
+        center_modal_on_parent(
+            self.dialog, root_for_center, root_for_center.state() == "zoomed"
+        )
+
+    def _build_general_tab(self) -> None:
+        frame = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(frame, text=t("settings.tabs.general"))
+
         ttk.Label(frame, text=t("settings.language")).grid(row=0, column=0, sticky="w")
-        language = tk.StringVar(value=current_language())
+        self.language = tk.StringVar(value=current_language())
         ttk.Radiobutton(
             frame,
             text=t("settings.language.es"),
             value="es",
-            variable=language,
+            variable=self.language,
         ).grid(row=1, column=0, sticky="w", pady=(4, 0))
         ttk.Radiobutton(
             frame,
             text=t("settings.language.en"),
             value="en",
-            variable=language,
+            variable=self.language,
         ).grid(row=2, column=0, sticky="w")
         ttk.Label(frame, text=t("settings.language_restart")).grid(
             row=3, column=0, sticky="w", pady=(6, 10)
         )
 
-        def apply_language() -> None:
-            chosen = language.get()
-            if chosen == current_language():
-                return
-            if is_gui_schema(self.connection):
-                self.connection.execute(
-                    """
-                    INSERT INTO app_settings (key, value, value_type, updated_at)
-                    VALUES ('ui.language', ?, 'TEXT', datetime('now'))
-                    ON CONFLICT(key) DO UPDATE SET
-                        value = excluded.value,
-                        updated_at = excluded.updated_at
-                    """,
-                    (chosen,),
-                )
-                self.connection.commit()
-            self.root.destroy()
-            import subprocess
-            import sys
+    def _build_ui_tab(self) -> None:
+        frame = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(frame, text=t("settings.tabs.ui"))
 
-            subprocess.Popen([sys.executable, "-m", "ig_orchestrator", "gui"])
+        ttk.Label(frame, text=t("settings.window_position")).grid(
+            row=0, column=0, sticky="w"
+        )
+        self.window_position = tk.StringVar(
+            value=_gui_setting(self.connection, "ui.window_position", "left")
+        )
+        positions_row = ttk.Frame(frame)
+        positions_row.grid(row=1, column=0, sticky="w", pady=(0, 12))
+        for index, position in enumerate(("left", "center", "right")):
+            ttk.Radiobutton(
+                positions_row,
+                text=t(f"settings.window_position_{position}"),
+                value=position,
+                variable=self.window_position,
+            ).grid(row=0, column=index, sticky="w", padx=(0, 16))
 
-        ttk.Button(frame, text=t("settings.language.es") + " / EN", command=apply_language).grid(
-            row=4, column=0, sticky="w", pady=(0, 12)
-        )
-        ttk.Label(frame, text=t("settings.processing")).grid(
-            row=5, column=0, sticky="w", pady=(8, 4)
-        )
-        stories_first = tk.BooleanVar(
+    def _build_processing_tab(self) -> None:
+        frame = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(frame, text=t("settings.tabs.processing"))
+
+        self.stories_first = tk.BooleanVar(
             value=read_stories_first_enabled(self.connection)
         )
-
-        def apply_stories_first() -> None:
-            write_stories_first_enabled(self.connection, stories_first.get())
-
         ttk.Checkbutton(
             frame,
             text=t("settings.stories_first"),
-            variable=stories_first,
-            command=apply_stories_first,
-        ).grid(row=6, column=0, sticky="w")
-        ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=520).grid(
-            row=7, column=0, sticky="w", pady=(2, 12)
+            variable=self.stories_first,
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=500).grid(
+            row=1, column=0, sticky="w", pady=(2, 12)
         )
         ttk.Button(
             frame,
             text=t("settings.purge_files"),
-            command=lambda: self._purge_downloaded_files(window),
-        ).grid(row=8, column=0, sticky="w")
-        ttk.Label(frame, text=t("settings.colors")).grid(
-            row=9, column=0, sticky="w", pady=(16, 4)
-        )
+            command=lambda: self._purge_downloaded_files(),
+        ).grid(row=2, column=0, sticky="w")
+
+    def _build_catalog_tab(self) -> None:
+        frame = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(frame, text=t("settings.tabs.catalog"))
+
+        ttk.Label(frame, text=t("settings.colors")).grid(row=0, column=0, sticky="w")
         color_row = ttk.Frame(frame)
-        color_row.grid(row=10, column=0, sticky="w")
+        color_row.grid(row=1, column=0, sticky="w", pady=(0, 12))
+        self.color_buttons: dict[str, ttk.Button] = {}
         for index, (key, label_key) in enumerate(
             (
                 ("favorite", "settings.color_favorite"),
@@ -206,49 +238,56 @@ class SettingsDialogMixin:
                 ("disabled", "settings.color_disabled"),
             )
         ):
-            ttk.Button(
+            btn = ttk.Button(
                 color_row,
                 text=t(label_key),
-                command=lambda k=key: self._pick_catalog_color(window, k),
-            ).grid(row=0, column=index, padx=(0, 4))
+                command=lambda k=key: self._pick_catalog_color(k),
+            )
+            btn.grid(row=0, column=index, padx=(0, 4))
+            self.color_buttons[key] = btn
 
-        ttk.Label(frame, text=t("settings.notify")).grid(
-            row=11, column=0, sticky="w", pady=(16, 4)
-        )
-        notify_enabled = tk.BooleanVar(
-            value=_gui_setting(self.connection, "notify.enabled", "0") in {"1", "true"}
+    def _build_notify_tab(self) -> None:
+        frame = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(frame, text=t("settings.tabs.notify"))
+
+        self.notify_enabled = tk.BooleanVar(
+            value=_gui_setting(self.connection, "notify.enabled", "0")
+            in {"1", "true"}
         )
         ttk.Checkbutton(
-            frame, text=t("settings.notify_enable"), variable=notify_enabled
-        ).grid(row=12, column=0, sticky="w")
+            frame, text=t("settings.notify_enable"), variable=self.notify_enabled
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
         ttk.Label(frame, text=t("settings.notify_target")).grid(
-            row=13, column=0, sticky="w", pady=(6, 0)
+            row=1, column=0, sticky="w", pady=(0, 0)
         )
-        target_var = tk.StringVar(
+        self.target_var = tk.StringVar(
             value=_gui_setting(self.connection, "notify.target", "me")
         )
-        ttk.Entry(frame, textvariable=target_var, width=32).grid(
-            row=14, column=0, sticky="w"
+        ttk.Entry(frame, textvariable=self.target_var, width=32).grid(
+            row=2, column=0, sticky="w", pady=(0, 8)
         )
+
         ttk.Label(frame, text=t("settings.notify_template")).grid(
-            row=15, column=0, sticky="w", pady=(6, 0)
+            row=3, column=0, sticky="w", pady=(0, 0)
         )
-        template_var = tk.StringVar(
+        self.template_var = tk.StringVar(
             value=_gui_setting(
                 self.connection,
                 "notify.template_batch_done",
                 t("settings.notify_template_default"),
             )
         )
-        ttk.Entry(frame, textvariable=template_var, width=64).grid(
-            row=16, column=0, sticky="ew"
+        ttk.Entry(frame, textvariable=self.template_var, width=64).grid(
+            row=4, column=0, sticky="ew", pady=(0, 12)
         )
+
         ttk.Label(frame, text=t("settings.notify_errors")).grid(
-            row=17, column=0, sticky="w", pady=(8, 2)
+            row=5, column=0, sticky="w", pady=(0, 4)
         )
-        error_vars: dict[str, tk.BooleanVar] = {}
         error_frame = ttk.Frame(frame)
-        error_frame.grid(row=18, column=0, sticky="w")
+        error_frame.grid(row=6, column=0, sticky="w")
+        self.error_vars: dict[str, tk.BooleanVar] = {}
         if is_gui_schema(self.connection):
             error_rows = self.connection.execute(
                 """
@@ -260,16 +299,51 @@ class SettingsDialogMixin:
             ).fetchall()
             for index, row in enumerate(error_rows):
                 var = tk.BooleanVar(value=bool(row["notify_on_match"]))
-                error_vars[str(row["code"])] = var
+                self.error_vars[str(row["code"])] = var
                 ttk.Checkbutton(
                     error_frame,
                     text=f"{row['code']}",
                     variable=var,
                 ).grid(row=index, column=0, sticky="w")
 
-        def save_notify() -> None:
-            if not is_gui_schema(self.connection):
-                return
+        ttk.Button(
+            frame,
+            text=t("settings.notify_test"),
+            command=self._send_test_notification,
+        ).grid(row=7, column=0, sticky="w", pady=(12, 0))
+
+    def _on_save(self) -> None:
+        """Apply changes and close dialog."""
+        if is_gui_schema(self.connection):
+            # Language
+            if self.language.get() != current_language():
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES ('ui.language', ?, 'TEXT', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (self.language.get(),),
+                )
+
+            # Window position
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('ui.window_position', ?, 'TEXT', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (self.window_position.get(),),
+            )
+
+            # Stories first
+            write_stories_first_enabled(self.connection, self.stories_first.get())
+
+            # Notify settings
             self.connection.execute(
                 """
                 INSERT INTO app_settings (key, value, value_type, updated_at)
@@ -277,7 +351,7 @@ class SettingsDialogMixin:
                 ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value, updated_at = excluded.updated_at
                 """,
-                ("1" if notify_enabled.get() else "0",),
+                ("1" if self.notify_enabled.get() else "0",),
             )
             self.connection.execute(
                 """
@@ -286,7 +360,7 @@ class SettingsDialogMixin:
                 ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value, updated_at = excluded.updated_at
                 """,
-                (target_var.get().strip() or "me",),
+                (self.target_var.get().strip() or "me",),
             )
             self.connection.execute(
                 """
@@ -295,9 +369,9 @@ class SettingsDialogMixin:
                 ON CONFLICT(key) DO UPDATE SET
                     value = excluded.value, updated_at = excluded.updated_at
                 """,
-                (template_var.get() or " ",),
+                (self.template_var.get() or " ",),
             )
-            for code, var in error_vars.items():
+            for code, var in self.error_vars.items():
                 self.connection.execute(
                     """
                     UPDATE bot_errors
@@ -308,19 +382,74 @@ class SettingsDialogMixin:
                 )
             self.connection.commit()
 
-        ttk.Button(frame, text=t("settings.notify_save"), command=save_notify).grid(
-            row=19, column=0, sticky="w", pady=(6, 0)
+        self.saved = True
+        if self.language.get() != current_language():
+            self.dialog.destroy()
+            import subprocess
+            import sys
+            subprocess.Popen([sys.executable, "-m", "ig_orchestrator", "gui"])
+        else:
+            self.dialog.destroy()
+
+    def _on_cancel(self) -> None:
+        """Close dialog without saving."""
+        self.dialog.destroy()
+
+    def _pick_catalog_color(self, key: str) -> None:
+        from ig_orchestrator.gui.catalog_colors import load_catalog_colors
+
+        catalog_colors = load_catalog_colors(self.connection)
+        current = catalog_colors.get(key) or "#ffffff"
+        _rgb, hex_color = colorchooser.askcolor(color=current, parent=self.dialog)
+        if not hex_color:
+            return
+        save_color(self.connection, key, hex_color)
+
+    def _send_test_notification(self) -> None:
+        import asyncio
+
+        try:
+            from ig_orchestrator.settings import load_settings
+
+            settings = load_settings()
+            asyncio.run(_send_test_telegram(settings, self.target_var.get().strip() or "me"))
+        except Exception as exc:
+            messagebox.showerror(
+                t("settings.notify_test"), str(exc), parent=self.dialog
+            )
+            return
+        messagebox.showinfo(
+            t("settings.notify_test"),
+            t("settings.notify_test_ok"),
+            parent=self.dialog,
         )
-        ttk.Button(
-            frame,
-            text=t("settings.notify_test"),
-            command=lambda: self._send_test_notification(
-                window, target_var.get().strip() or "me"
-            ),
-        ).grid(row=20, column=0, sticky="w", pady=(4, 0))
-        ttk.Button(frame, text=t("settings.close"), command=window.destroy).grid(
-            row=21, column=0, sticky="e", pady=(16, 0)
+
+    def _purge_downloaded_files(self) -> None:
+        if not messagebox.askyesno(
+            t("settings.purge_files"),
+            t("settings.purge_confirm"),
+            parent=self.dialog,
+        ):
+            return
+        count = purge_downloaded_files(self.connection)
+        messagebox.showinfo(
+            t("settings.purge_files"),
+            t("settings.purged", count=count),
+            parent=self.dialog,
         )
+
+
+class SettingsDialogMixin:
+    """Mixin: configuration dialog."""
+
+    def _open_settings(self) -> None:
+        dialog = SettingsDialogWithTabs(self.root, self.connection, self.root)
+        self.root.wait_window(dialog.dialog)
+        if dialog.saved and dialog.language.get() != current_language():
+            return
+        if dialog.saved:
+            self.catalog_colors = load_catalog_colors(self.connection)
+            self._refresh_catalog()
 
 
     def _pick_catalog_color(self, parent: tk.Toplevel, key: str) -> None:

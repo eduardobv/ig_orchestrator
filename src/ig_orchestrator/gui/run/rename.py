@@ -75,6 +75,11 @@ from ig_orchestrator.gui.process_runner import (
 from ig_orchestrator.gui.rename_folder_status import (
     decide_rename_completion,
     list_unmoved_account_folders,
+    rename_status_tone,
+)
+from ig_orchestrator.gui.theme import (
+    STATUS_TONE_BUSY,
+    STATUS_TONE_ERROR,
 )
 from ig_orchestrator.gui.shared.helpers import (
     _ACCOUNT_PROGRESS_RE,
@@ -100,6 +105,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -262,6 +268,7 @@ class RenameMixin:
         ttk.Button(actions, text="Copiar comando", command=copy_command).pack(
             side=tk.RIGHT
         )
+        center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
         dialog.focus_set()
 
 
@@ -273,12 +280,14 @@ class RenameMixin:
 
         if self.active_queue_id is None and self.active_batch_id is None:
             messagebox.showerror("Renombrar", "No hay un batch activo para renombrar.")
+            self._set_status_tone(STATUS_TONE_ERROR)
             return
         if self.active_queue_id is not None:
             try:
                 queue = get_queue(self.connection, self.active_queue_id)
             except BatchQueueError as exc:
                 messagebox.showerror("Renombrar", str(exc))
+                self._set_status_tone(STATUS_TONE_ERROR)
                 return
             if not queue.rename_batch_ids:
                 self.active_queue_id = None
@@ -289,6 +298,7 @@ class RenameMixin:
                 )
             except (BatchQueueError, ValueError) as exc:
                 messagebox.showerror("Renombrar", str(exc))
+                self._set_status_tone(STATUS_TONE_ERROR)
                 return
             self.default_date_var.set(params.start_now_date)
             self.rename_new_accounts = params.new_accounts
@@ -305,6 +315,7 @@ class RenameMixin:
                 )
             except ValueError as exc:
                 messagebox.showerror("Renombrar", str(exc))
+                self._set_status_tone(STATUS_TONE_ERROR)
                 return
             self.default_date_var.set(persisted_draft.default_start_now_date)
             self.rename_new_accounts = _new_account_rename_parameters(
@@ -321,10 +332,13 @@ class RenameMixin:
                 "Renombrar",
                 "Start date debe tener formato YYYY-MM-DD antes de renombrar.",
             )
+            self._set_status_tone(STATUS_TONE_ERROR)
             return
         if not MANUAL_RENAME_SCRIPT.is_file():
             error = f"No se encontro el script de renombrado: {MANUAL_RENAME_SCRIPT}"
             self._write_console(error + "\n")
+            self._set_status("No se pudo iniciar el renombrado")
+            self._set_status_tone(STATUS_TONE_ERROR)
             messagebox.showerror("Renombrar", error)
             return
 
@@ -336,9 +350,10 @@ class RenameMixin:
             f"Iniciando renombrado con Start date {start_now_date}: "
             f"{' '.join(command)}\n"
         )
+        self.active_process_kind = "rename"
         self._set_process_running(True)
         self._set_status("Renombrando archivos...")
-        self.active_process_kind = "rename"
+        self._set_status_tone(STATUS_TONE_BUSY)
         try:
             self.process_runner.start(
                 command,
@@ -350,6 +365,7 @@ class RenameMixin:
         except (OSError, RuntimeError) as exc:
             self._set_process_running(False)
             self._set_status("No se pudo iniciar el renombrado")
+            self._set_status_tone(STATUS_TONE_ERROR)
             self._write_console(f"No se pudo iniciar el renombrado: {exc}\n")
             messagebox.showerror("Renombrar", str(exc))
 
@@ -410,4 +426,5 @@ class RenameMixin:
             self._write_console(
                 f"Renombrado finalizado con codigo de salida {exit_code}.\n"
             )
+        self._set_status_tone(rename_status_tone(decision, exit_code=exit_code))
 

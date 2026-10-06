@@ -158,10 +158,17 @@ class MenubarMixin:
         batch_menu = tk.Menu(menubar, tearoff=False)
         batch_menu.add_command(label=t("menu.batch.execute"), command=self._execute)
         batch_menu.add_command(label=t("menu.batch.stop"), command=self._cancel_process)
+        batch_menu.add_command(label=t("menu.batch.pause"), command=self._toggle_pause_resume)
+        batch_menu.add_separator()
+        batch_menu.add_command(label=t("menu.batch.stories"), command=self._open_stories_inbox)
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
         batch_menu.add_command(
             label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command
+        )
+        batch_menu.add_separator()
+        batch_menu.add_command(
+            label=t("menu.batch.stories"), command=self._open_stories_inbox
         )
         menubar.add_cascade(label=t("menu.batch"), menu=batch_menu)
 

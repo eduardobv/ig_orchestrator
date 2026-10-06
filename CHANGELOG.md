@@ -1,5 +1,333 @@
 # Changelog
 
+## v2.1.6 - Stories Inbox Modal Restaurado
+
+Fecha: 2026-10-04
+
+### Creado
+
+* `src/ig_orchestrator/filesystem/story_inbox.py` - Lógica de movimiento de archivos de stories:
+  - Función `username_from_story_filename()` - Extrae username del nombre de archivo
+  - Función `list_inbox_media()` - Lista archivos de media en la carpeta inbox
+  - Función `organize_story_inbox()` - Mueve archivos identificando por username
+  - Función `summarize_results()` - Cuenta archivos movidos y errores
+  - Clases: `StoryInboxStatus`, `StoryInboxResult`, `StoryInboxError`
+
+* `src/ig_orchestrator/gui/stories/` - Módulo GUI para Stories Inbox:
+  - `dialog.py` - `StoriesInboxMixin` con métodos para abrir modal y ejecutar
+  - `settings.py` - Funciones para cargar/guardar rutas en `app_settings`
+  - `__init__.py` - Exporta mixin
+  - `MODULE.md` - Documentación del módulo
+
+* Tests:
+  - `tests/gui/test_stories_dialog.py` - Tests de configuración
+  - `tests/filesystem/test_story_inbox.py` - Tests de movimiento de archivos
+
+### Modificado
+
+* `src/ig_orchestrator/gui/chrome/menubar.py`:
+  - Agregado comando `menu.batch.pause` (pausar/reanudar en menú)
+  - Agregado comando `menu.batch.stories` (organizar stories en menú)
+  - Separator antes y después de "Organizar Stories"
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Agregada importación de `StoriesInboxMixin`
+  - Agregado `StoriesInboxMixin` en herencia de clase `InstagramOrchestratorApp`
+
+* `src/ig_orchestrator/gui/shared/locales/es.json`:
+  - Nuevas claves: `menu.batch.pause`, `menu.batch.stories`
+  - Nuevas claves stories.* (15 strings) para UI y mensajes
+
+* `src/ig_orchestrator/gui/shared/locales/en.json`:
+  - Nuevas claves: `menu.batch.pause`, `menu.batch.stories`
+  - Nuevas claves stories.* (15 strings) para UI y mensajes
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en story_inbox.py, dialog.py, settings.py (todo OK)
+* `pytest tests/filesystem/test_story_inbox.py` - Todos los tests pasan:
+  - username_from_story_filename()
+  - organize_story_inbox() moves files correctly
+  - organize_story_inbox() reports missing username and path
+  - organize_story_inbox() does not overwrite
+  - organize_story_inbox() requires paths
+  - organize_story_inbox() requires accounts_dir table
+* `pytest tests/gui/test_stories_dialog.py` - Test de settings pass
+
+### Comportamiento
+
+1. Menú **Batch** ahora tiene:
+   - Execute
+   - Stop
+   - Pause (toggle pause/resume)
+   - ---
+   - Organize Stories (nuevo)
+   - ---
+   - Rename
+   - Manual Rename
+
+2. Click en "Organize Stories" abre modal con:
+   - Campo para ruta inbox (con Browse)
+   - Campo para ruta BD de cuentas (con Browse)
+   - Área de log para resultados
+   - Botones: Save (guarda rutas), Run (ejecuta), Close
+
+3. Flujo de uso:
+   - Usuario configura rutas (se guardan en app_settings)
+   - Click Run ejecuta `organize_story_inbox()`
+   - Cada archivo se mueve de `inbox_path` a `{account_path}/story/`
+   - Username se extrae del nombre de archivo (formato: `{username}-...`)
+   - Log muestra resultado: MOVED, USERNAME_NOT_FOUND, DESTINATION_EXISTS, etc.
+
+## v2.1.5 - Nombre de Batch por Defecto con Timestamp
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Nueva función `_generate_default_batch_name()` en helpers.py:
+  - Genera nombre de batch con timestamp actual
+  - Formato: `descargas_YYYY_MM_DD_HH_MM_SS`
+  - Garantiza nombre único para cada invocación (precisión a segundo)
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/helpers.py`:
+  - Agregada función `_generate_default_batch_name()` 
+  - Exportada en `__all__`
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Línea 243-245: Inicialización de `batch_name_var` cambió de usar último batch ejecutado a generar nombre por defecto con timestamp
+  - Agregada importación de `_generate_default_batch_name`
+
+* `src/ig_orchestrator/gui/run/controller.py`:
+  - Método `_start_new_batch()` línea 138: cambió a usar `_generate_default_batch_name()` en lugar de `_suggest_batch_name()`
+  - Agregada importación de `_generate_default_batch_name`
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en helpers.py, app.py, controller.py (todo OK)
+* Test unitario de `_generate_default_batch_name()`:
+  - Verifica formato correcto: descargas_YYYY_MM_DD_HH_MM_SS
+  - Verifica nombres diferentes en invocaciones separadas (1 segundo)
+  - Todos los tests pasaron
+
+### Comportamiento
+
+1. Al iniciar la app: nombre es `descargas_YYYY_MM_DD_HH_MM_SS` (timestamp actual)
+2. Cada vez que se abre la app: se genera nuevo nombre con timestamp diferente
+3. Click en "New Batch": genera nuevo nombre con timestamp actual
+4. Usuario puede editar nombre manualmente si lo desea
+5. Nombre se persiste en SQLite cuando se ejecuta batch
+
+## v2.1.4 - Botón Pause/Resume en Ventana Principal
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Botón Pause/Resume en toolbar junto a botones Run/Stop
+  - Ícono pause.png (dos barras verticales) para estado pausa
+  - Usa play icon para estado resume
+  - Botón deshabilitado cuando no hay batch en ejecución
+  - Botón habilitado solo cuando hay un batch ejecutándose
+  - Muestra "Pause" (ícono ⏸) cuando batch está ejecutándose
+  - Muestra "Resume" (ícono ▶) cuando batch está pausado
+  - Tooltip dinámico que cambia con el estado
+
+* Funcionalidad de toggle pause/resume:
+  - Click en botón pausa el batch actual sin cerrarlo
+  - Click nuevamente reanuda desde donde se pausó
+  - Estado sincronizado entre ventana principal y "Batches / runs"
+  - Logs muestran "Cola pausada" / "Cola reanudada"
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/icons.py`:
+  - Agregado "pause": "pause.png" a `_ICON_FILES`
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - `_build_widgets()`: agregado botón `pause_button` entre execute y cancel
+  - Actualización de grid positions para reflejar nueva columna
+  - `_restore_open_queue()`: sincroniza estado pause button si queue está pausada
+
+* `src/ig_orchestrator/gui/run/controller.py`:
+  - `_toggle_pause_resume()`: método que detecta estado actual y alterna entre pause/resume
+  - `_pause_batch()`: pausa la cola actual y actualiza UI
+  - `_resume_batch()`: reanuda la cola pausada y actualiza UI
+
+* `src/ig_orchestrator/gui/chrome/statusbar.py`:
+  - `_set_process_running()`: habilita/deshabilita pause button según estado de ejecución
+
+* `src/ig_orchestrator/gui/static/icons/pause.png`: nuevo ícono pause (32x32)
+
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`:
+  - Nuevas claves: `tooltip.pause`, `tooltip.resume`, `warning`, `error`
+
+### Pruebas ejecutadas
+
+* `python -m py_compile` en archivos modificados (todo OK)
+* Verificación manual (GUI):
+  - Crear batch con 10+ URLs
+  - Click en "Run" → comienza ejecución
+  - Esperar a que descargue 2-3 URLs
+  - Click en botón Pause → verifica que tooltip cambió a "Resume"
+  - Verifica que logs muestran "Cola pausada"
+  - Click en botón Resume → verifica que tooltip cambió a "Pause"
+  - Verifica que logs muestran "Cola reanudada"
+  - Verificar que descargas continúan desde donde se pausaron
+
+## v2.1.3 - Copiar URLs al Portapapeles en Panel de Errores
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Funcionalidad de copia de URLs en modal de "URLs completadas/reintentos/fallidas":
+  - Botón "Copiar" en frame de acciones para copiar URL seleccionada
+  - Botón "Copiar todas" para copiar todas las URLs (una por línea)
+  - Context menu (click derecho) en URLs con opciones "Copiar", "Abrir en Chrome" y "Copiar todas"
+  - Atajo Ctrl+C para copiar URL seleccionada
+  - Notificación visual temporal "¡Copiado!" en verde al copiar
+
+### Modificado
+
+* `src/ig_orchestrator/gui/batch_accounts/problem_urls.py`:
+  - `_open_account_problem_urls()`: agregadas funciones `copy_to_clipboard()`, `_show_copied_notification()`,
+    `copy_selected_url()`, `copy_all_urls()`, `show_context_menu()`, `on_ctrl_c()`
+  - Frame de acciones: nuevos botones "Copiar" y "Copiar todas"
+  - Tree binding: `<Button-3>` para context menu, `<Control-c>` para Ctrl+C
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`: nuevas claves
+  `problem_urls.copy`, `problem_urls.open_chrome`, `problem_urls.copy_all`,
+  `problem_urls.copied`, `problem_urls.copy_failed`
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (suite completa)
+* Verificación manual en GUI: 
+  - Crear batch con URLs que generen errores
+  - Abrir modal de URLs fallidas/reintentos
+  - Click en botón "Copiar" → verifica portapapeles
+  - Click derecho en URL → verifica context menu
+  - Ctrl+C en URL seleccionada → verifica copia
+  - Botón "Copiar todas" → verifica copia de todas
+
+## v2.1.2 - Settings Modal con Pestañas
+
+Fecha: 2026-10-03
+
+### Creado
+
+* `SettingsDialogWithTabs` clase para refactorizar modal de settings con interfaz por tabs.
+* 5 pestañas: General (idioma), Interfaz (posición ventana), Procesamiento (stories first, limpiar ficheros), 
+  Catálogo (colores) y Notificaciones (avisos Telegram, test, errores).
+* Botones "Guardar" y "Cancelar" en lugar de guardado automático.
+* Nuevas claves de i18n: `settings.save`, `settings.cancel`, `settings.tabs.*`.
+
+### Modificado
+
+* `src/ig_orchestrator/gui/settings/dialog.py`: refactorización completa de `_open_settings()` en
+  `SettingsDialogWithTabs`, mixin `SettingsDialogMixin` ahora usa la nueva clase.
+* `src/ig_orchestrator/gui/shared/locales/es.json` y `en.json`: nuevas claves de traducción para
+  botones y nombres de tabs.
+* Comportamiento: cambios se aplican solo al presionar "Guardar"; "Cancelar" descarta cambios.
+* Idioma: al cambiar, la app se reinicia automáticamente (comportamiento previo conservado).
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/gui/` (suite de GUI)
+* `python -m pytest -q` (suite completa)
+* Verificación manual en GUI con `python -m ig_orchestrator gui`
+
+## v2.1.1 - Posicionamiento Configurable de Ventanas
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Función `center_modal_on_parent()` en `gui/shared/helpers.py` para centrar modales en pantalla o ventana padre
+* Configuración de posición de ventana principal: izquierda, centro, derecha
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/helpers.py`:
+  - Modificada `_half_screen_geometry()` para aceptar parámetro `position`
+  - Agregada función `center_modal_on_parent()` para centrar diálogos modales
+  - Cálculo de geometría por posición: left (x=0), center (x=screen_width//2), right (x=screen_width-width)
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Lee posición de ventana desde `app_settings` (SQLite) al iniciar
+  - Pasa posición a `_half_screen_geometry()`
+
+* `src/ig_orchestrator/gui/batch_accounts/problem_urls.py`:
+  - Agregada llamada a `center_modal_on_parent()` antes de mostrar modal de URLs problemáticas
+
+* `src/ig_orchestrator/gui/batches/dialog.py`:
+  - Agregada llamada a `center_modal_on_parent()` antes de mostrar modal de lotes
+
+* `src/ig_orchestrator/gui/shared/locales/{en,es}.json`:
+  - Nuevas claves i18n:
+    - `settings.window_position` — Título de configuración
+    - `settings.window_position_left` — Opción izquierda
+    - `settings.window_position_center` — Opción centro
+    - `settings.window_position_right` — Opción derecha
+    - `settings.save_window_position` — Botón guardar
+
+* `src/ig_orchestrator/gui/settings/dialog.py`:
+  - Agregado control de selección de posición de ventana en pestaña "Interface"
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (suite completa)
+* `python -m compileall -q src tests`
+
+## v2.1.0 - GUI v2.1 Editor Flags, Priority, Catalog Paste, Rename Tones y Stories Inbox
+
+Fecha: 2026-09-13
+
+Rama: `v2/gui-ux-stories`. Plan: `tasks/done/Tarea_v2_1_GUI_ux.md`.
+
+### Creado
+
+* `tasks/done/Tarea_v2_1_GUI_ux.md`
+* `src/ig_orchestrator/gui/draft/priority.py`
+* `src/ig_orchestrator/filesystem/story_inbox.py`
+* `src/ig_orchestrator/gui/stories/` (`dialog.py`, `settings.py`, `MODULE.md`)
+* `tests/gui/test_priority.py`, `tests/gui/test_stories_dialog.py`,
+  `tests/filesystem/test_story_inbox.py`
+
+### Modificado
+
+* Editor: Stories / New account / Update se resetean cuando cambia la
+  identidad del username (normalizado: strip, quitar `@`, casefold).
+  Catálogo, pegar Username, combobox y limpiar Username disparan el
+  reset. Cargar una fila del lote hidrata los checks de esa cuenta.
+* `normalize_username` público en `gui/draft/service.py`.
+* Editor: check **Priority** al lado de Update. Rank 1 exclusivo: la
+  cuenta queda primera en el lote y cualquier otra con el mismo rank
+  pierde la prioridad. `AccountDraft.priority` y columna
+  `batch_accounts.priority` (default 0) dejan sitio a ranks 2, 3…
+  Columna **Prio** en la tabla. El sort legado (solo-stories, menos
+  URLs) se aplica solo a las cuentas sin rank.
+* Catálogo: botón pegar (icono portapapeles) a la izquierda del ❌.
+  Pegar (botón, menú, Ctrl+V) selecciona el username si existe y lo
+  escribe en el editor.
+* Barra de estado: `tk.Button` con colores de rename — azul mientras
+  corre, verde éxito, amarillo incompleto (leftovers), rojo error.
+* Botón **Stories** (toolbar, a la derecha de Renombrar manual) y menú
+  `Lote → Organizar stories…`: modal con Ruta Stories y Ruta BD
+  (recordadas en `app_settings`). Mueve media `{username}-…` a
+  `{accounts_dir.path}\story`. Errores por fichero: username ausente,
+  no está en la BD, path vacío, carpeta inexistente, destino ocupado.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/gui/test_editor.py tests/gui/test_catalog.py`
+* `python -m pytest -q tests/gui/test_priority.py tests/gui/test_batch_accounts.py`
+* `python -m pytest -q tests/gui/test_catalog.py tests/gui/test_rename.py`
+* `python -m pytest -q tests/filesystem/test_story_inbox.py tests/gui/test_stories_dialog.py`
+* `python -m pytest -q` → 321 passed
+
 ## v2.0.0 - GUI, sqlite v2 y aviso Telegram
 
 Fecha: 2026-09-11

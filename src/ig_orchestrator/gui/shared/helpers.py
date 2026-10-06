@@ -30,6 +30,7 @@ _CATALOG_COLORS = {
 
 _BATCH_COLUMNS = (
     ("username", "Username"),
+    ("prio", "Prio"),
     ("urls", "URLs"),
     ("status", "Estado"),
     ("stories", "Stories"),
@@ -71,6 +72,10 @@ async def _send_test_telegram(settings: Settings, target: str) -> None:
 
 def _suggest_batch_name() -> str:
     return f"descargas_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}"
+
+
+def _generate_default_batch_name() -> str:
+    return datetime.now().strftime("descargas_%Y_%m_%d_%H_%M_%S")
 
 
 def _catalog_entry_colors(
@@ -139,10 +144,20 @@ def _window_mode_title(
     return t("mode.new")
 
 
-def _half_screen_geometry(screen_width: int, screen_height: int) -> str:
+def _half_screen_geometry(
+    screen_width: int,
+    screen_height: int,
+    position: str = "left",
+) -> str:
     width = max(860, screen_width // 2)
     height = max(680, screen_height - 80)
-    return f"{width}x{height}+0+0"
+    if position == "center":
+        x_offset = (screen_width - width) // 2
+    elif position == "right":
+        x_offset = screen_width - width
+    else:
+        x_offset = 0
+    return f"{width}x{height}+{x_offset}+0"
 
 
 def catalog_focus_username(
@@ -194,6 +209,10 @@ def stories_cell_text(download_stories: bool) -> str:
     return "✅" if download_stories else "❌"
 
 
+def priority_cell_text(priority: int) -> str:
+    return str(priority) if int(priority or 0) > 0 else ""
+
+
 def _username_heading_title(ascending: bool | None) -> str:
     if ascending is True:
         return "Username ▲"
@@ -207,11 +226,14 @@ def _sort_accounts_by_username(
     *,
     ascending: bool,
 ) -> list[AccountDraft]:
-    return sorted(
-        accounts,
+    ranked = [account for account in accounts if int(account.priority or 0) > 0]
+    rest = [account for account in accounts if int(account.priority or 0) <= 0]
+    ranked.sort(key=lambda account: int(account.priority or 0))
+    rest.sort(
         key=lambda account: account.username.casefold(),
         reverse=not ascending,
     )
+    return [*ranked, *rest]
 
 
 def _catalog_width_chars(usernames: Iterable[str]) -> int:
@@ -228,6 +250,7 @@ def _batch_column_samples(usernames: Iterable[str]) -> dict[str, str]:
     longest_username = max(username_values, key=lambda value: (len(value), value))
     return {
         "username": longest_username,
+        "prio": "Prio",
         "urls": "9999",
         "status": "Completada 9999/9999",
         "stories": "Stories",
@@ -332,6 +355,7 @@ def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
                 account.owner_id,
                 account.start_init_date,
                 account.destination_path,
+                int(account.priority or 0),
             )
             for account in draft.accounts
         ),
@@ -383,6 +407,19 @@ def _account_display_status(
     return f"Pendiente ({runtime.pending_items})", "pending"
 
 
+def center_modal_on_parent(
+    modal: tk.Toplevel,
+    parent: tk.Tk | tk.Toplevel,
+    is_parent_maximized: bool = False,
+) -> None:
+    modal.update_idletasks()
+    screen_width = modal.winfo_screenwidth()
+    screen_height = modal.winfo_screenheight()
+    x = (screen_width - modal.winfo_width()) // 2
+    y = (screen_height - modal.winfo_height()) // 2
+    modal.geometry(f"+{x}+{y}")
+
+
 __all__ = [
     "_ACCOUNT_PROGRESS_RE",
     "_BATCH_COLUMNS",
@@ -394,6 +431,7 @@ __all__ = [
     "_catalog_entry_colors",
     "_catalog_width_chars",
     "_draft_signature",
+    "_generate_default_batch_name",
     "_gui_setting",
     "_half_screen_geometry",
     "_instagram_profile_url",
@@ -411,6 +449,8 @@ __all__ = [
     "_window_mode_title",
     "batch_username_matches_filter",
     "catalog_focus_username",
+    "center_modal_on_parent",
     "filter_batch_accounts",
+    "priority_cell_text",
     "stories_cell_text",
 ]

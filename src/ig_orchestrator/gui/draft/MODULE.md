@@ -4,8 +4,9 @@
 Modelo en memoria del lote en edición y persistencia DRAFT.
 
 ## Archivos
-- `models.py` — `AccountDraft`, `BatchDraft`
-- `service.py` — validar, normalizar URLs, `save_batch_draft`
+- `models.py` — `AccountDraft`, `BatchDraft` (`priority: int = 0`)
+- `priority.py` — ranks exclusivos y orden de la tabla
+- `service.py` — validar, normalizar URLs/username, `save_batch_draft`
 
 ## No debe
 Importar Tk.

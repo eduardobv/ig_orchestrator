@@ -20,6 +20,7 @@ from ig_orchestrator.gui.batch_draft_service import (
     BatchDraftValidationError,
     inspect_account_draft,
     normalize_url_lines,
+    normalize_username,
     save_catalog_metadata_to_history,
     save_new_account_to_catalog,
     save_batch_draft,
@@ -139,13 +140,27 @@ class CatalogPanelMixin:
             filter_row, textvariable=self.catalog_filter_var
         )
         self.catalog_filter_entry.grid(row=0, column=0, sticky="ew")
-        bind_edit_context_menu(self.catalog_filter_entry)
+        bind_edit_context_menu(
+            self.catalog_filter_entry,
+            after_change=self._on_catalog_filter_pasted,
+        )
+        for sequence in ("<Control-v>", "<Control-V>", "<<Paste>>"):
+            self.catalog_filter_entry.bind(
+                sequence, self._on_catalog_filter_paste_key, add="+"
+            )
+        self.paste_catalog_button = compact_icon_button(
+            filter_row,
+            image=self.icons.get_compact("clipboard-black"),
+            command=self._paste_catalog_filter,
+            tooltip=t("tooltip.paste_catalog"),
+        )
+        self.paste_catalog_button.grid(row=0, column=1, sticky="e", padx=(4, 0))
         ttk.Button(
             filter_row,
             text="❌",
             width=3,
             command=self._clear_catalog_filter,
-        ).grid(row=0, column=1, sticky="e", padx=(4, 0))
+        ).grid(row=0, column=2, sticky="e", padx=(4, 0))
         self.catalog_filter_var.trace_add("write", lambda *_: self._refresh_catalog())
         self.catalog_list = tk.Listbox(
             parent,
@@ -194,6 +209,35 @@ class CatalogPanelMixin:
 
     def _clear_catalog_filter(self) -> None:
         self.catalog_filter_var.set("")
+
+
+    def _apply_catalog_pasted_text(self, raw: str) -> None:
+        pasted = normalize_username(first_clipboard_line(raw))
+        self.catalog_filter_var.set(pasted)
+        self.username_var.set(pasted)
+        self._apply_username_identity(pasted)
+        try:
+            self.catalog_filter_entry.icursor(tk.END)
+            self.catalog_filter_entry.focus_set()
+        except (tk.TclError, AttributeError):
+            pass
+
+
+    def _paste_catalog_filter(self) -> bool:
+        text = read_clipboard(self.root)
+        if text is None:
+            return False
+        self._apply_catalog_pasted_text(text)
+        return True
+
+
+    def _on_catalog_filter_pasted(self) -> None:
+        self._apply_catalog_pasted_text(self.catalog_filter_var.get())
+
+
+    def _on_catalog_filter_paste_key(self, _event: tk.Event | None = None) -> str:
+        self._paste_catalog_filter()
+        return "break"
 
 
     def _toggle_catalog_view(self) -> None:
@@ -500,6 +544,7 @@ class CatalogPanelMixin:
         if not username:
             return
         self.username_var.set(username)
+        self._apply_username_identity(username)
         self._apply_catalog_date()
 
 

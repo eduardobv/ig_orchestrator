@@ -78,9 +78,24 @@ def decide_rename_completion(
     )
 
 
+def rename_status_tone(
+    decision: RenameCompletionDecision,
+    *,
+    exit_code: int,
+) -> str:
+    """Map a rename result to a status-bar color tone."""
+
+    if decision.leftover_folders:
+        return "warning"
+    if exit_code == 0 and decision.mark_completed:
+        return "success"
+    return "error"
+
+
 __all__ = [
     "RenameCompletionDecision",
     "decide_rename_completion",
     "has_unmoved_account_folders",
     "list_unmoved_account_folders",
+    "rename_status_tone",
 ]

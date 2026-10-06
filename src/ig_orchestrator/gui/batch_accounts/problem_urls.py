@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    center_modal_on_parent,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -368,17 +369,150 @@ class ProblemUrlsMixin:
                 refresh_after_id[0] = None
             dialog.destroy()
 
+        def copy_to_clipboard(url: str) -> None:
+            """Copia URL al portapapeles."""
+            try:
+                dialog.clipboard_clear()
+                dialog.clipboard_append(url)
+                dialog.update()
+                _show_copied_notification()
+            except tk.TclError as e:
+                messagebox.showerror(
+                    t("error"),
+                    f"{t('problem_urls.copy_failed')}: {e}",
+                    parent=dialog,
+                )
+
+        def _show_copied_notification() -> None:
+            """Muestra notificación temporal 'Copied!'"""
+            notification = tk.Toplevel(dialog)
+            notification.wm_overrideredirect(True)
+            notification.wm_attributes("-alpha", 0.9)
+            notification.wm_attributes("-topmost", True)
+
+            # Posicionar en el centro inferior del dialog
+            dialog_x = dialog.winfo_x()
+            dialog_y = dialog.winfo_y()
+            dialog_w = dialog.winfo_width()
+            dialog_h = dialog.winfo_height()
+
+            label = tk.Label(
+                notification,
+                text=t("problem_urls.copied"),
+                background="#10b981",
+                foreground="white",
+                relief="solid",
+                borderwidth=1,
+                padx=12,
+                pady=6,
+                font=("Segoe UI", 9, "bold"),
+            )
+            label.pack()
+
+            notification.update_idletasks()
+            notif_w = notification.winfo_width()
+            notif_h = notification.winfo_height()
+            notif_x = dialog_x + (dialog_w - notif_w) // 2
+            notif_y = dialog_y + dialog_h - notif_h - 20
+            notification.wm_geometry(f"+{notif_x}+{notif_y}")
+
+            def hide_notification():
+                try:
+                    notification.destroy()
+                except tk.TclError:
+                    pass
+
+            notification.after(1500, hide_notification)
+
+        def copy_selected_url() -> None:
+            """Copia la URL seleccionada al portapapeles."""
+            selection = tree.selection()
+            if not selection:
+                messagebox.showwarning(
+                    t("error"),
+                    "Selecciona una fila primero.",
+                    parent=dialog,
+                )
+                return
+            url = url_by_iid.get(selection[0])
+            if url:
+                copy_to_clipboard(url)
+
+        def copy_all_urls() -> None:
+            """Copia todas las URLs al portapapeles, una por línea."""
+            if not url_by_iid:
+                messagebox.showinfo(
+                    "Copiar",
+                    "No hay URLs para copiar.",
+                    parent=dialog,
+                )
+                return
+            all_urls = "\n".join(url_by_iid.values())
+            try:
+                dialog.clipboard_clear()
+                dialog.clipboard_append(all_urls)
+                dialog.update()
+                _show_copied_notification()
+            except tk.TclError as e:
+                messagebox.showerror(
+                    t("error"),
+                    f"{t('problem_urls.copy_failed')}: {e}",
+                    parent=dialog,
+                )
+
+        def show_context_menu(event: tk.Event) -> None:
+            """Muestra context menu al hacer click derecho."""
+            selection = tree.identify_row(event.y)
+            if selection:
+                tree.selection_set(selection)
+                context_menu = tk.Menu(dialog, tearoff=False)
+                url = url_by_iid.get(selection)
+
+                if url:
+                    context_menu.add_command(
+                        label=t("problem_urls.copy"),
+                        command=lambda u=url: copy_to_clipboard(u),
+                    )
+                    context_menu.add_command(
+                        label=t("problem_urls.open_chrome"),
+                        command=lambda u=url: _open_chrome_tab(u),
+                    )
+                    context_menu.add_separator()
+
+                context_menu.add_command(
+                    label=t("problem_urls.copy_all"),
+                    command=copy_all_urls,
+                )
+                context_menu.post(event.x_root, event.y_root)
+
+        def on_ctrl_c(event: tk.Event) -> None:
+            """Atajo Ctrl+C para copiar URL seleccionada."""
+            copy_selected_url()
+
         actions = ttk.Frame(dialog, padding=10)
         actions.grid(row=3, column=0, sticky="ew")
         ttk.Button(actions, text="Cerrar", command=on_close).pack(side=tk.LEFT)
         ttk.Button(actions, text="Actualizar", command=reload_rows).pack(
             side=tk.RIGHT
         )
+        ttk.Button(
+            actions,
+            text=t("problem_urls.copy_all"),
+            command=copy_all_urls,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(
+            actions,
+            text=t("problem_urls.copy"),
+            command=copy_selected_url,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(actions, text="Abrir seleccionada", command=open_selected_url).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
         tree.bind("<Double-Button-1>", open_selected_url)
+        tree.bind("<Button-3>", show_context_menu)
+        dialog.bind("<Control-c>", on_ctrl_c)
         dialog.protocol("WM_DELETE_WINDOW", on_close)
         schedule_auto_refresh()
+        center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
         dialog.focus_set()
 

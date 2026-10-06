@@ -87,6 +87,7 @@ from ig_orchestrator.gui.process_runner import (
 )
 from ig_orchestrator.gui.rename_folder_status import (
     decide_rename_completion,
+    rename_status_tone,
     has_unmoved_account_folders,
     list_unmoved_account_folders,
 )
@@ -253,6 +254,41 @@ def test_decide_rename_completion_keeps_button_when_folders_remain(tmp_path: Pat
     failed = decide_rename_completion(exit_code=1, leftover_folders=[])
     assert failed.mark_completed is False
     assert failed.keep_rename_enabled is True
+
+    assert rename_status_tone(with_leftovers, exit_code=0) == "warning"
+    assert rename_status_tone(clean_success, exit_code=0) == "success"
+    assert rename_status_tone(failed, exit_code=1) == "error"
+
+
+def test_set_status_tone_paints_tk_button() -> None:
+    class FakeButton:
+        def __init__(self) -> None:
+            self.kwargs: dict[str, str] = {}
+
+        def configure(self, **kwargs) -> None:
+            self.kwargs.update(kwargs)
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.status_button = FakeButton()
+    app._status_idle_bg = "#F7F8FA"
+    app._status_idle_fg = "#1F2933"
+
+    app._set_status_tone("busy")
+    assert app.status_tone == "busy"
+    assert app.status_button.kwargs["bg"] == "#2563EB"
+    assert app.status_button.kwargs["fg"] == "#ffffff"
+
+    app._set_status_tone("success")
+    assert app.status_button.kwargs["bg"] == "#238636"
+
+    app._set_status_tone("warning")
+    assert app.status_button.kwargs["bg"] == "#fff2cc"
+
+    app._set_status_tone("error")
+    assert app.status_button.kwargs["bg"] == "#cf222e"
+
+    app._set_status_tone("idle")
+    assert app.status_button.kwargs["bg"] == "#F7F8FA"
 
 
 def test_gui_rename_parameters_only_include_checked_new_accounts() -> None:

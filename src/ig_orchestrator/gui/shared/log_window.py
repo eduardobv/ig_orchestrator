@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from ig_orchestrator.gui.shared.helpers import center_modal_on_parent
 from ig_orchestrator.gui.shared.i18n import t
 
 
@@ -71,6 +72,7 @@ class LogWindow:
         menu.add_command(label=t("log.clear"), command=self.clear)
         text.bind("<Button-3>", lambda event: menu.tk_popup(event.x_root, event.y_root))
         window.protocol("WM_DELETE_WINDOW", self._hide)
+        center_modal_on_parent(window, self._master, self._master.state() == "zoomed")
         self._window = window
         self._text = text
 
