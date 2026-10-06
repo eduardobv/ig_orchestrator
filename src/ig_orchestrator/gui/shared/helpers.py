@@ -30,6 +30,7 @@ _CATALOG_COLORS = {
 
 _BATCH_COLUMNS = (
     ("username", "Username"),
+    ("prio", "Prio"),
     ("urls", "URLs"),
     ("status", "Estado"),
     ("stories", "Stories"),
@@ -208,6 +209,10 @@ def stories_cell_text(download_stories: bool) -> str:
     return "✅" if download_stories else "❌"
 
 
+def priority_cell_text(priority: int) -> str:
+    return str(priority) if int(priority or 0) > 0 else ""
+
+
 def _username_heading_title(ascending: bool | None) -> str:
     if ascending is True:
         return "Username ▲"
@@ -221,11 +226,14 @@ def _sort_accounts_by_username(
     *,
     ascending: bool,
 ) -> list[AccountDraft]:
-    return sorted(
-        accounts,
+    ranked = [account for account in accounts if int(account.priority or 0) > 0]
+    rest = [account for account in accounts if int(account.priority or 0) <= 0]
+    ranked.sort(key=lambda account: int(account.priority or 0))
+    rest.sort(
         key=lambda account: account.username.casefold(),
         reverse=not ascending,
     )
+    return [*ranked, *rest]
 
 
 def _catalog_width_chars(usernames: Iterable[str]) -> int:
@@ -242,6 +250,7 @@ def _batch_column_samples(usernames: Iterable[str]) -> dict[str, str]:
     longest_username = max(username_values, key=lambda value: (len(value), value))
     return {
         "username": longest_username,
+        "prio": "Prio",
         "urls": "9999",
         "status": "Completada 9999/9999",
         "stories": "Stories",
@@ -346,6 +355,7 @@ def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
                 account.owner_id,
                 account.start_init_date,
                 account.destination_path,
+                int(account.priority or 0),
             )
             for account in draft.accounts
         ),
@@ -441,5 +451,6 @@ __all__ = [
     "catalog_focus_username",
     "center_modal_on_parent",
     "filter_batch_accounts",
+    "priority_cell_text",
     "stories_cell_text",
 ]

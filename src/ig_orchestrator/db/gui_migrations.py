@@ -109,6 +109,9 @@ def _patch_gui_schema(connection: Connection) -> None:
         """
     )
     _add_column_if_missing(
+        connection, "batch_accounts", "priority", "INTEGER NOT NULL DEFAULT 0"
+    )
+    _add_column_if_missing(
         connection, "downloaded_files", "working_relative_path", "TEXT"
     )
     _add_column_if_missing(connection, "downloaded_files", "sha256", "TEXT")

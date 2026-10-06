@@ -41,6 +41,7 @@ class BatchCreationAccount:
     download_stories: bool
     urls: tuple[str, ...]
     duplicate_urls: tuple[BatchCreationDuplicateUrl, ...] = ()
+    priority: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,16 +250,32 @@ def build_story_url(username: str) -> str:
     return f"https://www.instagram.com/stories/{username}/"
 
 
+def _account_priority(account: BatchCreationAccount) -> int:
+    try:
+        rank = int(getattr(account, "priority", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return rank if rank > 0 else 0
+
+
 def _ordered_accounts_for_creation(
     request: BatchCreationRequest,
 ) -> list[BatchCreationAccount]:
-    return sorted(
-        request.accounts,
+    ranked: list[BatchCreationAccount] = []
+    rest: list[BatchCreationAccount] = []
+    for account in request.accounts:
+        if _account_priority(account) > 0:
+            ranked.append(account)
+        else:
+            rest.append(account)
+    ranked.sort(key=_account_priority)
+    rest.sort(
         key=lambda account: (
             not (account.download_stories and not account.urls),
             len(account.urls),
-        ),
+        )
     )
+    return [*ranked, *rest]
 
 
 def _upsert_operational_config(

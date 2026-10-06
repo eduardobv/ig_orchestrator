@@ -250,10 +250,12 @@ class InstagramOrchestratorApp(
         self.batch_filter_var = tk.StringVar()
         self.batch_count_var = tk.StringVar(value=t("label.batch_count", count=0))
         self.username_var = tk.StringVar()
+        self._editor_bound_username = ""
         self.account_date_var = tk.StringVar(value=today)
         self.stories_var = tk.BooleanVar(value=False)
         self.new_account_var = tk.BooleanVar(value=False)
         self.catalog_update_var = tk.BooleanVar(value=False)
+        self.priority_var = tk.BooleanVar(value=False)
         self.owner_id_var = tk.StringVar()
         self.start_init_date_var = tk.StringVar()
         self.destination_path_var = tk.StringVar()
@@ -414,12 +416,20 @@ class InstagramOrchestratorApp(
         bottom = ttk.Frame(self.root, padding=(8, 0, 8, 8))
         bottom.grid(row=2, column=0, sticky="ew")
         bottom.columnconfigure(0, weight=1)
-        self.status_button = ttk.Button(
+        self.status_button = tk.Button(
             bottom,
             textvariable=self.status_bar_var,
             command=self.log_window.toggle,
+            anchor="w",
+            padx=8,
+            pady=4,
+            relief="groove",
+            bd=1,
         )
         self.status_button.grid(row=0, column=0, sticky="ew")
+        self._status_idle_bg = str(self.status_button.cget("bg"))
+        self._status_idle_fg = str(self.status_button.cget("fg"))
+        self.status_tone = "idle"
         self.console = tk.Text(bottom, height=1)
         self.clean_console_button = ttk.Button(bottom, command=self._clear_console)
 

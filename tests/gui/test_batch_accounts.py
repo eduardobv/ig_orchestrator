@@ -161,6 +161,7 @@ def test_gui_batch_columns_follow_compact_requested_order_and_catalog_width() ->
 
     assert _BATCH_COLUMNS == (
         ("username", "Username"),
+        ("prio", "Prio"),
         ("urls", "URLs"),
         ("status", "Estado"),
         ("stories", "Stories"),
@@ -169,6 +170,7 @@ def test_gui_batch_columns_follow_compact_requested_order_and_catalog_width() ->
     assert _catalog_width_chars(usernames) == len("the_longest_catalog_account")
     assert _batch_column_samples(usernames) == {
         "username": "the_longest_catalog_account",
+        "prio": "Prio",
         "urls": "9999",
         "status": "Completada 9999/9999",
         "stories": "Stories",

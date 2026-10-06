@@ -239,6 +239,95 @@ Fecha: 2026-10-03
 * `python -m pytest -q` (suite completa)
 * Verificación manual en GUI con `python -m ig_orchestrator gui`
 
+## v2.1.1 - Posicionamiento Configurable de Ventanas
+
+Fecha: 2026-10-03
+
+### Creado
+
+* Función `center_modal_on_parent()` en `gui/shared/helpers.py` para centrar modales en pantalla o ventana padre
+* Configuración de posición de ventana principal: izquierda, centro, derecha
+
+### Modificado
+
+* `src/ig_orchestrator/gui/shared/helpers.py`:
+  - Modificada `_half_screen_geometry()` para aceptar parámetro `position`
+  - Agregada función `center_modal_on_parent()` para centrar diálogos modales
+  - Cálculo de geometría por posición: left (x=0), center (x=screen_width//2), right (x=screen_width-width)
+
+* `src/ig_orchestrator/gui/shell/app.py`:
+  - Lee posición de ventana desde `app_settings` (SQLite) al iniciar
+  - Pasa posición a `_half_screen_geometry()`
+
+* `src/ig_orchestrator/gui/batch_accounts/problem_urls.py`:
+  - Agregada llamada a `center_modal_on_parent()` antes de mostrar modal de URLs problemáticas
+
+* `src/ig_orchestrator/gui/batches/dialog.py`:
+  - Agregada llamada a `center_modal_on_parent()` antes de mostrar modal de lotes
+
+* `src/ig_orchestrator/gui/shared/locales/{en,es}.json`:
+  - Nuevas claves i18n:
+    - `settings.window_position` — Título de configuración
+    - `settings.window_position_left` — Opción izquierda
+    - `settings.window_position_center` — Opción centro
+    - `settings.window_position_right` — Opción derecha
+    - `settings.save_window_position` — Botón guardar
+
+* `src/ig_orchestrator/gui/settings/dialog.py`:
+  - Agregado control de selección de posición de ventana en pestaña "Interface"
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q` (suite completa)
+* `python -m compileall -q src tests`
+
+## v2.1.0 - GUI v2.1 Editor Flags, Priority, Catalog Paste, Rename Tones y Stories Inbox
+
+Fecha: 2026-09-13
+
+Rama: `v2/gui-ux-stories`. Plan: `tasks/done/Tarea_v2_1_GUI_ux.md`.
+
+### Creado
+
+* `tasks/done/Tarea_v2_1_GUI_ux.md`
+* `src/ig_orchestrator/gui/draft/priority.py`
+* `src/ig_orchestrator/filesystem/story_inbox.py`
+* `src/ig_orchestrator/gui/stories/` (`dialog.py`, `settings.py`, `MODULE.md`)
+* `tests/gui/test_priority.py`, `tests/gui/test_stories_dialog.py`,
+  `tests/filesystem/test_story_inbox.py`
+
+### Modificado
+
+* Editor: Stories / New account / Update se resetean cuando cambia la
+  identidad del username (normalizado: strip, quitar `@`, casefold).
+  Catálogo, pegar Username, combobox y limpiar Username disparan el
+  reset. Cargar una fila del lote hidrata los checks de esa cuenta.
+* `normalize_username` público en `gui/draft/service.py`.
+* Editor: check **Priority** al lado de Update. Rank 1 exclusivo: la
+  cuenta queda primera en el lote y cualquier otra con el mismo rank
+  pierde la prioridad. `AccountDraft.priority` y columna
+  `batch_accounts.priority` (default 0) dejan sitio a ranks 2, 3…
+  Columna **Prio** en la tabla. El sort legado (solo-stories, menos
+  URLs) se aplica solo a las cuentas sin rank.
+* Catálogo: botón pegar (icono portapapeles) a la izquierda del ❌.
+  Pegar (botón, menú, Ctrl+V) selecciona el username si existe y lo
+  escribe en el editor.
+* Barra de estado: `tk.Button` con colores de rename — azul mientras
+  corre, verde éxito, amarillo incompleto (leftovers), rojo error.
+* Botón **Stories** (toolbar, a la derecha de Renombrar manual) y menú
+  `Lote → Organizar stories…`: modal con Ruta Stories y Ruta BD
+  (recordadas en `app_settings`). Mueve media `{username}-…` a
+  `{accounts_dir.path}\story`. Errores por fichero: username ausente,
+  no está en la BD, path vacío, carpeta inexistente, destino ocupado.
+
+### Pruebas ejecutadas
+
+* `python -m pytest -q tests/gui/test_editor.py tests/gui/test_catalog.py`
+* `python -m pytest -q tests/gui/test_priority.py tests/gui/test_batch_accounts.py`
+* `python -m pytest -q tests/gui/test_catalog.py tests/gui/test_rename.py`
+* `python -m pytest -q tests/filesystem/test_story_inbox.py tests/gui/test_stories_dialog.py`
+* `python -m pytest -q` → 321 passed
+
 ## v2.0.0 - GUI, sqlite v2 y aviso Telegram
 
 Fecha: 2026-09-11
