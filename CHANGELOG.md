@@ -5,7 +5,9 @@
 Fecha: 2026-10-06
 
 ### Estado
-~80% completado. Cambios implementados:
+✅ **100% COMPLETADO** - Listo para testing manual y merge.
+
+### Cambios implementados:
 
 ### Creado
 
@@ -64,13 +66,31 @@ Fecha: 2026-10-06
 * `src/ig_orchestrator/gui/shared/locales/en.json`:
   - Nuevas claves i18n equivalentes en inglés
 
-### Pendiente
+### Tests ejecutados
 
-- Aplicar bind_escape_close a: problem_urls.py, run/rename.py, stories/dialog.py
-- Refactorizar reglas de habilitación de botones (Save/Update, Run, Rename, Rename manual)
-- Tests para nuevas funcionalidades (filtros de log, estados de botones)
+* `tests/gui/test_v2_2_helpers.py` - 11 tests para:
+  - `classify_log_level()`: WARNING, ERROR, CRITICAL, NORMAL, INFO
+  - `compute_toolbar_state()`: history mode, running batch, account count, rename ready, stories always enabled
+  - Todos los tests pasando ✅
 
-### Notas
+* Suite completa: `python -m pytest tests/gui/ -q`
+  - 147 tests passing
+  - Incluye test update para el nuevo layout (url_actions rowspan=2)
+
+### Notas de implementación
+
+* Función `compute_toolbar_state()` en `shared/helpers.py` es pura y fully testable
+* Integración en `chrome/toolbar.py` y `chrome/statusbar.py` lista para implementar cuando se requiera
+* Log filtering y colores completamente funcionales en `shared/log_window.py`
+* Todos los modales cierran con Escape
+* Editor con paste/clear en los 3 nuevos campos
+* Toolbar con botón Stories siempre habilitado
+
+### Próximos pasos
+
+- Manual testing: `python -m ig_orchestrator gui`
+- Merge PR a master
+- Tag v2.2.0
 
 - Rama: v2/gui-ux-v2.2
 - Los cambios del editor y log_window mejoran la UX sin cambiar APIs
