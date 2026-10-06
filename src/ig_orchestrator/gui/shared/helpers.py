@@ -453,6 +453,64 @@ def classify_log_level(line: str) -> str:
     return "normal"
 
 
+def compute_toolbar_state(
+    batch_accounts_count: int,
+    is_running: bool,
+    batch_ready_for_rename: bool,
+    history_readonly: bool,
+) -> dict[str, str]:
+    """Compute enabled/disabled state for toolbar buttons.
+
+    Pure function for testable button state logic.
+
+    Args:
+        batch_accounts_count: Number of accounts in current batch
+        is_running: Whether a batch/rename process is currently running
+        batch_ready_for_rename: Whether batch is ready for rename (completed successfully)
+        history_readonly: Whether viewing a completed batch (read-only)
+
+    Returns:
+        Dict with button names and their states ('normal' or 'disabled')
+    """
+    # If in history mode, everything is disabled except specific buttons
+    if history_readonly:
+        return {
+            "save": "disabled",
+            "run": "disabled",
+            "pause": "disabled",
+            "stop": "disabled",
+            "rename": "disabled",
+            "rename_manual": "disabled",
+            "stories": "normal",
+        }
+
+    # During execution
+    if is_running:
+        return {
+            "save": "disabled",
+            "run": "disabled",
+            "pause": "normal",
+            "stop": "normal",
+            "rename": "disabled",
+            "rename_manual": "disabled",
+            "stories": "normal",
+        }
+
+    # Has accounts in batch (can save/run)
+    has_accounts = batch_accounts_count >= 1
+    rename_enabled = batch_ready_for_rename
+
+    return {
+        "save": "normal" if has_accounts else "disabled",
+        "run": "normal" if has_accounts else "disabled",
+        "pause": "disabled",
+        "stop": "disabled",
+        "rename": "normal" if rename_enabled else "disabled",
+        "rename_manual": "normal" if rename_enabled else "disabled",
+        "stories": "normal",
+    }
+
+
 __all__ = [
     "_ACCOUNT_PROGRESS_RE",
     "_BATCH_COLUMNS",
@@ -485,6 +543,7 @@ __all__ = [
     "catalog_focus_username",
     "center_modal_on_parent",
     "classify_log_level",
+    "compute_toolbar_state",
     "filter_batch_accounts",
     "priority_cell_text",
     "stories_cell_text",
