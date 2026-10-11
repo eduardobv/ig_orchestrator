@@ -126,4 +126,4 @@ Automatizar el lado de `inst1` (→ `feat-uc4-6`); renombrar sin pasar por `WORK
 - Implementado según el diseño. Desviaciones: «Renombrar ahora» no se ofrece dentro del diálogo; tras marcar el lote se avisa «ya puedes pulsar Renombrar» (el estado de renombrado vive en la ventana principal).
 - El registro `instances` se guarda al instante desde su pestaña (no depende de «Guardar» de Ajustes).
 - El destino es siempre `WORKING_FOLDER` de la instancia local (`.env`).
-- Pendiente de prueba manual real: traer una carpeta pequeña desde `\DESKTOP-OM856P7\ig_orchestrator	mp`.
+- Pendiente de prueba manual real: traer una carpeta pequeña desde la compartida de `inst1` (ruta UNC de `DESKTOP-OM856P7`).
