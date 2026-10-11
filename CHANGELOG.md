@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.2.2 - Traer descargas: «Comparar con lote» dentro de la tabla
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+* `gui/exchange/pull_dialog.py`: al elegir un lote la tabla añade la columna **En el lote** y muestra como filas en gris las cuentas del lote que aún no están en la carpeta compartida (antes solo había un texto con listas largas bajo la tabla, que ahora es un resumen con contadores).
+* `docs/tutorial-v3.md`: explica qué ve y qué no ve la app (cada instancia tiene su BD; solo se mira la carpeta compartida) y el significado de cada estado.
+
 ## v3.2.1 - Tutorial v3 y etiquetas de Instancias
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

@@ -211,7 +211,7 @@
   "pull.pulling": "Trayendo {folder}…",
   "pull.done": "Terminado.",
   "pull.done_cancelled": "Cancelado: lo no procesado sigue en el origen.",
-  "pull.compare_result": "Lote: {received}/{total} cuentas recibidas. Faltan: {missing}. Sobrantes: {extra}.",
+  "pull.compare_result": "Lote: {received} de {total} cuentas ya están en la carpeta compartida · faltan {missing} (filas en gris) · {extra} carpetas no pertenecen al lote.",
   "pull.offer_mark": "¿Marcar el lote {batch} como «Ejecutado en otra instancia»?",
   "pull.ready_to_rename": "Listo: ya puedes pulsar Renombrar.",
   "pull.rename_hint": "La carpeta de trabajo está vacía y hay carpetas estables en la carpeta de intercambio de «{instance}».\n\n¿Traer las descargas primero?",
@@ -235,5 +235,9 @@
   "settings.instances.testing": "Probando {path}…",
   "settings.instances.probe_ok": "accesible · escritura: {write} · libre: {free}",
   "settings.instances.no_paths": "La instancia no tiene rutas configuradas.",
-  "settings.instances.hint": "Para traer descargas de otro equipo solo hace falta la «Carpeta compartida (ruta desde este PC)». Las demás rutas son informativas. En la instancia de ESTE equipo (marcada como local) no hace falta carpeta compartida."
+  "settings.instances.hint": "Para traer descargas de otro equipo solo hace falta la «Carpeta compartida (ruta desde este PC)». Las demás rutas son informativas. En la instancia de ESTE equipo (marcada como local) no hace falta carpeta compartida.",
+  "pull.col.batch": "En el lote",
+  "pull.batch.yes": "Sí",
+  "pull.batch.no": "No está en el lote",
+  "pull.state.missing": "Falta (aún no llega)"
 }

@@ -211,7 +211,7 @@
   "pull.pulling": "Pulling {folder}…",
   "pull.done": "Done.",
   "pull.done_cancelled": "Cancelled: unprocessed files remain at the source.",
-  "pull.compare_result": "Batch: {received}/{total} accounts received. Missing: {missing}. Extra: {extra}.",
+  "pull.compare_result": "Batch: {received} of {total} accounts are already in the shared folder · {missing} missing (grey rows) · {extra} folders are not in the batch.",
   "pull.offer_mark": "Mark batch {batch} as “Executed on another instance”?",
   "pull.ready_to_rename": "Ready: you can press Rename now.",
   "pull.rename_hint": "The working folder is empty and there are stable folders in the exchange folder of “{instance}”.\n\nPull the downloads first?",
@@ -235,5 +235,9 @@
   "settings.instances.testing": "Testing {path}…",
   "settings.instances.probe_ok": "reachable · write: {write} · free: {free}",
   "settings.instances.no_paths": "The instance has no paths configured.",
-  "settings.instances.hint": "To pull downloads from another machine you only need the “Shared folder (path from THIS PC)”. The other paths are informational. The instance for THIS machine (marked local) needs no shared folder."
+  "settings.instances.hint": "To pull downloads from another machine you only need the “Shared folder (path from THIS PC)”. The other paths are informational. The instance for THIS machine (marked local) needs no shared folder.",
+  "pull.col.batch": "In batch",
+  "pull.batch.yes": "Yes",
+  "pull.batch.no": "Not in batch",
+  "pull.state.missing": "Missing (not arrived yet)"
 }

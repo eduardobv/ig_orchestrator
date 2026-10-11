@@ -138,9 +138,9 @@ class PullDialogMixin:
         )
         batch_box.grid(row=3, column=1, sticky="w", padx=8, pady=(6, 0))
 
-        columns = ("name", "files", "mb", "state")
+        columns = ("name", "files", "mb", "state", "batch")
         tree = ttk.Treeview(frame, columns=columns, show="headings", selectmode="extended")
-        for column, width in zip(columns, (260, 80, 90, 200), strict=True):
+        for column, width in zip(columns, (240, 70, 70, 170, 170), strict=True):
             tree.heading(column, text=t(f"pull.col.{column}"))
             tree.column(column, width=width, anchor="w")
         tree.grid(row=4, column=0, columnspan=4, sticky="nsew", pady=(8, 0))
@@ -186,7 +186,20 @@ class PullDialogMixin:
         def refresh_table() -> None:
             tree.delete(*tree.get_children())
             by_item: dict[str, ExchangeFolder] = {}
+            bid = selected_batch_id()
+            comparison = None
+            if bid is not None:
+                comparison = compare_with_batch(
+                    self.connection, bid, [f.name for f in state["folders"] if not f.is_empty]
+                )
+            in_batch = {n.casefold() for n in (comparison.received if comparison else [])}
             for folder in state["folders"]:
+                if comparison is None:
+                    batch_cell = ""
+                elif folder.name.casefold() in in_batch:
+                    batch_cell = t("pull.batch.yes")
+                else:
+                    batch_cell = t("pull.batch.no")
                 item = tree.insert(
                     "",
                     tk.END,
@@ -195,9 +208,19 @@ class PullDialogMixin:
                         folder.file_count,
                         format_mb(folder.total_bytes),
                         t(f"pull.state.{folder_state(folder, dest_root)}"),
+                        batch_cell,
                     ),
                 )
                 by_item[item] = folder
+            if comparison is not None:
+                for name in comparison.missing:
+                    tree.insert(
+                        "",
+                        tk.END,
+                        values=(name, "", "", t("pull.state.missing"), t("pull.batch.yes")),
+                        tags=("missing",),
+                    )
+                tree.tag_configure("missing", foreground="#888888")
             state["by_item"] = by_item
             refresh_compare()
 
@@ -213,12 +236,12 @@ class PullDialogMixin:
                     "pull.compare_result",
                     received=len(result.received),
                     total=len(result.received) + len(result.missing),
-                    missing=", ".join(result.missing) or "-",
-                    extra=", ".join(result.extra) or "-",
+                    missing=len(result.missing),
+                    extra=len(result.extra),
                 )
             )
 
-        batch_box.bind("<<ComboboxSelected>>", lambda _e: refresh_compare())
+        batch_box.bind("<<ComboboxSelected>>", lambda _e: refresh_table())
 
         def _scan() -> None:
             source = native_path_text(source_var.get())

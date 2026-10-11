@@ -113,20 +113,27 @@ Selecciona `inst1` y pulsa **Probar**: debe decir *accesible · escritura: Sí �
 | **Origen** + *Examinar…* | Carpeta de la que traer. **Escanear** la lista (se escanea sola al abrir). |
 | **Destino** | Siempre tu carpeta de trabajo (`WORKING_FOLDER` del `.env`). Solo se muestra. |
 | **Conservar copia en origen** | Marcado = copia (la laptop mantiene sus carpetas). Desmarcado (por defecto) = mueve, como tu «cortar». |
-| **Comparar con lote** | Elige un lote y verás «N/M cuentas recibidas. Faltan: … Sobrantes: …». |
-| Tabla | Una fila por carpeta: ficheros, MB y estado. |
+| **Comparar con lote** | Elige un lote **de este PC** (el mismo que enviaste a la laptop). La tabla añade la columna **En el lote** y las cuentas del lote que **aún no han llegado** salen como filas en gris «Falta (aún no llega)». Debajo, un resumen: «N de M cuentas ya están en la carpeta compartida · faltan X · Y carpetas no pertenecen al lote». Las filas en gris no se pueden traer (no existen todavía en la compartida). |
+| Tabla | Una fila por carpeta que hay **en la carpeta compartida**: ficheros, MB, estado y (si elegiste lote) si pertenece al lote. |
 | **Traer seleccionadas** | Trae solo las filas que marques (Ctrl/Mayús para varias). |
 | **Traer todas las listas** | Trae todas las que estén *Lista* o *Ya existe en destino*. |
 | **Cancelar** | Detiene el traspaso: lo no procesado sigue en la laptop y no quedan ficheros a medias. |
 
-**Estados de cada carpeta**
+### Qué ve (y qué NO ve) la app — importante
+
+Cada instancia tiene **su propia base de datos** y no se comunican. Por eso este diálogo **solo mira la carpeta compartida** (`tmp`) y tu carpeta de trabajo. **No sabe** qué lote está ejecutando la laptop ni qué cuentas ha terminado; **no ve** su carpeta de descargas (`Telegram_Desktop`), porque no está compartida.
+
+Consecuencia práctica: **puedes ir trayendo mientras el lote sigue en la laptop**, pero solo lo que tú ya hayas movido a `tmp`. La app no puede saber si una cuenta está completa en la laptop; eso lo decides tú al moverla a `tmp`. «Comparar con lote» te ayuda: te dice cuántas cuentas del lote ya han llegado y cuáles faltan. (El feat 6 automatizará esto: la laptop publicará solo cuentas terminadas junto con un `manifest.json`.)
+
+**Estados de cada carpeta** (se calculan solo con la carpeta compartida y tu carpeta de trabajo)
 
 | Estado | Significa | Qué hace la app |
 |---|---|---|
-| **Lista** | Estable y sin conflicto. | La trae. |
-| **En uso** | Se ha modificado hace menos de 3× `DOWNLOAD_STABLE_SECONDS` (la laptop aún escribe). | Pide confirmación antes de traerla. |
-| **Ya existe en destino** | Hay una carpeta con ese nombre en tu trabajo. | Fusiona sin sobrescribir: mismo nombre y tamaño → omite; otro tamaño → `nombre_1.ext`. |
-| **Vacía** | Sin ficheros. | La ignora. |
+| **Lista** | Está en `tmp`, sin cambios recientes y no existe aún en tu carpeta de trabajo. | La trae. |
+| **En uso** | Algún fichero de esa carpeta se modificó hace menos de 3× `DOWNLOAD_STABLE_SECONDS` (~30 s). Típico: **estás en medio de mover la carpeta a `tmp`** o la laptop sigue escribiendo. | Pide confirmación antes de traerla (riesgo de traerla incompleta). |
+| **Ya existe en destino** | En **tu** carpeta de trabajo ya hay una carpeta con ese nombre (restos de otro lote o de un renombrado). | Fusiona sin sobrescribir: mismo nombre y tamaño → omite; otro tamaño → `nombre_1.ext`. |
+| **Vacía** | La carpeta de `tmp` no tiene ficheros. | La ignora. |
+| **Falta (aún no llega)** | Solo con «Comparar con lote»: cuenta del lote que no está en `tmp`. | Nada; es informativo. |
 
 Al terminar, si elegiste un lote, la app pregunta si quieres marcarlo como **«Ejecutado en otra instancia»**. Con «Sí», el lote pasa a *Por renombrar* y ya puedes pulsar **Renombrar**.
 
@@ -149,4 +156,5 @@ Igual que siempre. Extra: si pulsas **Renombrar** con tu carpeta de trabajo vac�
 | «No existe o no es accesible» al Probar | Laptop apagada, red caída, carpeta no compartida o sin permiso de escritura. |
 | «Sin respuesta en 8 s» | El nombre de red no resuelve; prueba la IP: `\\192.168.x.x\ig_orchestrator\tmp`. |
 | No aparece ninguna instancia en el desplegable | Solo salen las **no locales** con carpeta compartida (o de descargas) rellena. |
-| La carpeta sale «En uso» | Se modificó hace menos de ~30 s; espera y pulsa **Escanear**. |
+| La carpeta sale «En uso» | Se modificó hace menos de ~30 s (p. ej. aún la estás moviendo a `tmp`); espera y pulsa **Escanear**. |
+| Elijo un lote y casi todo sale «Falta» | Normal si aún no has movido esas cuentas a `tmp`; la tabla solo muestra lo que ya está en la compartida. |
