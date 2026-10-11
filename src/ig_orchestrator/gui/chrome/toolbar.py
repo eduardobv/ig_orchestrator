@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    compute_toolbar_state,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -139,6 +140,7 @@ class ToolbarMixin:
             self.save_selection_button.configure(state="disabled")
             self.delete_button.configure(state="disabled")
             self.rename_button.configure(state="disabled")
+            self.rename_manual_button.configure(state="disabled")
             self.root.title(
                 f"{t('app.name')} - "
                 + t("mode.history", name=name, id=batch_id or "-")
@@ -152,12 +154,22 @@ class ToolbarMixin:
         )
         self.batch_context_var.set(context)
         self.root.title(f"{t('app.name')} - {_window_mode_title(context, self.batch_name_var.get(), self.history_readonly, self.saved_batch_id, self.active_batch_id)}")
-        self.register_button.configure(
-            state="normal" if actions_enabled else "disabled",
+
+        # Calculate button states using compute_toolbar_state
+        batch_accounts_count = len(self.accounts) if hasattr(self, "accounts") else 0
+        button_states = compute_toolbar_state(
+            batch_accounts_count=batch_accounts_count,
+            is_running=False,  # This method is only called when NOT running
+            batch_ready_for_rename=self.batch_ready_for_rename,
+            history_readonly=self.history_readonly,
         )
-        self.execute_button.configure(
-            state="normal" if actions_enabled else "disabled",
-        )
+
+        # Apply button states from compute_toolbar_state
+        self.register_button.configure(state=button_states.get("save", "disabled"))
+        self.execute_button.configure(state=button_states.get("run", "disabled"))
+        self.rename_button.configure(state=button_states.get("rename", "disabled"))
+        self.rename_manual_button.configure(state=button_states.get("rename_manual", "disabled"))
+
         self.delete_all_button.configure(
             state="normal" if actions_enabled else "disabled"
         )

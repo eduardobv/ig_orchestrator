@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _timestamp_console_text,
     _username_heading_title,
     _window_mode_title,
+    bind_escape_close,
     catalog_focus_username,
     center_modal_on_parent,
     filter_batch_accounts,
@@ -157,6 +158,7 @@ class SettingsDialogWithTabs:
         center_modal_on_parent(
             self.dialog, root_for_center, root_for_center.state() == "zoomed"
         )
+        bind_escape_close(self.dialog, on_close=self._on_cancel)
 
     def _build_general_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)

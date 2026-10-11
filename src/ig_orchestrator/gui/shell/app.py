@@ -320,7 +320,7 @@ class InstagramOrchestratorApp(
         top = ttk.Frame(self.root, padding=(8, 6))
         self.top_region = top
         top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(10, weight=1)
+        top.columnconfigure(11, weight=1)
 
         self.new_batch_button = icon_button(
             top,
@@ -380,16 +380,23 @@ class InstagramOrchestratorApp(
             command=self._show_manual_rename_command,
             tooltip=t("tooltip.rename_manual"),
         )
-        self.rename_manual_button.grid(row=0, column=7, padx=(0, 12))
-        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=8, sticky="w")
+        self.rename_manual_button.grid(row=0, column=7, padx=(0, 2))
+        self.stories_button = icon_button(
+            top,
+            image=self.icons.get("stories"),
+            command=self._open_stories_inbox,
+            tooltip=t("tooltip.stories"),
+        )
+        self.stories_button.grid(row=0, column=8, padx=(0, 12))
+        ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=9, sticky="w")
         self.batch_name_entry = ttk.Entry(
             top, textvariable=self.batch_name_var, width=28
         )
-        self.batch_name_entry.grid(row=0, column=9, sticky="ew", padx=(6, 12))
+        self.batch_name_entry.grid(row=0, column=10, sticky="ew", padx=(6, 12))
         bind_edit_context_menu(self.batch_name_entry)
-        ttk.Label(top, text=t("label.date")).grid(row=0, column=10, sticky="e")
+        ttk.Label(top, text=t("label.date")).grid(row=0, column=11, sticky="e")
         ttk.Label(top, textvariable=self.default_date_var).grid(
-            row=0, column=11, sticky="w", padx=(6, 0)
+            row=0, column=12, sticky="w", padx=(6, 0)
         )
 
         body = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)

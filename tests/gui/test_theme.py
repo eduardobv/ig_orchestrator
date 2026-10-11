@@ -95,7 +95,8 @@ def test_editor_layout_places_add_update_on_username_row() -> None:
         root.update_idletasks()
 
         assert str(app.add_update_button.grid_info()["row"]) == "1"
-        assert str(app.url_actions.grid_info()["row"]) == "4"
+        assert str(app.url_actions.grid_info()["row"]) == "3"  # Changed in v2.2: rowspan=2 for stable position
+        assert str(app.url_actions.grid_info()["rowspan"]) == "2"
         assert str(app.username_combo.grid_info()["column"]) == "0"
         assert str(app.paste_username_button.grid_info()["column"]) == "1"
         assert str(app.clear_username_button.grid_info()["column"]) == "2"

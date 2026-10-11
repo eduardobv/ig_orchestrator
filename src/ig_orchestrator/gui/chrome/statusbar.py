@@ -98,6 +98,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _username_heading_title,
     _window_mode_title,
     catalog_focus_username,
+    compute_toolbar_state,
     filter_batch_accounts,
     stories_cell_text,
 )
@@ -205,33 +206,43 @@ class StatusBarMixin:
     def _set_process_running(self, running: bool) -> None:
         self._set_descendants_enabled(self.top_region, not running)
         self._set_descendants_enabled(self.body_region, not running)
-        button_state = "disabled" if running else "normal"
-        self.register_button.configure(state=button_state)
+
+        # Calculate button states using compute_toolbar_state
+        batch_accounts_count = len(self.accounts) if hasattr(self, "accounts") else 0
+        button_states = compute_toolbar_state(
+            batch_accounts_count=batch_accounts_count,
+            is_running=running,
+            batch_ready_for_rename=self.batch_ready_for_rename,
+            history_readonly=self.history_readonly,
+        )
+
+        # Apply button states from compute_toolbar_state
+        self.register_button.configure(state=button_states.get("save", "disabled"))
+        self.execute_button.configure(state=button_states.get("run", "disabled"))
+        self.pause_button.configure(state=button_states.get("pause", "disabled"))
+        self.cancel_button.configure(state=button_states.get("stop", "disabled"))
+        self.rename_button.configure(state=button_states.get("rename", "disabled"))
+        self.rename_manual_button.configure(state=button_states.get("rename_manual", "disabled"))
+
         # The lots dialog stays reachable during a batch/sequence so pending
         # queue items can be removed before they start.
         if running and self.active_process_kind == "rename":
             self.pending_button.configure(state="disabled")
         else:
             self.pending_button.configure(state="normal")
-        self.execute_button.configure(state=button_state)
-        self.save_selection_button.configure(state=button_state)
+
+        # Additional state management
+        self.save_selection_button.configure(state=button_states.get("save", "disabled"))
         if running and self.active_process_kind == "batch":
             _set_ttk_enabled(self.tree, True)
             self.delete_button.configure(state="normal")
             self.save_selection_button.configure(state="disabled")
-        self.cancel_button.configure(state="normal" if running else "disabled")
-        self.pause_button.configure(
-            state="normal" if running and self.active_process_kind == "batch" else "disabled"
-        )
-        self.rename_button.configure(
-            state="normal" if not running and self.batch_ready_for_rename else "disabled"
-        )
+
         if running and self.active_process_kind == "rename":
             self._set_status_tone(STATUS_TONE_BUSY)
         elif running:
             self._set_status_tone(STATUS_TONE_IDLE)
-        # Always available: only previews the rename command, never runs it.
-        self.rename_manual_button.configure(state="normal")
+
         if not running:
             self._update_batch_context()
         self._set_status("Ejecutando..." if running else self.status_var.get())
