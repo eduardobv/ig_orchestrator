@@ -45,6 +45,8 @@ class ImportReport:
     warnings: list[str] = field(default_factory=list)
     issue_rows: list[tuple] = field(default_factory=list)
 
+    details: dict[str, list[str]] = field(default_factory=dict)
+
     @property
     def changed(self) -> bool:
         return bool(
@@ -54,21 +56,75 @@ class ImportReport:
             or self.media_accounts
         )
 
-    def render(self) -> str:
-        lines = [
-            ("SIMULACION (no se escribio nada)" if self.dry_run else "IMPORTACION APLICADA"),
+    @property
+    def verdict(self) -> str:
+        """``OK`` (nothing to note), ``NOTES`` (importable, review the notes) or ``BLOCK``."""
+
+        if self.source_accounts and self.issues.get("OUTSIDE_ROOT", 0) > self.source_accounts * 0.5:
+            return "BLOCK"
+        if self.warnings or self.details.get("SOBRAN_COMPLETE") or self.details.get("FALTAN_COMPLETE"):
+            return "NOTES"
+        return "OK" if not self.issues else "NOTES"
+
+    def _verdict_lines(self) -> list[str]:
+        if self.verdict == "BLOCK":
+            return [
+                "✖ NO IMPORTAR TODAVIA: muchas rutas quedan fuera de la raiz de la biblioteca.",
+                f"  Comprueba que la raiz es la correcta ({self.library_root}).",
+            ]
+        head = (
+            "✔ CORRECTO: se puede importar."
+            if self.verdict == "OK"
+            else "✔ SE PUEDE IMPORTAR (con avisos, mira abajo)."
+        )
+        return [
+            head,
+            "  Es seguro: solo anade cuentas archivadas y rellena rutas/contadores; no cambia el estado,"
+            " favorito ni fechas de tus cuentas, no toca G: y hace copia de seguridad antes.",
+        ]
+
+    def render(self, *, full: bool = False, limit: int = 15) -> str:
+        lines = list(self._verdict_lines())
+        title = "SIMULACION (no se escribio nada)" if self.dry_run else "IMPORTACION APLICADA"
+        lines += [
+            "",
+            title,
             f"Raiz de la biblioteca: {self.library_root}",
             f"Cuentas en origen: {self.source_accounts}",
-            f"Cuentas creadas: {self.accounts_created} · actualizadas: {self.accounts_updated}"
-            f" · sin cambios: {self.accounts_unchanged}",
-            f"Carpetas creadas: {self.folders_created}",
-            f"Indice de ficheros: {self.media_accounts} cuentas reindexadas"
-            f" ({self.media_rows} ficheros), {self.media_accounts_unchanged} sin cambios,"
-            f" {self.media_unparsed} nombres no reconocidos",
+            f"  - nuevas (se crean archivadas): {self.accounts_created}",
+            f"  - existentes que se actualizan: {self.accounts_updated}"
+            f" (sin cambios: {self.accounts_unchanged})",
+            f"Carpetas del arbol creadas: {self.folders_created}",
+            f"Indice de ficheros: {self.media_accounts} cuentas ({self.media_rows} ficheros),"
+            f" {self.media_accounts_unchanged} sin cambios, {self.media_unparsed} nombres no reconocidos",
         ]
+        sections = (
+            ("SOBRAN_COMPLETE", "SOBRAN en accounts_complete (ya no estan en lite; se IGNORAN)"),
+            ("FALTAN_COMPLETE", "FALTAN en accounts_complete (estan en lite; sin indice de ficheros)"),
+        )
+        for key, label in sections:
+            items = self.details.get(key) or []
+            if items:
+                lines += ["", f"{label}: {len(items)}"]
+                shown = items if full else items[:limit]
+                lines += [f"   {item}" for item in shown]
+                if len(shown) < len(items):
+                    lines.append(f"   ... y {len(items) - len(shown)} mas (guarda el informe completo)")
+        for warning in self.warnings:
+            lines += ["", f"AVISO: {warning}"]
         if self.issues:
-            lines.append("Incidencias: " + ", ".join(f"{k} {v}" for k, v in sorted(self.issues.items())))
-        lines.extend(f"AVISO: {w}" for w in self.warnings)
+            lines += ["", "INCIDENCIAS (a revisar despues; no impiden importar):"]
+            grouped: dict[str, list[tuple]] = defaultdict(list)
+            for row in self.issue_rows:
+                grouped[row[0]].append(row)
+            for kind, count in sorted(self.issues.items()):
+                lines.append(f"  {kind}: {count}")
+                rows = grouped.get(kind, [])
+                shown = rows if full else rows[:5]
+                for _kind, username, _owner, rel, detail in shown:
+                    lines.append(f"     {username or '-'}  {rel or ''}  {detail or ''}".rstrip())
+                if len(shown) < len(rows):
+                    lines.append(f"     ... y {len(rows) - len(shown)} mas")
         return "\n".join(lines)
 
 
@@ -159,7 +215,8 @@ def _read_sources(
         finally:
             connection.close()
 
-    lite_keys: set[str] = set()
+    lite_usernames: set[str] = set()
+    lite_paths: dict[str, tuple[str, str]] = {}
     if lite_path is not None:
         connection = _connect_ro(lite_path)
         try:
@@ -169,8 +226,9 @@ def _read_sources(
                 path = str(row["path"] or "")
                 rel = to_rel(path, root)
                 key = rel_key(rel) if rel else path.casefold()
-                lite_keys.add(key)
                 username = str(row["username"])
+                lite_usernames.add(username.casefold())
+                lite_paths[key] = (username, path)
                 twin = complete_by_key.get(key)
                 if twin is not None:
                     twin.lite_id = int(row["id"])
@@ -202,13 +260,31 @@ def _read_sources(
             connection.close()
 
     if complete_path is not None and lite_path is not None:
+        lite_users = {u for u in lite_usernames}
+        stale: list[str] = []
+        for group_key, group in candidates.items():
+            kept = []
+            for item in group:
+                if item.complete_id is not None and not item.from_lite and group_key not in lite_users:
+                    stale.append(f"{item.username}  {item.rel_path or item.abs_path}")
+                else:
+                    kept.append(item)
+            candidates[group_key] = kept
         complete_keys = set(complete_by_key)
-        only_lite = len(lite_keys - complete_keys)
-        only_complete = len(complete_keys - lite_keys)
-        if only_lite or only_complete:
+        missing = sorted(
+            f"{name}  {path}" for key, (name, path) in lite_paths.items() if key not in complete_keys
+        )
+        if stale:
+            report.details["SOBRAN_COMPLETE"] = sorted(stale, key=str.casefold)
             report.warnings.append(
-                f"accounts_complete desfasado respecto a lite: {only_lite} rutas solo en lite,"
-                f" {only_complete} solo en complete. Ejecuta sc1 --lite y --update (paso 0)."
+                f"accounts_complete tiene {len(stale)} carpetas que ya no estan en lite (borradas o"
+                " movidas): se ignoran. Para limpiarlas de verdad ejecuta sc1 --complete (~8 min)."
+            )
+        if missing:
+            report.details["FALTAN_COMPLETE"] = missing
+            report.warnings.append(
+                f"{len(missing)} carpetas de lite no estan en accounts_complete: se importan sin"
+                " indice de ficheros. Ejecuta sc1 --update (o --complete) y vuelve a importar."
             )
         age = abs(os.path.getmtime(lite_path) - os.path.getmtime(complete_path)) / 86400
         if age > STALE_DAYS:
@@ -218,6 +294,8 @@ def _read_sources(
 
     canonical: list[_Source] = []
     for group in candidates.values():
+        if not group:
+            continue
         distinct: dict[str, _Source] = {}
         for item in group:
             distinct.setdefault(rel_key(item.rel_path) if item.rel_path else item.abs_path.casefold(), item)

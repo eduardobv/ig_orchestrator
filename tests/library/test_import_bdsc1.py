@@ -235,12 +235,75 @@ def test_owner_mismatch_is_reported_not_overwritten(app, tmp_path: Path) -> None
     ).fetchone()[0] == "999"
 
 
-def test_stale_complete_warns(app, tmp_path: Path) -> None:
+def test_lite_without_complete_entry_is_listed_as_missing(app, tmp_path: Path) -> None:
     lite, complete = _sources(tmp_path)
 
     report = import_from_bdsc1(app, lite, complete, dry_run=True)
 
-    assert any("desfasado" in w for w in report.warnings)
+    missing = report.details["FALTAN_COMPLETE"]
+    assert any(line.startswith("carol") for line in missing)
+    assert any("sin indice" in w for w in report.warnings)
+    assert report.verdict == "NOTES"
+
+
+def test_complete_only_folders_are_ignored_and_listed(app, tmp_path: Path) -> None:
+    lite, complete = _sources(tmp_path)
+    with sqlite3.connect(complete) as conn:
+        conn.execute(
+            "INSERT INTO accounts (username, ownerId, path, posts, reels, story, highlights)"
+            " VALUES ('ghost', '9', ?, 1, 0, 0, 0)",
+            (ROOT + r"\00.MODELS\ghost",),
+        )
+        ghost_id = conn.execute("SELECT id FROM accounts WHERE username = 'ghost'").fetchone()[0]
+        conn.execute(
+            "INSERT INTO media (id_accounts, username, filename, path, type) VALUES (?, '', ?, '', 'POST')",
+            (ghost_id, _name("2026-01-01", 9001, 9)),
+        )
+
+    report = import_from_bdsc1(app, lite, complete)
+
+    assert any(line.startswith("ghost") for line in report.details["SOBRAN_COMPLETE"])
+    assert app.execute("SELECT COUNT(*) FROM catalog_accounts WHERE username = 'ghost'").fetchone()[0] == 0
+    assert app.execute("SELECT COUNT(*) FROM media_index WHERE media_id = 9001").fetchone()[0] == 0
+
+
+def test_report_text_has_verdict_and_lists(app, tmp_path: Path) -> None:
+    lite, complete = _sources(tmp_path)
+
+    report = import_from_bdsc1(app, lite, complete, dry_run=True)
+    text = report.render()
+    full = report.render(full=True)
+
+    assert "SE PUEDE IMPORTAR" in text
+    assert "FALTAN en accounts_complete" in text
+    assert "SIMULACION" in text
+    assert len(full) >= len(text)
+
+
+def test_clean_import_has_ok_verdict(app, tmp_path: Path) -> None:
+    lite = tmp_path / "lite.sqlite"
+    complete = tmp_path / "complete.sqlite"
+    _make_lite(lite, [("alice", "1", ROOT + r"\00.FAVORITES\alice")])
+    _make_complete(
+        complete,
+        [("alice", "1", ROOT + r"\00.FAVORITES\alice", 1, 0, 0, 0, "2026-02-01 10:00:00")],
+        [(1, _name("2026-02-01", 3001, 1), "POST")],
+    )
+
+    report = import_from_bdsc1(app, lite, complete, dry_run=True)
+
+    assert report.verdict == "OK"
+    assert "CORRECTO: se puede importar" in report.render()
+
+
+def test_wrong_root_blocks(app, tmp_path: Path) -> None:
+    lite = tmp_path / "lite.sqlite"
+    _make_lite(lite, [(f"u{i}", str(i), rf"D:\other\u{i}") for i in range(5)])
+
+    report = import_from_bdsc1(app, lite, None, dry_run=True)
+
+    assert report.verdict == "BLOCK"
+    assert "NO IMPORTAR" in report.render()
 
 
 def test_missing_sources_raise(app, tmp_path: Path) -> None:

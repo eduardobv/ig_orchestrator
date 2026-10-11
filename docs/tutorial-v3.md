@@ -173,10 +173,11 @@ Igual que siempre. Extra: si pulsas **Renombrar** con tu carpeta de trabajo vac�
 
 La importación es tan buena como `accounts_complete`. Con `G:` conectada, en tu carpeta de `sc1` (GenerateDirMap):
 
-1. `python generatedirmap.py --lite` (13–55 s) → actualiza rutas.
-2. `python generatedirmap.py --update` (2–32 s) → reconstruye en complete las cuentas nuevas/movidas y sus ficheros.
+1. `python generatedirmap.py --lite` (13–55 s) → actualiza rutas (la fuente de verdad de qué carpetas existen).
+2. `python generatedirmap.py --update` (2–32 s) → añade/actualiza en complete las cuentas nuevas o movidas y sus ficheros.
+   **`--update` no borra** de complete las carpetas que ya no existen en disco; si quieres complete limpio usa en su lugar `python generatedirmap.py --complete` (~8 min, reconstruye todo).
 
-Si no lo haces, la importación te avisará: «accounts_complete desfasado respecto a lite: N rutas solo en lite…». (Hoy: 253 rutas de lite que complete no tiene.)
+No hace falta que complete esté perfecto: **la importación usa lite para saber qué carpetas existen** y complete solo para enriquecer (contadores y ficheros). Las carpetas que complete conserva y lite no tiene se **ignoran** y se listan en el informe (sección SOBRAN).
 
 ### Paso 1 · Simular — `Catálogo → Importar desde bdsc1…`
 
@@ -188,6 +189,23 @@ Si no lo haces, la importación te avisará: «accounts_complete desfasado respe
 | **Importar** | Hace una copia de seguridad (`data/bkp/orchestrator_gui_pre_import_*.sqlite`) y aplica la importación. |
 
 **Cómo leer el informe**
+
+La primera línea es el veredicto:
+
+| Veredicto | Significa |
+|---|---|
+| ✔ **CORRECTO: se puede importar.** | Sin avisos ni incidencias. |
+| ✔ **SE PUEDE IMPORTAR (con avisos)** | Es seguro importar; los avisos/incidencias son cosas para revisar *después*. Lo habitual en tu biblioteca. |
+| ✖ **NO IMPORTAR TODAVIA** | Más de la mitad de las rutas caen fuera de la raíz de la biblioteca: la raíz (`G:K Stogram`) es incorrecta. |
+
+**¿Puede pasar algo malo al pulsar Importar?** No debería: solo *añade* cuentas archivadas y *rellena* rutas/contadores; nunca cambia estados, favoritos o fechas de tus cuentas, no toca `G:` y antes hace una copia en `data/bkp/` que puedes restaurar.
+
+Secciones del informe (con las listas de carpetas; «Guardar informe completo…» las trae enteras):
+
+| Sección | Significa |
+|---|---|
+| **SOBRAN en accounts_complete** | Carpetas que complete aún tiene pero que ya no están en lite (borradas o movidas). Se ignoran. Para limpiarlas de complete: `sc1 --complete`. |
+| **FALTAN en accounts_complete** | Carpetas que están en lite pero complete no conoce: se importan **sin índice de ficheros**. Ejecuta `sc1 --update` y vuelve a importar. |
 
 | Línea | Significa |
 |---|---|

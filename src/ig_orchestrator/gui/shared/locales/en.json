@@ -252,5 +252,6 @@
   "import.failed": "Error",
   "import.done_dry": "Simulation finished (nothing written).",
   "import.done": "Import finished.",
-  "import.backup": "Backup: {path}"
+  "import.backup": "Backup: {path}",
+  "import.save_report": "Save full report…"
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.3.1 - Informe de simulación claro (feat 3)
+
+* El informe empieza con un **veredicto** (Correcto / Se puede importar con avisos / No importar) y explica que la importación es segura.
+* Secciones **SOBRAN** (carpetas de `accounts_complete` que ya no están en lite) y **FALTAN** (en lite pero no en complete), con listas; incidencias con ejemplos.
+* Las carpetas que solo están en `accounts_complete` (y no en lite) **ya no se importan**: lite manda sobre qué carpetas existen. Evita crear cuentas fantasma.
+* Botón **Guardar informe completo…** y opción CLI `--report`.
+* Tutorial: `--update` no borra carpetas obsoletas; `--complete` limpia.
+
 ## v3.3.0 - feat-uc1-3: catálogo completo en bdapp + índice de ficheros
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

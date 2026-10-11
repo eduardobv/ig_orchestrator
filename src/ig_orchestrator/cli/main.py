@@ -111,6 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     import_parser.add_argument("--root", type=str, default=None, help="Library root (default: path_roots LIBRARY).")
     import_parser.add_argument("--dry-run", dest="import_dry_run", action="store_true")
     import_parser.add_argument("--no-media", action="store_true", help="Skip the file index.")
+    import_parser.add_argument("--report", type=Path, default=None, help="Write the full report here.")
 
     args = parser.parse_args(argv)
 
@@ -131,7 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from ig_orchestrator.library.import_cli import run_import_cli
 
         return run_import_cli(
-            args.lite, args.complete, args.root, args.import_dry_run, not args.no_media
+            args.lite, args.complete, args.root, args.import_dry_run, not args.no_media, args.report
         )
     if args.command == "audit-library":
         return _audit_library(args.lite, args.complete, args.md, args.csv, args.no_disk)

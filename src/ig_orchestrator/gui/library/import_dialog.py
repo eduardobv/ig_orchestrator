@@ -79,6 +79,7 @@ class LibraryImportMixin:
         media_var = tk.BooleanVar(value=True)
         status_var = tk.StringVar()
         results: queue.Queue = queue.Queue()
+        last_report: dict[str, object] = {}
 
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
@@ -109,6 +110,9 @@ class LibraryImportMixin:
         simulate.pack(side=tk.LEFT)
         apply_button = ttk.Button(actions, text=t("import.apply"))
         apply_button.pack(side=tk.LEFT, padx=8)
+        ttk.Button(actions, text=t("import.save_report"), command=lambda: save_report()).pack(
+            side=tk.LEFT
+        )
         ttk.Label(actions, textvariable=status_var).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text=t("audit.close"), command=window.destroy).pack(side=tk.RIGHT)
 
@@ -135,6 +139,7 @@ class LibraryImportMixin:
                 show(str(payload))
                 return
             report, backup = payload
+            last_report["report"] = report
             text = report.render()
             if backup is not None:
                 text += f"\n\n{t('import.backup', path=backup)}"
@@ -143,6 +148,17 @@ class LibraryImportMixin:
             if not report.dry_run:
                 self._reload_catalog()
                 self._write_console(text + "\n")
+
+        def save_report() -> None:
+            report = last_report.get("report")
+            if report is None:
+                return
+            chosen = filedialog.asksaveasfilename(
+                parent=window, defaultextension=".txt", initialfile="import-bdsc1.txt"
+            )
+            if chosen:
+                Path(chosen).write_text(report.render(full=True), encoding="utf-8")
+                status_var.set(t("audit.exported", path=chosen))
 
         def start(dry_run: bool) -> None:
             lite_text = native_path_text(lite_var.get())

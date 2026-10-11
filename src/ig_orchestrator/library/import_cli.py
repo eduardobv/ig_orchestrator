@@ -19,6 +19,7 @@ def run_import_cli(
     root: str | None,
     dry_run: bool,
     include_media: bool,
+    report_path: Path | None = None,
 ) -> int:
     try:
         settings = load_settings()
@@ -59,4 +60,7 @@ def run_import_cli(
     finally:
         connection.close()
     print(report.render())
+    if report_path is not None:
+        report_path.write_text(report.render(full=True), encoding="utf-8")
+        print(f"Informe completo: {report_path}")
     return 0
