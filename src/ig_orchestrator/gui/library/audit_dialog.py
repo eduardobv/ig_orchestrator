@@ -14,7 +14,7 @@ from ig_orchestrator.gui.shared.helpers import _open_path_in_explorer, bind_esca
 from ig_orchestrator.gui.stories.settings import STORIES_DB_SETTING
 from ig_orchestrator.gui.shared.helpers import _gui_setting
 from ig_orchestrator.library.audit import run_audit
-from ig_orchestrator.library.audit_cli import default_complete_path
+from ig_orchestrator.library.audit_cli import default_complete_path, native_path_text
 from ig_orchestrator.library.audit_report import (
     AuditReport,
     Finding,
@@ -70,6 +70,7 @@ class LibraryAuditMixin:
         self._library_audit_window = window
 
         saved_lite = _gui_setting(self.connection, STORIES_DB_SETTING, "")
+        saved_lite = native_path_text(saved_lite)
         lite_var = tk.StringVar(value=saved_lite)
         complete_var = tk.StringVar(
             value=str(default_complete_path(Path(saved_lite))) if saved_lite else ""
@@ -162,11 +163,13 @@ class LibraryAuditMixin:
             status_var.set(t("audit.done", total=len(report.findings)))
 
         def _run() -> None:
-            lite_text = lite_var.get().strip()
+            lite_text = native_path_text(lite_var.get())
+            lite_var.set(lite_text)
             if not lite_text:
                 messagebox.showerror(t("audit.title"), t("audit.paths_required"), parent=window)
                 return
-            complete_text = complete_var.get().strip()
+            complete_text = native_path_text(complete_var.get())
+            complete_var.set(complete_text)
             run_button.configure(state="disabled")
             status_var.set(t("audit.running"))
             run_audit_in_thread(
@@ -243,4 +246,4 @@ def _browse_file(parent: tk.Misc, variable: tk.StringVar) -> None:
         filetypes=[("SQLite", "*.sqlite *.db *.sqlite3"), ("All files", "*.*")],
     )
     if chosen:
-        variable.set(chosen)
+        variable.set(native_path_text(chosen))

@@ -8,7 +8,7 @@ from pathlib import Path
 from ig_orchestrator.db import init_gui_database
 from ig_orchestrator.gui.library.audit_dialog import run_audit_in_thread
 
-LOCALES = Path(__file__).resolve().parents[2] / "src" / "ig_orchestrator" / "gui" / "locales"
+LOCALES = Path(__file__).resolve().parents[2] / "src" / "ig_orchestrator" / "gui" / "shared" / "locales"
 
 
 def test_audit_locale_keys_in_both_languages() -> None:
@@ -43,3 +43,26 @@ def test_run_audit_in_thread_reports_error(tmp_path: Path) -> None:
     run_audit_in_thread(tmp_path / "missing.sqlite", tmp_path / "x.sqlite", None, results).join(timeout=10)
 
     assert results.get_nowait()[0] == "error"
+
+
+def test_native_path_text_uses_windows_separators() -> None:
+    import os
+
+    from ig_orchestrator.library.audit_cli import native_path_text
+
+    assert native_path_text("G:/4K Stogram/accounts_lite.sqlite") == os.path.normpath(
+        "G:/4K Stogram/accounts_lite.sqlite"
+    )
+    assert native_path_text("  ") == ""
+    if os.name == "nt":
+        assert native_path_text("G:/4K Stogram/x.sqlite") == r"G:\4K Stogram\x.sqlite"
+
+
+def test_audit_keys_resolve_through_t() -> None:
+    from ig_orchestrator.gui.i18n import load_language, t
+
+    for language in ("es", "en"):
+        load_language(language)
+        for key in ("menu.catalog.audit", "audit.title", "audit.run", "audit.col.paths"):
+            assert t(key) != key
+    load_language("es")

@@ -18,9 +18,14 @@ Informe de discrepancias entre `bdapp`, `accounts_lite`, `accounts_complete` y e
 * `cli/main.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, `gui/locales/{es,en}.json`, `README.md`, versión a 3.1.0.
 * `docs/feat-uc3-1.md` movido a `tasks/done/v3/` (con los resultados medidos).
 
+### Correcciones (v3.1.1)
+
+* Textos de la auditoría movidos a `gui/shared/locales/{es,en}.json` (los de `gui/locales` no se cargan): el menú y el diálogo mostraban las claves.
+* Rutas del diálogo siempre con separadores de Windows (`native_path_text`), también las leídas del ajuste y las del selector de archivos.
+
 ### Pruebas ejecutadas
 
-* `python -m pytest`: 342 passed. Auditoría real (0,4 s): PATH_MISSING 15, OWNER_DUP 69, OWNER_MISMATCH 4, FOLDER_MISMATCH 1, ONLY_IN_APP 5, ONLY_IN_LITE 902, COMPLETE_STALE 394, LAST_MODIFIED_MIXED 1; `mtime` de las BD sin cambios.
+* `python -m pytest`: 344 passed (342 antes de la corrección). Auditoría real (0,4 s): PATH_MISSING 15, OWNER_DUP 69, OWNER_MISMATCH 4, FOLDER_MISMATCH 1, ONLY_IN_APP 5, ONLY_IN_LITE 902, COMPLETE_STALE 394, LAST_MODIFIED_MIXED 1; `mtime` de las BD sin cambios.
 
 ## v3 (planificación) - Análisis y plan de mejoras
 

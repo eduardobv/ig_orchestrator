@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from ig_orchestrator.db import connect_readonly
@@ -10,6 +11,13 @@ from ig_orchestrator.library.audit_report import render_csv, render_markdown
 from ig_orchestrator.settings import SettingsError, load_settings
 
 STORIES_DB_SETTING = "stories.accounts_db_path"
+
+
+def native_path_text(value: str) -> str:
+    """Path text as the OS writes it (backslashes on Windows); '' stays ''."""
+
+    text = value.strip()
+    return os.path.normpath(text) if text else ""
 
 
 def default_complete_path(lite_path: Path) -> Path:
@@ -41,7 +49,7 @@ def run_audit_cli(
             if row is None or not row[0]:
                 print("No --lite given and 'stories.accounts_db_path' is not configured.")
                 return 2
-            lite = Path(row[0])
+            lite = Path(native_path_text(row[0]))
         if complete is None:
             complete = default_complete_path(lite)
         report = run_audit(connection, lite, complete, check_disk=not no_disk)
