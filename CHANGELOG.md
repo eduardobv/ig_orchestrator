@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.2.1 - Tutorial v3 y etiquetas de Instancias
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+* Creado `docs/tutorial-v3.md`: guía feat a feat (feats 1 y 2) con campos, botones, ejemplos con rutas reales y pruebas. Regla nueva en el plan: cada feat añade su sección.
+* Formulario de **Ajustes → Instancias**: etiquetas más claras (ruta «desde ESTE PC» vs «en ELLA misma») y texto de ayuda.
+* `CLAUDE.md` referencia el tutorial.
+
 ## v3.2.0 - feat-uc4-2: Registro de instancias y «Traer descargas…»
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

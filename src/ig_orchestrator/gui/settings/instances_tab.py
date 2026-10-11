@@ -125,6 +125,9 @@ class InstancesTab(ttk.Frame):
         window.title(t("settings.instances.title"))
         window.transient(self.winfo_toplevel())
         window.grab_set()
+        ttk.Label(
+            window, text=t("settings.instances.hint"), wraplength=560, justify="left"
+        ).pack(fill=tk.X, padx=12, pady=(12, 0))
         frame = ttk.Frame(window, padding=12)
         frame.pack(fill=tk.BOTH, expand=True)
         frame.columnconfigure(1, weight=1)

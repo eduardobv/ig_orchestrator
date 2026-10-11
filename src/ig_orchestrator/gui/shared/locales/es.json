@@ -227,12 +227,13 @@
   "settings.instances.test": "Probar",
   "settings.instances.yes": "Sí",
   "settings.instances.is_local": "Es esta instancia (local)",
-  "settings.instances.working_path": "Carpeta de descargas (working_path)",
-  "settings.instances.exchange_path": "Carpeta compartida (vista desde aquí)",
-  "settings.instances.exchange_local_path": "Carpeta compartida (vista desde ella)",
+  "settings.instances.working_path": "Su carpeta de descargas (informativa)",
+  "settings.instances.exchange_path": "Carpeta compartida: ruta desde ESTE PC (se usa para traer)",
+  "settings.instances.exchange_local_path": "Carpeta compartida: ruta en ELLA misma (informativa)",
   "settings.instances.notes": "Notas",
   "settings.instances.confirm_delete": "¿Eliminar la instancia «{name}»?",
   "settings.instances.testing": "Probando {path}…",
   "settings.instances.probe_ok": "accesible · escritura: {write} · libre: {free}",
-  "settings.instances.no_paths": "La instancia no tiene rutas configuradas."
+  "settings.instances.no_paths": "La instancia no tiene rutas configuradas.",
+  "settings.instances.hint": "Para traer descargas de otro equipo solo hace falta la «Carpeta compartida (ruta desde este PC)». Las demás rutas son informativas. En la instancia de ESTE equipo (marcada como local) no hace falta carpeta compartida."
 }

@@ -227,12 +227,13 @@
   "settings.instances.test": "Test",
   "settings.instances.yes": "Yes",
   "settings.instances.is_local": "This is the current instance (local)",
-  "settings.instances.working_path": "Downloads folder (working_path)",
-  "settings.instances.exchange_path": "Shared folder (as seen from here)",
-  "settings.instances.exchange_local_path": "Shared folder (as seen from it)",
+  "settings.instances.working_path": "Its downloads folder (informational)",
+  "settings.instances.exchange_path": "Shared folder: path from THIS PC (used to pull)",
+  "settings.instances.exchange_local_path": "Shared folder: path on ITSELF (informational)",
   "settings.instances.notes": "Notes",
   "settings.instances.confirm_delete": "Delete instance “{name}”?",
   "settings.instances.testing": "Testing {path}…",
   "settings.instances.probe_ok": "reachable · write: {write} · free: {free}",
-  "settings.instances.no_paths": "The instance has no paths configured."
+  "settings.instances.no_paths": "The instance has no paths configured.",
+  "settings.instances.hint": "To pull downloads from another machine you only need the “Shared folder (path from THIS PC)”. The other paths are informational. The instance for THIS machine (marked local) needs no shared folder."
 }
