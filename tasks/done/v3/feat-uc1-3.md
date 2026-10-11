@@ -212,3 +212,13 @@ con `feat-uc2-4`.
 ## Fuera de alcance
 
 Escanear el disco (→ `feat-uc3-8`), escribir en disco (→ `feat-uc2-4`), usar el índice para renombrar (→ `feat-uc1-9`/`feat-uc5-10`).
+
+## Resultado de la implementación (2026-10-11, v3.3.0)
+
+- **Estrategia elegida: A (aditiva).** No se reconstruyó el catálogo: la GUI actual sigue funcionando y no aporta nada visible reconstruirlo ahora. El árbol de nodos real (mover/renombrar nodos) llega con los feats 4 y 12.
+- **`ARCHIVED` tiene id 5** (el id 4 ya era `CHANGED`).
+- **`media_index` reducido** a lo que pide el renombrado y a la decisión del usuario (clave = id de cuenta): `account_id, kind, media_id, taken_at, owner_id, ext, suffix`. Sin `location`/`origin`, sin username, ruta, nombre de fichero ni fechas de creación/modificación. `taken_at` = hora del nombre como epoch.
+- Resultado real sobre una copia: 1 255 cuentas de origen → 924 creadas `ARCHIVED` + 331 actualizadas (3 cuentas solo existen en la app); 107 carpetas nuevas; 908 560 ficheros indexados (los ~1 400 restantes pertenecen a 2 usernames repetidos que no son canónicos); BD 8,8 → 64 MB.
+- Incidencias medidas: `OWNER_DUP` 86 (incluye rutas obsoletas de complete), `OWNER_MISMATCH` 4, `FOLDER_MISMATCH` 2, `USERNAME_DUP` 2, `ONLY_IN_APP` 3. Aviso: complete está desfasado (253 rutas solo en lite, 141 solo en complete) → ejecutar el paso 0 antes de importar de verdad.
+- Se añadió copia de seguridad también antes de cada importación real. El botón vive en `Catálogo → Importar desde bdsc1…` (como la auditoría), no en Ajustes.
+- No hecho aquí (según el diseño): el interruptor es del menú `Ver`, sin persistir entre sesiones.

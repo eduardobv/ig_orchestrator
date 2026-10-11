@@ -100,46 +100,88 @@ def _lookup_account_path(connection: sqlite3.Connection, username: str) -> str |
     return str(row["path"] if "path" in row.keys() else row[0] or "")
 
 
+def _lookup_bdapp_path(app: sqlite3.Connection, username: str) -> str | None:
+    """Absolute account folder from bdapp (``LIBRARY`` root + ``rel_path``)."""
+
+    try:
+        row = app.execute(
+            """
+            SELECT a.rel_path,
+                   (SELECT path FROM path_roots WHERE code = 'LIBRARY') AS root
+            FROM catalog_accounts a
+            WHERE a.username = ? COLLATE NOCASE AND a.rel_path IS NOT NULL
+            LIMIT 1
+            """,
+            (username,),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None or not str(row[1] or "").strip():
+        return None
+    root = str(row[1]).rstrip("\\/")
+    return "\\".join((root, str(row[0])))
+
+
 def organize_story_inbox(
     *,
     inbox: Path | str,
-    accounts_db: Path | str,
+    accounts_db: Path | str | None = None,
+    app_connection: sqlite3.Connection | None = None,
 ) -> list[StoryInboxResult]:
-    """Move each media file in *inbox* to ``{accounts_dir.path}/story``."""
+    """Move each media file in *inbox* to ``<account folder>/story``.
+
+    The account folder comes from bdapp (``app_connection``) first; the legacy
+    ``accounts_dir`` table in *accounts_db* is only a fallback.
+    """
 
     inbox_path = Path(inbox)
-    db_path = Path(accounts_db)
     if not inbox_path.is_dir():
         raise StoryInboxError(f"Stories folder does not exist: {inbox_path}")
-    if not db_path.is_file():
-        raise StoryInboxError(f"Accounts database does not exist: {db_path}")
+    db_path = Path(accounts_db) if accounts_db else None
+    if db_path is None and app_connection is None:
+        raise StoryInboxError("No account source: configure bdapp or an accounts database.")
+    if db_path is not None and not db_path.is_file():
+        if app_connection is None:
+            raise StoryInboxError(f"Accounts database does not exist: {db_path}")
+        db_path = None
 
-    try:
-        connection = _connect_accounts_db(db_path)
-    except sqlite3.Error as exc:
-        raise StoryInboxError(f"Cannot open accounts database: {exc}") from exc
+    connection: sqlite3.Connection | None = None
+    if db_path is not None:
+        try:
+            connection = _connect_accounts_db(db_path)
+        except sqlite3.Error as exc:
+            if app_connection is None:
+                raise StoryInboxError(f"Cannot open accounts database: {exc}") from exc
 
     results: list[StoryInboxResult] = []
     try:
-        tables = {
-            str(row[0])
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            ).fetchall()
-        }
-        if "accounts_dir" not in tables:
-            raise StoryInboxError(
-                "The database has no accounts_dir table. "
-                f"File: {db_path}"
-            )
+        if connection is not None:
+            tables = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if "accounts_dir" not in tables:
+                if app_connection is None:
+                    raise StoryInboxError(
+                        f"The database has no accounts_dir table. File: {db_path}"
+                    )
+                connection.close()
+                connection = None
         for source in list_inbox_media(inbox_path):
-            results.append(_move_one(connection, source))
+            results.append(_move_one(connection, source, app_connection))
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
     return results
 
 
-def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
+def _move_one(
+    connection: sqlite3.Connection | None,
+    source: Path,
+    app_connection: sqlite3.Connection | None = None,
+) -> StoryInboxResult:
     username = username_from_story_filename(source.name)
     if not username:
         return StoryInboxResult(
@@ -150,7 +192,11 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
             detail="filename has no username prefix before '-'",
         )
     try:
-        account_path = _lookup_account_path(connection, username)
+        account_path = (
+            _lookup_bdapp_path(app_connection, username) if app_connection is not None else None
+        )
+        if account_path is None and connection is not None:
+            account_path = _lookup_account_path(connection, username)
     except sqlite3.Error as exc:
         return StoryInboxResult(
             source=source,
@@ -165,7 +211,7 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
             username=username,
             destination=None,
             status=StoryInboxStatus.USERNAME_NOT_IN_DB,
-            detail=f"@{username} not found in accounts_dir",
+            detail=f"@{username} not found in bdapp or accounts_dir",
         )
     stripped = account_path.strip()
     if not stripped:

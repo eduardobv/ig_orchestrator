@@ -504,6 +504,18 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Importar la biblioteca a la app (bdsc1 → bdapp)
+
+Una sola vez (y cuando quieras refrescar): `Catalogo > Importar desde bdsc1...` o
+
+```bash
+python -m ig_orchestrator import-bdsc1 [--lite RUTA] [--complete RUTA] [--dry-run] [--no-media]
+```
+
+Antes: con G: conectada, ejecuta `sc1 --lite` y `--update` para refrescar `accounts_complete`.
+Usa `--dry-run` / **Simular** para ver el resultado sin escribir. Hace copia de seguridad en `data/bkp/`.
+Las cuentas que solo existen en G: entran como `ARCHIVED` (ocultas; `Ver > Mostrar biblioteca completa`).
+
 ### Auditar la biblioteca (solo lectura)
 
 Compara `bdapp`, `accounts_lite`, `accounts_complete` y el disco, sin modificar nada:

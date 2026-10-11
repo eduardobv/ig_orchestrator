@@ -7,6 +7,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 |---|---|---|
 | 1 · Auditoría de biblioteca | v3.1.0 | [Feat 1](#feat-1--auditar-biblioteca-v310) |
 | 2 · Instancias y «Traer descargas» | v3.2.0 | [Feat 2](#feat-2--instancias-y-traer-descargas-v320) |
+| 3 · Catálogo completo en la app | v3.3.0 | [Feat 3](#feat-3--catálogo-completo-en-la-app-v330) |
 
 ---
 
@@ -158,3 +159,78 @@ Igual que siempre. Extra: si pulsas **Renombrar** con tu carpeta de trabajo vac�
 | No aparece ninguna instancia en el desplegable | Solo salen las **no locales** con carpeta compartida (o de descargas) rellena. |
 | La carpeta sale «En uso» | Se modificó hace menos de ~30 s (p. ej. aún la estás moviendo a `tmp`); espera y pulsa **Escanear**. |
 | Elijo un lote y casi todo sale «Falta» | Normal si aún no has movido esas cuentas a `tmp`; la tabla solo muestra lo que ya está en la compartida. |
+
+
+---
+
+## Feat 3 · Catálogo completo en la app (v3.3.0)
+
+**Para qué sirve:** que la app (`bdapp`) conozca **toda** tu biblioteca de `G:` (no solo las 334 cuentas que gestionas) con su ruta, sus contadores y el **índice de ficheros** que usará el renombrado sin necesitar `G:`. Después de esto ya no se consulta `accounts_lite`/`accounts_complete` para nada (salvo para volver a importar).
+
+**Qué NO hace:** no escribe en `G:` ni en `accounts_*`, no mueve ni renombra carpetas, no escanea el disco (solo lee las bases de `sc1`).
+
+### Paso 0 · Refrescar `accounts_complete` (una vez, a mano)
+
+La importación es tan buena como `accounts_complete`. Con `G:` conectada, en tu carpeta de `sc1` (GenerateDirMap):
+
+1. `python generatedirmap.py --lite` (13–55 s) → actualiza rutas.
+2. `python generatedirmap.py --update` (2–32 s) → reconstruye en complete las cuentas nuevas/movidas y sus ficheros.
+
+Si no lo haces, la importación te avisará: «accounts_complete desfasado respecto a lite: N rutas solo en lite…». (Hoy: 253 rutas de lite que complete no tiene.)
+
+### Paso 1 · Simular — `Catálogo → Importar desde bdsc1…`
+
+| Elemento | Qué es |
+|---|---|
+| `accounts_lite` / `accounts_complete` | Rutas de las dos bases de `G:K Stogram`. Se rellenan solas. |
+| **Incluir índice de ficheros** | Marcado = carga también los ~900 000 ficheros (necesario para renombrar sin `G:`). Tarda ~14 s. |
+| **Simular** | Calcula todo y lo muestra **sin escribir nada**. Úsalo siempre primero. |
+| **Importar** | Hace una copia de seguridad (`data/bkp/orchestrator_gui_pre_import_*.sqlite`) y aplica la importación. |
+
+**Cómo leer el informe**
+
+| Línea | Significa |
+|---|---|
+| Cuentas creadas | Cuentas que existen en `G:` y no estaban en la app. Entran como **Archivadas**. |
+| Cuentas actualizadas | Cuentas que ya tenías: reciben ruta, contadores y fecha del último contenido. **No cambian de estado, favorito ni fecha de inicio.** |
+| Carpetas creadas | Nodos del árbol (categorías/grupos) que faltaban. |
+| Indice de ficheros | Cuentas cuyo listado de ficheros se (re)cargó / sin cambios. |
+| Incidencias | Cosas que requieren tu atención (ver tabla). Se guardan en la tabla `library_import_issues`; **no se corrige nada solo**. |
+
+| Incidencia | Significa | Lo resuelve |
+|---|---|---|
+| `OWNER_DUP` | Varias carpetas con el mismo id de Instagram (cuenta renombrada/duplicada). | Feat 7 |
+| `OWNER_MISMATCH` | El id de la app y el de `G:` difieren para un username. **No se sobrescribe.** | Revisar a mano |
+| `FOLDER_MISMATCH` | La carpeta de la app no es la de `G:`. | Revisar / feat 4 |
+| `USERNAME_DUP` | El mismo username en dos carpetas: se importa una (la de categoría activa o más reciente) y se anota la otra. | Feat 7 |
+| `ONLY_IN_APP` | Cuenta de la app que ya no está en `G:`. | Feats 5/8 |
+| `OUTSIDE_ROOT` / `PATH_CLASH` | Ruta fuera de `G:K Stogram` / ruta ya usada por otra cuenta. | Revisar |
+| `PARSE_ERROR` | Ficheros con nombre no reconocido (no entran en el índice). | Revisar |
+
+### Paso 2 · Importar
+
+Pulsa **Importar** y confirma. Es **idempotente**: si lo repites sin cambios en disco verás «0 creadas, 0 actualizadas». Desde consola: `python -m ig_orchestrator import-bdsc1 --dry-run` y luego sin `--dry-run`.
+
+### Qué cambia en la app después
+
+- **Catálogo:** sigue mostrando solo tus cuentas gestionadas. Para ver todas: menú `Ver → Mostrar biblioteca completa (archivadas)` (las archivadas salen en gris claro). No se recuerda entre sesiones.
+- **Usar una cuenta archivada** (añadirla al editor o a un lote) la pasa automáticamente a **Habilitada**.
+- **Organizar stories:** ya resuelve la carpeta de la cuenta desde la app, aunque la cuenta no esté en `accounts_lite`. La «base de cuentas antigua» del diálogo pasa a ser opcional.
+- **Búsqueda por id de Instagram:** el campo `instagram_user_id` está indexado (base del feat 7).
+
+### Cómo probarlo
+
+1. (Paso 0) Refresca `accounts_complete`.
+2. `Catálogo → Importar desde bdsc1…` → **Simular**: comprueba que «Cuentas actualizadas» ≈ tus 331–334 gestionadas y que las incidencias coinciden con la auditoría (feat 1).
+3. **Importar** → `Ver → Mostrar biblioteca completa`: debes ver ~1 250 cuentas; desmarca y vuelve a ver tus 334.
+4. Repite **Importar**: debe decir 0 cambios.
+5. `Organizar stories` con una imagen de una cuenta archivada: debe moverla a su carpeta `story`.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «No existe la base de datos: …» | Ruta mal o `G:` desconectada (puedes copiar las dos bases a local y apuntar ahí). |
+| Muchas cuentas «creadas» en una segunda importación | Se movieron carpetas en `G:` y complete no se refrescó: repite el paso 0. |
+| El informe dice «raíz de la biblioteca: …» distinta de `G:K Stogram` | Ajusta `path_roots.LIBRARY` o usa `--root`. |
+| Quieres deshacer | Restaura la copia de `data/bkp/` (cierra la app antes). |

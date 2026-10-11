@@ -281,6 +281,12 @@ class CatalogPanelMixin:
             self.catalog_list.grid()
 
 
+    def _toggle_full_library(self) -> None:
+        """Show/hide ARCHIVED accounts (on disk only, never downloaded by the app)."""
+        self.catalog_service.include_archived = bool(self.show_library_var.get())
+        self._reload_catalog()
+
+
     def _batch_usernames(self) -> set[str]:
         return {account.username.casefold() for account in self.accounts}
 

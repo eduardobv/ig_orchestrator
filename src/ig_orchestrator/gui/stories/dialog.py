@@ -122,7 +122,7 @@ class StoriesInboxMixin:
     ) -> None:
         inbox_path = inbox.strip()
         db_path = accounts_db.strip()
-        if not inbox_path or not db_path:
+        if not inbox_path:
             messagebox.showerror(t("stories.title"), t("stories.paths_required"), parent=window)
             return
         save_story_inbox_settings(
@@ -133,7 +133,8 @@ class StoriesInboxMixin:
         try:
             results = organize_story_inbox(
                 inbox=Path(inbox_path),
-                accounts_db=Path(db_path),
+                accounts_db=Path(db_path) if db_path else None,
+                app_connection=self.connection,
             )
         except StoryInboxError as exc:
             run_button.configure(state="normal")

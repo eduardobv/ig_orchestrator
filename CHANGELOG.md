@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.3.0 - feat-uc1-3: catálogo completo en bdapp + índice de ficheros
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+`bdapp` pasa a conocer toda la biblioteca (rutas, contadores, fecha del último contenido) y el índice de ficheros que usará el renombrado. **Estrategia A (aditiva):** no se reconstruye el catálogo; se amplía. No escribe en `accounts_*` ni en disco.
+
+### Creado
+
+* `library/import_bdsc1.py` (`import_from_bdsc1`, informe, simulación, idempotente), `library/paths.py`, `library/filenames.py`, `library/import_cli.py`.
+* Comando `python -m ig_orchestrator import-bdsc1 [--lite] [--complete] [--root] [--dry-run] [--no-media]`.
+* `gui/library/import_dialog.py` - `Catálogo → Importar desde bdsc1…` (Simular / Importar, copia de seguridad automática).
+* Esquema (aditivo en `_patch_gui_schema`): `catalog_accounts` (`rel_path`, contadores, `last_media_at`, `last_scan_at`, `disk_state`, `legacy_lite_id`), `catalog_folders` (`rel_path`, `kind`), tablas `media_index` (solo `account_id`, `kind`, `media_id`, `taken_at`, `owner_id`, `ext`, `suffix`), `media_index_state`, `library_import_issues`, raíz `LIBRARY` en `path_roots`, estado `ARCHIVED`.
+* Copia de seguridad automática antes de la migración (`data/bkp/orchestrator_gui_pre_v3_*.sqlite`) y antes de cada importación real (`..._pre_import_*`).
+* Tests: `tests/library/test_import_bdsc1.py` y ampliaciones en `tests/db/test_gui_database.py` y `tests/filesystem/test_story_inbox.py`.
+
+### Modificado
+
+* Story inbox resuelve la carpeta desde `bdapp` (con respaldo a `accounts_dir`); la base antigua pasa a ser opcional.
+* Las cuentas `ARCHIVED` no salen en el catálogo/editor por defecto (`Ver → Mostrar biblioteca completa`); al usarlas en el editor o en un lote pasan a `ENABLED`.
+* `models/account_history.py`, `db/v2/catalog/repository.py`, `db/account_history_repository.py`, `gui/catalog/{service,colors,panel}.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, `input/gui_batch_creation.py`, `gui/stories/dialog.py`, locales, `README.md`, versión 3.3.0.
+* `docs/feat-uc1-3.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 374 passed. Importación real sobre una **copia** de tus datos (14 s): 924 cuentas `ARCHIVED` creadas, 331 actualizadas, 107 carpetas, 908 560 ficheros indexados; las 334 cuentas previas conservan estado; segunda ejecución: 0 cambios. La BD pasa de 8,8 a 64 MB.
+
 ## v3.2.2 - Traer descargas: «Comparar con lote» dentro de la tabla
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

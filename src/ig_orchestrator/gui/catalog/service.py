@@ -32,6 +32,7 @@ class AccountCatalogService:
         backup_dir: Path = Path("config/bkp"),
     ) -> None:
         self.connection = connection
+        self.include_archived = False  # "show the full library" toggle
         self.batch_json_path = batch_json_path
         self.backup_dir = backup_dir
 
@@ -89,7 +90,9 @@ class AccountCatalogService:
         return list_usernames_active_on_date(self.connection, day)
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
-        for record in AccountHistoryRepository(self.connection).list_all():
+        for record in AccountHistoryRepository(self.connection).list_all(
+            include_archived=self.include_archived
+        ):
             yield AccountCatalogEntry(
                 username=record.user_name,
                 source="account_history",
@@ -157,6 +160,8 @@ def _deduplicate(entries: Iterable[AccountCatalogEntry]) -> list[AccountCatalogE
 def _catalog_sort_key(entry: AccountCatalogEntry) -> tuple[object, ...]:
     username = entry.username.casefold()
     destination_path = (entry.destination_path or "").strip().casefold()
+    if entry.status is AccountHistoryStatus.ARCHIVED:
+        return (5, username)
     if entry.status is AccountHistoryStatus.DISABLED:
         return (4, username)
     if entry.status is AccountHistoryStatus.INACTIVE:

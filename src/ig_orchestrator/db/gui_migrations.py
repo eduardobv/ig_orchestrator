@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 from sqlite3 import Connection
 
@@ -84,6 +86,8 @@ def apply_gui_migrations(connection: Connection) -> None:
 def _patch_gui_schema(connection: Connection) -> None:
     """Idempotent lookup/column patches for databases already at v100."""
 
+    backup_before_library_migration(connection)
+
     connection.execute(
         """
         INSERT OR IGNORE INTO batch_url_statuses
@@ -116,6 +120,7 @@ def _patch_gui_schema(connection: Connection) -> None:
     )
     _add_column_if_missing(connection, "downloaded_files", "sha256", "TEXT")
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
+    _patch_library_schema(connection)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS instances (
@@ -132,6 +137,128 @@ def _patch_gui_schema(connection: Connection) -> None:
         )
         """
     )
+
+
+def _patch_library_schema(connection: Connection) -> None:
+    """v3 feat 3: whole-library catalog (paths, counters) + per-account media index."""
+
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO catalog_account_statuses
+            (id, code, name, description, color_hex, sort_order, is_active)
+        VALUES (5, 'ARCHIVED', 'Archived',
+                'On disk only; never downloaded by the app.', '#e8eaed', 5, 1)
+        """
+    )
+    for column, definition in (
+        ("rel_path", "TEXT"),
+        ("posts_count", "INTEGER"),
+        ("reels_count", "INTEGER"),
+        ("story_count", "INTEGER"),
+        ("highlights_count", "INTEGER"),
+        ("last_media_at", "TEXT"),
+        ("last_scan_at", "TEXT"),
+        ("disk_state", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+        ("legacy_lite_id", "INTEGER"),
+    ):
+        _add_column_if_missing(connection, "catalog_accounts", column, definition)
+    _add_column_if_missing(connection, "catalog_folders", "rel_path", "TEXT")
+    _add_column_if_missing(
+        connection, "catalog_folders", "kind", "TEXT NOT NULL DEFAULT 'GROUP'"
+    )
+    connection.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_catalog_accounts_rel_path "
+        "ON catalog_accounts(rel_path) WHERE rel_path IS NOT NULL"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_catalog_accounts_owner "
+        "ON catalog_accounts(instagram_user_id)"
+    )
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS library_import_issues (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,
+            username TEXT,
+            owner_id TEXT,
+            rel_path TEXT,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        );
+        -- Only what the renamer needs: keyed by the account primary key (not username).
+        CREATE TABLE IF NOT EXISTS media_index (
+            id INTEGER PRIMARY KEY,
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind INTEGER NOT NULL,       -- 0 post/root, 1 reels, 2 story, 3 highlights
+            media_id INTEGER NOT NULL,
+            taken_at INTEGER NOT NULL,   -- naive local time of the file name, as epoch seconds
+            owner_id INTEGER NOT NULL,
+            ext INTEGER NOT NULL,        -- 0 jpg, 1 jpeg, 2 mp4
+            suffix TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_media_index_lookup
+            ON media_index(account_id, kind, media_id);
+        CREATE TABLE IF NOT EXISTS media_index_state (
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind INTEGER NOT NULL,
+            items INTEGER NOT NULL,
+            max_media_id INTEGER,
+            indexed_at TEXT NOT NULL,
+            source TEXT NOT NULL,
+            PRIMARY KEY (account_id, kind)
+        );
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO path_roots (code, path, updated_at)
+        SELECT 'LIBRARY', COALESCE(
+            (SELECT NULLIF(TRIM(path), '') FROM path_roots WHERE code = 'FINAL_BASE'),
+            (SELECT full_path FROM catalog_folders WHERE parent_id IS NULL ORDER BY id LIMIT 1),
+            ''
+        ), datetime('now')
+        """
+    )
+
+
+def backup_before_library_migration(connection: Connection) -> Path | None:
+    """Copy the database to ``<db dir>/bkp`` before the v3 library migration.
+
+    Runs only when the migration is still pending and the catalog has data.
+    """
+
+    columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(catalog_accounts)").fetchall()
+    }
+    if not columns or "rel_path" in columns:
+        return None
+    if connection.execute("SELECT COUNT(*) FROM catalog_accounts").fetchone()[0] == 0:
+        return None
+    return backup_database(connection, "pre_v3")
+
+
+def backup_database(connection: Connection, label: str) -> Path | None:
+    """Copy the main database to ``<db dir>/bkp/<name>_<label>_<timestamp>``."""
+
+    file_name = next(
+        (str(row[2]) for row in connection.execute("PRAGMA database_list") if row[1] == "main"),
+        "",
+    )
+    if not file_name:
+        return None
+    source = Path(file_name)
+    target_dir = source.parent / "bkp"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    target = target_dir / f"{source.stem}_{label}_{stamp}{source.suffix}"
+    connection.commit()
+    backup = sqlite3.connect(target)
+    try:
+        connection.backup(backup)
+    finally:
+        backup.close()
+    return target
 
 
 def _add_column_if_missing(

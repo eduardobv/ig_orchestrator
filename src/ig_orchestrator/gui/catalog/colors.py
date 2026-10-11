@@ -15,6 +15,7 @@ DEFAULT_CATALOG_COLORS = {
     "disabled": "#f4cccc",
     "enabled": "",
     "changed": "#cfe2f3",
+    "archived": "#e8eaed",
 }
 
 
@@ -81,6 +82,8 @@ def colors_for_entry(
     in_batch: bool = False,
     today: bool = False,
 ) -> dict[str, str]:
+    if entry.status is AccountHistoryStatus.ARCHIVED:
+        return _bg(palette.get("archived"))
     if entry.status is AccountHistoryStatus.DISABLED:
         return _bg(palette.get("disabled"))
     if in_batch:

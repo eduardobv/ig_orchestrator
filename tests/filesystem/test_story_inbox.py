@@ -134,3 +134,25 @@ def test_organize_story_inbox_requires_accounts_dir_table(tmp_path: Path) -> Non
 
     with pytest.raises(StoryInboxError, match="accounts_dir"):
         organize_story_inbox(inbox=inbox, accounts_db=db_path)
+
+
+def test_organize_story_inbox_resolves_from_bdapp_without_accounts_db(tmp_path: Path) -> None:
+    import sqlite3
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    library = tmp_path / "library"
+    account_root = library / "00.MODELS" / "newgirl"
+    account_root.mkdir(parents=True)
+    (inbox / "newgirl-20260101-1.jpeg").write_bytes(b"x")
+
+    app = sqlite3.connect(":memory:")
+    app.execute("CREATE TABLE path_roots (code TEXT, path TEXT)")
+    app.execute("CREATE TABLE catalog_accounts (username TEXT COLLATE NOCASE, rel_path TEXT)")
+    app.execute("INSERT INTO path_roots VALUES ('LIBRARY', ?)", (str(library),))
+    app.execute("INSERT INTO catalog_accounts VALUES ('NewGirl', '00.MODELS\\newgirl')")
+
+    results = organize_story_inbox(inbox=inbox, app_connection=app)
+
+    assert [r.status.value for r in results] == ["MOVED"]
+    assert (account_root / "story" / "newgirl-20260101-1.jpeg").exists()

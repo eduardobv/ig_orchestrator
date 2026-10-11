@@ -10,6 +10,7 @@ class AccountHistoryStatus(StrEnum):
     INACTIVE = "INACTIVE"
     DISABLED = "DISABLED"
     CHANGED = "CHANGED"
+    ARCHIVED = "ARCHIVED"  # on disk only; hidden unless the full library is shown
 
 
 def utc_now() -> datetime:

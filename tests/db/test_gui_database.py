@@ -110,7 +110,7 @@ def test_init_gui_database_is_idempotent_and_seeds_lookups(tmp_path: Path) -> No
     assert version == GUI_SCHEMA_USER_VERSION
     assert EXPECTED_TABLES.issubset(table_names)
     assert "v_all_statuses" in view_names
-    assert catalog_status_codes == ["ENABLED", "INACTIVE", "DISABLED", "CHANGED"]
+    assert catalog_status_codes == ["ENABLED", "INACTIVE", "DISABLED", "CHANGED", "ARCHIVED"]
     assert "STORIES_NOT_FOUND" in bot_error_codes
     assert "MEDIA_NOT_FOUND_OR_UNAVAILABLE" in bot_error_codes
     assert batch_count == 0
@@ -178,3 +178,38 @@ def test_init_gui_database_rejects_newer_user_version(tmp_path: Path) -> None:
         assert "newer than supported" in str(exc)
     else:
         raise AssertionError("Expected RuntimeError for a newer GUI schema")
+
+
+def test_library_migration_adds_columns_once_and_backs_up_existing_data(tmp_path) -> None:
+    import sqlite3
+
+    from ig_orchestrator.db import connect, init_gui_database
+    from ig_orchestrator.db.gui_migrations import _patch_gui_schema
+
+    db_path = tmp_path / "data" / "orchestrator_gui.sqlite"
+    db_path.parent.mkdir()
+    init_gui_database(db_path)
+    with connect(db_path) as connection:
+        connection.execute(
+            "INSERT INTO catalog_accounts (username, status_id, created_at, updated_at)"
+            " VALUES ('alice', 1, 'x', 'x')"
+        )
+        # Simulate a database created before v3: drop the library columns.
+        for column in ("rel_path", "posts_count", "reels_count", "story_count",
+                       "highlights_count", "last_media_at", "last_scan_at", "disk_state",
+                       "legacy_lite_id"):
+            connection.execute("DROP INDEX IF EXISTS uq_catalog_accounts_rel_path")
+            connection.execute(f"ALTER TABLE catalog_accounts DROP COLUMN {column}")
+        connection.commit()
+
+        _patch_gui_schema(connection)
+        _patch_gui_schema(connection)  # idempotent
+
+        columns = {r["name"] for r in connection.execute("PRAGMA table_info(catalog_accounts)")}
+        assert {"rel_path", "posts_count", "last_media_at", "disk_state"} <= columns
+        assert connection.execute("SELECT username FROM catalog_accounts").fetchone()[0] == "alice"
+
+    backups = list((db_path.parent / "bkp").glob("orchestrator_gui_pre_v3_*.sqlite"))
+    assert len(backups) == 1  # only the first run had a pending migration
+    with sqlite3.connect(backups[0]) as backup:
+        assert backup.execute("SELECT username FROM catalog_accounts").fetchone()[0] == "alice"

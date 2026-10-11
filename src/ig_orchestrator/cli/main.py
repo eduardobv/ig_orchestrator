@@ -102,6 +102,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     audit_parser.add_argument("--csv", type=Path, default=None, help="Write CSV report here.")
     audit_parser.add_argument("--no-disk", action="store_true", help="Skip disk checks.")
 
+    import_parser = subparsers.add_parser(
+        "import-bdsc1",
+        help="Import accounts_complete/accounts_lite (catalog + file index) into bdapp.",
+    )
+    import_parser.add_argument("--lite", type=Path, default=None)
+    import_parser.add_argument("--complete", type=Path, default=None)
+    import_parser.add_argument("--root", type=str, default=None, help="Library root (default: path_roots LIBRARY).")
+    import_parser.add_argument("--dry-run", dest="import_dry_run", action="store_true")
+    import_parser.add_argument("--no-media", action="store_true", help="Skip the file index.")
+
     args = parser.parse_args(argv)
 
     join_requested = (
@@ -117,6 +127,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _init_db(args.db_path)
     if args.command == "gui":
         return _run_gui(args.batch_json)
+    if args.command == "import-bdsc1":
+        from ig_orchestrator.library.import_cli import run_import_cli
+
+        return run_import_cli(
+            args.lite, args.complete, args.root, args.import_dry_run, not args.no_media
+        )
     if args.command == "audit-library":
         return _audit_library(args.lite, args.complete, args.md, args.csv, args.no_disk)
     if args.command == "run_continue":

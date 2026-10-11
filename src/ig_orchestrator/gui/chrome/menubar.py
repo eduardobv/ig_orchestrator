@@ -153,6 +153,13 @@ class MenubarMixin:
             label=t("menu.view.catalog_tree"),
             command=lambda: self._set_catalog_view("tree"),
         )
+        view_menu.add_separator()
+        self.show_library_var = tk.BooleanVar(value=False)
+        view_menu.add_checkbutton(
+            label=t("menu.view.full_library"),
+            variable=self.show_library_var,
+            command=self._toggle_full_library,
+        )
         menubar.add_cascade(label=t("menu.view"), menu=view_menu)
 
         batch_menu = tk.Menu(menubar, tearoff=False)
@@ -190,6 +197,7 @@ class MenubarMixin:
         )
         catalog_menu.add_separator()
         catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
+        catalog_menu.add_command(label=t("menu.catalog.import"), command=self._open_library_import)
         menubar.add_cascade(label=t("menu.catalog"), menu=catalog_menu)
 
         settings_menu = tk.Menu(menubar, tearoff=False)
