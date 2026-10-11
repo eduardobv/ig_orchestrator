@@ -92,6 +92,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_continue_parser.add_argument("--batch-id", type=int, default=None)
     run_continue_parser.add_argument("--batch-name", type=str, default=None)
 
+    audit_parser = subparsers.add_parser(
+        "audit-library",
+        help="Read-only audit of bdapp vs accounts_lite/complete vs disk.",
+    )
+    audit_parser.add_argument("--lite", type=Path, default=None)
+    audit_parser.add_argument("--complete", type=Path, default=None)
+    audit_parser.add_argument("--md", type=Path, default=None, help="Write Markdown report here.")
+    audit_parser.add_argument("--csv", type=Path, default=None, help="Write CSV report here.")
+    audit_parser.add_argument("--no-disk", action="store_true", help="Skip disk checks.")
+
     args = parser.parse_args(argv)
 
     join_requested = (
@@ -107,6 +117,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _init_db(args.db_path)
     if args.command == "gui":
         return _run_gui(args.batch_json)
+    if args.command == "audit-library":
+        return _audit_library(args.lite, args.complete, args.md, args.csv, args.no_disk)
     if args.command == "run_continue":
         return _run_continue(
             batch_id=args.batch_id,
@@ -139,6 +151,18 @@ def _init_db(db_path: Path | None) -> int:
     init_database(db_path)
     print(f"SQLite database ready: {db_path}")
     return 0
+
+
+def _audit_library(
+    lite: Path | None,
+    complete: Path | None,
+    md_path: Path | None,
+    csv_path: Path | None,
+    no_disk: bool,
+) -> int:
+    from ig_orchestrator.library.audit_cli import run_audit_cli
+
+    return run_audit_cli(lite, complete, md_path, csv_path, no_disk)
 
 
 def _run_gui(batch_json_path: Path) -> int:

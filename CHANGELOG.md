@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.1.0 - feat-uc3-1: Auditoría de biblioteca (solo lectura)
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Informe de discrepancias entre `bdapp`, `accounts_lite`, `accounts_complete` y el disco. No escribe en ninguna BD ni en disco.
+
+### Creado
+
+* `src/ig_orchestrator/library/` - `audit.py` (`run_audit`), `audit_report.py` (`Finding`, `AuditReport`, Markdown/CSV), `audit_cli.py`, `MODULE.md`.
+* `src/ig_orchestrator/gui/library/audit_dialog.py` - Diálogo `Catálogo > Auditar biblioteca…` (hilo aparte, filtro por código, exportar MD/CSV, abrir en Explorer).
+* Comando CLI `python -m ig_orchestrator audit-library [--lite] [--complete] [--md] [--csv] [--no-disk]`.
+* Tests: `tests/library/test_audit.py`, `tests/gui/test_audit_dialog.py`.
+
+### Modificado
+
+* `cli/main.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, `gui/locales/{es,en}.json`, `README.md`, versión a 3.1.0.
+* `docs/feat-uc3-1.md` movido a `tasks/done/v3/` (con los resultados medidos).
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 342 passed. Auditoría real (0,4 s): PATH_MISSING 15, OWNER_DUP 69, OWNER_MISMATCH 4, FOLDER_MISMATCH 1, ONLY_IN_APP 5, ONLY_IN_LITE 902, COMPLETE_STALE 394, LAST_MODIFIED_MIXED 1; `mtime` de las BD sin cambios.
+
 ## v3 (planificación) - Análisis y plan de mejoras
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

@@ -187,6 +187,8 @@ class MenubarMixin:
         catalog_menu.add_command(
             label=t("menu.catalog.enable"), command=self._enable_catalog_account
         )
+        catalog_menu.add_separator()
+        catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
         menubar.add_cascade(label=t("menu.catalog"), menu=catalog_menu)
 
         settings_menu = tk.Menu(menubar, tearoff=False)

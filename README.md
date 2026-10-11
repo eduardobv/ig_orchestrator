@@ -497,6 +497,19 @@ Tambien puedes pasar una ruta concreta:
 python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ```
 
+### Auditar la biblioteca (solo lectura)
+
+Compara `bdapp`, `accounts_lite`, `accounts_complete` y el disco, sin modificar nada:
+
+```bash
+python -m ig_orchestrator audit-library [--lite RUTA] [--complete RUTA] [--md salida.md] [--csv salida.csv] [--no-disk]
+```
+
+Sin `--lite` usa el ajuste `stories.accounts_db_path`; `--complete` por defecto es
+`accounts_complete.sqlite` junto a lite. En la GUI: `Catalogo > Auditar biblioteca...`.
+Codigos: `PATH_MISSING`, `OWNER_DUP`, `OWNER_MISMATCH`, `FOLDER_MISMATCH`, `ONLY_IN_APP`,
+`ONLY_IN_LITE`, `COMPLETE_STALE`, `LAST_MODIFIED_MIXED`, `NAME_CASE`, `USERNAME_DUP`, `DISK_OFFLINE`.
+
 ### Ejecutar dry-run por linea de comando
 
 ```bash
@@ -702,7 +715,7 @@ sequenceDiagram
 
 ## Que hace cada modulo
 
-- `main.py`: punto de entrada. Soporta `init-db`, `--input ... --run` y `--input ... --dry-run`.
+- `main.py`: punto de entrada. Soporta `init-db`, `audit-library`, `--input ... --run` y `--input ... --dry-run`.
 - `settings.py`: lee `.env`, valida variables obligatorias y convierte rutas/numeros.
 - `input/batch_json_parser.py`: valida el JSON de entrada.
 - `input/batch_importer.py`: guarda batch, cuentas, settings no sensibles y URLs en SQLite.

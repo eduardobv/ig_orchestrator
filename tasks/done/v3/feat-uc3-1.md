@@ -100,3 +100,11 @@ Ningún cambio de esquema.
 ## Fuera de alcance
 
 Reparar nada. Las reparaciones llegan en `feat-uc3-8` (sincronización) y `feat-problem1-5/7`.
+
+## Resultado de la implementación (2026-10-11, v3.1.0)
+
+- Cifras reales: `PATH_MISSING` 15 · `OWNER_DUP` 69 · `OWNER_MISMATCH` 4 · `FOLDER_MISMATCH` 1 · `ONLY_IN_APP` 5 · `ONLY_IN_LITE` 902 · `LAST_MODIFIED_MIXED` 1 · `NAME_CASE` 0 · `COMPLETE_STALE` 394 (253 rutas de lite ausentes en complete + 141 de complete ausentes en lite; se cuenta por ruta, por eso no coincide con 116/138/24).
+- En `accounts_complete` la tabla se llama `accounts` (no `accounts_dir`); el módulo acepta ambas.
+- La carpeta del catálogo de `bdapp` es la de la **persona**; lite guarda `<carpeta>/<username>`. `FOLDER_MISMATCH` acepta ambas (la ruta o su padre).
+- `LAST_MODIFIED_MIXED` se detecta en `modified_at` (118 filas con `T`); `last_modified` está vacío en lite.
+- Auditoría completa en ~0,4 s con G: conectada; con G: ausente emite `DISK_OFFLINE`.

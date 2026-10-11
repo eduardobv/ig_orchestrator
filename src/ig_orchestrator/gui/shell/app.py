@@ -149,6 +149,7 @@ from ig_orchestrator.gui.editor.panel import EditorPanelMixin
 from ig_orchestrator.gui.run.controller import RunControllerMixin
 from ig_orchestrator.gui.run.rename import RenameMixin
 from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
+from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
 from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
 def launch_gui(
@@ -190,6 +191,7 @@ class InstagramOrchestratorApp(
     RunControllerMixin,
     RenameMixin,
     StoriesInboxMixin,
+    LibraryAuditMixin,
 ):
     def __init__(
         self,
