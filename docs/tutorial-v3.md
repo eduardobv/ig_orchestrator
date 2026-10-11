@@ -182,7 +182,7 @@ Si no lo haces, la importación te avisará: «accounts_complete desfasado respe
 
 | Elemento | Qué es |
 |---|---|
-| `accounts_lite` / `accounts_complete` | Rutas de las dos bases de `G:K Stogram`. Se rellenan solas. |
+| `accounts_lite` / `accounts_complete` | Rutas de las dos bases de `G:\4K Stogram`. Se rellenan solas. |
 | **Incluir índice de ficheros** | Marcado = carga también los ~900 000 ficheros (necesario para renombrar sin `G:`). Tarda ~14 s. |
 | **Simular** | Calcula todo y lo muestra **sin escribir nada**. Úsalo siempre primero. |
 | **Importar** | Hace una copia de seguridad (`data/bkp/orchestrator_gui_pre_import_*.sqlite`) y aplica la importación. |
@@ -204,7 +204,7 @@ Si no lo haces, la importación te avisará: «accounts_complete desfasado respe
 | `FOLDER_MISMATCH` | La carpeta de la app no es la de `G:`. | Revisar / feat 4 |
 | `USERNAME_DUP` | El mismo username en dos carpetas: se importa una (la de categoría activa o más reciente) y se anota la otra. | Feat 7 |
 | `ONLY_IN_APP` | Cuenta de la app que ya no está en `G:`. | Feats 5/8 |
-| `OUTSIDE_ROOT` / `PATH_CLASH` | Ruta fuera de `G:K Stogram` / ruta ya usada por otra cuenta. | Revisar |
+| `OUTSIDE_ROOT` / `PATH_CLASH` | Ruta fuera de `G:\4K Stogram` / ruta ya usada por otra cuenta. | Revisar |
 | `PARSE_ERROR` | Ficheros con nombre no reconocido (no entran en el índice). | Revisar |
 
 ### Paso 2 · Importar
@@ -232,5 +232,5 @@ Pulsa **Importar** y confirma. Es **idempotente**: si lo repites sin cambios en 
 |---|---|
 | «No existe la base de datos: …» | Ruta mal o `G:` desconectada (puedes copiar las dos bases a local y apuntar ahí). |
 | Muchas cuentas «creadas» en una segunda importación | Se movieron carpetas en `G:` y complete no se refrescó: repite el paso 0. |
-| El informe dice «raíz de la biblioteca: …» distinta de `G:K Stogram` | Ajusta `path_roots.LIBRARY` o usa `--root`. |
+| El informe dice «raíz de la biblioteca: …» distinta de `G:\4K Stogram` | Ajusta `path_roots.LIBRARY` o usa `--root`. |
 | Quieres deshacer | Restaura la copia de `data/bkp/` (cierra la app antes). |
