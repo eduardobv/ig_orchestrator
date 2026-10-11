@@ -162,6 +162,7 @@ class MenubarMixin:
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.stories"), command=self._open_stories_inbox)
         batch_menu.add_separator()
+        batch_menu.add_command(label=t("menu.batch.pull"), command=self._open_pull_dialog)
         batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
         batch_menu.add_command(
             label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command

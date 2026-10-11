@@ -116,6 +116,22 @@ def _patch_gui_schema(connection: Connection) -> None:
     )
     _add_column_if_missing(connection, "downloaded_files", "sha256", "TEXT")
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS instances (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL CHECK (role IN ('MAIN', 'WORKER')),
+            is_local INTEGER NOT NULL DEFAULT 0,
+            working_path TEXT,
+            exchange_path TEXT,
+            exchange_local_path TEXT,
+            app_version TEXT,
+            last_seen_at TEXT,
+            notes TEXT
+        )
+        """
+    )
 
 
 def _add_column_if_missing(

@@ -432,6 +432,10 @@ class BatchesDialogMixin:
                 reload_history()
             self._update_pending_button_label()
 
+        def pull_for_selected() -> None:
+            summary = selected_active_summary()
+            self._open_pull_dialog(summary.batch_id if summary is not None else None)
+
         def mark_elsewhere_selected() -> None:
             summary = selected_active_summary()
             if summary is None:
@@ -827,6 +831,11 @@ class BatchesDialogMixin:
             active_actions,
             text="Finalizar sin renombrar",
             command=finish_selected,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(
+            active_actions,
+            text=t("pull.button"),
+            command=pull_for_selected,
         ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(
             active_actions,

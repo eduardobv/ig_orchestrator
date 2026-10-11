@@ -279,6 +279,8 @@ class RenameMixin:
             return
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
+        if self._offer_pull_before_rename():
+            return
 
         if self.active_queue_id is None and self.active_batch_id is None:
             messagebox.showerror("Renombrar", "No hay un batch activo para renombrar.")

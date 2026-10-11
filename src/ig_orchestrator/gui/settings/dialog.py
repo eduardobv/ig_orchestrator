@@ -9,6 +9,7 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.gui.settings.instances_tab import InstancesTab
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
@@ -143,6 +144,7 @@ class SettingsDialogWithTabs:
         self._build_ui_tab()
         self._build_processing_tab()
         self._build_catalog_tab()
+        self._build_instances_tab()
         self._build_notify_tab()
 
         # Buttons
@@ -247,6 +249,14 @@ class SettingsDialogWithTabs:
             )
             btn.grid(row=0, column=index, padx=(0, 4))
             self.color_buttons[key] = btn
+
+    def _build_instances_tab(self) -> None:
+        if not is_gui_schema(self.connection):
+            return
+        self.notebook.add(
+            InstancesTab(self.notebook, self.connection),
+            text=t("settings.tabs.instances"),
+        )
 
     def _build_notify_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)

@@ -497,6 +497,13 @@ Tambien puedes pasar una ruta concreta:
 python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ```
 
+### Flujo de dos instancias (traer descargas)
+
+1. `Ajustes > Instancias`: registra la otra instancia (p. ej. `inst1`) con su carpeta compartida (`exchange_path`, UNC o unidad) y pulsa **Probar**.
+2. `Lote > Traer descargas…` (o el boton del dialogo de lotes): elige la instancia, escanea y pulsa **Traer todas las listas**.
+   Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
+3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
+
 ### Auditar la biblioteca (solo lectura)
 
 Compara `bdapp`, `accounts_lite`, `accounts_complete` y el disco, sin modificar nada:

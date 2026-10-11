@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.2.0 - feat-uc4-2: Registro de instancias y «Traer descargas…»
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Elimina el paso manual de copiar de la carpeta compartida de otra instancia a la carpeta de trabajo. No toca la biblioteca ni `accounts_lite`.
+
+### Creado
+
+* Tabla `instances` (se crea con `CREATE TABLE IF NOT EXISTS` en `_patch_gui_schema`) y `db/instances_repository.py` (`Instance`, `InstanceRepository`; solo una instancia local).
+* `src/ig_orchestrator/exchange/` - `inbox_scan.py` (carpetas, tamaño, estabilidad por `mtime`, prefijo extendido de Windows), `pull.py` (plan + copia verificada con `.part`, política `merge_skip_identical`/`abort`, cancelación, espacio libre), `compare.py` (comparar con lote, sondeo de ruta con timeout), `MODULE.md`.
+* `gui/settings/instances_tab.py` - pestaña **Ajustes → Instancias** (alta/edición/baja y «Probar»; guarda al instante).
+* `gui/exchange/pull_dialog.py` - **Lote → Traer descargas…** (también botón en el diálogo de lotes): origen por instancia o ruta libre, estados Lista/En uso/Ya existe/Vacía, comparar con lote, progreso, cancelar, oferta de «Ejecutado en otra instancia».
+* Aviso al pulsar **Renombrar** si la carpeta de trabajo está vacía y hay carpetas estables en el intercambio de una instancia.
+* Tests: `tests/exchange/test_pull.py`, `tests/gui/test_pull_dialog.py`.
+
+### Modificado
+
+* `db/gui_migrations.py`, `db/__init__.py`, `gui/shell/app.py`, `gui/chrome/menubar.py`, `gui/batches/dialog.py`, `gui/run/rename.py`, `gui/settings/dialog.py`, `gui/shared/locales/{es,en}.json`, `README.md`, versión 3.2.0.
+* `docs/feat-uc4-2.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 361 passed. Prueba de humo real de la GUI con una copia de la BD: escaneo automático, «Traer todas las listas» (movió el fichero y limpió la carpeta de origen), pestaña de ajustes.
+
 ## v3.1.0 - feat-uc3-1: Auditoría de biblioteca (solo lectura)
 
 Fecha: 2026-10-11 · Rama: `v3/integration`

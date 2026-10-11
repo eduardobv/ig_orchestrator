@@ -120,3 +120,10 @@ No se crea tabla nueva (el diario formal llega con `feat-uc2-4`).
 ## Fuera de alcance
 
 Automatizar el lado de `inst1` (→ `feat-uc4-6`); renombrar sin pasar por `WORKING_FOLDER` (→ `feat-uc1-9`).
+
+## Resultado de la implementación (2026-10-11, v3.2.0)
+
+- Implementado según el diseño. Desviaciones: «Renombrar ahora» no se ofrece dentro del diálogo; tras marcar el lote se avisa «ya puedes pulsar Renombrar» (el estado de renombrado vive en la ventana principal).
+- El registro `instances` se guarda al instante desde su pestaña (no depende de «Guardar» de Ajustes).
+- El destino es siempre `WORKING_FOLDER` de la instancia local (`.env`).
+- Pendiente de prueba manual real: traer una carpeta pequeña desde `\DESKTOP-OM856P7\ig_orchestrator	mp`.
