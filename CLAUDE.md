@@ -383,4 +383,5 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
 - **README.md**: Guía operativa completa
 - **tasks/TareaX.md**: Descripción de cada tarea
 - **docs/modularizacion_v2.md**: Arquitectura de modularización v2
+- **docs/v3-status.md**, **docs/plan-v3-features.md**, **docs/feat-*.md**: Análisis, plan y propuestas de la serie v3 (integración de `sc1`/`sc2`, catálogo = disco, renombrado sin G:)
 - **MODULE.md** en cada paquete: Documentación interna del módulo

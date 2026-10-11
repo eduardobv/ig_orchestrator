@@ -1,5 +1,26 @@
 # Changelog
 
+## v3 (planificación) - Análisis y plan de mejoras
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Solo documentación: no cambia código ni la versión de la app (sigue en v2.2.0).
+
+### Creado
+
+* `docs/v3-status.md` - Estado actual de la app, `sc1` (GenerateDirMap), `sc2` (ManualRenameFiles), las bases de datos (`bdapp`, `accounts_lite`, `accounts_complete`) y los procesos manuales, con mediciones reales.
+* `docs/feat-uc3-1.md`, `feat-uc4-2.md`, `feat-uc1-3.md`, `feat-uc2-4.md`, `feat-problem1-5.md`, `feat-uc4-6.md`, `feat-problem1-7.md`, `feat-uc3-8.md`, `feat-uc1-9.md`, `feat-uc5-10.md`, `feat-uc6-11.md`, `feat-uc2-12.md` - Una propuesta independiente por mejora (sufijo = dificultad 1–12).
+* `docs/plan-v3-features.md` - Orden de ejecución, dependencias, puntos de decisión y retirada gradual de los scripts.
+
+### Modificado
+
+* `CLAUDE.md` - Referencias a los nuevos documentos.
+* Revisión 2026-10-11 (decisiones del usuario): `accounts_complete` como fuente principal e índice de renombrado importado en el feat 3, BD única reestructurable, registro de instancias (feat 2), estado final explícito. Afecta a `v3-status.md`, `plan-v3-features.md` y `feat-uc1-3/uc4-2/uc4-6/uc3-8/uc1-9/uc5-10`.
+
+### Pruebas ejecutadas
+
+* No aplica (sin cambios de código). Los datos citados se midieron en solo lectura sobre `orchestrator_gui.sqlite`, `accounts_lite.sqlite` y `accounts_complete.sqlite`.
+
 ## v2.2.0 - GUI UX Improvements (En desarrollo)
 
 Fecha: 2026-10-06
