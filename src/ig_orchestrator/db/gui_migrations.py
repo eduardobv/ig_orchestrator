@@ -223,6 +223,27 @@ def _patch_library_schema(connection: Connection) -> None:
             updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_fs_operations_group ON fs_operations(op_group, seq);
+        CREATE TABLE IF NOT EXISTS exchange_publications (
+            id INTEGER PRIMARY KEY,
+            package_id TEXT NOT NULL UNIQUE,
+            batch_ids TEXT NOT NULL,      -- JSON list of batch ids
+            status TEXT NOT NULL,         -- PENDING | PUBLISHED | FAILED
+            path TEXT,
+            files INTEGER,
+            bytes INTEGER,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS exchange_imports (
+            id INTEGER PRIMARY KEY,
+            package_id TEXT NOT NULL UNIQUE,
+            source_instance TEXT,
+            batch_id INTEGER REFERENCES batches(id),
+            imported_at TEXT NOT NULL,
+            files INTEGER,
+            bytes INTEGER
+        );
         CREATE TABLE IF NOT EXISTS account_lifecycle (
             id INTEGER PRIMARY KEY,
             op_group TEXT,

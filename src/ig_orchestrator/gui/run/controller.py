@@ -489,6 +489,8 @@ class RunControllerMixin:
                 self._update_pending_button_label()
                 return
         self._set_process_running(False)
+        if not cancelled and exit_code == 0 and not self.last_run_was_dry_run:
+            self._auto_publish_after_run(self._batches_to_publish(batch_id, queued))
         if cancelled:
             self._set_status(f"Lote {batch_id} interrumpido; queda pendiente")
             self._write_console(

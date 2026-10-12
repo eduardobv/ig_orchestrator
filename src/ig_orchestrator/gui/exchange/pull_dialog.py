@@ -19,6 +19,9 @@ from ig_orchestrator.exchange import (
     plan_pull,
     scan_exchange,
 )
+from ig_orchestrator.db import connect
+from ig_orchestrator.exchange.manifest import PackageInfo, scan_packages
+from ig_orchestrator.exchange.result_import import import_package
 from ig_orchestrator.exchange.compare import (
     compare_with_batch,
     list_recent_batches,
@@ -89,6 +92,8 @@ class PullDialogMixin:
             "cancel": threading.Event(),
             "busy": False,
             "by_item": {},
+            "packages": [],
+            "pkg_by_item": {},
         }
         instance_var = tk.StringVar(value=next(iter(sources), t("pull.free_path")))
         source_var = tk.StringVar(value=sources[instance_var.get()].pull_source if sources else "")
@@ -161,8 +166,10 @@ class PullDialogMixin:
         pull_selected.pack(side=tk.LEFT)
         pull_all = ttk.Button(actions, text=t("pull.pull_all"))
         pull_all.pack(side=tk.LEFT, padx=8)
+        import_button = ttk.Button(actions, text=t("pull.pkg.import"))
+        import_button.pack(side=tk.LEFT)
         cancel_button = ttk.Button(actions, text=t("pull.cancel"), state="disabled")
-        cancel_button.pack(side=tk.LEFT)
+        cancel_button.pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text=t("audit.close"), command=lambda: _close()).pack(side=tk.RIGHT)
 
         def selected_batch_id() -> int | None:
@@ -174,6 +181,7 @@ class PullDialogMixin:
             normal = "disabled" if busy else "normal"
             pull_selected.configure(state=normal)
             pull_all.configure(state=normal)
+            import_button.configure(state=normal)
             cancel_button.configure(state="normal" if busy else "disabled")
 
         def on_instance(_event: object = None) -> None:
@@ -222,6 +230,30 @@ class PullDialogMixin:
                     )
                 tree.tag_configure("missing", foreground="#888888")
             state["by_item"] = by_item
+            pkg_by_item: dict[str, PackageInfo] = {}
+            for index, package in enumerate(state["packages"]):
+                if package.problem:
+                    status_text = package.problem
+                elif package.imported:
+                    status_text = t("pull.pkg.imported")
+                else:
+                    status_text = t("pull.pkg.ready")
+                item = tree.insert(
+                    "",
+                    tk.END,
+                    iid=f"pkg:{index}",
+                    values=(
+                        f"[{t('pull.pkg.tag')}] {package.source_instance or '?'} · {', '.join(package.batch_names)}",
+                        package.files,
+                        format_mb(package.bytes),
+                        status_text,
+                        f"{package.accounts} {t('pull.pkg.accounts')}",
+                    ),
+                    tags=("pkg",),
+                )
+                pkg_by_item[item] = package
+            tree.tag_configure("pkg", foreground="#1a4d8f")
+            state["pkg_by_item"] = pkg_by_item
             refresh_compare()
 
         def refresh_compare() -> None:
@@ -255,7 +287,8 @@ class PullDialogMixin:
             def work() -> None:
                 try:
                     folders = scan_exchange(Path(source), stable_seconds=stable_seconds)
-                    state["queue"].put(("scanned", folders))
+                    packages = scan_packages(Path(source))
+                    state["queue"].put(("scanned", (folders, packages)))
                 except ExchangeUnavailableError as exc:
                     state["queue"].put(("error", str(exc)))
                 except Exception as exc:  # noqa: BLE001 - shown to the user
@@ -311,6 +344,44 @@ class PullDialogMixin:
             threading.Thread(target=work, name="pull-run", daemon=True).start()
             window.after(150, poll)
 
+        def start_import() -> None:
+            by_item: dict[str, PackageInfo] = state["pkg_by_item"]
+            chosen = [by_item[i] for i in tree.selection() if i in by_item]
+            if not chosen:
+                chosen = [p for p in by_item.values() if not p.problem and not p.imported]
+            chosen = [p for p in chosen if not p.problem and not p.imported]
+            if not chosen:
+                messagebox.showinfo(t("pull.title"), t("pull.pkg.none"), parent=window)
+                return
+            state["cancel"].clear()
+            set_busy(True)
+            progress.configure(value=0, maximum=1)
+            gui_db = Path(self.settings.sqlite_gui_db_path)
+            keep = keep_var.get()
+
+            def on_progress(folder: str, done: int, total: int) -> None:
+                state["queue"].put(("progress", (folder, done)))
+
+            def work() -> None:
+                results = []
+                try:
+                    connection = connect(gui_db)
+                    try:
+                        for package in chosen:
+                            results.append(
+                                (package, import_package(connection, package, dest_root, keep_source=keep,
+                                                         progress=on_progress, cancel_event=state["cancel"]))
+                            )
+                    finally:
+                        connection.close()
+                    state["queue"].put(("imported", results))
+                except Exception as exc:  # noqa: BLE001 - shown to the user
+                    state["queue"].put(("error", str(exc)))
+
+            threading.Thread(target=work, name="package-import", daemon=True).start()
+            window.after(150, poll)
+
+        import_button.configure(command=start_import)
         pull_selected.configure(command=lambda: start_pull(False))
         pull_all.configure(command=lambda: start_pull(True))
         cancel_button.configure(command=lambda: state["cancel"].set())
@@ -325,10 +396,14 @@ class PullDialogMixin:
                         status_var.set(t("pull.pulling", folder=folder))
                         continue
                     if kind == "scanned":
-                        state["folders"] = payload
+                        state["folders"], state["packages"] = payload
                         refresh_table()
-                        status_var.set(t("pull.scanned", count=len(payload)))
+                        status_var.set(t("pull.scanned", count=len(payload[0]) + len(payload[1])))
                         set_busy(False)
+                    elif kind == "imported":
+                        set_busy(False)
+                        self._finish_import(window, payload, status_var)
+                        _scan_again()
                     elif kind == "error":
                         status_var.set(payload)
                         set_busy(False)
@@ -358,6 +433,24 @@ class PullDialogMixin:
         bind_escape_close(window, on_close=_close)
         if source_var.get().strip():
             window.after(100, _scan)
+
+    def _finish_import(self, window: tk.Toplevel, results: list, status_var: tk.StringVar) -> None:
+        lines = []
+        imported_batches = 0
+        for package, result in results:
+            label = f"{package.source_instance} · {', '.join(package.batch_names)}"
+            lines.append(f"{label}: {result.summary()}")
+            lines.extend(f"    ! {warning}" for warning in result.warnings)
+            imported_batches += len(result.batch_ids) if result.ok and not result.skipped_duplicate else 0
+        body = "Importar paquetes:\n" + "\n".join(lines) + "\n"
+        self._write_console(body)
+        status_var.set(results[-1][1].summary() if results else "")
+        if imported_batches:
+            self._reload_catalog()
+            self._update_pending_button_label()
+            messagebox.showinfo(t("pull.title"), t("pull.pkg.done", batches=imported_batches), parent=window)
+        elif any(not r.ok for _p, r in results):
+            messagebox.showwarning(t("pull.title"), body, parent=window)
 
     def _offer_pull_before_rename(self) -> bool:
         """Ask to pull first when WORKING is empty but an instance has stable folders.

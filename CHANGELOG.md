@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.6.0 - feat-uc4-6: publicación automática desde la instancia 24/7 + importación fiel
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+La instancia `WORKER` entrega sola lo que descarga en un **paquete** atómico (carpetas + `manifest.json` con el resultado real de cada URL) y la principal lo **importa fielmente**: estados reales de las URLs y datos de renombrado, sin «Ejecutado en otra instancia».
+
+### Creado
+
+* `exchange/manifest.py` (formato `ig_orchestrator.batch_result` v1: `build_manifest`, `write_manifest`, `read_package`, `scan_packages`, validación de versión), `exchange/publish.py` (`publish_batches`, `unpublished_batches`, ajustes de publicación, limpieza de `.partial`), `exchange/result_import.py` (`import_package`).
+* Tablas `exchange_publications` y `exchange_imports`.
+* GUI: `Lote → Publicar descargas…` (`gui/exchange/publish_dialog.py`), publicación **automática** al terminar un lote o una cola (si la instancia local es `WORKER` y está activada), sección de publicación en `Ajustes → Instancias`, filas «Paquete» en **Traer descargas** con el botón **Importar paquetes**.
+* Tests: `tests/exchange/test_publish_import.py` (15) y `test_publish_settings.py`.
+
+### Modificado
+
+* `exchange/inbox_scan.py` ya no ofrece paquetes ni `*.partial` como carpetas sueltas.
+* El aviso de **Ejecutado en otra instancia** explica que descarta los resultados reales y remite a *Importar paquetes*.
+* `gui/run/controller.py` (disparo de la publicación), `gui/chrome/menubar.py`, `gui/shell/app.py`, `gui/settings/instances_tab.py`, `gui/batches/dialog.py`, `db/gui_migrations.py`, locales, `README.md`, versión 3.6.0.
+* `docs/feat-uc4-6.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 442 passed. Prueba con una copia de tu base de datos: publicar el lote 121 (3 cuentas con carpeta) y, en una segunda copia, importarlo (7 URLs `COMPLETED`, ficheros traídos, segunda importación sin cambios). **No probado con dos máquinas reales.**
+
 ## v3.5.2 - Corrección: cuentas «Sin ruta» fantasma y ruta antigua en el editor
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

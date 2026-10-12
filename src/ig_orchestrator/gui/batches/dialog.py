@@ -452,7 +452,8 @@ class BatchesDialogMixin:
                 f"Marcar el lote {summary.batch_name} (id={summary.batch_id}) "
                 "como ejecutado en otra instancia?\n\n"
                 "Dejara de ser pendiente de descarga y pasara a POR RENOMBRAR "
-                "(puedes renombrar o finalizar sin renombrar).",
+                "(puedes renombrar o finalizar sin renombrar).\n\n"
+                + t("batches.elsewhere_warning"),
                 parent=dialog,
             ):
                 return

@@ -10,6 +10,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 3 · Catálogo completo en la app | v3.3.0 | [Feat 3](#feat-3--catálogo-completo-en-la-app-v330) |
 | 4 · Operaciones de disco desde el catálogo | v3.4.0 | [Feat 4](#feat-4--operaciones-de-disco-desde-el-catálogo-v340) |
 | 5 · Cuenta eliminada en Instagram | v3.5.0 | [Feat 5](#feat-5--cuenta-eliminada-en-instagram-v350) |
+| 6 · La laptop entrega sola (paquetes) | v3.6.0 | [Feat 6](#feat-6--la-laptop-entrega-sola-paquetes-v360) |
 
 ---
 
@@ -413,3 +414,99 @@ En la **vista de árbol** las cuentas `DELETED` aparecen dentro de su carpeta (p
 2. Clic derecho en una cuenta de `10.TEMP` → **Marcar como eliminada…** → revisa la vista previa → *Ejecutar*. Comprueba la carpeta en `09.DELETED`.
 3. `Catálogo → Operaciones de disco…` → **Deshacer** (vuelve todo). Repite y esta vez usa **Restaurar cuenta eliminada…**.
 4. Pega 2 usernames en **Marcar varias…** y revisa que sale un solo plan.
+
+
+---
+
+## Feat 6 · La laptop entrega sola (paquetes) (v3.6.0)
+
+**Para qué sirve:** la laptop 24/7 (`inst1`) deja de necesitar que muevas carpetas a mano. Al terminar un lote, la app de la laptop **publica un paquete** en la carpeta compartida con las carpetas descargadas **y el resultado real de cada URL**. En tu PC, **Importar paquetes** copia los ficheros y crea el lote con esos resultados, listo para **Renombrar**. Se acabó el «Ejecutado en otra instancia» que marcaba todo como fallido.
+
+> **Importante:** necesitas la **versión 3.6.0 o superior en las dos máquinas**. La laptop debe actualizarse para publicar; tu PC para importar. Cada máquina sigue con su propia base de datos.
+
+### Cómo queda tu flujo
+
+```
+LAPTOP (WORKER)                                              TU PC (MAIN)
+Descarga el lote (Telegram_Desktop = su carpeta de trabajo)
+        │  al terminar, la app publica sola (o Lote → Publicar descargas…)
+        ▼
+C:\Eduardo\ig_orchestrator\tmp\inst1_<lote>_<fecha>\      ── compartida ──►   Lote → Traer descargas… → Importar paquetes
+   manifest.json  +  data\<cuenta>\...                                                   (copia ficheros + crea el lote con estados reales)
+                                                                                         ▼
+                                                                              Renombrar (como siempre)
+```
+
+### Paso 1 · En la laptop: configurar (una vez)
+
+`Ajustes → Instancias`:
+
+| Qué | Valor (ejemplo con tus rutas) |
+|---|---|
+| Añadir la instancia local | Nombre `inst1` · Rol **WORKER** · marcada **«Es esta instancia (local)»** |
+| Carpeta compartida: ruta en ELLA misma | `C:\Eduardo\ig_orchestrator\tmp` (**obligatoria para publicar**) |
+| Casilla **Publicar automáticamente al terminar los lotes** | Marcada para que lo haga sola |
+| Modo | **MOVE** (mueve: borra la carpeta de descargas solo después de verificar el 100 %) o **COPY** (conserva el origen) |
+
+> La auto-publicación solo funciona si la instancia **local** es `WORKER`. En tu PC (rol MAIN) la casilla no tiene efecto.
+
+### Paso 2 · En la laptop: publicar
+
+| Cómo | Qué pasa |
+|---|---|
+| **Automático** | Al terminar un lote (o una cola entera) sin errores, la consola dice «Publicando…» y luego «Paquete publicado: N cuenta(s), M fichero(s)». No bloquea el siguiente lote. |
+| **Manual** — `Lote → Publicar descargas…` | Lista los lotes terminados sin publicar. Elige uno o varios, el modo (mover/copiar) y pulsa **Publicar**. |
+
+Si la compartida está apagada, no se pierde nada: el origen no se toca y puedes repetirlo con `Publicar descargas…`.
+
+Reglas del paquete: se construye en una carpeta `*.partial`; el `manifest.json` se escribe el **último** y solo entonces se renombra. Si se corta la red, **no queda un paquete que parezca válido** (los `*.partial` viejos se limpian solos).
+
+### Paso 3 · En tu PC: importar
+
+`Lote → Traer descargas…` → elige `inst1` → **Escanear**. Verás dos tipos de fila:
+
+| Fila | Qué es | Botón |
+|---|---|---|
+| Carpeta suelta (como antes) | Una carpeta de cuenta movida a mano | **Traer seleccionadas / todas** |
+| **[Paquete]** `inst1 · <lote>` en azul | Un paquete publicado por la laptop: lote(s), nº de cuentas, ficheros y MB | **Importar paquetes** |
+
+| Estado del paquete | Significa |
+|---|---|
+| **Paquete listo** | Se puede importar. |
+| **Ya importado** | Ya se importó (no se duplica nada). |
+| Texto de error (p. ej. «Incompleto (sin manifiesto)», «requiere la app 3.6.0…») | No se puede importar; el texto dice por qué. |
+
+**Importar paquetes** (sin seleccionar nada importa todos los listos):
+
+1. Comprueba el tamaño de cada fichero contra el manifiesto (si alguno falta o difiere, no importa nada).
+2. Copia las carpetas a tu carpeta de trabajo sin sobrescribir (igual que «Traer»).
+3. Crea el lote con los **estados reales** de cada URL (completadas, fallidas y por qué), las cuentas nuevas con sus datos de renombrado, y lo deja **POR RENOMBRAR**.
+4. Marca el paquete como importado y borra los ficheros del paquete (con *Conservar copia en origen* se conservan).
+
+Reglas del lote: si ya tenías el lote como **borrador** se le aplican los resultados; si existía terminado, se crea como `<lote>_inst1` (y se avisa). Las cuentas se buscan primero por **id de Instagram** y luego por username; las desconocidas se crean.
+
+### Paso 4 · Renombrar
+
+Igual que siempre: `Renombrar`. Las cuentas nuevas ya llevan su id, fecha de inicio y carpeta destino.
+
+### «Ejecutado en otra instancia»
+
+Sigue existiendo para lotes **sin paquete**, pero ahora avisa de que **descarta los resultados reales**. Si la laptop publicó un paquete, usa **Importar paquetes**.
+
+### Cómo probarlo
+
+1. Actualiza las dos máquinas a ≥ 3.6.0. En la laptop configura el Paso 1.
+2. Lanza un lote pequeño en la laptop (o usa `Publicar descargas…` con uno terminado, en modo **COPY** la primera vez).
+3. En tu PC: `Traer descargas…` → **Escanear** → debe aparecer la fila **[Paquete]** → **Importar paquetes**.
+4. Comprueba en `Lote → Abrir lotes` que el lote está **POR RENOMBRAR** y que las URLs tienen sus estados reales (ninguna «Executed on another instance»); pulsa **Renombrar**.
+5. Vuelve a escanear: el paquete sale **Ya importado**. Importarlo otra vez no hace nada.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «No hay carpeta compartida…» al publicar | La instancia local no tiene «ruta en ELLA misma» o no está marcada como local. |
+| La publicación automática no se dispara | La instancia local no es WORKER, la casilla está desmarcada o el lote no terminó correctamente. |
+| «El paquete requiere la app 3.6.0…» | Las dos máquinas deben estar en la misma versión o superior a la del paquete. |
+| «Paquete dañado» | Algún fichero falta o cambió de tamaño tras publicar: vuelve a publicarlo. |
+| Una cuenta no trae ficheros | No tenía carpeta en el trabajo de la laptop: se avisa al publicar («Sin carpeta descargada»). |

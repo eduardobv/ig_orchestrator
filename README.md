@@ -497,6 +497,13 @@ Tambien puedes pasar una ruta concreta:
 python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ```
 
+### Publicación automática (instancia 24/7)
+
+En la instancia WORKER (laptop): `Ajustes > Instancias`, registra la instancia local como `WORKER` con su «Carpeta compartida: ruta en ELLA misma», activa
+**Publicar automáticamente** y elige MOVER/COPIAR. Al terminar un lote (o la cola) deja un paquete en la compartida; tambien `Lote > Publicar descargas...`.
+En la principal: `Lote > Traer descargas...` muestra los paquetes; **Importar paquetes** copia los ficheros y crea el lote con los estados reales (listo para Renombrar).
+Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el manifiesto se escribe el ultimo (`*.partial` = incompleto).
+
 ### Flujo de dos instancias (traer descargas)
 
 1. `Ajustes > Instancias`: registra la otra instancia (p. ej. `inst1`) con su carpeta compartida (`exchange_path`, UNC o unidad) y pulsa **Probar**.

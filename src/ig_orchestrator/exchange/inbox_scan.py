@@ -79,6 +79,9 @@ def scan_exchange(
     reference = time.time() if now is None else now
     folders: list[ExchangeFolder] = []
     for name in dir_names:
+        # Packages (manifest) and unfinished packages (.partial) are handled by exchange.manifest.
+        if name.endswith(".partial") or os.path.isfile(os.path.join(long_path(Path(root)), name, "manifest.json")):
+            continue
         count = 0
         total = 0
         newest = 0.0

@@ -147,3 +147,11 @@ CREATE TABLE IF NOT EXISTS exchange_imports (
 ## Fuera de alcance
 
 Sincronizar las **bases de datos** de las dos instancias (cada una conserva la suya; solo se intercambian resultados), copia automática del código entre instancias, renombrar en `inst1`.
+
+## Resultado de la implementación (2026-10-12, v3.6.0)
+
+- Implementado: paquete atómico (`.partial` → manifiesto → renombre), publicación manual y automática (lote o cola, solo `WORKER` con la opción activada), importación fiel con estados reales, idempotencia por `package_id`, verificación de tamaños, adjuntar a DRAFT/IMPORTED o crear con sufijo, resolución de cuentas por `instagram_user_id`.
+- **No implementado (diferido):** notificación de Telegram al publicar; reanudación de un `.partial` a mitad (una publicación fallida se repite desde cero; en MOVE el origen no se toca hasta verificar); `sha256` por fichero (solo tamaños); diálogo «Adjuntar o Crear con sufijo» (la regla es automática y se avisa en el informe).
+- `Settings` no distingue roles: el rol sale de la instancia marcada como local (`instances`).
+- Requiere la **versión 3.6.0 o superior en ambas máquinas** (`min_reader_version`); la laptop necesita el código nuevo para publicar.
+- Sin probar con dos máquinas reales.

@@ -13,8 +13,24 @@ from tkinter import filedialog, messagebox, ttk
 from ig_orchestrator import __version__
 from ig_orchestrator.db.instances_repository import ROLES, Instance, InstanceRepository
 from ig_orchestrator.exchange.compare import probe_path
+from ig_orchestrator.exchange.publish import (
+    AUTO_PUBLISH_SETTING,
+    PUBLISH_MODE_SETTING,
+    write_publish_settings,
+)
 from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
+
+
+def read_publish_settings_raw(connection: Connection) -> tuple[bool, str]:
+    """Stored values (the checkbox shows what the user chose, even before marking an instance local)."""
+
+    def value(key: str, default: str) -> str:
+        row = connection.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+        return str(row[0]).strip() if row is not None and str(row[0]).strip() else default
+
+    mode = value(PUBLISH_MODE_SETTING, "MOVE").upper()
+    return value(AUTO_PUBLISH_SETTING, "0").lower() in {"1", "true", "yes"}, mode if mode in {"MOVE", "COPY"} else "MOVE"
 
 
 def format_free_space(free_bytes: int | None) -> str:
@@ -53,7 +69,26 @@ class InstancesTab(ttk.Frame):
         ttk.Label(self, textvariable=self.status, wraplength=520).grid(
             row=2, column=0, columnspan=5, sticky="w", pady=(8, 0)
         )
+        self._connection = connection
+        auto, mode = read_publish_settings_raw(connection)
+        self.auto_var = tk.BooleanVar(value=auto)
+        self.mode_var = tk.StringVar(value=mode)
+        box = ttk.LabelFrame(self, text=t("settings.instances.publish_mode"), padding=8)
+        box.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(12, 0))
+        ttk.Checkbutton(
+            box, text=t("settings.instances.auto_publish"), variable=self.auto_var, command=self._save_publish
+        ).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Combobox(
+            box, textvariable=self.mode_var, values=("MOVE", "COPY"), state="readonly", width=8
+        ).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.mode_var.trace_add("write", lambda *_: self._save_publish())
+        ttk.Label(box, text=t("settings.instances.publish_hint"), wraplength=520, justify="left").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(6, 0)
+        )
         self.refresh()
+
+    def _save_publish(self) -> None:
+        write_publish_settings(self._connection, self.auto_var.get(), self.mode_var.get())
 
     def refresh(self) -> None:
         self.tree.delete(*self.tree.get_children())
