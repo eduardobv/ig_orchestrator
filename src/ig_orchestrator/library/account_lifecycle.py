@@ -8,17 +8,28 @@ data needed to restore the previous state.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
-from ig_orchestrator.library.fsops_plan import Conflict, OpType, Plan, Step
+from ig_orchestrator.library.fsops_plan import Conflict, OpType, Plan, Step, validate_name
 from ig_orchestrator.library.paths import parent_rel, rel_key
 
 DELETED_FOLDER_SETTING = "library.deleted_folder_rel"
 KEEP_GROUP_SETTING = "library.deleted_keep_group"
 DEFAULT_DELETED_FOLDER = "09.DELETED"
+
+
+DELETED_NAME = re.compile(r"-(deleted?|inactive)$", re.IGNORECASE)
+
+
+def _is_deleted_location(parent: str, deleted_root: str) -> bool:
+    """True when *parent* already is the deleted folder (or inside it) or a ``-Deleted`` group."""
+
+    key, root = rel_key(parent), rel_key(deleted_root)
+    return key == root or key.startswith(root + "\\") or bool(DELETED_NAME.search(_basename(parent)))
 
 
 def _now() -> str:
@@ -50,6 +61,8 @@ class AccountAction:
 class LifecyclePlan:
     plan: Plan
     actions: list[AccountAction] = field(default_factory=list)
+    # account_id -> (destination parent folder rel, reason: "sibling_deleted" | "deleted_folder" | "custom")
+    destinations: dict[int, tuple[str, str]] = field(default_factory=dict)
 
     @property
     def can_execute(self) -> bool:
@@ -74,7 +87,39 @@ class AccountLifecycleService:
         return int(self.conn.execute("SELECT id FROM catalog_account_statuses WHERE code = ?", (code,)).fetchone()[0])
 
     # ----------------------------------------------------------- planning
-    def plan_mark_deleted(self, account_ids: list[int], *, suffix_on_conflict: bool = False) -> LifecyclePlan:
+    def suggest_destination(self, account_id: int) -> tuple[str, str]:
+        """Where to move a deleted account: the model's own ``<Group>-Deleted`` sibling if it exists,
+        otherwise the library-wide deleted folder. Returns ``(destination parent rel, reason)``."""
+
+        row = self.conn.execute("SELECT rel_path FROM catalog_accounts WHERE id = ?", (account_id,)).fetchone()
+        src = row["rel_path"] if row is not None else None
+        if src:
+            group = parent_rel(src)  # e.g. 00.FAVORITES\Valeria-Makusheva
+            if "\\" in group:
+                grandparent, group_name = parent_rel(group), _basename(group)
+                if not DELETED_NAME.search(group_name):
+                    for suffix in ("-Deleted", "-Delete"):
+                        candidate = _join(grandparent, group_name + suffix)
+                        if self._exists_dir(candidate):
+                            return candidate, "sibling_deleted"
+        group_part = _basename(parent_rel(src)) if src and self.keep_group and parent_rel(src) else ""
+        root = self.deleted_folder
+        return (_join(root, group_part) if group_part else root), "deleted_folder"
+
+    def _exists_dir(self, rel: str) -> bool:
+        return os.path.isdir(self.fs.abs(rel)) or self.fs.folder_id_for_rel(rel) is not None
+
+    def plan_mark_deleted(
+        self,
+        account_ids: list[int],
+        *,
+        suffix_on_conflict: bool = False,
+        dest_overrides: dict[int, str] | None = None,
+    ) -> LifecyclePlan:
+        """Plan the move to a deleted folder. ``dest_overrides`` maps account id -> destination
+        parent folder rel (it may not exist yet: missing folders are created)."""
+
+        overrides = dest_overrides or {}
         rows = self._accounts(account_ids)
         title = (
             f"Marcar como eliminada: {rows[0]['username']}" if len(rows) == 1
@@ -111,16 +156,27 @@ class AccountLifecycleService:
                 result.actions.append(AccountAction(int(row["id"]), username, src, None))
                 plan.affected_accounts += 1
                 continue
-            if rel_key(parent_rel(src)).startswith(rel_key(deleted_root)):
-                plan.conflicts.append(
-                    Conflict("ALREADY_IN_DELETED", f"@{username} ya esta en {deleted_root}: solo cambia el estado", blocking=False)
-                )
-                result.actions.append(AccountAction(int(row["id"]), username, src, None))
-                plan.affected_accounts += 1
+            current_parent = parent_rel(src)
+            if int(row["id"]) in overrides:
+                dest_parent, reason = overrides[int(row["id"])].strip("\\/"), "custom"
+            else:
+                dest_parent, reason = self.suggest_destination(int(row["id"]))
+                if _is_deleted_location(current_parent, deleted_root):
+                    plan.conflicts.append(
+                        Conflict("ALREADY_IN_DELETED", f"@{username} ya esta en una carpeta de eliminadas: solo cambia el estado", blocking=False)
+                    )
+                    result.actions.append(AccountAction(int(row["id"]), username, src, None))
+                    result.destinations[int(row["id"])] = (current_parent, "current")
+                    plan.affected_accounts += 1
+                    continue
+            result.destinations[int(row["id"])] = (dest_parent, reason)
+            problem = self._check_destination(dest_parent, src)
+            if problem:
+                plan.conflicts.append(Conflict("BAD_DESTINATION", f"@{username}: {problem}"))
                 continue
-
-            group_part = _basename(parent_rel(src)) if self.keep_group and parent_rel(src) else ""
-            dest_parent = _join(deleted_root, group_part) if group_part else deleted_root
+            if rel_key(dest_parent) == rel_key(current_parent):
+                plan.conflicts.append(Conflict("NO_CHANGE", f"@{username} ya esta en {dest_parent}: elige otro destino"))
+                continue
             name = _basename(src)
             dst = _join(dest_parent, name)
             if suffix_on_conflict:
@@ -143,6 +199,17 @@ class AccountLifecycleService:
         if plan.steps and not online:
             plan.conflicts.append(Conflict("OFFLINE", "La biblioteca (G:) no esta disponible"))
         return result
+
+    def _check_destination(self, dest_parent: str, src: str) -> str | None:
+        if not dest_parent:
+            return "El destino no puede ser la raiz de la biblioteca"
+        for part in dest_parent.split("\\"):
+            problem = validate_name(part)
+            if problem:
+                return f"{problem} ('{part}')"
+        if rel_key(dest_parent) == rel_key(src) or rel_key(dest_parent).startswith(rel_key(src) + "\\"):
+            return "El destino no puede estar dentro de la propia carpeta de la cuenta"
+        return None
 
     def _exists(self, rel: str) -> bool:
         return os.path.exists(self.fs.abs(rel)) or self.fs.folder_id_for_rel(rel) is not None or bool(

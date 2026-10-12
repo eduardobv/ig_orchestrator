@@ -119,4 +119,5 @@ Borrado físico de carpetas (→ `feat-uc2-12`, con cuarentena), detección auto
 - **Cuentas en lotes borrador:** solo se avisa (no se quitan del lote); las que están en un lote en ejecución bloquean.
 - Estado y movimiento no comparten transacción SQLite (el movimiento tiene su propio diario); si la app muriera justo entre ambos, `Etiquetar 09.DELETED…` corrige el estado.
 - Multi-selección: se implementó pegando usernames (el catálogo no tiene selección múltiple todavía).
+- **v3.5.1 (a petición del usuario):** el destino se sugiere (`<Modelo>-Deleted` si existe, si no `09.DELETED`) y es editable: otra carpeta o carpeta nueva creada en el mismo paso.
 - Sin probar contra `G:` real: primera prueba recomendada con una cuenta de `10.TEMP`, luego **Deshacer** o **Restaurar**.

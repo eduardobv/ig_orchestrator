@@ -351,6 +351,26 @@ Si la app se cierra a mitad de una operación, **al abrirla** comprueba el disco
 | **Etiquetar 09.DELETED…** | `Catálogo` | Marca como `DELETED` las cuentas que **ya estaban** en `09.DELETED` (sin mover nada). Úsalo una vez tras importar. |
 | **Ocultar** | Clic derecho / `Catálogo` | Antes se llamaba «Delete». Solo oculta la cuenta (`DISABLED`); **no mueve nada**. |
 
+### Elegir el destino de la carpeta (v3.5.1)
+
+Al pulsar **Marcar como eliminada…** se abre una ventana con una fila por cuenta: *Cuenta · De · A (carpeta destino) · Motivo*.
+
+| Motivo | Cuándo se sugiere |
+|---|---|
+| **Carpeta -Deleted de la modelo** | Existe `<Modelo>-Deleted` (o `-Delete`) junto a la carpeta de la modelo. Ej.: la cuenta está en `00.FAVORITES\Valeria-Makusheva\lerabuns` y existe `00.FAVORITES\Valeria-Makusheva-Deleted` → se sugiere esa. |
+| **Carpeta de eliminadas** | No existe la carpeta de la modelo con `-Deleted`, o la cuenta cuelga directamente de una categoría: se sugiere `09.DELETED`. |
+| **Elegido por ti** | Cambiaste el destino. |
+| **Ya está en una carpeta de eliminadas** | Solo cambiará el estado (no se mueve). |
+
+| Botón | Qué hace |
+|---|---|
+| **Cambiar destino…** | Abre el árbol de carpetas para las filas seleccionadas. Elige una existente, o selecciona la carpeta padre y pulsa **Nueva carpeta aquí…** para escribir un nombre: la carpeta se **crea al ejecutar** y la cuenta se mueve dentro. |
+| **Usar carpeta de eliminadas** | Pone `09.DELETED` (o la que tengas en Ajustes) en las filas seleccionadas. |
+| **Restablecer sugerido** | Vuelve a la sugerencia automática. |
+| **Usar sufijo _2 si ya existe** | Si ya hay una carpeta con ese nombre en el destino, usa `nombre_2` en vez de bloquear. |
+
+Los avisos y bloqueos (favorita, id compartido, lote en ejecución, destino existente…) se muestran abajo y se recalculan al cambiar el destino; **Ejecutar** se desactiva mientras haya un bloqueo. Con varias cuentas puedes dar un destino distinto a cada una.
+
 ### Dónde se ven las cuentas eliminadas
 
 Las cuentas `DELETED` **no salen** en el catálogo normal (igual que las archivadas). Para verlas: `Ver → Mostrar biblioteca completa` (salen en color **lila**).

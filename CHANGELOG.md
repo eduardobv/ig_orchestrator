@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.5.1 - Marcar como eliminada: destino editable
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+* Al marcar una cuenta como eliminada se abre una ventana con **De → A** y el motivo. El destino se **sugiere**: la carpeta `<Modelo>-Deleted` (o `-Delete`) hermana de la carpeta de la modelo si existe; si no, la carpeta de eliminadas (`09.DELETED`).
+* Se puede **cambiar el destino** (una o varias filas): elegir otra carpeta del catálogo o **crear una carpeta nueva** desde el selector (`Nueva carpeta aquí…`); se crea y se mueve la cuenta en el mismo gesto (vista previa, historial y deshacer como siempre). Botones: *Usar carpeta de eliminadas*, *Restablecer sugerido*, casilla *sufijo _2*.
+* Una cuenta que ya está en una carpeta `-Deleted`/`-Inactive` o en la de eliminadas solo cambia de estado.
+* `AccountLifecycleService.suggest_destination` y `plan_mark_deleted(..., dest_overrides=)`; `FsOperationService.ensure_folder_rows` registra en el catálogo carpetas que existen en disco pero no tenían fila (el destino puede ser una carpeta creada en el Explorador).
+* Tests: `tests/library/test_lifecycle_destinations.py`, `tests/gui/test_delete_destination.py`.
+
 ## v3.5.0 - feat-problem1-5: cuenta eliminada en Instagram
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

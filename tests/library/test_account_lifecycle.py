@@ -232,3 +232,4 @@ def test_suggestions_need_two_batches_and_ignore_other_instance(env) -> None:
     conn.commit()
 
     assert [(name, n) for _id, name, n in svc.suggest_deleted()] == [("alice", 2)]
+

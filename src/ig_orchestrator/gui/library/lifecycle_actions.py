@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from ig_orchestrator.gui.i18n import t
+from ig_orchestrator.gui.library.delete_destination_dialog import choose_delete_plan
 from ig_orchestrator.gui.library.plan_dialog import confirm_plan
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
 from ig_orchestrator.library.account_lifecycle import AccountLifecycleService, LifecyclePlan
@@ -53,12 +54,17 @@ class AccountLifecycleActionsMixin:
         if not ids:
             return
         service = self._lifecycle()
-        plan = service.plan_mark_deleted(ids)
-        if any(c.code == "DEST_EXISTS" for c in plan.plan.blocking) and messagebox.askyesno(
-            t("life.title"), t("life.use_suffix"), parent=self.root
-        ):
-            plan = service.plan_mark_deleted(ids, suffix_on_conflict=True)
-        self._confirm_and_run_lifecycle(plan, service.execute_mark_deleted)
+        lifecycle = choose_delete_plan(self.root, service, ids)
+        if lifecycle is None:
+            return
+        try:
+            service.execute_mark_deleted(lifecycle)
+        except FsOpsError as exc:
+            messagebox.showerror(t("life.title"), str(exc), parent=self.root)
+            return
+        self._write_console(f"{lifecycle.plan.title}: OK\n")
+        self._set_status(lifecycle.plan.title)
+        self._after_fsops_change()
 
     def _catalog_mark_many_deleted(self) -> None:
         window = tk.Toplevel(self.root)

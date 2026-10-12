@@ -325,7 +325,7 @@ class FsOperationService:
     # -------------------------------------------------------------- DB effect
     def _apply_db(self, op_type: OpType, src: str | None, dst: str | None) -> None:
         if op_type is OpType.MKDIR:
-            parent_id = self.folder_id_for_rel(parent_rel(dst))
+            parent_id = self.ensure_folder_rows(parent_rel(dst))
             depth = len([p for p in dst.split("\\") if p])
             now = _now()
             self.conn.execute(
@@ -344,9 +344,32 @@ class FsOperationService:
         else:
             self._prefix_replace(src, dst)
 
+    def ensure_folder_rows(self, rel: str) -> int | None:
+        """Register in the catalog folders that exist on disk but have no row yet.
+
+        Returns the id of *rel* (``None`` if it is outside the library or missing on disk).
+        """
+
+        existing = self.folder_id_for_rel(rel)
+        if existing is not None or not rel:
+            return existing
+        if not os.path.isdir(self.abs(rel)):
+            return None
+        parent_id = self.ensure_folder_rows(parent_rel(rel))
+        depth = len([p for p in rel.split("\\") if p])
+        now = _now()
+        cursor = self.conn.execute(
+            """
+            INSERT INTO catalog_folders (parent_id, name, full_path, depth, created_at, updated_at, rel_path, kind)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (parent_id, _basename(rel), self.abs(rel), depth, now, now, rel, "CATEGORY" if depth == 1 else "GROUP"),
+        )
+        return int(cursor.lastrowid)
+
     def _prefix_replace(self, src: str, dst: str) -> None:
         now = _now()
-        new_parent_id = self.folder_id_for_rel(parent_rel(dst))
+        new_parent_id = self.ensure_folder_rows(parent_rel(dst))
         for row in self._folders_under(src):
             rel = str(row["rel_path"])
             new_rel = dst + rel[len(src):]
