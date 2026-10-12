@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.9.0 - feat-uc1-9: renombrado integrado (port de `sc2 newRename`)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+El renombrado se ejecuta **dentro de la app**, con el mismo resultado que `ManualRenameFiles --newRename`: sin subproceso, sin rutas fijas a `D:\Archivos\Scripts\...`, leyendo las cuentas de la base de datos de la app (no de `accounts_lite`) y con **vista previa** de lo que se va a hacer.
+
+### Creado
+
+* `src/ig_orchestrator/renaming/` - `files.py`, `timeline.py` (asignación de fechas, con el mismo orden de llamadas al azar que `sc2`), `planner.py` (recorrido de carpetas con `DryOps`/`RealOps`: la vista previa y la ejecución son el mismo código), `mover.py` (mover/fusionar a la biblioteca sin sobrescribir), `service.py` (`RenameService.preview/run`), `settings.py`, `MODULE.md`.
+* Tablas `rename_runs` y `rename_run_accounts` (historial de cada renombrado).
+* GUI: ventana **Renombrar descargas** (`gui/run/rename_preview_dialog.py`): «¿Dónde están los ficheros?» (tu carpeta de trabajo o las carpetas de las instancias registradas, o cualquier ruta), opciones, **Vista previa** (árbol cuenta → fichero → nombre nuevo y fecha) y **Otra semilla**; ejecución en segundo plano con resultado por cuenta (`gui/run/integrated_rename.py`).
+* Ajustes: **motor de renombrado** (integrado / script externo `sc2`) y «mostrar siempre la vista previa» en `Ajustes → Procesamiento`; casilla **«Mantener actualizado accounts_lite»** (`compat.lite.enabled`) en `Ajustes → Catálogo`.
+* `compat_lite.add_to_lite` (cuentas nuevas registradas también en lite mientras el espejo esté activo).
+* Tests: `tests/renaming/` (paridad con `sc2`, servicio, ajustes).
+
+### Comportamiento
+
+* **Paridad con `sc2`:** con la misma semilla y el mismo reloj, ambos motores dejan exactamente los mismos nombres (9 casos: cuentas existentes y nuevas, bloques por debajo/entre/por encima de la biblioteca, duplicados, subcarpetas).
+* **Cuentas** salen de la app: registrada = tiene ruta en la biblioteca. Una cuenta nueva (declarada en el lote) se **registra una sola vez en la app** (id de Instagram, fecha de inicio, ruta, carpeta) y, si está activo el espejo, también en `accounts_lite`.
+* **Escritura inmediata:** tras mover una carpeta, se refrescan los contadores, la fecha del último contenido y el índice de ficheros de esa cuenta (sin esperar a «Sincronizar»).
+* La vista previa usa una **semilla**; lo que ves es lo que se aplica. «Cancelar» durante la ejecución para antes de la siguiente cuenta.
+
+### Modificado
+
+* `gui/run/rename.py` (elige motor), `gui/run/controller.py`, `gui/settings/dialog.py`, `gui/shell/app.py`, `db/gui_migrations.py`, locales, `README.md`, versión 3.9.0.
+* `docs/feat-uc1-9.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 511 passed. Prueba de la GUI con una copia de tu base: vista previa → ejecutar → ficheros renombrados y movidos a la carpeta de la cuenta, descargas vacías, historial guardado. **No probado con tu `G:` real.**
+
 ## v3.8.0 - feat-uc3-8: sincronización incremental disco ↔ app (sustituye a `sc1`)
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

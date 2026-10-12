@@ -9,6 +9,12 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.renaming.settings import (
+    lite_mirror_enabled,
+    preview_required,
+    read_engine,
+    write_setting,
+)
 from ig_orchestrator.gui.settings.instances_tab import InstancesTab
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
@@ -219,11 +225,23 @@ class SettingsDialogWithTabs:
         ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=500).grid(
             row=1, column=0, sticky="w", pady=(2, 12)
         )
+        self.rename_engine_var = tk.StringVar(value=read_engine(self.connection))
+        ttk.Label(frame, text=t("settings.rename_engine")).grid(row=3, column=0, sticky="w", pady=(14, 0))
+        engines = ttk.Frame(frame)
+        engines.grid(row=4, column=0, sticky="w")
+        ttk.Radiobutton(engines, text=t("settings.rename_engine_integrated"), value="integrated",
+                        variable=self.rename_engine_var).pack(anchor="w")
+        ttk.Radiobutton(engines, text=t("settings.rename_engine_legacy"), value="legacy_sc2",
+                        variable=self.rename_engine_var).pack(anchor="w")
+        self.rename_preview_var = tk.BooleanVar(value=preview_required(self.connection))
+        ttk.Checkbutton(frame, text=t("settings.rename_preview"), variable=self.rename_preview_var).grid(
+            row=5, column=0, sticky="w", pady=(6, 0)
+        )
         ttk.Button(
             frame,
             text=t("settings.purge_files"),
             command=lambda: self._purge_downloaded_files(),
-        ).grid(row=2, column=0, sticky="w")
+        ).grid(row=6, column=0, sticky="w", pady=(14, 0))
 
     def _build_catalog_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)
@@ -263,6 +281,13 @@ class SettingsDialogWithTabs:
         ttk.Checkbutton(
             frame, text=t("settings.deleted_keep_group"), variable=self.deleted_keep_group_var
         ).grid(row=4, column=0, sticky="w")
+        self.lite_mirror_var = tk.BooleanVar(value=lite_mirror_enabled(self.connection))
+        ttk.Checkbutton(frame, text=t("settings.lite_mirror"), variable=self.lite_mirror_var).grid(
+            row=5, column=0, sticky="w", pady=(14, 0)
+        )
+        ttk.Label(frame, text=t("settings.lite_mirror_help"), wraplength=520, justify="left").grid(
+            row=6, column=0, sticky="w"
+        )
 
     def _build_instances_tab(self) -> None:
         if not is_gui_schema(self.connection):
@@ -368,6 +393,11 @@ class SettingsDialogWithTabs:
 
             # Stories first
             write_stories_first_enabled(self.connection, self.stories_first.get())
+
+            # Renamer and accounts_lite mirror
+            write_setting(self.connection, "renaming.engine", self.rename_engine_var.get())
+            write_setting(self.connection, "renaming.preview", "1" if self.rename_preview_var.get() else "0", "BOOLEAN")
+            write_setting(self.connection, "compat.lite.enabled", "1" if self.lite_mirror_var.get() else "0", "BOOLEAN")
 
             # Deleted accounts folder
             for key, value, kind in (

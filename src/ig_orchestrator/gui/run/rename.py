@@ -8,6 +8,7 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.renaming.settings import INTEGRATED, read_engine
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
@@ -337,6 +338,9 @@ class RenameMixin:
                 "Start date debe tener formato YYYY-MM-DD antes de renombrar.",
             )
             self._set_status_tone(STATUS_TONE_ERROR)
+            return
+        if read_engine(self.connection) == INTEGRATED:
+            self._start_integrated_rename(start_now_date, self.rename_new_accounts)
             return
         if not MANUAL_RENAME_SCRIPT.is_file():
             error = f"No se encontro el script de renombrado: {MANUAL_RENAME_SCRIPT}"

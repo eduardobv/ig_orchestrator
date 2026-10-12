@@ -13,6 +13,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 6 · La laptop entrega sola (paquetes) | v3.6.0 | [Feat 6](#feat-6--la-laptop-entrega-sola-paquetes-v360) |
 | 7 · Cuenta que cambió de username | v3.7.0 | [Feat 7](#feat-7--cuenta-que-cambió-de-username-v370) |
 | 8 · Sincronizar con el disco | v3.8.0 | [Feat 8](#feat-8--sincronizar-con-el-disco-v380) |
+| 9 · Renombrado integrado | v3.9.0 | [Feat 9](#feat-9--renombrado-integrado-v390) |
 
 ---
 
@@ -664,3 +665,89 @@ Las reglas heredadas de `sc1` ahora se pueden cambiar en la base (`app_settings`
 | Una cuenta no se actualiza | Su fecha de carpeta no cambió (herramientas que no la tocan): usa **Verificar cuenta** o **Verificación completa**. |
 | Muchas cuentas «con cambios» tras renombrar un lote | Normal por ahora: el renombrado antiguo no anota contadores; la sincronización rápida lo corrige en segundos. |
 | Sale «Carpeta nueva» para algo que no es una cuenta | Una carpeta con ficheros multimedia sueltos cuenta como cuenta (igual que `sc1`): *Ignorar*. |
+
+
+---
+
+## Feat 9 · Renombrado integrado (v3.9.0)
+
+**Para qué sirve:** el botón **Renombrar** ya no lanza el script externo `ManualRenameFiles` (`sc2`). Hace lo mismo **dentro de la app**, con el **mismo resultado** (está probado contra `sc2` con la misma semilla), pero con una **vista previa** donde ves cada fichero y su nombre nuevo antes de tocar nada, y usando solo la base de datos de la app (no `accounts_lite`).
+
+> **Primera vez:** pruébalo con una descarga pequeña. La vista previa te enseña exactamente lo que se aplicará.
+
+### Qué hace el renombrado (igual que `sc2`)
+
+1. Para cada carpeta de cuenta descargada, mira los ficheros que ya hay en la biblioteca (`G:`) de esa cuenta.
+2. Los ficheros descargados (`1234567890123.jpg`) cuyo **id ya existe** en la biblioteca son **duplicados**: se renombran `id_duplicated.jpg` (y se borran si marcas *Eliminar duplicados*).
+3. El resto se agrupa por los 6 primeros dígitos del id y recibe una **fecha** interpolada entre los ficheros vecinos de la biblioteca (los más nuevos que el último, entre la fecha del último y tu fecha de inicio). Nombre final: `2026-10-10 14.22.07 3500...123_<idUsuario>_manual.jpg`.
+4. Las **cuentas nuevas** reparten sus ficheros entre su *fecha de inicio* y la fecha del lote, con el id de propietario del lote.
+5. La carpeta renombrada se **mueve a la biblioteca** (junto a la carpeta de la cuenta). Si ya existe, se fusiona sin sobrescribir; si algún nombre choca, esa cuenta no se mueve.
+
+### Cómo se usa — botón **Renombrar** (igual que antes)
+
+Se abre **Renombrar descargas**:
+
+| Elemento | Qué es |
+|---|---|
+| **¿Dónde están los ficheros a renombrar?** | *Mi carpeta de trabajo* (por defecto), las carpetas de **otras instancias registradas** (descargas o compartida), o cualquier ruta con *Examinar…*. Así puedes renombrar directamente en la compartida de la laptop, sin traerla antes. |
+| *Fecha de inicio* | La del lote (startNowDate); no se edita aquí. |
+| **Eliminar duplicados** | Borra los `_duplicated` generados en esta ejecución. |
+| **Mover a la biblioteca** | Mueve la carpeta de cada cuenta a su sitio en `G:`. Sin marcar, solo renombra. |
+| **Vista previa** | Calcula todo **sin tocar el disco**: árbol *cuenta → fichero → nombre nuevo → fecha*, avisos y conflictos de movimiento. |
+| **Otra semilla** | Los minutos y segundos de las fechas son aleatorios; con otra semilla salen otros. **Lo que ves es lo que se aplica.** |
+| **Ejecutar** | Pide confirmación y renombra en segundo plano. |
+
+En la lista, cada cuenta muestra su estado:
+
+| Estado | Significa |
+|---|---|
+| **Renombrar** | Cuenta de la biblioteca: se renombrará y moverá (ves a qué carpeta). |
+| **Cuenta nueva** | Estaba declarada como nueva en el lote: se registrará en la app. |
+| **Omitida** | No se tocará. La razón sale en la línea: *no está registrada y no se declaró como nueva*, *la carpeta registrada no existe*, *declarada como nueva pero ya está registrada*, *no está como carpeta en el origen*. |
+| `!` (aviso) | Por ejemplo, una subcarpeta (como `story`) que no existe en la biblioteca: no se renombra. |
+| ✖ Conflicto al mover | Algún fichero choca con uno de la biblioteca: la carpeta se queda sin mover. |
+
+### Al terminar
+
+* La consola y un resumen muestran, por cuenta: renombrados, duplicados, eliminados y si se movió. Las cuentas con problemas salen en un aviso.
+* Las **cuentas nuevas** quedan registradas **una sola vez en la app** (id de Instagram, fecha de inicio, carpeta) y, si el espejo está activo, también en `accounts_lite`.
+* Los **contadores** y el **índice de ficheros** de cada cuenta movida se actualizan al momento (no hace falta «Sincronizar con el disco»).
+* El lote se marca como completado si todo salió bien; si quedan carpetas sin mover, **Renombrar** sigue disponible.
+* Cada ejecución queda guardada (historial `rename_runs`).
+* Si pulsas **Detener** durante el renombrado, para **antes de la siguiente cuenta** (la que está en curso termina).
+
+### Ajustes — dónde están
+
+**`Ajustes → Procesamiento`:**
+
+| Opción | Qué hace |
+|---|---|
+| **Motor de renombrado** | *Integrado en la app* (por defecto) o *Script externo ManualRenameFiles (sc2)* (como antes, por si quieres comparar o hay un problema). |
+| **Mostrar siempre la vista previa antes de renombrar** | Desmárcalo para renombrar directo con el botón, sin ventana (no recomendado al principio). |
+
+**`Ajustes → Catálogo` → «Mantener actualizado accounts_lite»** (la casilla que pedías):
+
+| Casilla | Efecto |
+|---|---|
+| **Marcada** (por defecto) | Cada vez que la app mueve, renombra, marca como eliminada o registra una cuenta, también actualiza `accounts_lite`. Mantiene vivos `sc2` y el resto de herramientas antiguas. |
+| **Desmarcada** | La app **deja de escribir** en `accounts_lite`. Hazlo cuando ya no uses ni `sc1` ni el motor externo `sc2`. |
+
+> Recomendación: usa el renombrado integrado unas semanas; cuando confirmes que todo va bien, elige motor *Integrado* y **desmarca** «Mantener actualizado accounts_lite».
+
+### Cómo probarlo
+
+1. Deja un par de carpetas de cuentas descargadas en tu carpeta de trabajo (o prueba con la compartida de la laptop).
+2. Pulsa **Renombrar** → comprueba la lista → pulsa **Vista previa** si cambias algo → revisa unos cuantos nombres y fechas.
+3. **Ejecutar** y mira la consola. Abre una de las carpetas en `G:`: los ficheros nuevos terminan en `_manual`.
+4. Comprueba que las descargas ya no están en la carpeta de trabajo y que las cuentas nuevas aparecen en el catálogo con su carpeta.
+5. (Opcional) Compara con el motor externo en otra descarga: `Ajustes → Procesamiento → Script externo`.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «Omitida — no está registrada…» | La carpeta descargada se llama como una cuenta que la app no conoce. Declárala como cuenta nueva en el lote o impórtala/regístrala. |
+| «Conflicto al mover» | Un fichero con el mismo nombre ya existe en la biblioteca. Revisa esa cuenta; nada se sobrescribe. |
+| Los ficheros de `story`/`reels` no se renombran | Esa subcarpeta no existe aún en la biblioteca para esa cuenta (igual que en `sc2`). Se avisa en la vista previa. |
+| «Contadores no actualizados» | Había una sincronización en curso; ejecuta *Sincronizar con el disco → Rápida*. |
+| Quiero volver al script de siempre | `Ajustes → Procesamiento → Motor → Script externo`. |

@@ -521,6 +521,12 @@ class RunControllerMixin:
 
 
     def _cancel_process(self) -> None:
+        rename_cancel = getattr(self, "_rename_cancel", None)
+        if rename_cancel is not None and self.active_process_kind == "rename":
+            rename_cancel.set()  # the integrated renamer stops before the next account
+            self._set_status("Deteniendo renombrado (termina la cuenta en curso)...")
+            self._write_console("Detencion solicitada: el renombrado parara antes de la siguiente cuenta.\n")
+            return
         if self.process_runner.cancel():
             self.cancel_requested = self.active_process_kind == "batch"
             self._set_status("Deteniendo proceso...")

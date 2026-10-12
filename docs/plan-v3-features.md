@@ -39,7 +39,7 @@ y renombra o mueve al workplace principal las carpetas descargadas por otras; re
 | 6 ✅ | [`feat-uc4-6`](../tasks/done/v3/feat-uc4-6.md) · Instancia 24/7: publicación + manifiesto | UC4 (inst1) · M1 | `inst1` entrega sola; pc1 recibe resultados reales (adiós «Executed on another instance») | ⬤⬤⬤○ | rec.: 2 | 5–6 d |
 | 7 ✅ | [`feat-problem1-7`](../tasks/done/v3/feat-problem1-7.md) · Cuenta renombrada | Problema 1 · M4 | Renombrar/fusionar cuentas con alias, sin reiniciar; lista de 69 candidatos | ⬤⬤⬤⬤ | **4**, **3**; rec.: 1 | 6–8 d |
 | 8 ✅ | [`feat-uc3-8`](../tasks/done/v3/feat-uc3-8.md) · Sincronización incremental | UC3 · UC1 (sc1) · M5 | De ~8 min de lectura a segundos–1 min; botón «Verificar cuenta» | ⬤⬤⬤○ | **3**; rec.: 4 | 6–8 d |
-| 9 | [`feat-uc1-9`](feat-uc1-9.md) · Renombrado integrado | UC1 (sc2) · UC4 | Sin scripts externos; vista previa; renombrar desde cualquier carpeta | ⬤⬤⬤⬤ | **3**; rec.: 4 | 8–10 d |
+| 9 ✅ | [`feat-uc1-9`](../tasks/done/v3/feat-uc1-9.md) · Renombrado integrado | UC1 (sc2) · UC4 | Sin scripts externos; vista previa; renombrar desde cualquier carpeta | ⬤⬤⬤⬤ | **3**; rec.: 4 | 8–10 d |
 | 10 | [`feat-uc5-10`](feat-uc5-10.md) · Renombrar sin G: (usa el índice cargado en el feat 3) | UC5 | Renombrar con el disco apagado; movimiento pendiente | ⬤⬤⬤○ | **9**, **3**; rec.: 8 | 4–6 d |
 | 11 | [`feat-uc6-11`](feat-uc6-11.md) · Almacén y volcado a G: | UC6 · M7 | Conectas G: solo para volcar; cola «pendiente de volcar» | ⬤⬤⬤⬤ | **10**, **9**, **4** | 6–8 d |
 | 12 | [`feat-uc2-12`](feat-uc2-12.md) · Catálogo avanzado | UC2 (fase 2) | Eliminar con cuarentena, fusionar, ficha editable, arrastrar y soltar | ⬤⬤⬤⬤ | **4**, **3**; rec.: 7, 8 | 8–10 d |

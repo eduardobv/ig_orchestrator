@@ -511,6 +511,12 @@ Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el man
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Renombrado integrado
+
+`Renombrar` abre **Renombrar descargas**: elige dónde están los ficheros (tu carpeta de trabajo, la de otra instancia registrada o cualquier ruta), pulsa **Vista previa**,
+revisa los nombres nuevos y **Ejecutar**. Mismo algoritmo que `ManualRenameFiles` (paridad probada), sin scripts externos. Ajustes: `Ajustes > Procesamiento` (motor integrado o `sc2`, vista previa)
+y `Ajustes > Catalogo` (mantener `accounts_lite` actualizado o no).
+
 ### Sincronizar con el disco
 
 `Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).

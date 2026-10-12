@@ -115,3 +115,12 @@ CREATE TABLE IF NOT EXISTS rename_run_accounts (
 ## Fuera de alcance
 
 Renombrar sin G: (→ `feat-uc5-10`), almacén de procesadas (→ `feat-uc6-11`), `compareProcess`, borrar `sc2`.
+
+## Resultado de la implementación (2026-10-12, v3.9.0)
+
+- Implementado el port completo del algoritmo de `newRename` con paridad verificada contra `sc2` (misma semilla + mismo reloj = mismos nombres; 9 casos), vista previa congelada con semilla, motor seleccionable (`renaming.engine`), historial en `rename_runs`/`rename_run_accounts`, cancelación entre cuentas, origen elegible (carpeta propia, instancias registradas o ruta libre) y escritura inmediata de contadores/índice tras mover.
+- **Motor por defecto: integrado**, con la vista previa **siempre** visible (se puede desactivar). El script externo sigue disponible como motor `legacy_sc2` hasta que se confirme su uso real.
+- Cuentas «registradas» = con ruta en la biblioteca (`catalog_accounts.rel_path`); ya no se consulta `accounts_lite`. Una cuenta nueva que no se llega a mover **no recibe ruta** (queda pendiente; `feat-uc5-10` lo gestionará).
+- **Decisión abierta resuelta:** una subcarpeta ausente en la biblioteca no se renombra (paridad); se avisa en la vista previa.
+- **No implementado:** pestaña «Resultado» persistente (el resultado se muestra al terminar y queda en `rename_run_accounts`), comparar con `compareProcess`/`renameProcess` (no se portan), referencia desde el índice en vez de disco (→ `feat-uc5-10`).
+- Sin probar con tu `G:` real. Primera prueba recomendada: copiar una cuenta pequeña de `10.TEMP` como biblioteca y una descarga de prueba.

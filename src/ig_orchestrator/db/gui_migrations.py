@@ -249,6 +249,28 @@ def _patch_library_schema(connection: Connection) -> None:
             files INTEGER,
             bytes INTEGER
         );
+        CREATE TABLE IF NOT EXISTS rename_runs (
+            id INTEGER PRIMARY KEY,
+            batch_id INTEGER REFERENCES batches(id),
+            queue_id INTEGER,
+            engine TEXT NOT NULL,
+            source_folder TEXT NOT NULL,
+            start_now_date TEXT NOT NULL,
+            options TEXT,
+            status TEXT NOT NULL,         -- RUNNING | OK | WITH_PROBLEMS | CANCELLED
+            started_at TEXT NOT NULL,
+            finished_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS rename_run_accounts (
+            id INTEGER PRIMARY KEY,
+            rename_run_id INTEGER NOT NULL REFERENCES rename_runs(id) ON DELETE CASCADE,
+            username TEXT NOT NULL,
+            status TEXT NOT NULL,         -- RENAMED | NEW | SKIPPED | MOVE_CONFLICT | NO_FILES | ERROR
+            renamed INTEGER DEFAULT 0,
+            duplicated INTEGER DEFAULT 0,
+            moved INTEGER DEFAULT 0,
+            detail TEXT
+        );
         CREATE TABLE IF NOT EXISTS scan_runs (
             id INTEGER PRIMARY KEY,
             scope TEXT NOT NULL,          -- ALL | CATEGORY | ACCOUNT | DEEP
