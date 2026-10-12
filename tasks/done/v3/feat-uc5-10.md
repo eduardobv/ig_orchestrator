@@ -133,3 +133,10 @@ La generalización a un almacén dedicado con volcado selectivo es `feat-uc6-11`
 ## Fuera de alcance
 
 Almacén dedicado y volcado selectivo (→ `feat-uc6-11`); retirar `accounts_complete.sqlite` (se puede archivar tras validar el índice).
+
+## Resultado de la implementación (2026-10-12, v3.10.0)
+
+- Implementado: `IndexConsultProvider` equivalente al de disco (probado con la misma semilla), escritura inmediata en el índice, renombrado sin biblioteca con `RENAMED_PENDING_MOVE`, «Mover renombradas pendientes», «Verificar índice» con aceptar disco, motivo `NO_INDEX`.
+- Simplificación: selección `auto` = disco si la carpeta de la cuenta es accesible (siempre exacto), índice si no; no se compara `dir_mtime` (la tabla de estado no lo guarda).
+- No implementado: códigos `INDEX_STALE`/`INDEX_MISSING` en la auditoría, aviso de antigüedad del índice en la modal, columnas `location`/`origin` (el pendiente se rastrea en `rename_run_accounts`).
+- Sin probar con `G:` real desconectada.

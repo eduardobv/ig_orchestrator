@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.10.0 - feat-uc5-10: renombrar sin la unidad G: (índice en la app)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+El renombrado puede usar el **índice de ficheros de la app** (`media_index`, por id de cuenta) en lugar de leer la biblioteca. Con `G:` desconectada, renombra en su sitio y deja la carpeta **pendiente de mover**.
+
+### Creado
+
+* `renaming/consult.py` - `IndexConsultProvider` (mismos datos que el proveedor de disco), `write_through` (los ficheros recién renombrados entran en el índice), `has_index`, `index_status`, `verify_index`.
+* `gui/library/index_actions.py` - **Lote → Mover renombradas pendientes…** y **Catálogo → Verificar índice con el disco**.
+* Columnas nuevas en `rename_run_accounts` (`manual_path`, `destination`, `account_id`, `spec`, `resolved`) para recordar lo pendiente.
+* Tests: `tests/renaming/test_offline_index.py`.
+
+### Comportamiento
+
+* **Referencia automática:** si la carpeta de la cuenta es accesible se lee del disco (exacto); si no, del índice. Casilla **«Usar el índice de la app»** para forzar el índice.
+* **Sin índice y sin disco:** la cuenta se omite con motivo `NO_INDEX`.
+* **Biblioteca no disponible:** se renombra en la carpeta de descargas, estado `RENAMED_PENDING_MOVE`; las cuentas nuevas se registran al mover. «Mover renombradas pendientes» las mueve cuando vuelve `G:` y refresca contadores e índice.
+* **Equivalencia comprobada:** con la misma semilla, índice y disco dan los mismos nombres.
+* **Verificar índice:** lista altas/bajas respecto al disco y permite aceptar el disco (reindexa la cuenta).
+
+### Modificado
+
+`renaming/service.py`, `db/gui_migrations.py`, `gui/run/rename_preview_dialog.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.10.0. `docs/feat-uc5-10.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 520 passed. No probado con `G:` real desconectada físicamente.
+
 ## v3.9.0 - feat-uc1-9: renombrado integrado (port de `sc2 newRename`)
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

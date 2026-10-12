@@ -41,6 +41,8 @@ def account_status_text(plan) -> str:
 
 
 def move_text(plan) -> str:
+    if plan.pending_move:
+        return t("rename.move.pending")
     if plan.move is None:
         return "-"
     if plan.move.status == "MOVED":
@@ -73,6 +75,7 @@ def show_rename_dialog(
     choice_var = tk.StringVar(value=choices[0][0])
     dedupe_var = tk.BooleanVar(value=True)
     move_var = tk.BooleanVar(value=True)
+    index_var = tk.BooleanVar(value=False)
     info = tk.StringVar()
 
     frame = ttk.Frame(window, padding=10)
@@ -89,6 +92,7 @@ def show_rename_dialog(
     options.grid(row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
     ttk.Checkbutton(options, text=t("rename.dialog.dedupe"), variable=dedupe_var).pack(side=tk.LEFT)
     ttk.Checkbutton(options, text=t("rename.dialog.move"), variable=move_var).pack(side=tk.LEFT, padx=12)
+    ttk.Checkbutton(options, text=t("rename.dialog.use_index"), variable=index_var).pack(side=tk.LEFT)
     ttk.Button(options, text=t("rename.dialog.compute"), command=lambda: compute(None)).pack(side=tk.LEFT, padx=12)
     ttk.Button(options, text=t("rename.dialog.reseed"), command=lambda: compute(random.SystemRandom().randrange(1, 2**31))).pack(side=tk.LEFT)
     ttk.Label(frame, textvariable=info, wraplength=940, justify="left").grid(row=3, column=0, columnspan=3, sticky="w", pady=(6, 4))
@@ -125,7 +129,7 @@ def show_rename_dialog(
         tree.delete(*tree.get_children())
         run.configure(state="disabled")
         source = native_path_text(source_var.get())
-        job = RenameJob(source, start_now_date, specs, dedupe_var.get(), move_var.get())
+        job = RenameJob(source, start_now_date, specs, dedupe_var.get(), move_var.get(), "index" if index_var.get() else "auto")
         try:
             preview = service.preview(job, seed=seed or state["seed"])
         except ValueError as exc:
@@ -135,7 +139,7 @@ def show_rename_dialog(
         total_renamed = total_dups = skipped = 0
         for plan in preview.accounts:
             node = tree.insert("", tk.END, text=plan.username,
-                               values=(account_status_text(plan), plan.reason or move_text(plan), "", ""), open=False)
+                               values=(account_status_text(plan), plan.reason or (t("rename.ref.index") + " · " if plan.reference == "INDEX" else "") + move_text(plan), "", ""), open=False)
             skipped += plan.status == SKIPPED
             total_renamed += plan.renamed
             total_dups += plan.duplicated

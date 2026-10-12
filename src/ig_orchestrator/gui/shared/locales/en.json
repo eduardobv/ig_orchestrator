@@ -458,5 +458,18 @@
   "rename.result.summary": "Rename finished: {summary}",
   "rename.result.moved": "moved",
   "rename.result.deleted": "{count} duplicate(s) deleted",
-  "rename.result.cancelled": "Rename cancelled: the pending accounts were not touched."
+  "rename.result.cancelled": "Rename cancelled: the pending accounts were not touched.",
+  "rename.dialog.use_index": "Use the app index",
+  "rename.move.pending": "Pending move (library not available)",
+  "rename.ref.index": "Reference: index",
+  "pending.menu": "Move pending renamed…",
+  "pending.title": "Pending renamed folders",
+  "pending.none": "No renamed folders are waiting to be moved.",
+  "pending.confirm": "{count} renamed folder(s) are waiting for the library: {names}.\n\nMove them now?",
+  "pending.done": "{moved} of {total} folder(s) moved.",
+  "index.menu": "Verify index against disk",
+  "index.title": "File index",
+  "index.offline": "The account has no path or the library is not available.",
+  "index.ok": "The index matches the disk ({status}).",
+  "index.differences": "Differences: {added} file(s) on disk not in the index, {removed} in the index no longer on disk.\n\n{sample}\n\nAccept the disk (re-index the account)?"
 }

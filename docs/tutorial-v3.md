@@ -14,6 +14,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 7 · Cuenta que cambió de username | v3.7.0 | [Feat 7](#feat-7--cuenta-que-cambió-de-username-v370) |
 | 8 · Sincronizar con el disco | v3.8.0 | [Feat 8](#feat-8--sincronizar-con-el-disco-v380) |
 | 9 · Renombrado integrado | v3.9.0 | [Feat 9](#feat-9--renombrado-integrado-v390) |
+| 10 · Renombrar sin G: | v3.10.0 | [Feat 10](#feat-10--renombrar-sin-la-unidad-g-v3100) |
 
 ---
 
@@ -751,3 +752,45 @@ En la lista, cada cuenta muestra su estado:
 | Los ficheros de `story`/`reels` no se renombran | Esa subcarpeta no existe aún en la biblioteca para esa cuenta (igual que en `sc2`). Se avisa en la vista previa. |
 | «Contadores no actualizados» | Había una sincronización en curso; ejecuta *Sincronizar con el disco → Rápida*. |
 | Quiero volver al script de siempre | `Ajustes → Procesamiento → Motor → Script externo`. |
+
+
+---
+
+## Feat 10 · Renombrar sin la unidad G: (v3.10.0)
+
+**Para qué sirve:** renombrar aunque el disco `G:` esté apagado o desconectado. La app guarda en su base de datos lo que el renombrado necesita saber de tu biblioteca (id, fecha y propietario de cada fichero), así que ya no hace falta leer el disco.
+
+### Cómo funciona
+
+| Situación | Qué hace la app |
+|---|---|
+| `G:` conectada | Lee la carpeta de la cuenta del disco (exacto), igual que antes. |
+| `G:` desconectada y la cuenta tiene índice | Usa el índice. Renombra **en la carpeta de descargas** y deja la cuenta como **pendiente de mover**. |
+| `G:` desconectada y la cuenta **no** tiene índice | La cuenta se **omite** (`NO_INDEX`). Conecta `G:` o sincroniza esa cuenta una vez. |
+| Cuenta nueva | No necesita índice; se mueve y se registra cuando `G:` vuelva. |
+
+### Dónde está cada opción
+
+* **Renombrar descargas** (botón *Renombrar*): casilla **«Usar el índice de la app»** (fuerza el índice aunque `G:` esté conectada). En la vista previa, las cuentas muestran «Referencia: índice» y «Pendiente de mover (biblioteca no disponible)».
+* **Lote → Mover renombradas pendientes…**: cuando vuelvas a conectar `G:`, pulsa aquí. Lista las carpetas pendientes, pide confirmación, las mueve (fusionando sin sobrescribir), registra las cuentas nuevas y actualiza contadores e índice. Si `G:` sigue sin estar disponible, te avisa y no hace nada.
+* **Catálogo → Verificar índice con el disco** (selecciona una cuenta antes): compara el índice de esa cuenta con sus carpetas. Si hay diferencias (ficheros añadidos o borrados fuera de la app) las lista y te pregunta si **aceptar el disco**, que vuelve a indexar la cuenta.
+
+### Qué se guarda
+
+El índice guarda solo lo necesario (id, fecha, propietario, extensión y sufijo), por **id de cuenta**: renombrar la cuenta o moverla de carpeta no lo rompe. Cada fichero que renombra la app entra al índice al momento; los cambios hechos fuera de la app entran al sincronizar con el disco.
+
+### Cómo probarlo
+
+1. Prepara una descarga con una cuenta que ya esté en el catálogo.
+2. Desconecta `G:` (o prueba con una copia). Pulsa **Renombrar**: la vista previa muestra «Referencia: índice» y «Pendiente de mover».
+3. **Ejecutar**: los ficheros quedan renombrados en la carpeta de descargas y la cuenta como pendiente.
+4. Vuelve a conectar `G:` → **Lote → Mover renombradas pendientes…** → confirma. Comprueba que la carpeta está en `G:` con los mismos nombres.
+5. **Catálogo → Verificar índice con el disco** sobre esa cuenta: debe decir que coincide.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «NO_INDEX» | La cuenta nunca se sincronizó/importó, así que no hay índice. Conecta `G:` y pulsa *Sincronizar con el disco → Cuenta*. |
+| «Conflicto al mover» al mover pendientes | Algún fichero ya existe en `G:` con el mismo nombre. Nada se sobrescribe; la carpeta sigue pendiente. |
+| El renombrado asignó fechas algo distintas a lo esperado | El índice estaba desactualizado (cambios hechos fuera de la app). Usa *Verificar índice* y acepta el disco. |

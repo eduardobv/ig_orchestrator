@@ -122,6 +122,9 @@ def _patch_gui_schema(connection: Connection) -> None:
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
     _patch_library_schema(connection)
     _add_column_if_missing(connection, "fs_operations", "payload", "TEXT")
+    for column, kind in (("manual_path", "TEXT"), ("destination", "TEXT"), ("account_id", "INTEGER"),
+                         ("spec", "TEXT"), ("resolved", "INTEGER DEFAULT 0")):
+        _add_column_if_missing(connection, "rename_run_accounts", column, kind)
     for column in ("dir_mtime_root", "dir_mtime_story", "dir_mtime_reels", "dir_mtime_highlights"):
         _add_column_if_missing(connection, "catalog_accounts", column, "REAL")
     _add_column_if_missing(connection, "catalog_accounts", "scan_state", "TEXT NOT NULL DEFAULT 'UNKNOWN'")

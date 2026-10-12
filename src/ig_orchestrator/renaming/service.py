@@ -7,6 +7,7 @@ result is stored in ``rename_runs`` / ``rename_run_accounts``.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import random
@@ -20,6 +21,7 @@ from ig_orchestrator.library.compat_lite import add_to_lite, lite_path_from_sett
 from ig_orchestrator.library.fsops import FsOperationService
 from ig_orchestrator.library.paths import parent_rel, to_rel
 from ig_orchestrator.library.scanner import ACCOUNT, LibraryScanner
+from ig_orchestrator.renaming.consult import IndexConsultProvider, has_index, write_through
 from ig_orchestrator.renaming.mover import FAILED, MOVED, MoveResult, move_renamed_folder, preview_move
 from ig_orchestrator.renaming.planner import (
     DiskConsultProvider,
@@ -34,6 +36,8 @@ from ig_orchestrator.renaming.timeline import TimelineContext
 
 ProgressCallback = Callable[[int, int, str], None]
 RENAMED, NEW_ACCOUNT, SKIPPED = "RENAMED", "NEW", "SKIPPED"
+PENDING_MOVE = "RENAMED_PENDING_MOVE"
+REFERENCES = ("auto", "index", "disk")
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +55,7 @@ class RenameJob:
     new_accounts: tuple[NewAccountSpec, ...] = ()
     no_duplicated: bool = True
     move_renamed: bool = True
+    reference: str = "auto"  # auto | index | disk
 
 
 @dataclass(slots=True)
@@ -65,6 +70,8 @@ class AccountPlan:
     account_id: int | None = None
     tree: TreeResult = field(default_factory=TreeResult)
     move: MoveResult | None = None
+    reference: str = "DISK"  # DISK | INDEX | NONE (new account)
+    pending_move: bool = False
 
     @property
     def renamed(self) -> int:
@@ -101,6 +108,7 @@ class AccountResult:
     moved: bool = False
     detail: str = ""
     warnings: list[str] = field(default_factory=list)
+    pending: bool = False
 
 
 @dataclass(slots=True)
@@ -191,10 +199,38 @@ class RenameService:
                 plan.status, plan.reason = SKIPPED, "No esta registrada en la app y no se declaro como cuenta nueva"
             else:
                 plan.consult_folder = self.fs.abs(str(row["rel_path"]))
-                if not os.path.isdir(plan.consult_folder):
-                    plan.status, plan.reason = SKIPPED, f"La carpeta registrada no existe: {plan.consult_folder}"
+                self._choose_reference(job, plan)
             plans.append(plan)
         return plans
+
+    def _library_online(self) -> bool:
+        return os.path.isdir(self.fs.root)
+
+    def _destination_online(self, plan: AccountPlan) -> bool:
+        """False when the move target is inside the library but the library (``G:``) is not reachable."""
+
+        if to_rel(plan.consult_folder, self.fs.root) is None:
+            return True
+        return self._library_online()
+
+    def _choose_reference(self, job: RenameJob, plan: AccountPlan) -> None:
+        """Disk when the account folder is reachable (exact); the app index otherwise or when forced."""
+
+        reachable = os.path.isdir(plan.consult_folder)
+        if job.reference == "disk" or (job.reference == "auto" and reachable):
+            if not reachable:
+                plan.status, plan.reason = SKIPPED, f"La carpeta registrada no existe: {plan.consult_folder}"
+            return
+        if plan.account_id is not None and has_index(self.conn, plan.account_id):
+            plan.reference = "INDEX"
+        else:
+            plan.status = SKIPPED
+            plan.reason = "NO_INDEX: la biblioteca no esta disponible y la cuenta no tiene indice en la app"
+
+    def _provider(self, plan: AccountPlan):
+        if plan.reference == "INDEX" and plan.account_id is not None:
+            return IndexConsultProvider(self.conn, plan.account_id)
+        return DiskConsultProvider(plan.consult_folder)
 
     def _context(self, job: RenameJob, rng: random.Random, now: datetime, spec: NewAccountSpec | None):
         if spec is None:
@@ -216,10 +252,12 @@ class RenameService:
             if plan.status == SKIPPED:
                 continue
             ctx, new_user = self._context(job, rng, stamp, plan.spec)
-            provider = DiskConsultProvider(plan.consult_folder)
-            plan.tree = process_folder_tree(plan.manual_path, provider, DryOps(), ctx, new_user)
+            plan.tree = process_folder_tree(plan.manual_path, self._provider(plan), DryOps(), ctx, new_user)
             if job.move_renamed:
-                plan.move = preview_move(plan.manual_path, plan.consult_folder)
+                if self._destination_online(plan):
+                    plan.move = preview_move(plan.manual_path, plan.consult_folder)
+                else:
+                    plan.pending_move = True
         return preview
 
     # ------------------------------------------------------------ execution
@@ -253,8 +291,7 @@ class RenameService:
         if plan.status == SKIPPED:
             return AccountResult(plan.username, "SKIPPED", detail=plan.reason)
         ctx, new_user = self._context(job, rng, now, plan.spec)
-        provider = DiskConsultProvider(plan.consult_folder)
-        tree = process_folder_tree(plan.manual_path, provider, RealOps(), ctx, new_user)
+        tree = process_folder_tree(plan.manual_path, self._provider(plan), RealOps(), ctx, new_user)
         outcome = AccountResult(
             plan.username,
             plan.status,
@@ -269,7 +306,12 @@ class RenameService:
             outcome.deleted_duplicates = self._delete_duplicates(tree.duplicated_files, plan.manual_path, outcome)
         if not (outcome.renamed or outcome.duplicated) and outcome.status == plan.status:
             outcome.status = "NO_FILES" if plan.status == RENAMED else outcome.status
-        if job.move_renamed:
+        if job.move_renamed and not self._destination_online(plan):
+            if os.path.isdir(plan.manual_path):
+                outcome.pending = True
+                outcome.status = PENDING_MOVE
+                outcome.detail = "Biblioteca no disponible: renombrada en su sitio, pendiente de mover"
+        elif job.move_renamed:
             moved = move_renamed_folder(plan.manual_path, plan.consult_folder)
             outcome.moved = moved.status == MOVED
             if moved.status == FAILED:
@@ -277,10 +319,23 @@ class RenameService:
                 outcome.detail = moved.detail + (": " + ", ".join(moved.conflicts[:5]) if moved.conflicts else "")
         try:
             self._record_in_bdapp(plan, outcome)
+            if not outcome.moved and plan.account_id is not None and tree.actions:
+                self._index_renamed(plan, tree)
         except Exception as exc:  # noqa: BLE001 - the files are already renamed; report it
             outcome.warnings.append(f"No se pudo actualizar la base de la app: {exc}")
-        self._store_account(outcome)
+        self._store_account(outcome, plan)
         return outcome
+
+    def _index_renamed(self, plan: AccountPlan, tree: TreeResult) -> None:
+        """Write-through: the files just renamed enter the index so the next rename sees them."""
+
+        entries = []
+        for action in tree.actions:
+            if action.kind != "RENAME":
+                continue
+            folder = os.path.relpath(os.path.dirname(action.new), plan.manual_path)
+            entries.append(("" if folder == "." else folder, os.path.basename(action.new)))
+        write_through(self.conn, int(plan.account_id), entries)
 
     def _delete_duplicates(self, files: list[str], manual_path: str, outcome: AccountResult) -> int:
         deleted = 0
@@ -359,12 +414,66 @@ class RenameService:
         self._run_id = int(cursor.lastrowid)
         return self._run_id
 
-    def _store_account(self, outcome: AccountResult) -> None:
+    def _store_account(self, outcome: AccountResult, plan: AccountPlan | None = None) -> None:
+        spec = plan.spec if plan is not None and outcome.pending else None
         self.conn.execute(
-            "INSERT INTO rename_run_accounts (rename_run_id, username, status, renamed, duplicated, moved, detail)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO rename_run_accounts (rename_run_id, username, status, renamed, duplicated, moved, detail,"
+            " manual_path, destination, account_id, spec, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
             (self._run_id, outcome.username, outcome.status, outcome.renamed, outcome.duplicated,
-             int(outcome.moved), outcome.detail or "; ".join(outcome.warnings[:3])),
+             int(outcome.moved), outcome.detail or "; ".join(outcome.warnings[:3]),
+             plan.manual_path if outcome.pending and plan else None,
+             plan.consult_folder if outcome.pending and plan else None,
+             plan.account_id if plan else None,
+             json.dumps(dataclasses.asdict(spec)) if spec is not None else None),
+        )
+        self.conn.commit()
+
+    # ------------------------------------------------------- pending moves
+    def pending_moves(self) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM rename_run_accounts WHERE status = ? AND COALESCE(resolved, 0) = 0 ORDER BY id", (PENDING_MOVE,)
+        ).fetchall()
+
+    def move_pending(self, progress: ProgressCallback | None = None) -> list[AccountResult]:
+        """Move the folders renamed while the library was offline; register new accounts afterwards."""
+
+        rows = self.pending_moves()
+        if rows and not self._library_online():
+            raise ValueError("La biblioteca no esta disponible: conecta la unidad e intentalo de nuevo")
+        results = []
+        for index, row in enumerate(rows, start=1):
+            if progress is not None:
+                progress(index, len(rows), row["username"])
+            results.append(self._move_one_pending(row))
+        return results
+
+    def _move_one_pending(self, row: sqlite3.Row) -> AccountResult:
+        manual, destination = str(row["manual_path"] or ""), str(row["destination"] or "")
+        spec = NewAccountSpec(**json.loads(row["spec"])) if row["spec"] else None
+        outcome = AccountResult(row["username"], NEW_ACCOUNT if spec else RENAMED)
+        if not os.path.isdir(manual):
+            outcome.status, outcome.detail = "SKIPPED", "La carpeta renombrada ya no esta en su sitio"
+            self._resolve_pending(row, "SKIPPED", False, outcome.detail)
+            return outcome
+        moved = move_renamed_folder(manual, destination)
+        outcome.moved = moved.status == MOVED
+        if not outcome.moved:
+            outcome.status = "MOVE_CONFLICT"
+            outcome.detail = moved.detail + (": " + ", ".join(moved.conflicts[:5]) if moved.conflicts else "")
+            return outcome
+        plan = AccountPlan(row["username"], row["username"], manual, destination, outcome.status, spec=spec,
+                           account_id=row["account_id"])
+        try:
+            self._record_in_bdapp(plan, outcome)
+        except Exception as exc:  # noqa: BLE001 - already moved; report
+            outcome.warnings.append(f"No se pudo actualizar la base de la app: {exc}")
+        self._resolve_pending(row, outcome.status, True, outcome.detail)
+        return outcome
+
+    def _resolve_pending(self, row: sqlite3.Row, status: str, moved: bool, detail: str) -> None:
+        self.conn.execute(
+            "UPDATE rename_run_accounts SET status = ?, moved = ?, resolved = 1, detail = ? WHERE id = ?",
+            (status, int(moved), detail, row["id"]),
         )
         self.conn.commit()
 

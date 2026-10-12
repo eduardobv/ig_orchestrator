@@ -172,6 +172,7 @@ class MenubarMixin:
         batch_menu.add_command(label=t("menu.batch.pull"), command=self._open_pull_dialog)
         batch_menu.add_command(label=t("menu.batch.publish"), command=self._open_publish_dialog)
         batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
+        batch_menu.add_command(label=t("pending.menu"), command=self._move_pending_renamed)
         batch_menu.add_command(
             label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command
         )
@@ -206,6 +207,7 @@ class MenubarMixin:
         sync_menu.add_command(label=t("scan.findings_menu"), command=self._open_scan_findings)
         catalog_menu.add_cascade(label=t("scan.menu"), menu=sync_menu)
         catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
+        catalog_menu.add_command(label=t("index.menu"), command=self._verify_account_index)
         catalog_menu.add_separator()
         catalog_menu.add_command(label=t("rename.menu"), command=self._catalog_username_changed)
         catalog_menu.add_command(label=t("owners.menu"), command=self._open_owner_groups)

@@ -458,5 +458,18 @@
   "rename.result.summary": "Renombrado terminado: {summary}",
   "rename.result.moved": "movida",
   "rename.result.deleted": "{count} duplicado(s) eliminado(s)",
-  "rename.result.cancelled": "Renombrado cancelado: las cuentas pendientes no se tocaron."
+  "rename.result.cancelled": "Renombrado cancelado: las cuentas pendientes no se tocaron.",
+  "rename.dialog.use_index": "Usar el índice de la app",
+  "rename.move.pending": "Pendiente de mover (biblioteca no disponible)",
+  "rename.ref.index": "Referencia: índice",
+  "pending.menu": "Mover renombradas pendientes…",
+  "pending.title": "Renombradas pendientes",
+  "pending.none": "No hay carpetas renombradas pendientes de mover.",
+  "pending.confirm": "{count} carpeta(s) renombradas esperan a la biblioteca: {names}.\n\n¿Moverlas ahora?",
+  "pending.done": "{moved} de {total} carpeta(s) movidas.",
+  "index.menu": "Verificar índice con el disco",
+  "index.title": "Índice de ficheros",
+  "index.offline": "La cuenta no tiene ruta o la biblioteca no está disponible.",
+  "index.ok": "El índice coincide con el disco ({status}).",
+  "index.differences": "Diferencias: {added} fichero(s) en el disco que no están en el índice, {removed} en el índice que ya no están.\n\n{sample}\n\n¿Aceptar el disco (reindexar la cuenta)?"
 }

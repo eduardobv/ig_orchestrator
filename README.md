@@ -517,6 +517,11 @@ Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el man
 revisa los nombres nuevos y **Ejecutar**. Mismo algoritmo que `ManualRenameFiles` (paridad probada), sin scripts externos. Ajustes: `Ajustes > Procesamiento` (motor integrado o `sc2`, vista previa)
 y `Ajustes > Catalogo` (mantener `accounts_lite` actualizado o no).
 
+### Renombrar sin la unidad G:
+
+Si la biblioteca no está disponible, **Renombrar** usa el índice de la app y deja las carpetas renombradas en la carpeta de descargas como *pendientes de mover*.
+Cuando vuelvas a conectar `G:`: **Lote → Mover renombradas pendientes…**. **Catálogo → Verificar índice con el disco** compara el índice de una cuenta con sus carpetas.
+
 ### Sincronizar con el disco
 
 `Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).
