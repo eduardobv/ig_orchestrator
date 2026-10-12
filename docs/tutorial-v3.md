@@ -234,7 +234,7 @@ Pulsa **Importar** y confirma. Es **idempotente**: si lo repites sin cambios en 
 
 - **Catálogo:** sigue mostrando solo tus cuentas gestionadas. Para ver todas: menú `Ver → Mostrar biblioteca completa (archivadas)` (las archivadas salen en gris claro). No se recuerda entre sesiones.
 - **Usar una cuenta archivada** (añadirla al editor o a un lote) la pasa automáticamente a **Habilitada**.
-- **Organizar stories:** ya resuelve la carpeta de la cuenta desde la app, aunque la cuenta no esté en `accounts_lite`. La «base de cuentas antigua» del diálogo pasa a ser opcional.
+- **Organizar stories:** ya resuelve la carpeta de la cuenta desde la app (no usa `accounts_lite`). Desde v3.4.1 el diálogo solo pide la carpeta de stories; el campo de la base de cuentas antigua desapareció.
 - **Búsqueda por id de Instagram:** el campo `instagram_user_id` está indexado (base del feat 7).
 
 ### Cómo probarlo

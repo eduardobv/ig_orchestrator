@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.4.1 - Organizar stories sin accounts_lite
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+* `Organizar stories` ya **no depende de `accounts_lite`**: se quitó el campo de la base antigua del diálogo y la carpeta de cada cuenta se resuelve solo desde `bdapp` (`rel_path` + raíz `LIBRARY`; si una cuenta no tiene `rel_path`, su carpeta de catálogo + username).
+* `save_story_inbox_settings` guarda solo la carpeta de stories (el ajuste `stories.accounts_db_path` se conserva porque lo usan la auditoría y la importación como valor por defecto).
+* `filesystem/story_inbox.py` conserva el parámetro `accounts_db` solo por compatibilidad (respaldo opcional, no usado por la GUI).
+* Tests: resolución desde `bdapp` con y sin `rel_path`.
+
 ## v3.4.0 - feat-uc2-4: operaciones de disco desde el catálogo
 
 Fecha: 2026-10-12 · Rama: `v3/integration`
