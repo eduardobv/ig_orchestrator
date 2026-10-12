@@ -46,6 +46,15 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 - `owner_groups.py` — `find_owner_groups` (pistas `RENAME_PROBABLE`, `SAME_CATEGORY`, `CROSS_CATEGORY`, `ALL_DELETED`), `ignore_group`.
 - Los nombres de fichero de la biblioteca no contienen el username, así que renombrar la carpeta no obliga a renombrar ficheros.
 
+## Sincronización con el disco (feat 8)
+
+- `scanner.py` — `LibraryScanner(conn).scan(ALL|CATEGORY|ACCOUNT, deep=)` → `ScanReport`. Una `stat` por carpeta de cuenta y por subcarpeta (`root`, `reels`, `story`, `highlights`);
+  solo se relistan las de fecha distinta (`dir_mtime_*`). Primera vez: línea base (confía en la importación). Algoritmo de contadores, id y último contenido portado de `generatedirmap.py`.
+  Descubre carpetas nuevas con el mismo recorrido por niveles que `sc1` pero sin reevaluar las cuentas conocidas. No escribe en el disco ni borra cuentas.
+- `scan_findings` (`NEW_FOLDER`, `MOVED_FOLDER`, `MISSING_FOLDER`, `OWNER_CHANGED`, `USERNAME_DUP`): `accept_finding` hace que **la app siga al disco** (crea cuenta archivada, actualiza ruta o id); `ignore_finding` la descarta.
+- `rules.py` — `LibraryRules.load(conn)` lee `library.max_depth`, `library.media_subfolders`, `library.media_extensions`, `library.non_account_names`.
+- El escáner mantiene `media_index` de las carpetas que relee (mismo parser y columnas que la importación: solo `jpg`/`jpeg`/`mp4`).
+
 ## Códigos (auditoría)
 
 `PATH_MISSING`, `OWNER_DUP` (detalle: `SAME_CATEGORY` / `DELETED_PAIR` / `ALL_DELETED` / `CROSS_CATEGORY`), `OWNER_MISMATCH`,

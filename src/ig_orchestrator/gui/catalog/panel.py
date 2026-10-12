@@ -212,6 +212,9 @@ class CatalogPanelMixin:
             label=t("fsops.move_account"), command=self._catalog_move_account
         )
         self.catalog_menu.add_command(
+            label=t("scan.account"), command=self._sync_account
+        )
+        self.catalog_menu.add_command(
             label=t("rename.menu"), command=self._catalog_username_changed
         )
         self.catalog_menu.add_command(

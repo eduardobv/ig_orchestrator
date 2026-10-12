@@ -511,6 +511,12 @@ Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el man
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Sincronizar con el disco
+
+`Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).
+Solo a peticion. No toca el disco; lo distinto (carpetas nuevas, movidas, ausentes, ids distintos) aparece en **Hallazgos** para aceptarlo o ignorarlo.
+Consola: `python -m ig_orchestrator scan [--scope all|category|account] [--path REL] [--account USER] [--deep]`.
+
 ### Cuenta que cambió de username
 
 Clic derecho en la cuenta (o `Catalogo`) > **Cambio de username...**: renombra la carpeta, la cuenta (mismo id interno) y guarda el nombre antiguo como alias.

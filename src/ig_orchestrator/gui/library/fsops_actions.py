@@ -184,6 +184,8 @@ class FsOpsActionsMixin:
             menu.add_command(label=t("fsops.new_folder"), command=self._catalog_new_folder)
             menu.add_command(label=t("fsops.rename_folder"), command=self._catalog_rename_folder)
             menu.add_command(label=t("fsops.move_to"), command=self._catalog_move_folder)
+            menu.add_separator()
+            menu.add_command(label=t("scan.category"), command=self._sync_category)
             self.catalog_folder_menu = menu
         state = "normal" if self._fsops_online() else "disabled"
         for index in range(3):

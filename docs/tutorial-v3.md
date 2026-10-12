@@ -12,6 +12,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 5 · Cuenta eliminada en Instagram | v3.5.0 | [Feat 5](#feat-5--cuenta-eliminada-en-instagram-v350) |
 | 6 · La laptop entrega sola (paquetes) | v3.6.0 | [Feat 6](#feat-6--la-laptop-entrega-sola-paquetes-v360) |
 | 7 · Cuenta que cambió de username | v3.7.0 | [Feat 7](#feat-7--cuenta-que-cambió-de-username-v370) |
+| 8 · Sincronizar con el disco | v3.8.0 | [Feat 8](#feat-8--sincronizar-con-el-disco-v380) |
 
 ---
 
@@ -592,3 +593,74 @@ Selecciona la operación → **Deshacer**: carpetas, ficheros, username, alias y
 | Pide confirmar que son la misma cuenta | Falta el id en alguna: la app no puede comprobarlo; confirma solo si estás seguro. |
 | «La fusión unió filas del mismo lote» al deshacer | Ya no se puede revertir automáticamente; restaura el backup si lo necesitas. |
 | No sale en «ids repetidos» | Ya está resuelto, marcado como «No es renombrado», o falta el id de Instagram. |
+
+
+---
+
+## Feat 8 · Sincronizar con el disco (v3.8.0)
+
+**Para qué sirve:** es tu **red de seguridad** por si alguna vez cambias algo en `G:` fuera de la app (con el Explorador). Detecta qué carpetas cambiaron y deja que la app las siga. **Sustituye a `sc1`** (`generatedirmap.py`): ya no necesitas ejecutarlo.
+
+**Qué NO hace:** no mueve, renombra ni borra nada en el disco, y **nunca se ejecuta sola** (ni al abrir la app). Solo lee y actualiza la base de datos de la app.
+
+> Si de ahora en adelante haces todo desde la app, casi nunca necesitarás esto: cada operación (mover, renombrar, borrar…) ya actualiza la base.
+
+### Cómo es de rápida
+
+En vez de leer los ~950 000 nombres de fichero (como `sc1 --complete`, unos 8 minutos), la app pregunta por la **fecha de modificación de cada carpeta de cuenta** (y de `story`, `reels`, `highlights`). Solo vuelve a leer las carpetas cuya fecha cambió. Con tus datos: **1 169 cuentas revisadas en medio segundo** (más en frío, por el disco USB).
+
+### Dónde está — `Catálogo → Sincronizar con el disco`
+
+| Opción | Qué hace |
+|---|---|
+| **Rápida (solo lo que cambió)** | Revisa todas las cuentas y relee solo las carpetas cambiadas; busca carpetas nuevas o ausentes. Es la que usarás. |
+| **Verificar categoría seleccionada** | Lo mismo pero solo para una carpeta (selecciónala en la vista de árbol, o clic derecho → *Verificar categoría seleccionada*). |
+| **Verificar cuenta seleccionada** | Una sola cuenta (clic derecho en la cuenta). Instantáneo. |
+| **Verificación completa…** | Relee **todas** las carpetas aunque no hayan cambiado (equivale a `sc1 --complete`). Avisa del tiempo y pide confirmación. Úsala si dudas de los datos. |
+| **Hallazgos de sincronización…** | Abre la lista de diferencias pendientes. |
+
+También por consola: `python -m ig_orchestrator scan [--scope all|category|account] [--path 00.FAVORITES] [--account usuario] [--deep]`.
+
+### La primera vez
+
+Justo después de importar, la app **da por buena la importación**: solo anota la fecha de cada carpeta como punto de partida (por eso la primera «Rápida» es instantánea y dice «N tomadas como base»). Las cuentas **sin id de Instagram** sí se leen. A partir de ahí, cada sincronización relee solo lo que cambió. Si quieres comprobarlo todo desde cero: **Verificación completa**.
+
+### Qué actualiza sola
+
+* Los **contadores** (posts, reels, stories, highlights), la **fecha del último contenido**, el **id de Instagram si estaba vacío** y el **índice de ficheros** de las carpetas que cambiaron.
+* Marca cada cuenta: `PRESENT`/`MISSING` (si la carpeta ya no está en disco).
+
+### Hallazgos — lo que necesita tu decisión
+
+Nunca se aplican solos. En `Hallazgos de sincronización…` selecciona y pulsa **Aceptar** (la app sigue al disco) o **Ignorar**.
+
+| Hallazgo | Significa | «Aceptar» hace |
+|---|---|---|
+| **Carpeta nueva** | Hay una carpeta de cuenta en `G:` que la app no conoce. | Crea la cuenta como **archivada** (se lee en la próxima sincronización). |
+| **Carpeta movida/renombrada** | Una cuenta conocida ya no está en su sitio y hay una carpeta con **el mismo username o el mismo id de Instagram** en otro. | Actualiza la ruta de la cuenta a la nueva. |
+| **Carpeta ausente** | Una cuenta conocida ya no está en disco. | Nada: queda marcada como ausente (**no se borra la cuenta**). |
+| **Id de Instagram distinto** | El id que hay en disco no es el que guarda la app. | Guarda el id del disco. |
+| **Username repetido** | Hay dos carpetas con el mismo username. | Nada: resuélvelo con «Cambió de username…» (fusionar). |
+
+Si hubo errores de lectura (disco USB con problemas), **no se marca ninguna cuenta como ausente** para evitar falsas alarmas. Con `G:` desconectada la sincronización está desactivada.
+
+### Reglas (avanzado)
+
+Las reglas heredadas de `sc1` ahora se pueden cambiar en la base (`app_settings`): `library.max_depth` (3), `library.media_subfolders` (`reels,story,highlights`), `library.media_extensions`, `library.non_account_names`.
+
+### Cómo probarlo
+
+1. `Catálogo → Sincronizar con el disco → Rápida`: la primera vez dice que tomó cuentas «como base»; debe terminar en segundos y sin hallazgos.
+2. Repítela: debe leer **0 carpetas de cuentas** y no tener cambios.
+3. En el Explorador crea una carpeta de cuenta con una imagen dentro (en una categoría de prueba como `10.TEMP`) y ejecuta *Rápida*: sale **Carpeta nueva**. *Aceptar* → aparece como cuenta archivada (`Ver → Mostrar biblioteca completa`).
+4. Mueve una carpeta de cuenta con el Explorador y sincroniza: sale **Carpeta movida/renombrada**; *Aceptar* actualiza la ruta. (Muévela de vuelta después.)
+5. Añade una foto a una cuenta y pulsa **Verificar cuenta**: los contadores se actualizan.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «La biblioteca (G:) no está disponible» | `G:` desconectada: no se puede sincronizar. |
+| Una cuenta no se actualiza | Su fecha de carpeta no cambió (herramientas que no la tocan): usa **Verificar cuenta** o **Verificación completa**. |
+| Muchas cuentas «con cambios» tras renombrar un lote | Normal por ahora: el renombrado antiguo no anota contadores; la sincronización rápida lo corrige en segundos. |
+| Sale «Carpeta nueva» para algo que no es una cuenta | Una carpeta con ficheros multimedia sueltos cuenta como cuenta (igual que `sc1`): *Ignorar*. |

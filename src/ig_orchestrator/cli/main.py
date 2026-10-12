@@ -102,6 +102,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     audit_parser.add_argument("--csv", type=Path, default=None, help="Write CSV report here.")
     audit_parser.add_argument("--no-disk", action="store_true", help="Skip disk checks.")
 
+    scan_parser = subparsers.add_parser(
+        "scan", help="Synchronise bdapp with the library on disk (incremental, read-only on disk)."
+    )
+    scan_parser.add_argument("--scope", choices=("all", "category", "account"), default="all")
+    scan_parser.add_argument("--path", type=str, default="", help="Relative folder for --scope category.")
+    scan_parser.add_argument("--account", type=str, default="", help="Username for --scope account.")
+    scan_parser.add_argument("--deep", action="store_true", help="Re-read every folder (like sc1 --complete).")
+
     import_parser = subparsers.add_parser(
         "import-bdsc1",
         help="Import accounts_complete/accounts_lite (catalog + file index) into bdapp.",
@@ -128,6 +136,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _init_db(args.db_path)
     if args.command == "gui":
         return _run_gui(args.batch_json)
+    if args.command == "scan":
+        from ig_orchestrator.library.scan_cli import run_scan_cli
+
+        return run_scan_cli(args.scope, args.path, args.account, args.deep)
     if args.command == "import-bdsc1":
         from ig_orchestrator.library.import_cli import run_import_cli
 

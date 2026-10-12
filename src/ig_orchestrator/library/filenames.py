@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import calendar
+import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 
 FILENAME_RE = re.compile(
     r"^(\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.(\d{2}) (\d+)_(\d+)(.*)\.([A-Za-z0-9]+)$"
@@ -47,3 +49,29 @@ def parse_media_name(filename: str) -> MediaName | None:
         suffix=match.group(9),
         ext=ext,
     )
+
+
+# sc1 parser: any extension, owner id followed by optional free text (``_manual``, `` (1)``...).
+INSTAGRAM_NAME_RE = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.\d{2}) (?P<media_id>\d+)_(?P<owner_id>\d+)(?:[_\-\s].*)?\.[^.]+$"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class InstagramName:
+    timestamp: datetime
+    media_id: str
+    owner_id: str
+
+
+def parse_instagram_filename(filename: str) -> InstagramName | None:
+    """Same result as ``parse_instagram_filename`` in ``generatedirmap.py``."""
+
+    match = INSTAGRAM_NAME_RE.match(os.path.basename(filename))
+    if match is None:
+        return None
+    try:
+        stamp = datetime.strptime(match.group("timestamp"), "%Y-%m-%d %H.%M.%S")
+    except ValueError:
+        return None
+    return InstagramName(stamp, match.group("media_id"), match.group("owner_id"))

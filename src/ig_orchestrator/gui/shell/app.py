@@ -155,6 +155,7 @@ from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
 from ig_orchestrator.gui.library.fsops_actions import FsOpsActionsMixin
 from ig_orchestrator.gui.library.lifecycle_actions import AccountLifecycleActionsMixin
 from ig_orchestrator.gui.library.rename_actions import AccountRenameActionsMixin
+from ig_orchestrator.gui.library.scan_actions import LibraryScanActionsMixin
 from ig_orchestrator.gui.library.import_dialog import LibraryImportMixin
 from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
@@ -202,6 +203,7 @@ class InstagramOrchestratorApp(
     FsOpsActionsMixin,
     AccountLifecycleActionsMixin,
     AccountRenameActionsMixin,
+    LibraryScanActionsMixin,
     PullDialogMixin,
     PublishDialogMixin,
 ):

@@ -122,6 +122,9 @@ def _patch_gui_schema(connection: Connection) -> None:
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
     _patch_library_schema(connection)
     _add_column_if_missing(connection, "fs_operations", "payload", "TEXT")
+    for column in ("dir_mtime_root", "dir_mtime_story", "dir_mtime_reels", "dir_mtime_highlights"):
+        _add_column_if_missing(connection, "catalog_accounts", column, "REAL")
+    _add_column_if_missing(connection, "catalog_accounts", "scan_state", "TEXT NOT NULL DEFAULT 'UNKNOWN'")
     _add_column_if_missing(connection, "account_lifecycle", "payload", "TEXT")
     connection.execute(
         """
@@ -245,6 +248,30 @@ def _patch_library_schema(connection: Connection) -> None:
             imported_at TEXT NOT NULL,
             files INTEGER,
             bytes INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS scan_runs (
+            id INTEGER PRIMARY KEY,
+            scope TEXT NOT NULL,          -- ALL | CATEGORY | ACCOUNT | DEEP
+            rel_scope TEXT,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            dirs_stat INTEGER DEFAULT 0,
+            dirs_listed INTEGER DEFAULT 0,
+            files_seen INTEGER DEFAULT 0,
+            accounts_changed INTEGER DEFAULT 0,
+            accounts_new INTEGER DEFAULT 0,
+            accounts_missing INTEGER DEFAULT 0,
+            errors INTEGER DEFAULT 0,
+            seconds REAL
+        );
+        CREATE TABLE IF NOT EXISTS scan_findings (
+            id INTEGER PRIMARY KEY,
+            scan_run_id INTEGER NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,           -- NEW_FOLDER | MOVED_FOLDER | MISSING_FOLDER | OWNER_CHANGED | USERNAME_DUP
+            account_id INTEGER REFERENCES catalog_accounts(id) ON DELETE SET NULL,
+            rel_path TEXT,
+            detail TEXT,
+            resolved INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS account_usernames (
             id INTEGER PRIMARY KEY,

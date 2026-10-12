@@ -141,3 +141,12 @@ mantiene fresco el `media_index` (reemplaza las filas del `(cuenta, kind)` cuya 
 ## Fuera de alcance
 
 Índice de ficheros (`media`), detección automática de renombrados sin confirmación, observadores del sistema de ficheros (USN/ReadDirectoryChangesW) — se descartan por exigir G: conectada en todo momento.
+
+## Resultado de la implementación (2026-10-12, v3.8.0)
+
+- Implementado el escáner incremental con `stat` por carpeta, línea base tras la importación, escaneo por ámbito (todo, categoría, cuenta) y completo, hallazgos con Aceptar/Ignorar, reglas configurables y CLI.
+- **Paridad con `sc1` verificada** con un árbol de prueba (id de Instagram, contadores, último contenido y filas de índice). La única diferencia deliberada: el índice solo guarda `jpg`/`jpeg`/`mp4` (el resto cuenta en los contadores, como en `sc1`).
+- **Primer escaneo = línea base:** en tu base real tomó 1 158 cuentas como base y relistó 11 (sin id de Instagram). Si dudas de la importación, usa **Verificación completa**.
+- **No implementado (diferido):** indicador ✓/⟳/✕ en el árbol, aviso «hace N días» (`scan.remind_days`; el texto existe como `_scan_reminder`), botones *Mover*/*Renombrar* dentro de hallazgos (se resuelven con «Cambió de username…» / «Mover a…»), prueba automática contra `generatedirmap.py` (se ejecutó a mano), hilos para el `stat` (0,5 s con caché; ~40 s en frío medido antes).
+- **Write-through pendiente:** hasta los feats 9–10 el renombrado (`sc2`) no anota contadores, así que las carpetas que toca aparecen como «con cambios» en la siguiente sincronización rápida (esperado y barato).
+- `accounts_lite` no se actualiza con el escáner (se retira `sc1`); las cuentas nuevas aceptadas no se escriben en lite.

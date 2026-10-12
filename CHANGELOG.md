@@ -1,5 +1,36 @@
 # Changelog
 
+## v3.8.0 - feat-uc3-8: sincronización incremental disco ↔ app (sustituye a `sc1`)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Mantiene `bdapp` al día con el disco **leyendo lo mínimo**: una consulta de fecha de modificación por carpeta de cuenta y subcarpeta decide qué relistar. Solo a petición, nunca al arrancar, y **no escribe en el disco**.
+
+### Creado
+
+* `library/scanner.py` (`LibraryScanner.scan(scope, deep=…)`, `accept_finding`, `ignore_finding`, `list_findings`), `library/rules.py` (reglas de `sc1` ahora configurables en `app_settings`), `library/scan_cli.py`, `filenames.parse_instagram_filename` (mismo parser que `sc1`).
+* Tablas `scan_runs`, `scan_findings`; columnas `catalog_accounts.dir_mtime_{root,story,reels,highlights}` y `scan_state`.
+* Comando `python -m ig_orchestrator scan [--scope all|category|account] [--path REL] [--account USER] [--deep]`.
+* GUI: `Catálogo → Sincronizar con el disco` (**Rápida**, **Verificar categoría**, **Verificar cuenta**, **Verificación completa…**, **Hallazgos…**), clic derecho en cuenta/carpeta, ventana de **hallazgos** (Aceptar / Ignorar).
+* Tests: `tests/library/test_scanner.py` (14) y `tests/gui/test_scan_actions.py`.
+
+### Cómo funciona
+
+* **Primera vez tras importar:** se toma la importación como base (solo se anota la fecha de cada carpeta) y se relistan únicamente las cuentas sin id de Instagram. Las siguientes sincronizaciones relistan solo las carpetas cuya fecha cambió.
+* **Detecta (sin aplicar solo):** carpeta nueva, carpeta movida/renombrada (misma cuenta o mismo id), carpeta ausente (se marca `disk_state = MISSING`, **no se borra nada**), id de Instagram distinto, username repetido.
+* **Mantiene:** contadores de posts/reels/story/highlights, fecha del último contenido, id de Instagram (solo rellena vacíos) y el índice de ficheros de las carpetas que cambiaron.
+* Si hubo errores de lectura no se marca ninguna cuenta como ausente. Con `G:` desconectada no se puede sincronizar.
+* **Paridad con `sc1`:** la verificación completa produce los mismos id, contadores, último contenido y filas de índice que `generatedirmap.py --complete` sobre un árbol de prueba.
+
+### Modificado
+
+* `db/gui_migrations.py`, `cli/main.py`, `gui/chrome/menubar.py`, `gui/catalog/panel.py`, `gui/library/fsops_actions.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.8.0.
+* `docs/feat-uc3-8.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 484 passed (1 omitido: prueba de Tk). Sobre una **copia** de tu base y tu `G:` real (solo lectura): 1 169 cuentas revisadas en ~0,5 s, 4 676 consultas de carpeta, 0 hallazgos, dos veces seguidas.
+
 ## v3.7.0 - feat-problem1-7: cuenta renombrada en Instagram (renombrar o fusionar)
 
 Fecha: 2026-10-12 · Rama: `v3/integration`
