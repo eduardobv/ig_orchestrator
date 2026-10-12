@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.12.0 - feat-uc2-12: catálogo avanzado (ficha, multiselección, arrastrar, papelera)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+### Creado
+
+* `library/account_card.py` + `gui/library/catalog_advanced.py`: **Ficha de la cuenta** (id de Instagram, fecha del primer post, favorita, notas; solo lectura: carpeta, estado de disco, contadores, nombres anteriores, últimos lotes y operaciones) con validaciones (id numérico, avisa si otro registro tiene el mismo id o si difiere del id mayoritario de los ficheros; fecha válida y no futura). Columna `catalog_accounts.notes`.
+* **Selección múltiple** en el árbol del catálogo y **Mover cuentas seleccionadas** como un único plan (`FsOperationService.plan_move_accounts`): las que no se pueden mover se omiten con una nota y todas forman un solo grupo deshacible.
+* **Arrastrar y soltar** cuentas (o una carpeta) sobre una carpeta del árbol: abre la vista previa del plan, nunca ejecuta directamente.
+* **Abrir carpeta** y **Copiar ruta** en el menú contextual.
+* `library/trash.py` + tabla `trash_items`: **papelera** (`LIBRARY\.trash\<fecha>__<usuario>`, mismo volumen, instantánea), **restaurar** (si el sitio original está libre), **vaciar** con confirmación escribiendo `ELIMINAR`. Bloqueos: lote en ejecución, datos pendientes en el almacén, biblioteca no disponible. `.trash` se añade a las carpetas que el escáner no toma como cuentas.
+* Tests: `tests/library/test_catalog_advanced.py`.
+
+### Modificado
+
+`library/fsops.py`, `library/rules.py`, `gui/catalog/panel.py` (selectmode extended, arrastre, menú), `gui/chrome/menubar.py` (Catálogo → Ficha / Papelera), `gui/shell/app.py`, locales, `README.md`, versión 3.12.0. `docs/feat-uc2-12.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 535 passed. Prueba de GUI con copia de la base: soltar 2 cuentas sobre una carpeta (plan de 2 pasos, movidas) y enviar otra a la papelera. **No probado con tu `G:` real.**
+
 ## v3.11.0 - feat-uc6-11: almacén de procesadas y volcado a G:
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

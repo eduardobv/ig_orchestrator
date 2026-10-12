@@ -108,3 +108,10 @@ Un único panel **Operaciones de disco** (de `feat-uc2-4`) con filtros y botón 
 
 - `compareProcess` de `sc2` (comparar y reemplazar vídeos por tamaño): se **aparca**; si se quiere conservar, abrir un feat propio «Herramienta de comparación» (aislada del catálogo).
 - Previsualización de medios en la propia app, etiquetas/colecciones, búsqueda por contenido.
+
+## Resultado de la implementación (2026-10-12, v3.12.0)
+
+- Implementado: 12a (ficha editable con validaciones, multiselección, abrir carpeta, copiar ruta), 12b (mover varias cuentas en un solo plan y arrastrar y soltar con vista previa), 12c (papelera con restaurar y vaciado con palabra de confirmación, bloqueos).
+- No implementado: fusionar genérico entre cualquier par de carpetas (queda la fusión de cuentas del feat 7), «Eliminar también del catálogo» (la cuenta pasa a estado Eliminada), retención automática de la papelera en la interfaz (el servicio ya soporta `retention_days`), selector de carpeta/grupo en la ficha (se mueve con el plan), panel de operaciones con la papelera (la papelera tiene su propia lista), mover/renombrar en lote de carpetas.
+- Arrastrar: probado por llamada directa al manejador, no con ratón real.
+- Sin probar con `G:` real.

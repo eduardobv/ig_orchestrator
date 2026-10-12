@@ -208,6 +208,8 @@ class MenubarMixin:
         sync_menu.add_command(label=t("scan.findings_menu"), command=self._open_scan_findings)
         catalog_menu.add_cascade(label=t("scan.menu"), menu=sync_menu)
         catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
+        catalog_menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
+        catalog_menu.add_command(label=t("trash.open"), command=self._open_trash_dialog)
         catalog_menu.add_command(label=t("index.menu"), command=self._verify_account_index)
         catalog_menu.add_separator()
         catalog_menu.add_command(label=t("rename.menu"), command=self._catalog_username_changed)

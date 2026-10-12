@@ -147,6 +147,7 @@ from ig_orchestrator.gui.chrome.statusbar import StatusBarMixin
 from ig_orchestrator.gui.chrome.toolbar import ToolbarMixin
 from ig_orchestrator.gui.editor.panel import EditorPanelMixin
 from ig_orchestrator.gui.run.controller import RunControllerMixin
+from ig_orchestrator.gui.library.catalog_advanced import CatalogAdvancedMixin
 from ig_orchestrator.gui.library.index_actions import IndexActionsMixin
 from ig_orchestrator.gui.library.staging_panel import StagingPanelMixin
 from ig_orchestrator.gui.run.integrated_rename import IntegratedRenameMixin
@@ -202,6 +203,7 @@ class InstagramOrchestratorApp(
     RenameMixin,
     IntegratedRenameMixin,
     IndexActionsMixin,
+    CatalogAdvancedMixin,
     StagingPanelMixin,
     StoriesInboxMixin,
     LibraryAuditMixin,

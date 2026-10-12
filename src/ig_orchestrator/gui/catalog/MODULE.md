@@ -25,3 +25,7 @@ Lanzar `run_continue` ni mutar `self.accounts` (salvo pintar tag in_batch).
 
 ## Tests
 `tests/gui/test_catalog.py`, `tests/gui/test_catalog_tree.py`
+
+## Catálogo avanzado (v3.12)
+
+El árbol usa `selectmode="extended"`. `gui/library/catalog_advanced.py` (mixin) aporta ficha de cuenta, mover varias cuentas (`FsOperationService.plan_move_accounts`), arrastrar y soltar (`_drop_on_catalog_tree`), abrir carpeta/copiar ruta y la papelera (`library/trash.py`).

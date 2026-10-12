@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 # Content/category folders that are never usernames (same list as sc1).
 DEFAULT_NON_ACCOUNT_NAMES = (
-    ".thumb.stogram", "highlights", "mobile", "reels", "story", "tagged", "telegram", "otros", "captura",
+    ".thumb.stogram", ".trash", "highlights", "mobile", "reels", "story", "tagged", "telegram", "otros", "captura",
 )
 DEFAULT_MEDIA_SUBFOLDERS = ("reels", "story", "highlights")
 DEFAULT_MEDIA_EXTENSIONS = ("mp4", "mov", "wmv", "jpe", "jpeg", "jpg", "png")

@@ -176,7 +176,7 @@ class CatalogPanelMixin:
         )
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
         self.catalog_tree = ttk.Treeview(
-            parent, show="tree", selectmode="browse"
+            parent, show="tree", selectmode="extended"
         )
         self.catalog_tree.grid(row=2, column=0, sticky="nsew")
         self.catalog_tree.bind(
@@ -186,6 +186,7 @@ class CatalogPanelMixin:
             "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
         )
         self.catalog_tree.bind("<Button-3>", self._show_catalog_menu)
+        self._setup_catalog_drag_and_drop()
         self._apply_catalog_view_visibility()
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
         self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
@@ -208,9 +209,13 @@ class CatalogPanelMixin:
             label="Activar", command=self._enable_catalog_account
         )
         self.catalog_menu.add_separator()
+        self.catalog_menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
         self.catalog_menu.add_command(
-            label=t("fsops.move_account"), command=self._catalog_move_account
+            label=t("fsops.move_account"), command=self._catalog_move_selected
         )
+        self.catalog_menu.add_command(label=t("card.open_folder"), command=self._catalog_open_folder)
+        self.catalog_menu.add_command(label=t("card.copy_path"), command=self._catalog_copy_path)
+        self.catalog_menu.add_command(label=t("trash.delete"), command=self._catalog_delete_to_trash)
         self.catalog_menu.add_command(
             label=t("scan.account"), command=self._sync_account
         )

@@ -527,6 +527,11 @@ Cuando vuelvas a conectar `G:`: **Lote → Mover renombradas pendientes…**. **
 `Ajustes > Catalogo` define una carpeta local de **almacén**. En *Renombrar* eliges el destino de las procesadas (Biblioteca o Almacén). Con el almacén, `G:` puede estar apagada:
 cuando la conectes, **Lote > Pendiente de volcar a G:...** fusiona lo almacenado en su sitio (sin sobrescribir, con comprobación de tamaño).
 
+### Catálogo avanzado
+
+Clic derecho en una cuenta: **Ficha de la cuenta…**, **Mover cuentas seleccionadas** (Ctrl/Mayús para varias), **Abrir carpeta**, **Copiar ruta**, **Eliminar (a la papelera)…**.
+También se puede arrastrar cuentas sobre una carpeta. **Catálogo → Papelera…** restaura o vacía (pide escribir `ELIMINAR`).
+
 ### Sincronizar con el disco
 
 `Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).

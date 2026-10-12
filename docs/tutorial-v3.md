@@ -16,6 +16,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 9 · Renombrado integrado | v3.9.0 | [Feat 9](#feat-9--renombrado-integrado-v390) |
 | 10 · Renombrar sin G: | v3.10.0 | [Feat 10](#feat-10--renombrar-sin-la-unidad-g-v3100) |
 | 11 · Almacén y volcado | v3.11.0 | [Feat 11](#feat-11--almacen-y-volcado-a-g-v3110) |
+| 12 · Catálogo avanzado | v3.12.0 | [Feat 12](#feat-12--catalogo-avanzado-v3120) |
 
 ---
 
@@ -845,3 +846,54 @@ Si moviste o renombraste la cuenta en el catálogo mientras esperaba, el volcado
 | Cuenta en *Conflicto* | Un fichero con el mismo nombre ya existe en `G:`. Revisa y decide a mano; el almacén conserva el original. |
 | «No hay espacio suficiente en el almacén» al renombrar | El disco del almacén no tiene sitio para esa cuenta; la cuenta se queda sin mover. |
 | Una cuenta nueva almacenada no se renombra por segunda vez | Hasta volcarla no tiene carpeta en el catálogo; vuélcala primero. |
+
+
+---
+
+## Feat 12 · Catálogo avanzado (v3.12.0)
+
+**Para qué sirve:** gestionar la biblioteca desde el árbol del catálogo, sin el Explorador ni editar SQLite a mano.
+
+### Ficha de la cuenta — clic derecho → *Ficha de la cuenta…* (o Catálogo → Ficha de la cuenta…)
+
+| Campo | Qué hacer |
+|---|---|
+| **Id de Instagram** | Solo dígitos. Avisa si otro registro ya tiene ese id o si los ficheros de la cuenta son mayoritariamente de otro id. **No renombra ficheros.** |
+| **Fecha del primer post** | `AAAA-MM-DD`, no futura. La usa el renombrado de cuentas nuevas. |
+| **Favorita / Notas** | Libres. |
+| Solo lectura | Estado, carpeta, estado de disco, contadores, último contenido, nombres anteriores, últimos lotes y últimas operaciones. |
+
+Si hay avisos (no errores) puedes **guardar de todos modos**; los errores bloquean el guardado.
+
+### Seleccionar varias cuentas y moverlas
+
+En el árbol (vista árbol) usa **Ctrl** o **Mayús** para seleccionar varias cuentas → clic derecho → **Mover cuentas seleccionadas** → elige la carpeta destino.
+Sale **un único plan**: las cuentas que no se pueden mover (ya están allí, carpeta repetida, lote en ejecución…) se omiten con una nota. Todo se guarda como **un grupo** en el historial, así que **Deshacer** revierte todas a la vez.
+
+### Arrastrar y soltar
+
+Arrastra una o varias cuentas seleccionadas (o una carpeta) sobre otra carpeta del árbol. Se abre la **vista previa del plan**; hasta que no pulses *Ejecutar* no se mueve nada. Con *Esc* cancelas el arrastre.
+
+### Abrir carpeta / Copiar ruta
+
+Clic derecho en una cuenta. *Copiar ruta* copia la ruta de cada cuenta seleccionada (una por línea).
+
+### Papelera — clic derecho → *Eliminar (a la papelera)…* y Catálogo → *Papelera…*
+
+* **Eliminar** mueve la carpeta a `G:\4K Stogram\.trash\<fecha>__<usuario>` (instantáneo, no copia nada) y la cuenta queda como *Eliminada* sin carpeta. Antes te lista cuáles se eliminarán y cuáles **están bloqueadas** (en un lote en ejecución, con datos pendientes de volcar en el almacén, o con `G:` desconectada).
+* **Papelera…** muestra lo que hay (ficheros, tamaño, fecha, sitio original). **Restaurar** devuelve la carpeta a su sitio original si sigue libre.
+* **Eliminar definitivamente / Vaciar papelera…** borra de verdad. Te muestra el recuento y exige **escribir `ELIMINAR`**.
+
+### Cómo probarlo
+
+1. Selecciona dos cuentas con Ctrl → arrástralas sobre otra carpeta → revisa el plan → *Ejecutar*. Luego *Historial de operaciones → Deshacer*.
+2. Abre la **Ficha** de una cuenta, cambia el id a uno que tenga otra cuenta y comprueba el aviso.
+3. Elimina una cuenta de prueba (`10.TEMP`), mira que desaparece de `G:` y aparece en **Papelera…**, restáurala.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «Se omite: …» en el plan | Esa cuenta no puede moverse (mismo destino, carpeta repetida, lote en ejecución, sin carpeta). Las demás sí. |
+| «El sitio original está ocupado» al restaurar | Hay otra carpeta con ese nombre; muévela o renómbrala y restaura de nuevo. |
+| No puedo eliminar una cuenta | Está en un lote en ejecución, tiene datos en el almacén o `G:` no está conectada. |

@@ -255,6 +255,30 @@ class FsOperationService:
         plan.steps.append(Step(OpType.MOVE_DIR, src, dst, account_id))
         return plan
 
+    def plan_move_accounts(self, account_ids: list[int], dest_folder_id: int) -> Plan:
+        """One plan for several accounts: the ones that cannot move are skipped (non-blocking notes)."""
+
+        dest = self.folder(dest_folder_id)
+        plan = Plan(f"Mover {len(account_ids)} cuenta(s) -> '{dest.rel_path or 'raiz'}'")
+        seen: set[str] = set()
+        for account_id in account_ids:
+            single = self.plan_move_account(account_id, dest_folder_id)
+            name = self.conn.execute("SELECT username FROM catalog_accounts WHERE id = ?", (account_id,)).fetchone()[0]
+            if not single.can_execute:
+                for c in single.blocking:
+                    plan.conflicts.append(Conflict("SKIPPED", f"@{name} se omite: {c.message}", False))
+                continue
+            step = single.steps[0]
+            if rel_key(step.dst_rel) in seen:
+                plan.conflicts.append(Conflict("SKIPPED", f"@{name} se omite: otra cuenta del grupo tiene el mismo nombre de carpeta", False))
+                continue
+            seen.add(rel_key(step.dst_rel))
+            plan.steps.append(step)
+        plan.affected_accounts = len(plan.steps)
+        if not plan.steps:
+            plan.conflicts.append(Conflict("NOTHING_TO_DO", "Ninguna de las cuentas seleccionadas se puede mover"))
+        return plan
+
     # -------------------------------------------------------------- execution
     def execute(self, plan: Plan) -> str:
         if not plan.can_execute:
