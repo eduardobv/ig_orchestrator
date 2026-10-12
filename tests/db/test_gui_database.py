@@ -110,7 +110,7 @@ def test_init_gui_database_is_idempotent_and_seeds_lookups(tmp_path: Path) -> No
     assert version == GUI_SCHEMA_USER_VERSION
     assert EXPECTED_TABLES.issubset(table_names)
     assert "v_all_statuses" in view_names
-    assert catalog_status_codes == ["ENABLED", "INACTIVE", "DISABLED", "CHANGED", "ARCHIVED"]
+    assert catalog_status_codes == ["ENABLED", "INACTIVE", "DISABLED", "CHANGED", "ARCHIVED", "DELETED"]
     assert "STORIES_NOT_FOUND" in bot_error_codes
     assert "MEDIA_NOT_FOUND_OR_UNAVAILABLE" in bot_error_codes
     assert batch_count == 0

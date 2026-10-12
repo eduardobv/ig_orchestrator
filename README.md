@@ -504,6 +504,13 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Cuentas eliminadas en Instagram
+
+`Catalogo > Marcar como eliminada...` (o clic derecho sobre la cuenta): pone la cuenta en `DELETED` y mueve su carpeta a `09.DELETED\<cuenta>`, con vista previa.
+`Marcar varias...` acepta usernames pegados; `Restaurar cuenta eliminada...` la devuelve a su carpeta y estado anteriores; `Sugerir eliminadas...` propone candidatas
+(cuentas con "no encontrada" en 2 o mas lotes; solo una pista); `Etiquetar 09.DELETED...` clasifica sin mover las cuentas que ya estan en esa carpeta.
+**Ocultar** (antes "Delete") solo oculta la cuenta del catalogo (`DISABLED`) y no mueve nada.
+
 ### Operaciones de disco desde el catálogo
 
 En el árbol del catálogo (`Ver` → vista de árbol): clic derecho en una **carpeta** → *Nueva carpeta…*, *Renombrar carpeta…*, *Mover a…*;

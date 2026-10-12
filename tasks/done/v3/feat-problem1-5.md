@@ -111,3 +111,12 @@ sin mover nada (`previous_rel_path = NULL`).
 ## Fuera de alcance
 
 Borrado físico de carpetas (→ `feat-uc2-12`, con cuarentena), detección automática sin confirmación, renombrados (→ `feat-problem1-7`).
+
+## Resultado de la implementación (2026-10-12, v3.5.0)
+
+- **`DELETED` tiene id 6** (el 5 ya era `ARCHIVED`). `DELETED` se oculta del catálogo/editor igual que `ARCHIVED` (visible con `Mostrar biblioteca completa`), en lugar de mostrarse como `DISABLED`: evita inundar la lista con las 134 de `09.DELETED`.
+- El destino usa el **nombre de la carpeta** de la cuenta (normalmente igual al username). Opción `library.deleted_keep_group` implementada (crea la carpeta de grupo si falta).
+- **Cuentas en lotes borrador:** solo se avisa (no se quitan del lote); las que están en un lote en ejecución bloquean.
+- Estado y movimiento no comparten transacción SQLite (el movimiento tiene su propio diario); si la app muriera justo entre ambos, `Etiquetar 09.DELETED…` corrige el estado.
+- Multi-selección: se implementó pegando usernames (el catálogo no tiene selección múltiple todavía).
+- Sin probar contra `G:` real: primera prueba recomendada con una cuenta de `10.TEMP`, luego **Deshacer** o **Restaurar**.

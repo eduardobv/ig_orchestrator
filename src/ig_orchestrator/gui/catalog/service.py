@@ -184,7 +184,7 @@ def _deduplicate(entries: Iterable[AccountCatalogEntry]) -> list[AccountCatalogE
 def _catalog_sort_key(entry: AccountCatalogEntry) -> tuple[object, ...]:
     username = entry.username.casefold()
     destination_path = (entry.destination_path or "").strip().casefold()
-    if entry.status is AccountHistoryStatus.ARCHIVED:
+    if entry.status in (AccountHistoryStatus.ARCHIVED, AccountHistoryStatus.DELETED):
         return (5, username)
     if entry.status is AccountHistoryStatus.DISABLED:
         return (4, username)

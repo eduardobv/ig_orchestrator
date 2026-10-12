@@ -7,6 +7,7 @@ from tkinter import messagebox, ttk
 
 from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
+from ig_orchestrator.library.account_lifecycle import AccountLifecycleService
 from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
 
 
@@ -75,6 +76,7 @@ def open_history(app) -> None:
             return
         try:
             service.undo(group)
+            AccountLifecycleService(app.connection).restore_after_undo(group)
         except FsOpsError as exc:
             messagebox.showerror(t("ops.title"), str(exc), parent=window)
             return

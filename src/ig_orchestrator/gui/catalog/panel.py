@@ -201,13 +201,21 @@ class CatalogPanelMixin:
             command=lambda: self._set_catalog_account_favorite(False),
         )
         self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(label="Delete", command=self._disable_catalog_account)
+        self.catalog_menu.add_command(
+            label=t("menu.catalog.delete"), command=self._disable_catalog_account
+        )
         self.catalog_menu.add_command(
             label="Activar", command=self._enable_catalog_account
         )
         self.catalog_menu.add_separator()
         self.catalog_menu.add_command(
             label=t("fsops.move_account"), command=self._catalog_move_account
+        )
+        self.catalog_menu.add_command(
+            label=t("life.mark_deleted"), command=self._catalog_mark_deleted
+        )
+        self.catalog_menu.add_command(
+            label=t("life.restore"), command=self._catalog_restore_deleted
         )
 
 

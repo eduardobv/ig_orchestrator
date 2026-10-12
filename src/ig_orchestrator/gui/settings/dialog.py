@@ -250,6 +250,20 @@ class SettingsDialogWithTabs:
             btn.grid(row=0, column=index, padx=(0, 4))
             self.color_buttons[key] = btn
 
+        ttk.Label(frame, text=t("settings.deleted_folder")).grid(row=2, column=0, sticky="w")
+        self.deleted_folder_var = tk.StringVar(
+            value=_gui_setting(self.connection, "library.deleted_folder_rel", "09.DELETED")
+        )
+        ttk.Entry(frame, textvariable=self.deleted_folder_var, width=32).grid(
+            row=3, column=0, sticky="w", pady=(0, 6)
+        )
+        self.deleted_keep_group_var = tk.BooleanVar(
+            value=_gui_setting(self.connection, "library.deleted_keep_group", "0") in {"1", "true"}
+        )
+        ttk.Checkbutton(
+            frame, text=t("settings.deleted_keep_group"), variable=self.deleted_keep_group_var
+        ).grid(row=4, column=0, sticky="w")
+
     def _build_instances_tab(self) -> None:
         if not is_gui_schema(self.connection):
             return
@@ -354,6 +368,25 @@ class SettingsDialogWithTabs:
 
             # Stories first
             write_stories_first_enabled(self.connection, self.stories_first.get())
+
+            # Deleted accounts folder
+            for key, value, kind in (
+                (
+                    "library.deleted_folder_rel",
+                    self.deleted_folder_var.get().strip().strip("\\/") or "09.DELETED",
+                    "TEXT",
+                ),
+                ("library.deleted_keep_group", "1" if self.deleted_keep_group_var.get() else "0", "BOOLEAN"),
+            ):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES (?, ?, ?, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value, updated_at = excluded.updated_at
+                    """,
+                    (key, value, kind),
+                )
 
             # Notify settings
             self.connection.execute(

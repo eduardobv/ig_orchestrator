@@ -75,7 +75,7 @@ class GuiCatalogRepository(AccountHistoryRepository):
         return _row_to_history(row)
 
     def list_all(self, include_archived: bool = False) -> list[AccountHistory]:
-        where = "" if include_archived else " WHERE cas.code <> 'ARCHIVED'"
+        where = "" if include_archived else " WHERE cas.code NOT IN ('ARCHIVED', 'DELETED')"
         rows = self.connection.execute(
             _CATALOG_SELECT + where + " ORDER BY ca.id"
         ).fetchall()
@@ -85,7 +85,7 @@ class GuiCatalogRepository(AccountHistoryRepository):
         disabled_id = self._lookups.id_for("catalog_account_statuses", "DISABLED")
         rows = self.connection.execute(
             _CATALOG_SELECT
-            + " WHERE ca.status_id <> ? AND cas.code <> 'ARCHIVED' ORDER BY ca.id",
+            + " WHERE ca.status_id <> ? AND cas.code NOT IN ('ARCHIVED', 'DELETED') ORDER BY ca.id",
             (disabled_id,),
         ).fetchall()
         return [_row_to_history(row) for row in rows]
@@ -105,7 +105,7 @@ class GuiCatalogRepository(AccountHistoryRepository):
             FROM catalog_accounts ca
             JOIN catalog_folders cf ON cf.id = ca.folder_id
             JOIN catalog_account_statuses cas ON cas.id = ca.status_id
-            WHERE TRIM(cf.full_path) <> '' AND cas.code <> 'ARCHIVED'
+            WHERE TRIM(cf.full_path) <> '' AND cas.code NOT IN ('ARCHIVED', 'DELETED')
             ORDER BY destination_path COLLATE NOCASE
             """
         ).fetchall()

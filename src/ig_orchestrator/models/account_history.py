@@ -11,6 +11,7 @@ class AccountHistoryStatus(StrEnum):
     DISABLED = "DISABLED"
     CHANGED = "CHANGED"
     ARCHIVED = "ARCHIVED"  # on disk only; hidden unless the full library is shown
+    DELETED = "DELETED"  # no longer exists on Instagram; folder archived
 
 
 def utc_now() -> datetime:

@@ -24,8 +24,18 @@ def plan_rows(plan: Plan) -> list[tuple[str, str, str]]:
     ]
 
 
-def confirm_plan(parent: tk.Misc, plan: Plan) -> bool:
-    """Show the plan modally; returns True only if the user confirms a runnable plan."""
+def confirm_plan(
+    parent: tk.Misc,
+    plan: Plan,
+    *,
+    extra_rows: list[tuple[str, str, str]] | None = None,
+    can_execute: bool | None = None,
+) -> bool:
+    """Show the plan modally; returns True only if the user confirms a runnable plan.
+
+    ``extra_rows`` lists effects that are not disk steps (e.g. status-only changes);
+    ``can_execute`` overrides the plan rule when the plan has no disk steps.
+    """
 
     window = tk.Toplevel(parent)
     window.title(t("plan.title"))
@@ -52,7 +62,7 @@ def confirm_plan(parent: tk.Misc, plan: Plan) -> bool:
     for column, width in zip(columns, (110, 300, 300), strict=True):
         tree.heading(column, text=t(f"plan.col.{column}"))
         tree.column(column, width=width, anchor="w")
-    for row in plan_rows(plan):
+    for row in [*plan_rows(plan), *(extra_rows or [])]:
         tree.insert("", tk.END, values=row)
     tree.grid(row=2, column=0, sticky="nsew")
 
@@ -73,7 +83,8 @@ def confirm_plan(parent: tk.Misc, plan: Plan) -> bool:
     ttk.Button(buttons, text=t("plan.cancel"), command=window.destroy).pack(side=tk.RIGHT, padx=(6, 0))
     run = ttk.Button(buttons, text=t("plan.execute"), command=_ok)
     run.pack(side=tk.RIGHT)
-    if not plan.can_execute:
+    runnable = plan.can_execute if can_execute is None else can_execute
+    if not runnable:
         run.configure(state="disabled")
     bind_escape_close(window, on_close=window.destroy)
     window.grab_set()

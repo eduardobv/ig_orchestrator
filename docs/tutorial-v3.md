@@ -9,6 +9,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 2 · Instancias y «Traer descargas» | v3.2.0 | [Feat 2](#feat-2--instancias-y-traer-descargas-v320) |
 | 3 · Catálogo completo en la app | v3.3.0 | [Feat 3](#feat-3--catálogo-completo-en-la-app-v330) |
 | 4 · Operaciones de disco desde el catálogo | v3.4.0 | [Feat 4](#feat-4--operaciones-de-disco-desde-el-catálogo-v340) |
+| 5 · Cuenta eliminada en Instagram | v3.5.0 | [Feat 5](#feat-5--cuenta-eliminada-en-instagram-v350) |
 
 ---
 
@@ -329,3 +330,66 @@ Si la app se cierra a mitad de una operación, **al abrirla** comprueba el disco
 | Las opciones salen desactivadas | `G:` no está conectada o hay un proceso en ejecución. |
 | «Ya existe en disco» | Hay una carpeta con ese nombre: elige otro nombre u otro destino (no se fusiona). |
 | Una carpeta no se ve tras crearla | Solo se muestran carpetas con cuentas o recién creadas vacías; pulsa el filtro vacío para refrescar. |
+
+
+---
+
+## Feat 5 · Cuenta eliminada en Instagram (v3.5.0)
+
+**Para qué sirve:** cuando una cuenta ya no existe en Instagram, un solo paso la marca como **eliminada** y mueve su carpeta a `G:\4K Stogram\09.DELETED`. Sustituye al proceso manual (marcar + mover en el Explorador + tocar las bases a mano). Usa el motor del feat 4: vista previa, historial y deshacer.
+
+> **Primera vez:** pruébalo con una cuenta de `10.TEMP`, y luego pulsa **Deshacer** o **Restaurar**. `G:` debe estar conectada.
+
+### Dónde está
+
+| Acción | Dónde | Qué hace |
+|---|---|---|
+| **Marcar como eliminada…** | Clic derecho en la cuenta, o `Catálogo → Marcar como eliminada…` | Estado `DELETED` + mueve la carpeta a `09.DELETED\<cuenta>`. Quita el favorito. |
+| **Marcar varias como eliminadas…** | `Catálogo` | Pega varios usernames (uno por línea o separados por comas) y obtienes **un solo** plan. |
+| **Restaurar cuenta eliminada…** | Clic derecho / `Catálogo` | Devuelve la carpeta a su sitio anterior y el estado que tenía. Solo cuentas `DELETED`. |
+| **Sugerir eliminadas…** | `Catálogo` | Lista cuentas que fallaron con «no encontrada» en **2 o más lotes** distintos y sin descargas correctas después. **Es solo una pista**: nunca actúa sola. Selecciona y pulsa *Vista previa…*. |
+| **Etiquetar 09.DELETED…** | `Catálogo` | Marca como `DELETED` las cuentas que **ya estaban** en `09.DELETED` (sin mover nada). Úsalo una vez tras importar. |
+| **Ocultar** | Clic derecho / `Catálogo` | Antes se llamaba «Delete». Solo oculta la cuenta (`DISABLED`); **no mueve nada**. |
+
+### Dónde se ven las cuentas eliminadas
+
+Las cuentas `DELETED` **no salen** en el catálogo normal (igual que las archivadas). Para verlas: `Ver → Mostrar biblioteca completa` (salen en color **lila**).
+
+### La vista previa (misma ventana del feat 4)
+
+| Texto | Significa |
+|---|---|
+| Fila *Mover* `De → A` | La carpeta que se moverá a la carpeta de eliminadas. |
+| Fila *Solo estado* | La cuenta no tiene carpeta en disco o ya está en `09.DELETED`: solo cambia el estado. |
+| `era favorita` (aviso) | Dejará de ser favorita; se restaura si deshaces o restauras. |
+| `el id … aparece también en @otra` (aviso) | Probablemente es un **renombrado**, no una eliminación: revísalo antes (feat 7 lo resolverá). No bloquea. |
+| `lote borrador` (aviso) | La cuenta sigue en ese lote borrador; no se quita. |
+| `ACCOUNT_IN_ACTIVE_BATCH` (rojo) | Está en un lote en ejecución: bloquea. |
+| `DEST_EXISTS` (rojo) | Ya hay una carpeta con ese nombre en `09.DELETED`. La app pregunta si usar sufijo `_2`. |
+
+### Ajustes — `Ajustes → Catálogo`
+
+| Campo | Qué hace |
+|---|---|
+| Carpeta de cuentas eliminadas | Carpeta relativa a la biblioteca (por defecto `09.DELETED`). |
+| Conservar la carpeta de grupo | Si lo marcas, usa `09.DELETED\<grupo>\<cuenta>` en vez de plano. Por defecto desmarcado (plano, como tus 134 actuales). |
+
+### Deshacer
+
+`Catálogo → Operaciones de disco…` → selecciona la operación → **Deshacer**: la carpeta vuelve a su sitio y la cuenta recupera su estado y su favorito anteriores. **Restaurar** hace lo mismo a posteriori, sin depender del historial.
+
+### Si pasa algo raro
+
+| Síntoma | Causa |
+|---|---|
+| Al abrir la app dice que completó una operación | Se cerró a mitad: la app lo comprobó en disco y lo dejó consistente. |
+| La cuenta aparece movida pero sigue sin estado «eliminada» | Muy raro (corte entre el movimiento y el estado): usa **Etiquetar 09.DELETED…**. |
+| «Restaurar» solo cambia el estado | La cuenta se etiquetó sin moverla: no se conoce su carpeta anterior. |
+| Intentas añadir al editor una cuenta eliminada | La app pide confirmación explícita. |
+
+### Cómo probarlo
+
+1. `Ver → Mostrar biblioteca completa` y `Catálogo → Etiquetar 09.DELETED…`: clasifica las ~134 que ya estaban en esa carpeta (no mueve nada).
+2. Clic derecho en una cuenta de `10.TEMP` → **Marcar como eliminada…** → revisa la vista previa → *Ejecutar*. Comprueba la carpeta en `09.DELETED`.
+3. `Catálogo → Operaciones de disco…` → **Deshacer** (vuelve todo). Repite y esta vez usa **Restaurar cuenta eliminada…**.
+4. Pega 2 usernames en **Marcar varias…** y revisa que sale un solo plan.

@@ -150,7 +150,17 @@ def _patch_library_schema(connection: Connection) -> None:
                 'On disk only; never downloaded by the app.', '#e8eaed', 5, 1)
         """
     )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO catalog_account_statuses
+            (id, code, name, description, color_hex, sort_order, is_active)
+        VALUES (6, 'DELETED', 'Deleted on Instagram',
+                'Account no longer exists; folder archived.', '#d9d2e9', 6, 1)
+        """
+    )
     for column, definition in (
+        ("deleted_at", "TEXT"),
+        ("previous_rel_path", "TEXT"),
         ("rel_path", "TEXT"),
         ("posts_count", "INTEGER"),
         ("reels_count", "INTEGER"),
@@ -213,6 +223,18 @@ def _patch_library_schema(connection: Connection) -> None:
             updated_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_fs_operations_group ON fs_operations(op_group, seq);
+        CREATE TABLE IF NOT EXISTS account_lifecycle (
+            id INTEGER PRIMARY KEY,
+            op_group TEXT,
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,           -- DELETE | LABEL | RESTORE
+            prev_status_id INTEGER,
+            prev_favorite INTEGER,
+            prev_rel_path TEXT,
+            created_at TEXT NOT NULL,
+            undone INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_lifecycle_group ON account_lifecycle(op_group);
         CREATE TABLE IF NOT EXISTS media_index_state (
             account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
             kind INTEGER NOT NULL,

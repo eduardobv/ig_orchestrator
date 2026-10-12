@@ -470,6 +470,8 @@ class EditorPanelMixin:
         if self._history_guard("agregar o actualizar cuentas"):
             return
         account = self._editor_account()
+        if not self._confirm_if_deleted(account.username):
+            return
         try:
             draft = BatchDraft(
                 batch_name=self.batch_name_var.get() or "validation",

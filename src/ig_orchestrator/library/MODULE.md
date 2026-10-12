@@ -27,6 +27,13 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 - `compat_lite.py` — `mirror_to_lite`: solo actualiza `accounts_dir.path` donde difiere (idempotente); `compat.lite.enabled` lo desactiva.
 - Renombrar el username de una cuenta NO está aquí (feat 7); borrar/fusionar tampoco (feats 5, 7, 12).
 
+## Ciclo de vida de cuentas (feat 5)
+
+- `account_lifecycle.py` — `AccountLifecycleService`: `plan_mark_deleted(ids, suffix_on_conflict=)` calcula destino (`<carpeta eliminadas>\\<cuenta>` o con grupo), avisos
+  (favorita, id de Instagram compartido, lote borrador) y bloqueos (lote en ejecución, destino existente); el movimiento de carpeta es un paso `MOVE_DIR` del diario de fsops.
+  Tabla `account_lifecycle` guarda estado/favorito/ruta anteriores por grupo de operaciones: `restore_after_undo(op_group)` los repone tras `FsOperationService.undo`.
+- Cuentas sin carpeta o ya dentro de la carpeta de eliminadas: solo cambia el estado. `DELETED` se oculta del catálogo igual que `ARCHIVED`.
+
 ## Códigos (auditoría)
 
 `PATH_MISSING`, `OWNER_DUP` (detalle: `SAME_CATEGORY` / `DELETED_PAIR` / `ALL_DELETED` / `CROSS_CATEGORY`), `OWNER_MISMATCH`,

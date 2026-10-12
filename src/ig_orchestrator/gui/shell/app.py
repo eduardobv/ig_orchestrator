@@ -152,6 +152,7 @@ from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
 from ig_orchestrator.gui.exchange.pull_dialog import PullDialogMixin
 from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
 from ig_orchestrator.gui.library.fsops_actions import FsOpsActionsMixin
+from ig_orchestrator.gui.library.lifecycle_actions import AccountLifecycleActionsMixin
 from ig_orchestrator.gui.library.import_dialog import LibraryImportMixin
 from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
@@ -197,6 +198,7 @@ class InstagramOrchestratorApp(
     LibraryAuditMixin,
     LibraryImportMixin,
     FsOpsActionsMixin,
+    AccountLifecycleActionsMixin,
     PullDialogMixin,
 ):
     def __init__(

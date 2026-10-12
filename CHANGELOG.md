@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.5.0 - feat-problem1-5: cuenta eliminada en Instagram
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Una sola acción para marcar una cuenta como eliminada: cambia su estado a `DELETED` y mueve su carpeta a `09.DELETED`, con vista previa, deshacer y restaurar.
+
+### Creado
+
+* `library/account_lifecycle.py` (`AccountLifecycleService`: `plan_mark_deleted`, `execute_mark_deleted`, `plan_restore`, `execute_restore`, `restore_after_undo`, `find_unlabeled_deleted`, `label_deleted`, `suggest_deleted`).
+* Estado `DELETED` (id 6), columnas `catalog_accounts.deleted_at` y `previous_rel_path`, tabla `account_lifecycle` (estado y favorito anteriores, para deshacer/restaurar).
+* GUI (`gui/library/lifecycle_actions.py`): **Marcar como eliminada…**, **Marcar varias como eliminadas…** (pegar usernames), **Restaurar cuenta eliminada…**, **Sugerir eliminadas…**, **Etiquetar 09.DELETED…**; confirmación al añadir al editor una cuenta eliminada.
+* Ajustes → Catálogo: carpeta de eliminadas (`library.deleted_folder_rel`) y conservar grupo (`library.deleted_keep_group`).
+* Tests: `tests/library/test_account_lifecycle.py` (11).
+
+### Modificado
+
+* El menú «Delete» pasa a llamarse **Ocultar** (sigue siendo `DISABLED`); `DELETED` se oculta del catálogo como `ARCHIVED` (visible con `Ver → Mostrar biblioteca completa`, color lila).
+* El Deshacer de `Catálogo → Operaciones de disco…` también restaura estado y favorito.
+* `models/account_history.py`, `db/gui_migrations.py`, `db/v2/catalog/repository.py`, `gui/catalog/{colors,service,panel}.py`, `gui/chrome/menubar.py`, `gui/editor/panel.py`, `gui/settings/dialog.py`, `gui/library/{plan_dialog,fsops_history_dialog}.py`, locales, `README.md`, versión 3.5.0.
+* `docs/feat-problem1-5.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 412 passed. Prueba de humo de la GUI con una copia de tu BD y biblioteca temporal: marcar, ocultar, restaurar, etiquetar. **No probado contra `G:` real.**
+
 ## v3.4.1 - Organizar stories sin accounts_lite
 
 Fecha: 2026-10-12 · Rama: `v3/integration`
