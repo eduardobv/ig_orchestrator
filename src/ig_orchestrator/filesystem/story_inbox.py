@@ -107,19 +107,25 @@ def _lookup_bdapp_path(app: sqlite3.Connection, username: str) -> str | None:
         row = app.execute(
             """
             SELECT a.rel_path,
-                   (SELECT path FROM path_roots WHERE code = 'LIBRARY') AS root
+                   (SELECT path FROM path_roots WHERE code = 'LIBRARY') AS root,
+                   f.full_path, a.username
             FROM catalog_accounts a
-            WHERE a.username = ? COLLATE NOCASE AND a.rel_path IS NOT NULL
+            LEFT JOIN catalog_folders f ON f.id = a.folder_id
+            WHERE a.username = ? COLLATE NOCASE
             LIMIT 1
             """,
             (username,),
         ).fetchone()
     except sqlite3.Error:
         return None
-    if row is None or not str(row[1] or "").strip():
+    if row is None:
         return None
-    root = str(row[1]).rstrip("\\/")
-    return "\\".join((root, str(row[0])))
+    if row[0] and str(row[1] or "").strip():
+        root = str(row[1]).rstrip("\\/")
+        return "\\".join((root, str(row[0])))
+    if row[2]:  # account without rel_path: its catalog folder + username
+        return "\\".join((str(row[2]).rstrip("\\/"), str(row[3])))
+    return None
 
 
 def organize_story_inbox(

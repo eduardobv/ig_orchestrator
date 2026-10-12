@@ -21,14 +21,16 @@ def save_story_inbox_settings(
     connection: Connection,
     *,
     inbox: str,
-    accounts_db: str,
+    accounts_db: str | None = None,
 ) -> None:
+    """Persist the inbox path; the legacy accounts DB path is only written when given."""
+
     if not is_gui_schema(connection):
         return
-    for key, value in (
-        (STORIES_INBOX_SETTING, inbox.strip()),
-        (STORIES_DB_SETTING, accounts_db.strip()),
-    ):
+    pairs = [(STORIES_INBOX_SETTING, inbox.strip())]
+    if accounts_db is not None:
+        pairs.append((STORIES_DB_SETTING, accounts_db.strip()))
+    for key, value in pairs:
         connection.execute(
             """
             INSERT INTO app_settings (key, value, value_type, updated_at)

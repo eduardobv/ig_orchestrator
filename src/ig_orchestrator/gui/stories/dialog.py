@@ -36,7 +36,7 @@ class StoriesInboxMixin:
             except tk.TclError:
                 self._stories_inbox_window = None
 
-        inbox_saved, db_saved = load_story_inbox_settings(self.connection)
+        inbox_saved, _legacy_db = load_story_inbox_settings(self.connection)
         window = tk.Toplevel(self.root)
         window.title(t("stories.title"))
         window.geometry("720x420")
@@ -46,10 +46,9 @@ class StoriesInboxMixin:
         frame = ttk.Frame(window, padding=10)
         frame.pack(fill=tk.BOTH, expand=True)
         frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(3, weight=1)
+        frame.rowconfigure(2, weight=1)
 
         inbox_var = tk.StringVar(value=inbox_saved)
-        db_var = tk.StringVar(value=db_saved)
 
         ttk.Label(frame, text=t("stories.inbox")).grid(row=0, column=0, sticky="w")
         inbox_entry = ttk.Entry(frame, textvariable=inbox_var)
@@ -61,37 +60,26 @@ class StoriesInboxMixin:
             command=lambda: _browse_directory(window, inbox_var),
         ).grid(row=0, column=2, sticky="e")
 
-        ttk.Label(frame, text=t("stories.db")).grid(row=1, column=0, sticky="w", pady=(8, 0))
-        db_entry = ttk.Entry(frame, textvariable=db_var)
-        db_entry.grid(row=1, column=1, sticky="ew", padx=(8, 8), pady=(8, 0))
-        bind_edit_context_menu(db_entry)
-        ttk.Button(
-            frame,
-            text=t("stories.browse"),
-            command=lambda: _browse_file(window, db_var),
-        ).grid(row=1, column=2, sticky="e", pady=(8, 0))
-
         ttk.Label(frame, text=t("stories.log")).grid(
-            row=2, column=0, columnspan=3, sticky="w", pady=(12, 0)
+            row=1, column=0, columnspan=3, sticky="w", pady=(12, 0)
         )
         log = tk.Text(frame, wrap="word", height=12, undo=False)
-        log.grid(row=3, column=0, columnspan=3, sticky="nsew", pady=(4, 0))
+        log.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=(4, 0))
         scroll = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=log.yview)
-        scroll.grid(row=3, column=3, sticky="ns", pady=(4, 0))
+        scroll.grid(row=2, column=3, sticky="ns", pady=(4, 0))
         log.configure(yscrollcommand=scroll.set)
-        frame.rowconfigure(3, weight=1)
 
         actions = ttk.Frame(frame)
-        actions.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        actions.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(8, 0))
         ttk.Button(
             actions,
             text=t("stories.save"),
-            command=lambda: self._save_stories_inbox_paths(inbox_var.get(), db_var.get()),
+            command=lambda: self._save_stories_inbox_paths(inbox_var.get()),
         ).pack(side=tk.LEFT)
         run_button = ttk.Button(actions, text=t("stories.run"))
         run_button.configure(
             command=lambda: self._run_stories_inbox(
-                window, log, run_button, inbox_var.get(), db_var.get()
+                window, log, run_button, inbox_var.get()
             )
         )
         run_button.pack(side=tk.LEFT, padx=(8, 0))
@@ -106,10 +94,8 @@ class StoriesInboxMixin:
         window.protocol("WM_DELETE_WINDOW", _on_close)
         bind_escape_close(window, on_close=_on_close)
 
-    def _save_stories_inbox_paths(self, inbox: str, accounts_db: str) -> None:
-        save_story_inbox_settings(
-            self.connection, inbox=inbox, accounts_db=accounts_db
-        )
+    def _save_stories_inbox_paths(self, inbox: str) -> None:
+        save_story_inbox_settings(self.connection, inbox=inbox)
         self._set_status(t("stories.saved"))
 
     def _run_stories_inbox(
@@ -118,22 +104,17 @@ class StoriesInboxMixin:
         log: tk.Text,
         run_button: ttk.Button,
         inbox: str,
-        accounts_db: str,
     ) -> None:
         inbox_path = inbox.strip()
-        db_path = accounts_db.strip()
         if not inbox_path:
             messagebox.showerror(t("stories.title"), t("stories.paths_required"), parent=window)
             return
-        save_story_inbox_settings(
-            self.connection, inbox=inbox_path, accounts_db=db_path
-        )
+        save_story_inbox_settings(self.connection, inbox=inbox_path)
         run_button.configure(state="disabled")
         window.update_idletasks()
         try:
             results = organize_story_inbox(
                 inbox=Path(inbox_path),
-                accounts_db=Path(db_path) if db_path else None,
                 app_connection=self.connection,
             )
         except StoryInboxError as exc:

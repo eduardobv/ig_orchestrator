@@ -148,11 +148,36 @@ def test_organize_story_inbox_resolves_from_bdapp_without_accounts_db(tmp_path: 
 
     app = sqlite3.connect(":memory:")
     app.execute("CREATE TABLE path_roots (code TEXT, path TEXT)")
-    app.execute("CREATE TABLE catalog_accounts (username TEXT COLLATE NOCASE, rel_path TEXT)")
+    app.execute("CREATE TABLE catalog_folders (id INTEGER, full_path TEXT)")
+    app.execute(
+        "CREATE TABLE catalog_accounts (username TEXT COLLATE NOCASE, rel_path TEXT, folder_id INTEGER)"
+    )
     app.execute("INSERT INTO path_roots VALUES ('LIBRARY', ?)", (str(library),))
-    app.execute("INSERT INTO catalog_accounts VALUES ('NewGirl', '00.MODELS\\newgirl')")
+    app.execute("INSERT INTO catalog_accounts VALUES ('NewGirl', '00.MODELS\\newgirl', NULL)")
 
     results = organize_story_inbox(inbox=inbox, app_connection=app)
 
     assert [r.status.value for r in results] == ["MOVED"]
     assert (account_root / "story" / "newgirl-20260101-1.jpeg").exists()
+
+
+def test_organize_story_inbox_uses_catalog_folder_when_account_has_no_rel_path(tmp_path: Path) -> None:
+    import sqlite3
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    person = tmp_path / "library" / "00.FAVORITES" / "Valeria"
+    (person / "lerabuns").mkdir(parents=True)
+    (inbox / "lerabuns-20260101-1.jpeg").write_bytes(b"x")
+
+    app = sqlite3.connect(":memory:")
+    app.execute("CREATE TABLE path_roots (code TEXT, path TEXT)")
+    app.execute("CREATE TABLE catalog_folders (id INTEGER, full_path TEXT)")
+    app.execute("CREATE TABLE catalog_accounts (username TEXT COLLATE NOCASE, rel_path TEXT, folder_id INTEGER)")
+    app.execute("INSERT INTO catalog_folders VALUES (1, ?)", (str(person),))
+    app.execute("INSERT INTO catalog_accounts VALUES ('lerabuns', NULL, 1)")
+
+    results = organize_story_inbox(inbox=inbox, app_connection=app)
+
+    assert [r.status.value for r in results] == ["MOVED"]
+    assert (person / "lerabuns" / "story" / "lerabuns-20260101-1.jpeg").exists()

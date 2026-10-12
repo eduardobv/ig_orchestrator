@@ -25,13 +25,12 @@ The module is responsible for:
 
 1. **UI Dialog**: Modal window (Toplevel) with:
    - Input field for inbox folder path (+ Browse button)
-   - Input field for accounts DB path (+ Browse button)
    - Text log area for results
    - Save, Run, and Close buttons
 
 2. **Storage**: Persist paths in `app_settings`:
    - `stories.inbox_path` → folder with story files
-   - `stories.accounts_db_path` → external SQLite DB with `accounts_dir` table
+   - (v3.4.1) `stories.accounts_db_path` ya no se usa aquí: la carpeta de cada cuenta se resuelve desde bdapp (`catalog_accounts.rel_path` + raíz `LIBRARY`, o su carpeta de catálogo + username)
 
 3. **Execution**: Call `organize_story_inbox()` from `filesystem/story_inbox.py`
 
@@ -49,8 +48,8 @@ The module is responsible for:
 3. Modal loads saved paths from `app_settings`
 4. User may edit paths and click **Save** (persists to app_settings)
 5. User clicks **Run**:
-   - Validates paths not empty
-   - Calls `organize_story_inbox()` with inbox + DB paths
+   - Validates the inbox path is not empty
+   - Calls `organize_story_inbox()` with the inbox path and the app connection
    - Writes results to text log
    - Disables/enables Run button while processing
 
