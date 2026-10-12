@@ -1,5 +1,37 @@
 # Changelog
 
+## v3.11.0 - feat-uc6-11: almacén de procesadas y volcado a G:
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Renombrar y entregar a la biblioteca pasan a ser pasos separados: las carpetas renombradas pueden quedarse en un **almacén local** y se **vuelcan** a `G:` cuando quieras.
+
+### Creado
+
+* `src/ig_orchestrator/staging/` (`StagingService`: registro del almacén, plan de volcado, volcado verificado y reanudable, `MODULE.md`).
+* Tablas `staged_accounts` y `dump_runs`.
+* GUI: **Lote → Pendiente de volcar a G:…** (`gui/library/staging_panel.py`): cuentas, ficheros, tamaño, destino (Nueva / Fusionar / Conflicto), *Volcar seleccionadas*, *Volcar todo*.
+* Ventana de Renombrar: selector **Destino de las procesadas** (Biblioteca / Almacén) y las opciones invalidan la vista previa si cambian.
+* Ajustes → Catálogo: **carpeta del almacén** y **qué hacer tras renombrar** (preguntar / almacén / biblioteca).
+* `mover.move_folder_to` / `preview_move_to` (destino explícito).
+* Tests: `tests/staging/test_staging.py`.
+
+### Comportamiento
+
+* El almacén replica la estructura de la biblioteca (`categoría\grupo\carpeta`), así que el volcado es una fusión directa.
+* Volcado: copia cada fichero, comprueba el tamaño y solo entonces lo borra del almacén; nunca sobrescribe (si un nombre ya existe, esa cuenta queda en *Conflicto*). Si se corta, se vuelve a lanzar y continúa sin duplicar.
+* El destino se recalcula al volcar: si la cuenta se movió o renombró en el catálogo mientras esperaba, va a su sitio nuevo.
+* Tras volcar: contadores e índice se refrescan, las cuentas nuevas reciben su ruta (y entran en `accounts_lite` si el espejo está activo).
+* Se comprueba el espacio libre del almacén antes de mover.
+
+### Modificado
+
+`renaming/service.py`, `renaming/mover.py`, `renaming/settings.py`, `db/gui_migrations.py`, `gui/run/rename_preview_dialog.py`, `gui/settings/dialog.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, `CLAUDE.md`, versión 3.11.0. `docs/feat-uc6-11.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 528 passed. Prueba de GUI con copia de la base: renombrar hacia el almacén y abrir el panel. **No probado con tu `G:` real.**
+
 ## v3.10.0 - feat-uc5-10: renombrar sin la unidad G: (índice en la app)
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

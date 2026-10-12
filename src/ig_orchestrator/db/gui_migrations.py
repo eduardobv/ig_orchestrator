@@ -252,6 +252,30 @@ def _patch_library_schema(connection: Connection) -> None:
             files INTEGER,
             bytes INTEGER
         );
+        CREATE TABLE IF NOT EXISTS staged_accounts (
+            id INTEGER PRIMARY KEY,
+            catalog_account_id INTEGER NOT NULL REFERENCES catalog_accounts(id),
+            staging_rel TEXT NOT NULL,
+            target_rel TEXT NOT NULL,
+            rename_run_id INTEGER REFERENCES rename_runs(id),
+            files INTEGER,
+            bytes INTEGER,
+            status TEXT NOT NULL,         -- STAGED | DUMPING | DUMPED | CONFLICT | FAILED
+            staged_at TEXT NOT NULL,
+            dumped_at TEXT,
+            error TEXT,
+            UNIQUE (catalog_account_id, staging_rel)
+        );
+        CREATE TABLE IF NOT EXISTS dump_runs (
+            id INTEGER PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            status TEXT NOT NULL,
+            accounts INTEGER DEFAULT 0,
+            files INTEGER DEFAULT 0,
+            bytes INTEGER DEFAULT 0,
+            summary TEXT
+        );
         CREATE TABLE IF NOT EXISTS rename_runs (
             id INTEGER PRIMARY KEY,
             batch_id INTEGER REFERENCES batches(id),

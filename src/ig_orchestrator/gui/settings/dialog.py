@@ -13,6 +13,8 @@ from ig_orchestrator.renaming.settings import (
     lite_mirror_enabled,
     preview_required,
     read_engine,
+    staging_after_rename,
+    staging_root_setting,
     write_setting,
 )
 from ig_orchestrator.gui.settings.instances_tab import InstancesTab
@@ -288,6 +290,15 @@ class SettingsDialogWithTabs:
         ttk.Label(frame, text=t("settings.lite_mirror_help"), wraplength=520, justify="left").grid(
             row=6, column=0, sticky="w"
         )
+        ttk.Label(frame, text=t("settings.staging_root")).grid(row=7, column=0, sticky="w", pady=(14, 0))
+        self.staging_root_var = tk.StringVar(value=staging_root_setting(self.connection))
+        ttk.Entry(frame, textvariable=self.staging_root_var, width=48).grid(row=8, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.staging_after")).grid(row=9, column=0, sticky="w", pady=(6, 0))
+        self.staging_after_var = tk.StringVar(value=staging_after_rename(self.connection))
+        after = ttk.Frame(frame)
+        after.grid(row=10, column=0, sticky="w")
+        for value, key in (("ASK", "settings.staging_ask"), ("STAGING", "settings.staging_staging"), ("LIBRARY", "settings.staging_library")):
+            ttk.Radiobutton(after, text=t(key), value=value, variable=self.staging_after_var).pack(anchor="w")
 
     def _build_instances_tab(self) -> None:
         if not is_gui_schema(self.connection):
@@ -397,6 +408,8 @@ class SettingsDialogWithTabs:
             # Renamer and accounts_lite mirror
             write_setting(self.connection, "renaming.engine", self.rename_engine_var.get())
             write_setting(self.connection, "renaming.preview", "1" if self.rename_preview_var.get() else "0", "BOOLEAN")
+            write_setting(self.connection, "staging.root", self.staging_root_var.get().strip().rstrip("\\/"), "PATH")
+            write_setting(self.connection, "staging.after_rename", self.staging_after_var.get())
             write_setting(self.connection, "compat.lite.enabled", "1" if self.lite_mirror_var.get() else "0", "BOOLEAN")
 
             # Deleted accounts folder

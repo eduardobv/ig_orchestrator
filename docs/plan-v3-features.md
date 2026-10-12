@@ -41,7 +41,7 @@ y renombra o mueve al workplace principal las carpetas descargadas por otras; re
 | 8 ✅ | [`feat-uc3-8`](../tasks/done/v3/feat-uc3-8.md) · Sincronización incremental | UC3 · UC1 (sc1) · M5 | De ~8 min de lectura a segundos–1 min; botón «Verificar cuenta» | ⬤⬤⬤○ | **3**; rec.: 4 | 6–8 d |
 | 9 ✅ | [`feat-uc1-9`](../tasks/done/v3/feat-uc1-9.md) · Renombrado integrado | UC1 (sc2) · UC4 | Sin scripts externos; vista previa; renombrar desde cualquier carpeta | ⬤⬤⬤⬤ | **3**; rec.: 4 | 8–10 d |
 | 10 ✅ | [`feat-uc5-10`](../tasks/done/v3/feat-uc5-10.md) · Renombrar sin G: (usa el índice cargado en el feat 3) | UC5 | Renombrar con el disco apagado; movimiento pendiente | ⬤⬤⬤○ | **9**, **3**; rec.: 8 | 4–6 d |
-| 11 | [`feat-uc6-11`](feat-uc6-11.md) · Almacén y volcado a G: | UC6 · M7 | Conectas G: solo para volcar; cola «pendiente de volcar» | ⬤⬤⬤⬤ | **10**, **9**, **4** | 6–8 d |
+| 11 ✅ | [`feat-uc6-11`](../tasks/done/v3/feat-uc6-11.md) · Almacén y volcado a G: | UC6 · M7 | Conectas G: solo para volcar; cola «pendiente de volcar» | ⬤⬤⬤⬤ | **10**, **9**, **4** | 6–8 d |
 | 12 | [`feat-uc2-12`](feat-uc2-12.md) · Catálogo avanzado | UC2 (fase 2) | Eliminar con cuarentena, fusionar, ficha editable, arrastrar y soltar | ⬤⬤⬤⬤ | **4**, **3**; rec.: 7, 8 | 8–10 d |
 
 Total orientativo: **59–76 días de desarrollo** (no incluye las pruebas manuales sobre datos reales, que conviene hacer feat a feat). Es una estimación gruesa para decidir orden, no un compromiso.

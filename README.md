@@ -522,6 +522,11 @@ y `Ajustes > Catalogo` (mantener `accounts_lite` actualizado o no).
 Si la biblioteca no está disponible, **Renombrar** usa el índice de la app y deja las carpetas renombradas en la carpeta de descargas como *pendientes de mover*.
 Cuando vuelvas a conectar `G:`: **Lote → Mover renombradas pendientes…**. **Catálogo → Verificar índice con el disco** compara el índice de una cuenta con sus carpetas.
 
+### Almacén y volcado
+
+`Ajustes > Catalogo` define una carpeta local de **almacén**. En *Renombrar* eliges el destino de las procesadas (Biblioteca o Almacén). Con el almacén, `G:` puede estar apagada:
+cuando la conectes, **Lote > Pendiente de volcar a G:...** fusiona lo almacenado en su sitio (sin sobrescribir, con comprobación de tamaño).
+
 ### Sincronizar con el disco
 
 `Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).

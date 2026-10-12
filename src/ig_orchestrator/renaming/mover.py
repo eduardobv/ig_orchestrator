@@ -56,7 +56,10 @@ def destination_for(source: str, account_folder: str) -> str:
 def preview_move(source: str, account_folder: str) -> MoveResult:
     """What ``move_renamed_folder`` would do (no changes)."""
 
-    destination = destination_for(source, account_folder)
+    return preview_move_to(source, destination_for(source, account_folder))
+
+
+def preview_move_to(source: str, destination: str) -> MoveResult:
     if os.path.exists(destination) and not os.path.isdir(destination):
         return MoveResult(FAILED, destination, detail="el destino existe y no es una carpeta")
     if not os.path.isdir(source):
@@ -69,10 +72,13 @@ def preview_move(source: str, account_folder: str) -> MoveResult:
 
 
 def move_renamed_folder(source: str, account_folder: str) -> MoveResult:
-    planned = preview_move(source, account_folder)
+    return move_folder_to(source, destination_for(source, account_folder))
+
+
+def move_folder_to(source: str, destination: str) -> MoveResult:
+    planned = preview_move_to(source, destination)
     if planned.status != MOVED:
         return planned
-    destination = planned.destination
     try:
         if os.path.isdir(destination):
             merge_directory_contents(source, destination)

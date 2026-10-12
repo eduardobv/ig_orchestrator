@@ -318,6 +318,10 @@ WORKING_FOLDER\username\             # Raíz cuenta
 - Si destino existe: sufijo numérico `archivo_1.jpg`, `archivo_2.jpg`, etc.
 - Al finalizar lote real: limpiar `telegram_media*` en raíz y `*_1.mp4` duplicados en `reels\`
 
+### Almacén (v3.11)
+
+Opcional: `app_settings['staging.root']`. Las carpetas renombradas pueden dejarse en `STAGING\<categoria>\<grupo>\<carpeta>` (`staged_accounts`) y volcarse a la biblioteca con `Lote > Pendiente de volcar a G:` (`staging/service.py`).
+
 ### Reportes
 
 ```

@@ -173,6 +173,7 @@ class MenubarMixin:
         batch_menu.add_command(label=t("menu.batch.publish"), command=self._open_publish_dialog)
         batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
         batch_menu.add_command(label=t("pending.menu"), command=self._move_pending_renamed)
+        batch_menu.add_command(label=t("staging.menu"), command=self._open_staging_panel)
         batch_menu.add_command(
             label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command
         )

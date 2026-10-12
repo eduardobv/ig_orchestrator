@@ -121,3 +121,9 @@ Ambos flujos usan el diario de operaciones: una caída entre «copiado» y «bor
 ## Fuera de alcance
 
 Volcado automático al detectar la unidad, deduplicación avanzada de contenido por hash, sincronización entre almacenes de dos equipos.
+
+## Resultado de la implementación (2026-10-12, v3.11.0)
+
+- Implementado: almacén con la misma estructura que la biblioteca, flujo «renombrar → almacén», panel «Pendiente de volcar», volcado verificado (tamaño) y reanudable, recálculo del destino, cuentas nuevas registradas al volcar, comprobación de espacio, historial `dump_runs`.
+- No implementado: `staging.layout = flat` (solo `by_target`), indicador en la barra de estado, oferta automática de volcar al detectar `G:`, «Quitar del almacén» de carpetas no volcadas, `media_index.location` (el estado vive en `staged_accounts`), un segundo renombrado de una cuenta nueva ya almacenada (queda sin ruta hasta volcar).
+- Sin probar con `G:` real.

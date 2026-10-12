@@ -11,6 +11,7 @@ import dataclasses
 import json
 import os
 import random
+import shutil
 import sqlite3
 import threading
 from collections.abc import Callable
@@ -22,7 +23,17 @@ from ig_orchestrator.library.fsops import FsOperationService
 from ig_orchestrator.library.paths import parent_rel, to_rel
 from ig_orchestrator.library.scanner import ACCOUNT, LibraryScanner
 from ig_orchestrator.renaming.consult import IndexConsultProvider, has_index, write_through
-from ig_orchestrator.renaming.mover import FAILED, MOVED, MoveResult, move_renamed_folder, preview_move
+from ig_orchestrator.renaming.mover import (
+    FAILED,
+    MOVED,
+    MoveResult,
+    destination_for,
+    move_folder_to,
+    move_renamed_folder,
+    preview_move,
+    preview_move_to,
+)
+from ig_orchestrator.staging import StagingService
 from ig_orchestrator.renaming.planner import (
     DiskConsultProvider,
     DryOps,
@@ -56,6 +67,7 @@ class RenameJob:
     no_duplicated: bool = True
     move_renamed: bool = True
     reference: str = "auto"  # auto | index | disk
+    destination: str = "library"  # library | staging
 
 
 @dataclass(slots=True)
@@ -72,6 +84,8 @@ class AccountPlan:
     move: MoveResult | None = None
     reference: str = "DISK"  # DISK | INDEX | NONE (new account)
     pending_move: bool = False
+    staging_rel: str = ""  # destination inside the staging root (destination = staging)
+    target_rel: str = ""
 
     @property
     def renamed(self) -> int:
@@ -109,6 +123,7 @@ class AccountResult:
     detail: str = ""
     warnings: list[str] = field(default_factory=list)
     pending: bool = False
+    staged: bool = False
 
 
 @dataclass(slots=True)
@@ -177,6 +192,8 @@ class RenameService:
             for name in os.listdir(job.source_folder)
             if os.path.isdir(os.path.join(job.source_folder, name))
         }
+        if job.destination == "staging":
+            StagingService(self.conn, root=self.fs.root).staging_root()  # raises ValueError when not configured
         plans: list[AccountPlan] = []
         for key, spec in specs.items():
             if key not in folders:
@@ -200,8 +217,19 @@ class RenameService:
             else:
                 plan.consult_folder = self.fs.abs(str(row["rel_path"]))
                 self._choose_reference(job, plan)
+            if job.destination == "staging" and plan.status != SKIPPED:
+                self._staging_target(plan)
             plans.append(plan)
         return plans
+
+    def _staging_target(self, plan: AccountPlan) -> None:
+        """Where a renamed folder goes in the staging area: the same relative place it will have in the library."""
+
+        rel = to_rel(destination_for(plan.manual_path, plan.consult_folder), self.fs.root)
+        if rel is None:
+            plan.status, plan.reason = SKIPPED, "El destino queda fuera de la biblioteca: no se puede almacenar"
+            return
+        plan.staging_rel = plan.target_rel = rel
 
     def _library_online(self) -> bool:
         return os.path.isdir(self.fs.root)
@@ -253,7 +281,10 @@ class RenameService:
                 continue
             ctx, new_user = self._context(job, rng, stamp, plan.spec)
             plan.tree = process_folder_tree(plan.manual_path, self._provider(plan), DryOps(), ctx, new_user)
-            if job.move_renamed:
+            if job.move_renamed and job.destination == "staging" and plan.status != SKIPPED:
+                staging = StagingService(self.conn, root=self.fs.root)
+                plan.move = preview_move_to(plan.manual_path, staging.staging_path(plan.staging_rel))
+            elif job.move_renamed:
                 if self._destination_online(plan):
                     plan.move = preview_move(plan.manual_path, plan.consult_folder)
                 else:
@@ -306,7 +337,9 @@ class RenameService:
             outcome.deleted_duplicates = self._delete_duplicates(tree.duplicated_files, plan.manual_path, outcome)
         if not (outcome.renamed or outcome.duplicated) and outcome.status == plan.status:
             outcome.status = "NO_FILES" if plan.status == RENAMED else outcome.status
-        if job.move_renamed and not self._destination_online(plan):
+        if job.move_renamed and job.destination == "staging":
+            self._stage(plan, outcome)
+        elif job.move_renamed and not self._destination_online(plan):
             if os.path.isdir(plan.manual_path):
                 outcome.pending = True
                 outcome.status = PENDING_MOVE
@@ -318,13 +351,30 @@ class RenameService:
                 outcome.status = "MOVE_CONFLICT"
                 outcome.detail = moved.detail + (": " + ", ".join(moved.conflicts[:5]) if moved.conflicts else "")
         try:
-            self._record_in_bdapp(plan, outcome)
+            account_id = self._record_in_bdapp(plan, outcome)
+            plan.account_id = account_id if account_id is not None else plan.account_id
             if not outcome.moved and plan.account_id is not None and tree.actions:
                 self._index_renamed(plan, tree)
         except Exception as exc:  # noqa: BLE001 - the files are already renamed; report it
             outcome.warnings.append(f"No se pudo actualizar la base de la app: {exc}")
         self._store_account(outcome, plan)
         return outcome
+
+    def _stage(self, plan: AccountPlan, outcome: AccountResult) -> None:
+        staging = StagingService(self.conn, root=self.fs.root)
+        destination = staging.staging_path(plan.staging_rel)
+        free = shutil.disk_usage(staging.staging_root()).free if os.path.isdir(staging.staging_root()) else None
+        size = sum(os.path.getsize(os.path.join(c, n)) for c, _d, names in os.walk(plan.manual_path) for n in names)
+        if free is not None and size > free:
+            outcome.status, outcome.detail = "ERROR", "No hay espacio suficiente en el almacen"
+            return
+        moved = move_folder_to(plan.manual_path, destination)
+        if moved.status == FAILED:
+            outcome.status = "MOVE_CONFLICT"
+            outcome.detail = moved.detail + (": " + ", ".join(moved.conflicts[:5]) if moved.conflicts else "")
+            return
+        outcome.staged, outcome.status = True, "STAGED"
+        outcome.detail = "En el almacen, pendiente de volcar a la biblioteca"
 
     def _index_renamed(self, plan: AccountPlan, tree: TreeResult) -> None:
         """Write-through: the files just renamed enter the index so the next rename sees them."""
@@ -351,15 +401,20 @@ class RenameService:
         return deleted
 
     # -------------------------------------------------------------- bdapp
-    def _record_in_bdapp(self, plan: AccountPlan, outcome: AccountResult) -> None:
+    def _record_in_bdapp(self, plan: AccountPlan, outcome: AccountResult) -> int | None:
         account_id = plan.account_id
         if plan.status == NEW_ACCOUNT and plan.spec is not None:
             account_id = self._register_new(plan, outcome)
+        if account_id is not None and outcome.staged:
+            StagingService(self.conn, root=self.fs.root).record(
+                account_id, plan.staging_rel, plan.target_rel, getattr(self, "_run_id", None)
+            )
         if account_id is not None and outcome.moved:
             try:
                 LibraryScanner(self.conn, root=self.fs.root).scan(ACCOUNT, account_id=account_id)
             except Exception as exc:  # noqa: BLE001 - a scan in progress or an offline disk must not fail the rename
                 outcome.warnings.append(f"Contadores no actualizados ({exc}); usa Sincronizar")
+        return account_id
 
     def _register_new(self, plan: AccountPlan, outcome: AccountResult) -> int:
         spec = plan.spec
@@ -397,7 +452,7 @@ class RenameService:
                         outcome.warnings.append(f"accounts_lite no actualizada: {exc}")
             else:
                 outcome.warnings.append("La carpeta destino queda fuera de la biblioteca: cuenta sin ruta")
-        else:
+        elif not outcome.staged:
             outcome.warnings.append("Cuenta nueva sin mover: queda sin ruta hasta que se mueva a la biblioteca")
         self.conn.commit()
         return account_id

@@ -15,6 +15,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 8 · Sincronizar con el disco | v3.8.0 | [Feat 8](#feat-8--sincronizar-con-el-disco-v380) |
 | 9 · Renombrado integrado | v3.9.0 | [Feat 9](#feat-9--renombrado-integrado-v390) |
 | 10 · Renombrar sin G: | v3.10.0 | [Feat 10](#feat-10--renombrar-sin-la-unidad-g-v3100) |
+| 11 · Almacén y volcado | v3.11.0 | [Feat 11](#feat-11--almacen-y-volcado-a-g-v3110) |
 
 ---
 
@@ -794,3 +795,53 @@ El índice guarda solo lo necesario (id, fecha, propietario, extensión y sufijo
 | «NO_INDEX» | La cuenta nunca se sincronizó/importó, así que no hay índice. Conecta `G:` y pulsa *Sincronizar con el disco → Cuenta*. |
 | «Conflicto al mover» al mover pendientes | Algún fichero ya existe en `G:` con el mismo nombre. Nada se sobrescribe; la carpeta sigue pendiente. |
 | El renombrado asignó fechas algo distintas a lo esperado | El índice estaba desactualizado (cambios hechos fuera de la app). Usa *Verificar índice* y acepta el disco. |
+
+
+---
+
+## Feat 11 · Almacén y volcado a G: (v3.11.0)
+
+**Para qué sirve:** separar *renombrar* de *entregar a la biblioteca*. Renombras en el día a día y las cuentas esperan en un **almacén** (una carpeta local, por ejemplo en un disco rápido). Solo conectas `G:` cuando quieres **volcar** todo de una vez.
+
+### 1) Configurar el almacén — `Ajustes → Catálogo`
+
+| Campo | Qué es |
+|---|---|
+| **Almacén de procesadas (carpeta local)** | Dónde se guardan las cuentas ya renombradas hasta volcarlas. Si está vacío, el almacén no se ofrece. |
+| **Tras renombrar** | *Preguntar siempre* (por defecto), *Dejar en el almacén* o *Mover a la biblioteca* como valor inicial de la ventana de Renombrar. |
+
+### 2) Renombrar hacia el almacén — botón *Renombrar*
+
+En la ventana, **Destino de las procesadas**: *Biblioteca (G:)* o *Almacén (volcar después)*. Si cambias cualquier opción, la vista previa se invalida: pulsa **Vista previa** otra vez antes de **Ejecutar**.
+Con *Almacén*, cada cuenta se mueve a `almacén\categoría\grupo\cuenta` (la misma estructura que `G:`); la biblioteca no se toca. El lote queda completado igual: no espera al volcado.
+
+### 3) Volcar — `Lote → Pendiente de volcar a G:…`
+
+| Elemento | Qué hace |
+|---|---|
+| Lista | Cada cuenta del almacén con ficheros, tamaño y **destino**: *Nueva* (la carpeta no existe en `G:`), *Fusionar* (ya existe), *Conflicto* (algún nombre ya existe en `G:`), *Falta* (la carpeta ya no está en el almacén). |
+| **Actualizar** | Recalcula la lista (útil tras conectar `G:`). La cabecera dice si la biblioteca está conectada. |
+| **Volcar seleccionadas / Volcar todo** | Pide confirmación con el resumen y vuelca en segundo plano. Se puede cerrar la ventana; el progreso sale en la consola. |
+| **Quitar volcadas de la lista** | Limpia del panel las cuentas ya volcadas. |
+
+Cómo vuelca: copia cada fichero, comprueba que el tamaño coincide y solo entonces lo borra del almacén. **Nunca sobrescribe**: si un nombre ya existe, esa cuenta queda en *Conflicto* y no se toca.
+Si se corta la luz o cierras la app a mitad, vuelve a abrir el panel y pulsa *Volcar*: continúa sin duplicar ni perder ficheros.
+Después se actualizan contadores e índice; las cuentas nuevas reciben su carpeta en el catálogo (y en `accounts_lite` si el espejo está activo).
+Si moviste o renombraste la cuenta en el catálogo mientras esperaba, el volcado la lleva a su sitio nuevo.
+
+### Cómo probarlo
+
+1. Configura el almacén en Ajustes → Catálogo.
+2. Renombra una descarga con **Destino = Almacén**. Comprueba que `G:` no cambió y que en el almacén aparece la carpeta de la cuenta.
+3. Abre **Lote → Pendiente de volcar a G:…**: verás la cuenta como *Fusionar* o *Nueva*.
+4. Con `G:` conectada, **Volcar todo**. El almacén queda vacío y la cuenta tiene los ficheros nuevos en `G:`.
+5. (Opcional) Desconecta `G:`: *Volcar* avisa de que la biblioteca no está disponible y no hace nada.
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «No hay almacén configurado» | Indica la carpeta en Ajustes → Catálogo. |
+| Cuenta en *Conflicto* | Un fichero con el mismo nombre ya existe en `G:`. Revisa y decide a mano; el almacén conserva el original. |
+| «No hay espacio suficiente en el almacén» al renombrar | El disco del almacén no tiene sitio para esa cuenta; la cuenta se queda sin mover. |
+| Una cuenta nueva almacenada no se renombra por segunda vez | Hasta volcarla no tiene carpeta en el catálogo; vuélcala primero. |

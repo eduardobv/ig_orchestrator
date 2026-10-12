@@ -16,6 +16,7 @@ from ig_orchestrator.gui.shared.helpers import bind_escape_close
 from ig_orchestrator.library.audit_cli import native_path_text
 from ig_orchestrator.renaming import NewAccountSpec, RenameJob, RenamePreview, RenameService
 from ig_orchestrator.renaming.service import NEW_ACCOUNT, SKIPPED
+from ig_orchestrator.renaming.settings import staging_after_rename, staging_root_setting
 
 MAX_FILES_SHOWN = 400
 
@@ -45,6 +46,8 @@ def move_text(plan) -> str:
         return t("rename.move.pending")
     if plan.move is None:
         return "-"
+    if plan.move.status == "MOVED" and plan.staging_rel:
+        return t("rename.move.staging")
     if plan.move.status == "MOVED":
         return os.path.dirname(plan.move.destination) or plan.move.destination
     return t("rename.move.conflict")
@@ -76,6 +79,12 @@ def show_rename_dialog(
     dedupe_var = tk.BooleanVar(value=True)
     move_var = tk.BooleanVar(value=True)
     index_var = tk.BooleanVar(value=False)
+    staging_configured = bool(staging_root_setting(connection))
+    default_dest = staging_after_rename(connection)
+    dest_labels = {"library": t("rename.dest.library"), "staging": t("rename.dest.staging")}
+    dest_var = tk.StringVar(
+        value=dest_labels["staging" if (default_dest == "STAGING" and staging_configured) else "library"]
+    )
     info = tk.StringVar()
 
     frame = ttk.Frame(window, padding=10)
@@ -93,6 +102,9 @@ def show_rename_dialog(
     ttk.Checkbutton(options, text=t("rename.dialog.dedupe"), variable=dedupe_var).pack(side=tk.LEFT)
     ttk.Checkbutton(options, text=t("rename.dialog.move"), variable=move_var).pack(side=tk.LEFT, padx=12)
     ttk.Checkbutton(options, text=t("rename.dialog.use_index"), variable=index_var).pack(side=tk.LEFT)
+    ttk.Label(options, text=t("rename.dest.label")).pack(side=tk.LEFT, padx=(12, 4))
+    ttk.Combobox(options, textvariable=dest_var, values=list(dest_labels.values()), state="readonly",
+                 width=18 if staging_configured else 10).pack(side=tk.LEFT)
     ttk.Button(options, text=t("rename.dialog.compute"), command=lambda: compute(None)).pack(side=tk.LEFT, padx=12)
     ttk.Button(options, text=t("rename.dialog.reseed"), command=lambda: compute(random.SystemRandom().randrange(1, 2**31))).pack(side=tk.LEFT)
     ttk.Label(frame, textvariable=info, wraplength=940, justify="left").grid(row=3, column=0, columnspan=3, sticky="w", pady=(6, 4))
@@ -129,7 +141,8 @@ def show_rename_dialog(
         tree.delete(*tree.get_children())
         run.configure(state="disabled")
         source = native_path_text(source_var.get())
-        job = RenameJob(source, start_now_date, specs, dedupe_var.get(), move_var.get(), "index" if index_var.get() else "auto")
+        job = RenameJob(source, start_now_date, specs, dedupe_var.get(), move_var.get(), "index" if index_var.get() else "auto",
+                        "staging" if staging_configured and dest_var.get() == dest_labels["staging"] else "library")
         try:
             preview = service.preview(job, seed=seed or state["seed"])
         except ValueError as exc:
@@ -155,6 +168,17 @@ def show_rename_dialog(
         info.set(t("rename.dialog.summary", accounts=len(preview.accounts), renamed=total_renamed, dups=total_dups,
                    skipped=skipped, seed=preview.seed))
         run.configure(state="normal" if preview.runnable else "disabled")
+
+    def invalidate(*_args) -> None:
+        """An option changed: the shown preview no longer matches what would run."""
+
+        if state["preview"] is not None:
+            state["preview"] = None
+            run.configure(state="disabled")
+            info.set(t("rename.dialog.recompute"))
+
+    for var in (dedupe_var, move_var, index_var, dest_var):
+        var.trace_add("write", invalidate)
 
     def execute() -> None:
         preview = state["preview"]

@@ -45,6 +45,23 @@ def write_setting(conn: sqlite3.Connection, key: str, value: str, kind: str = "T
     conn.commit()
 
 
+def staging_after_rename(conn: sqlite3.Connection) -> str:
+    """``ASK`` | ``STAGING`` | ``LIBRARY`` (what to do with renamed folders)."""
+
+    try:
+        value = _value(conn, "staging.after_rename", "ASK").upper()
+    except NoSettingsTable:
+        return "LIBRARY"
+    return value if value in ("ASK", "STAGING", "LIBRARY") else "ASK"
+
+
+def staging_root_setting(conn: sqlite3.Connection) -> str:
+    try:
+        return _value(conn, "staging.root", "")
+    except NoSettingsTable:
+        return ""
+
+
 def lite_mirror_enabled(conn: sqlite3.Connection) -> bool:
     try:
         return _value(conn, "compat.lite.enabled", "1").lower() not in {"0", "false", "no"}
