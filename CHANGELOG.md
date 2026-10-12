@@ -1,5 +1,33 @@
 # Changelog
 
+## v3.4.0 - feat-uc2-4: operaciones de disco desde el catálogo
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Primera vez que la app **modifica la biblioteca**: crear, renombrar y mover carpetas y cuentas desde el árbol del catálogo, con vista previa, diario y deshacer. Disco y `bdapp` cambian juntos.
+
+### Creado
+
+* `library/fsops.py` (`FsOperationService`: `plan_mkdir`, `plan_rename_folder`, `plan_move_folder`, `plan_move_account`, `execute`, `recover`, `undo`, `history`), `library/fsops_plan.py` (`Plan`, `Step`, `Conflict`, `validate_name`), `library/compat_lite.py` (espejo `bdapp → accounts_lite`).
+* Tabla `fs_operations` (diario: `PLANNED → DISK_DONE → COMMITTED`, `undo_of`).
+* GUI: menú contextual del árbol (carpetas: **Nueva carpeta…**, **Renombrar carpeta…**, **Mover a…**; cuentas: **Mover a otra carpeta…**), `gui/library/{plan_dialog,folder_picker,fsops_history_dialog,fsops_actions}.py`, `Catálogo → Operaciones de disco…` (historial + Deshacer).
+* El árbol muestra las carpetas vacías (p. ej. recién creadas).
+* Recuperación automática al abrir la app (completa o descarta operaciones interrumpidas) y reconciliación del espejo de lite.
+* Tests: `tests/library/test_fsops.py` (18), `tests/gui/test_catalog_actions.py`.
+
+### Reglas de seguridad
+
+Nunca sobrescribe (conflicto `DEST_EXISTS`); nunca sale de la raíz `LIBRARY`; no mueve una carpeta dentro de sí misma; bloquea cuentas de un lote en ejecución (`PROCESSING`); desactivado si `G:` no está disponible; una sola operación a la vez; renombrado solo de mayúsculas en dos pasos (NTFS).
+
+### Modificado
+
+* `db/gui_migrations.py`, `gui/catalog/{panel,service,tree}.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.4.0.
+* `docs/feat-uc2-4.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 400 passed. Prueba de humo de la GUI con una copia de tu BD y una biblioteca temporal: nueva carpeta, mover cuenta, historial. **No se probó contra `G:` real.**
+
 ## v3.3.1 - Informe de simulación claro (feat 3)
 
 * El informe empieza con un **veredicto** (Correcto / Se puede importar con avisos / No importar) y explica que la importación es segura.

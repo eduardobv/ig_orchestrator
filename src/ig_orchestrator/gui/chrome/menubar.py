@@ -198,6 +198,7 @@ class MenubarMixin:
         catalog_menu.add_separator()
         catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
         catalog_menu.add_command(label=t("menu.catalog.import"), command=self._open_library_import)
+        catalog_menu.add_command(label=t("menu.catalog.ops"), command=self._open_fsops_history)
         menubar.add_cascade(label=t("menu.catalog"), menu=catalog_menu)
 
         settings_menu = tk.Menu(menubar, tearoff=False)

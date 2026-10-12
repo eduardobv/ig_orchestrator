@@ -198,6 +198,21 @@ def _patch_library_schema(connection: Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_media_index_lookup
             ON media_index(account_id, kind, media_id);
+        CREATE TABLE IF NOT EXISTS fs_operations (
+            id INTEGER PRIMARY KEY,
+            op_group TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            op_type TEXT NOT NULL,       -- MKDIR | MOVE_DIR | RENAME_DIR | RMDIR
+            src_rel TEXT,
+            dst_rel TEXT,
+            account_id INTEGER REFERENCES catalog_accounts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL,        -- PLANNED | DISK_DONE | COMMITTED | FAILED | UNDONE
+            error TEXT,
+            undo_of INTEGER REFERENCES fs_operations(id),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fs_operations_group ON fs_operations(op_group, seq);
         CREATE TABLE IF NOT EXISTS media_index_state (
             account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
             kind INTEGER NOT NULL,

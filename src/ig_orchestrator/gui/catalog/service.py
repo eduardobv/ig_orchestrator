@@ -45,6 +45,30 @@ class AccountCatalogService:
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
         return sorted(_deduplicate(entries), key=_catalog_sort_key)
 
+    def list_empty_folder_paths(self) -> list[str]:
+        """Catalog folders (excluding the root) with no account anywhere below them."""
+
+        try:
+            folders = self.connection.execute(
+                "SELECT id, parent_id, full_path FROM catalog_folders"
+            ).fetchall()
+            occupied: set[int] = set()
+            parents = {int(r["id"]): r["parent_id"] for r in folders}
+            for row in self.connection.execute(
+                "SELECT DISTINCT folder_id FROM catalog_accounts WHERE folder_id IS NOT NULL"
+            ):
+                current = int(row[0])
+                while current is not None and current not in occupied:
+                    occupied.add(current)
+                    current = parents.get(current)
+            return [
+                str(r["full_path"])
+                for r in folders
+                if int(r["id"]) not in occupied and r["parent_id"] is not None
+            ]
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_folders
+            return []
+
     def disable(self, username: str) -> None:
         repository = AccountHistoryRepository(self.connection)
         repository.create_or_get(username)

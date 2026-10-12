@@ -151,6 +151,7 @@ from ig_orchestrator.gui.run.rename import RenameMixin
 from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
 from ig_orchestrator.gui.exchange.pull_dialog import PullDialogMixin
 from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
+from ig_orchestrator.gui.library.fsops_actions import FsOpsActionsMixin
 from ig_orchestrator.gui.library.import_dialog import LibraryImportMixin
 from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
@@ -195,6 +196,7 @@ class InstagramOrchestratorApp(
     StoriesInboxMixin,
     LibraryAuditMixin,
     LibraryImportMixin,
+    FsOpsActionsMixin,
     PullDialogMixin,
 ):
     def __init__(
@@ -291,6 +293,7 @@ class InstagramOrchestratorApp(
         self._update_pending_button_label()
         self._update_batch_context()
         self._restore_open_queue()
+        self.root.after(600, self._fsops_startup)
 
 
     def _restore_open_queue(self) -> None:

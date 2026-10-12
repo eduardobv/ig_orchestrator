@@ -504,6 +504,12 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Operaciones de disco desde el catálogo
+
+En el árbol del catálogo (`Ver` → vista de árbol): clic derecho en una **carpeta** → *Nueva carpeta…*, *Renombrar carpeta…*, *Mover a…*;
+clic derecho en una **cuenta** → *Mover a otra carpeta…*. Siempre hay una vista previa; nada se sobrescribe. `Catalogo > Operaciones de disco...`
+muestra el historial y permite **Deshacer**. Con `G:` desconectada las acciones se desactivan. Mientras exista, `accounts_lite` se mantiene al dia.
+
 ### Importar la biblioteca a la app (bdsc1 → bdapp)
 
 Una sola vez (y cuando quieras refrescar): `Catalogo > Importar desde bdsc1...` o

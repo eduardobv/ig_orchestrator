@@ -133,3 +133,12 @@ diferencia queda en `fs_operations` y el espejo se rehace al reconectar (`mirror
 ## Fuera de alcance
 
 Eliminar carpetas (papelera/cuarentena → `feat-uc2-12`), fusionar carpetas (→ `feat-problem1-7`), renombrar usernames (→ `feat-problem1-7`), escaneo (→ `feat-uc3-8`).
+
+## Resultado de la implementación (2026-10-12, v3.4.0)
+
+- Implementado según el diseño: plan → vista previa → ejecución con diario → recuperación → deshacer; espejo `accounts_lite` por reconciliación (solo filas que difieren).
+- **Añadido `RMDIR`** como operación interna para poder deshacer un `MKDIR` (solo carpetas vacías).
+- El árbol del catálogo ahora incluye carpetas vacías (si no, una carpeta recién creada no se vería).
+- Bloqueo de cuentas: solo lotes en estado `PROCESSING`.
+- No incluido (según el diseño): borrar carpetas, fusionar, renombrar usernames y arrastrar y soltar.
+- Sin probar contra `G:` real: la primera prueba debe hacerse en una categoría pequeña (p. ej. `10.TEMP`) y comprobando `Operaciones de disco…`.

@@ -205,6 +205,10 @@ class CatalogPanelMixin:
         self.catalog_menu.add_command(
             label="Activar", command=self._enable_catalog_account
         )
+        self.catalog_menu.add_separator()
+        self.catalog_menu.add_command(
+            label=t("fsops.move_account"), command=self._catalog_move_account
+        )
 
 
     def _clear_catalog_filter(self) -> None:
@@ -358,7 +362,11 @@ class CatalogPanelMixin:
         for key, color in self.catalog_colors.items():
             if color:
                 tree.tag_configure(key, background=color)
-        roots = build_catalog_tree(list(entries), unrouted_label=t("label.unrouted"))
+        roots = build_catalog_tree(
+            list(entries),
+            unrouted_label=t("label.unrouted"),
+            extra_folder_paths=None if query.strip() else self.catalog_service.list_empty_folder_paths(),
+        )
         match = query.strip().casefold()
 
         def insert_nodes(parent: str, nodes) -> None:
@@ -429,6 +437,9 @@ class CatalogPanelMixin:
     def _show_catalog_menu(self, event: tk.Event) -> None:
         if self.catalog_view_mode == "tree":
             row = self.catalog_tree.identify_row(event.y)
+            if row.startswith("folder:"):
+                self._popup_folder_menu(event, row)
+                return
             if not row.startswith("user:"):
                 return
             self.catalog_tree.selection_set(row)

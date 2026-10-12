@@ -26,8 +26,12 @@ def build_catalog_tree(
     entries: list[AccountCatalogEntry],
     *,
     unrouted_label: str = "Sin ruta",
+    extra_folder_paths: list[str] | None = None,
 ) -> list[CatalogTreeNode]:
-    """Group catalog entries into a folder tree; usernames are leaves."""
+    """Group catalog entries into a folder tree; usernames are leaves.
+
+    ``extra_folder_paths`` adds folders that hold no account yet (e.g. just created).
+    """
 
     folders: dict[str, CatalogTreeNode] = {}
     roots: list[CatalogTreeNode] = []
@@ -71,6 +75,13 @@ def build_catalog_tree(
                 entry=entry,
             )
         )
+
+    for extra in extra_folder_paths or []:
+        parent = None
+        current_path = ""
+        for index, name in enumerate(split_destination_path(extra)):
+            current_path = name if index == 0 else _join_windows(current_path, name)
+            parent = folder_node(current_path, name, parent)
 
     if unrouted.children:
         unrouted.children.sort(key=lambda node: node.name.casefold())

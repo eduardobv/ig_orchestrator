@@ -8,6 +8,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 1 · Auditoría de biblioteca | v3.1.0 | [Feat 1](#feat-1--auditar-biblioteca-v310) |
 | 2 · Instancias y «Traer descargas» | v3.2.0 | [Feat 2](#feat-2--instancias-y-traer-descargas-v320) |
 | 3 · Catálogo completo en la app | v3.3.0 | [Feat 3](#feat-3--catálogo-completo-en-la-app-v330) |
+| 4 · Operaciones de disco desde el catálogo | v3.4.0 | [Feat 4](#feat-4--operaciones-de-disco-desde-el-catálogo-v340) |
 
 ---
 
@@ -252,3 +253,79 @@ Pulsa **Importar** y confirma. Es **idempotente**: si lo repites sin cambios en 
 | Muchas cuentas «creadas» en una segunda importación | Se movieron carpetas en `G:` y complete no se refrescó: repite el paso 0. |
 | El informe dice «raíz de la biblioteca: …» distinta de `G:\4K Stogram` | Ajusta `path_roots.LIBRARY` o usa `--root`. |
 | Quieres deshacer | Restaura la copia de `data/bkp/` (cierra la app antes). |
+
+
+---
+
+## Feat 4 · Operaciones de disco desde el catálogo (v3.4.0)
+
+**Para qué sirve:** crear, renombrar y mover carpetas y cuentas **desde el catálogo**, y que se refleje a la vez en `G:` y en la app. Es la primera función que **escribe en tu biblioteca**, por eso todo pasa por una vista previa, queda registrado y se puede deshacer.
+
+> **Primera vez:** pruébalo con algo pequeño y reversible (una carpeta nueva vacía, o una cuenta de `10.TEMP`). `G:` debe estar conectada.
+
+### Dónde está
+
+Necesitas la **vista de árbol** del catálogo (botón del árbol junto al título «Catálogo», o `Ver → Vista de árbol`).
+
+| Qué seleccionas | Clic derecho → | Qué hace |
+|---|---|---|
+| Una **carpeta** (categoría o grupo) | **Nueva carpeta…** | Pide un nombre y crea la carpeta dentro de la seleccionada (en disco y en el catálogo). Ejemplo: clic derecho en `00.FAVORITES` → *Nueva carpeta…* → `Maria-Perez` → se crea `G:K Stogram .FAVORITES\Maria-Perez`. |
+| Una **carpeta** | **Renombrar carpeta…** | Cambia el nombre en disco y actualiza las rutas de **todas** las cuentas y subcarpetas que cuelgan de ella. |
+| Una **carpeta** | **Mover a…** | Elige otra carpeta destino en un árbol; mueve la carpeta entera con todo su contenido. |
+| Una **cuenta** (en árbol o en lista) | **Mover a otra carpeta…** | Mueve la carpeta de la cuenta a otra categoría/grupo (p. ej. de `00.FAVORITES\Grupo` a `04.INACTIVE`). |
+
+No hay (todavía) arrastrar y soltar, borrar, fusionar ni renombrar el *username* de una cuenta: eso llega en feats posteriores.
+
+### La vista previa
+
+Antes de tocar nada se abre una ventana con:
+
+| Elemento | Significa |
+|---|---|
+| Título | Qué vas a hacer. |
+| Cuentas / carpetas afectadas | Cuántas rutas cambiarán. |
+| Tabla *Acción · De · A* | Lo que se hará exactamente (rutas relativas a `G:K Stogram`). |
+| Texto en rojo | **Conflictos que bloquean** (ver tabla). Con alguno, **Ejecutar** está desactivado. |
+| **Ejecutar / Cancelar** | Nada ocurre hasta que pulses Ejecutar. |
+
+| Conflicto | Significa |
+|---|---|
+| `DEST_EXISTS` | Ya existe algo con ese nombre en el destino. **Nunca se sobrescribe ni se fusiona.** |
+| `INVALID_NAME` | El nombre tiene caracteres no válidos en Windows (`< > : " / \ | ? *`), es un nombre reservado (`CON`, `NUL`…) o acaba en punto/espacio. |
+| `INTO_ITSELF` | Intentas mover una carpeta dentro de sí misma. |
+| `ACCOUNT_IN_ACTIVE_BATCH` | Una cuenta afectada está en un lote que se está ejecutando. |
+| `OFFLINE` | `G:` no está disponible. |
+| `NO_CHANGE` / `NO_PATH` | El destino es el mismo / la cuenta no tiene carpeta conocida. |
+
+Si `G:` está desconectada, las opciones del menú aparecen **desactivadas** (o un aviso lo explica).
+
+### Qué se actualiza solo
+
+- La carpeta en `G:` (renombrado instantáneo, solo metadatos).
+- La ruta de la cuenta/carpetas en la app, y el árbol del catálogo.
+- **`accounts_lite`**: se actualiza la ruta de las cuentas afectadas para que *Organizar stories* y el renombrado antiguo (`sc2`) sigan funcionando sin pasos manuales. Si lite no está accesible, se rehace al abrir la app.
+
+### Deshacer y recuperación — `Catálogo → Operaciones de disco…`
+
+| Elemento | Qué hace |
+|---|---|
+| Tabla | Cada acción realizada (fecha, tipo, origen → destino, estado). |
+| **Deshacer** | Revierte la acción seleccionada en disco y en la app. Solo si el estado actual coincide (p. ej. una carpeta creada solo se puede deshacer si sigue vacía). |
+
+Si la app se cierra a mitad de una operación, **al abrirla** comprueba el disco: si el movimiento llegó a hacerse, completa la app; si no, lo descarta. Te avisa con un mensaje.
+
+### Cómo probarlo
+
+1. Árbol del catálogo → clic derecho en una categoría pequeña → **Nueva carpeta…** `Prueba` → vista previa → **Ejecutar**. Comprueba en el Explorador que existe y que sale en el árbol.
+2. Clic derecho en `Prueba` → **Renombrar carpeta…** → `Prueba2`.
+3. Clic derecho en una cuenta de `10.TEMP` → **Mover a otra carpeta…** → `Prueba2`. Comprueba el disco y que *Organizar stories* la encuentra.
+4. `Catálogo → Operaciones de disco…` → selecciona cada una y **Deshacer** en orden inverso (mover → renombrar → crear).
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| No aparece el menú de carpetas | Estás en la vista de lista: cambia a vista de árbol. |
+| Las opciones salen desactivadas | `G:` no está conectada o hay un proceso en ejecución. |
+| «Ya existe en disco» | Hay una carpeta con ese nombre: elige otro nombre u otro destino (no se fusiona). |
+| Una carpeta no se ve tras crearla | Solo se muestran carpetas con cuentas o recién creadas vacías; pulsa el filtro vacío para refrescar. |

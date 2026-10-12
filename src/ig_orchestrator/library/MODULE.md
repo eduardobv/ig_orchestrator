@@ -18,6 +18,15 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 - `paths.py` (relativo ↔ absoluto a la raíz `LIBRARY`), `filenames.py` (regex del nombre de fichero), `import_cli.py`.
 - Incidencias en `library_import_issues`: `USERNAME_DUP`, `OWNER_DUP`, `OWNER_MISMATCH`, `FOLDER_MISMATCH`, `PATH_CLASH`, `OUTSIDE_ROOT`, `ONLY_IN_APP`, `PARSE_ERROR`.
 
+## Operaciones de disco (feat 4)
+
+- `fsops.py` — `FsOperationService`: toda modificación de carpetas de la biblioteca pasa por aquí. `plan_*` (sin efectos) → `execute(plan)`:
+  por paso, fila en `fs_operations` (`PLANNED`) → `os.rename` → `DISK_DONE` → actualizar `catalog_folders`/`catalog_accounts` (prefijo) → `COMMITTED`.
+  `recover()` resuelve pasos interrumpidos mirando el disco; `undo(op_group)` crea las operaciones inversas.
+- `fsops_plan.py` — `Plan`/`Step`/`Conflict` (códigos: `OFFLINE`, `OUTSIDE_ROOT`, `SRC_MISSING`, `DEST_EXISTS`, `DEST_IN_CATALOG`, `INVALID_NAME`, `INTO_ITSELF`, `IS_ROOT`, `NO_CHANGE`, `NO_PATH`, `ACCOUNT_IN_ACTIVE_BATCH`).
+- `compat_lite.py` — `mirror_to_lite`: solo actualiza `accounts_dir.path` donde difiere (idempotente); `compat.lite.enabled` lo desactiva.
+- Renombrar el username de una cuenta NO está aquí (feat 7); borrar/fusionar tampoco (feats 5, 7, 12).
+
 ## Códigos (auditoría)
 
 `PATH_MISSING`, `OWNER_DUP` (detalle: `SAME_CATEGORY` / `DELETED_PAIR` / `ALL_DELETED` / `CROSS_CATEGORY`), `OWNER_MISMATCH`,
