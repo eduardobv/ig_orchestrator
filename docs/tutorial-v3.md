@@ -197,7 +197,7 @@ La primera línea es el veredicto:
 |---|---|
 | ✔ **CORRECTO: se puede importar.** | Sin avisos ni incidencias. |
 | ✔ **SE PUEDE IMPORTAR (con avisos)** | Es seguro importar; los avisos/incidencias son cosas para revisar *después*. Lo habitual en tu biblioteca. |
-| ✖ **NO IMPORTAR TODAVIA** | Más de la mitad de las rutas caen fuera de la raíz de la biblioteca: la raíz (`G:K Stogram`) es incorrecta. |
+| ✖ **NO IMPORTAR TODAVIA** | Más de la mitad de las rutas caen fuera de la raíz de la biblioteca: la raíz (`G:\4K Stogram`) es incorrecta. |
 
 **¿Puede pasar algo malo al pulsar Importar?** No debería: solo *añade* cuentas archivadas y *rellena* rutas/contadores; nunca cambia estados, favoritos o fechas de tus cuentas, no toca `G:` y antes hace una copia en `data/bkp/` que puedes restaurar.
 
@@ -269,7 +269,7 @@ Necesitas la **vista de árbol** del catálogo (botón del árbol junto al títu
 
 | Qué seleccionas | Clic derecho → | Qué hace |
 |---|---|---|
-| Una **carpeta** (categoría o grupo) | **Nueva carpeta…** | Pide un nombre y crea la carpeta dentro de la seleccionada (en disco y en el catálogo). Ejemplo: clic derecho en `00.FAVORITES` → *Nueva carpeta…* → `Maria-Perez` → se crea `G:K Stogram .FAVORITES\Maria-Perez`. |
+| Una **carpeta** (categoría o grupo) | **Nueva carpeta…** | Pide un nombre y crea la carpeta dentro de la seleccionada (en disco y en el catálogo). Ejemplo: clic derecho en `00.FAVORITES` → *Nueva carpeta…* → `Maria-Perez` → se crea `G:\4K Stogram\00.FAVORITES\Maria-Perez`. |
 | Una **carpeta** | **Renombrar carpeta…** | Cambia el nombre en disco y actualiza las rutas de **todas** las cuentas y subcarpetas que cuelgan de ella. |
 | Una **carpeta** | **Mover a…** | Elige otra carpeta destino en un árbol; mueve la carpeta entera con todo su contenido. |
 | Una **cuenta** (en árbol o en lista) | **Mover a otra carpeta…** | Mueve la carpeta de la cuenta a otra categoría/grupo (p. ej. de `00.FAVORITES\Grupo` a `04.INACTIVE`). |
@@ -284,7 +284,7 @@ Antes de tocar nada se abre una ventana con:
 |---|---|
 | Título | Qué vas a hacer. |
 | Cuentas / carpetas afectadas | Cuántas rutas cambiarán. |
-| Tabla *Acción · De · A* | Lo que se hará exactamente (rutas relativas a `G:K Stogram`). |
+| Tabla *Acción · De · A* | Lo que se hará exactamente (rutas relativas a `G:\4K Stogram`). |
 | Texto en rojo | **Conflictos que bloquean** (ver tabla). Con alguno, **Ejecutar** está desactivado. |
 | **Ejecutar / Cancelar** | Nada ocurre hasta que pulses Ejecutar. |
 
