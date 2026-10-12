@@ -135,6 +135,8 @@ class StoriesInboxMixin:
             dest = str(item.destination) if item.destination is not None else "-"
             if item.status is StoryInboxStatus.MOVED:
                 lines.append(f"MOVED  {item.source.name}  ->  {dest}")
+            elif item.status is StoryInboxStatus.MOVED_VIA_ALIAS:
+                lines.append(f"MOVED_VIA_ALIAS  {item.source.name}  ->  {dest}  ({item.detail})")
             else:
                 lines.append(
                     f"{item.status}  {item.source.name}  ({item.username or '-'})  {item.detail}"

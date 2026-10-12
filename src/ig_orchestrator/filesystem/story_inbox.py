@@ -26,6 +26,7 @@ class StoryInboxError(ValueError):
 
 class StoryInboxStatus(StrEnum):
     MOVED = "MOVED"
+    MOVED_VIA_ALIAS = "MOVED_VIA_ALIAS"  # the username in the file name is an old name of the account
     NO_USERNAME_IN_NAME = "NO_USERNAME_IN_NAME"
     USERNAME_NOT_IN_DB = "USERNAME_NOT_IN_DB"
     EMPTY_PATH = "EMPTY_PATH"
@@ -128,6 +129,27 @@ def _lookup_bdapp_path(app: sqlite3.Connection, username: str) -> str | None:
     return None
 
 
+def _lookup_alias(app: sqlite3.Connection, username: str) -> tuple[str, str] | None:
+    """``(account folder, current username)`` when *username* is a unique old name of an account."""
+
+    try:
+        rows = app.execute(
+            """
+            SELECT DISTINCT a.username FROM account_usernames u
+            JOIN catalog_accounts a ON a.id = u.catalog_account_id
+            WHERE u.username = ? COLLATE NOCASE AND a.username <> ? COLLATE NOCASE
+            """,
+            (username, username),
+        ).fetchall()
+    except sqlite3.Error:
+        return None
+    if len(rows) != 1:  # an old name reused by several accounts is ambiguous: never guess
+        return None
+    current = str(rows[0][0])
+    path = _lookup_bdapp_path(app, current)
+    return (path, current) if path else None
+
+
 def organize_story_inbox(
     *,
     inbox: Path | str,
@@ -211,6 +233,12 @@ def _move_one(
             status=StoryInboxStatus.USERNAME_NOT_IN_DB,
             detail=str(exc),
         )
+    alias_note = ""
+    if account_path is None and app_connection is not None:
+        alias = _lookup_alias(app_connection, username)
+        if alias is not None:
+            account_path, current_name = alias
+            alias_note = f"@{username} ahora es @{current_name}"
     if account_path is None:
         return StoryInboxResult(
             source=source,
@@ -262,12 +290,15 @@ def _move_one(
         source=source,
         username=username,
         destination=destination,
-        status=StoryInboxStatus.MOVED,
+        status=StoryInboxStatus.MOVED_VIA_ALIAS if alias_note else StoryInboxStatus.MOVED,
+        detail=alias_note,
     )
 
 
 def summarize_results(results: list[StoryInboxResult]) -> tuple[int, int]:
-    moved = sum(1 for item in results if item.status is StoryInboxStatus.MOVED)
+    moved = sum(
+        1 for item in results if item.status in (StoryInboxStatus.MOVED, StoryInboxStatus.MOVED_VIA_ALIAS)
+    )
     errors = len(results) - moved
     return moved, errors
 

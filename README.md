@@ -511,6 +511,12 @@ Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el man
    Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
 3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
 
+### Cuenta que cambió de username
+
+Clic derecho en la cuenta (o `Catalogo`) > **Cambio de username...**: renombra la carpeta, la cuenta (mismo id interno) y guarda el nombre antiguo como alias.
+Si ya existe una cuenta/carpeta con el nombre nuevo se **fusionan** sin perder ficheros (identicos se retiran, duplicados por id de publicacion van a `_duplicates`).
+`Catalogo > Revisar ids repetidos...` lista las cuentas que comparten id de Instagram (con pista) para resolverlas. Todo se puede **Deshacer** desde `Operaciones de disco`.
+
 ### Cuentas eliminadas en Instagram
 
 `Catalogo > Marcar como eliminada...` (o clic derecho sobre la cuenta): pone la cuenta en `DELETED` y mueve su carpeta a `09.DELETED\<cuenta>`, con vista previa.

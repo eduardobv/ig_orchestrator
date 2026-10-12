@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.7.0 - feat-problem1-7: cuenta renombrada en Instagram (renombrar o fusionar)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Cuando una cuenta cambia de username se resuelve **desde la app, en un gesto**: carpeta en disco, base de datos, `accounts_lite` y GUI, con historial de nombres. El renombrado simple conserva **la misma fila (mismo id)**.
+
+### Creado
+
+* `library/account_rename.py` (`AccountRenameService`: `plan_rename`, `execute`, `undo_blocker`, `restore_after_undo`, `resolve_alias`), `library/merge.py` (fusión de carpetas sin perder ficheros: idénticos, duplicados por `media_id`, conflictos de tamaño, deshacer), `library/owner_groups.py` (grupos de cuentas con el mismo id de Instagram y su clasificación).
+* Tablas `account_usernames` (historial de nombres, relleno con el nombre vigente de las 1 169 cuentas), `owner_dup_ignored`; columnas `fs_operations.payload` y `account_lifecycle.payload`; operaciones `MERGE_DIR` / `UNMERGE_DIR` en el motor de disco (con recuperación y deshacer).
+* GUI: **Cambió de username…** (clic derecho y menú Catálogo) con ventana de vista previa (renombrado o fusión, qué cuenta se conserva, resumen de ficheros), **Revisar ids repetidos…** (grupos con pista y «Resolver…» / «No es renombrado»), aviso en el editor «@old ahora es @new».
+* Story inbox: `MOVED_VIA_ALIAS` cuando el fichero lleva un nombre antiguo (solo si es inequívoco).
+* Tests: `test_account_rename.py` (15), `test_owner_groups.py`, `test_story_inbox_alias.py`, `test_catalog_refresh_after_rename.py`.
+
+### Modificado
+
+* Al terminar, la GUI se refresca sin reiniciar: lista, árbol, editor y tabla del lote abierto.
+* `fsops.py`, `fsops_plan.py`, `db/gui_migrations.py`, `filesystem/story_inbox.py`, `gui/stories/dialog.py`, `gui/library/fsops_history_dialog.py`, `gui/editor/panel.py`, `gui/catalog/panel.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.7.0.
+* `docs/feat-problem1-7.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 469 passed. Prueba con una copia de tu base de datos: tus 2 grupos de id repetido restantes se clasifican (1 «renombrado probable», 1 «revisión manual») y se resolvió el probable (`dianaseyx` → `exkeysi`, conservando la carpeta activa). **No probado contra `G:` real.**
+
 ## v3.6.0 - feat-uc4-6: publicación automática desde la instancia 24/7 + importación fiel
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

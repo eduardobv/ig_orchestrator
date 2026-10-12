@@ -23,6 +23,9 @@ from ig_orchestrator.library.fsops_plan import (
     Step,
     validate_name,
 )
+from pathlib import Path
+
+from ig_orchestrator.library import merge as merge_module
 from ig_orchestrator.library.paths import parent_rel, rel_key, to_abs, to_rel
 
 _LOCK = threading.Lock()  # one disk operation at a time inside the app
@@ -271,10 +274,11 @@ class FsOperationService:
         cursor = self.conn.execute(
             """
             INSERT INTO fs_operations (op_group, seq, op_type, src_rel, dst_rel, account_id,
-                                       status, undo_of, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'PLANNED', ?, ?, ?)
+                                       status, undo_of, created_at, updated_at, payload)
+            VALUES (?, ?, ?, ?, ?, ?, 'PLANNED', ?, ?, ?, ?)
             """,
-            (group, seq, step.op_type.value, step.src_rel, step.dst_rel, step.account_id, undo_of, now, now),
+            (group, seq, step.op_type.value, step.src_rel, step.dst_rel, step.account_id, undo_of, now, now,
+             step.payload),
         )
         self.conn.commit()
         return int(cursor.lastrowid)
@@ -288,11 +292,13 @@ class FsOperationService:
     def _run_step(self, group: str, seq: int, step: Step, undo_of: int | None = None) -> int:
         op_id = self._insert_op(group, seq, step, undo_of)
         try:
-            self._disk(step.op_type, step.src_rel, step.dst_rel)
+            payload = self._disk(step.op_type, step.src_rel, step.dst_rel, step.payload)
         except OSError as exc:
             self._set_status(op_id, OpStatus.FAILED, str(exc))
             self.conn.commit()
             raise FsOpsError(f"Fallo en disco: {exc}") from exc
+        if payload is not None and step.op_type is OpType.MERGE_DIR:
+            self.conn.execute("UPDATE fs_operations SET payload = ? WHERE id = ?", (payload, op_id))
         self._set_status(op_id, OpStatus.DISK_DONE)
         self.conn.commit()
         self._commit_db(op_id, step.op_type, step.src_rel, step.dst_rel)
@@ -307,11 +313,20 @@ class FsOperationService:
             self.conn.rollback()
             raise
 
-    def _disk(self, op_type: OpType, src: str | None, dst: str | None) -> None:
+    def _disk(
+        self, op_type: OpType, src: str | None, dst: str | None, payload: str | None = None
+    ) -> str | None:
+        """Run the disk side of a step; returns the merge manifest for ``MERGE_DIR``."""
+
         if op_type is OpType.MKDIR:
             os.mkdir(self.abs(dst))
         elif op_type is OpType.RMDIR:
             os.rmdir(self.abs(src))
+        elif op_type is OpType.MERGE_DIR:
+            return merge_module.execute_merge(Path(self.abs(src)), Path(self.abs(dst))).to_json()
+        elif op_type is OpType.UNMERGE_DIR:
+            report = merge_module.MergeReport.from_json(payload or "[]")
+            merge_module.undo_merge(report, Path(self.abs(dst)), Path(self.abs(src)))
         else:
             source, target = self.abs(src), self.abs(dst)
             if rel_key(src) == rel_key(dst) and src != dst:
@@ -321,6 +336,7 @@ class FsOperationService:
                 os.rename(temp, target)
             else:
                 os.rename(source, target)
+        return None
 
     # -------------------------------------------------------------- DB effect
     def _apply_db(self, op_type: OpType, src: str | None, dst: str | None) -> None:
@@ -341,6 +357,8 @@ class FsOperationService:
             folder_id = self.folder_id_for_rel(src)
             if folder_id is not None:
                 self.conn.execute("DELETE FROM catalog_folders WHERE id = ?", (folder_id,))
+        elif op_type in (OpType.MERGE_DIR, OpType.UNMERGE_DIR):
+            pass  # account rows are handled by the service that planned the merge
         else:
             self._prefix_replace(src, dst)
 
@@ -404,7 +422,7 @@ class FsOperationService:
 
         messages: list[str] = []
         rows = self.conn.execute(
-            "SELECT id, op_type, src_rel, dst_rel FROM fs_operations"
+            "SELECT id, op_type, src_rel, dst_rel, payload FROM fs_operations"
             " WHERE status IN ('PLANNED', 'DISK_DONE') ORDER BY id"
         ).fetchall()
         for row in rows:
@@ -415,6 +433,22 @@ class FsOperationService:
             if op_type is OpType.RMDIR:
                 done = not src_exists
             elif op_type is OpType.MKDIR:
+                done = dst_exists
+            elif op_type is OpType.MERGE_DIR:
+                if src_exists and dst_exists:  # interrupted merge: finish it (it is resumable)
+                    try:
+                        payload = self._disk(op_type, src, dst)
+                        self.conn.execute("UPDATE fs_operations SET payload = ? WHERE id = ?", (payload, row["id"]))
+                    except OSError:
+                        pass
+                    src_exists = os.path.exists(self.abs(src))
+                done = dst_exists and not src_exists
+            elif op_type is OpType.UNMERGE_DIR:
+                if dst_exists and row["payload"]:
+                    try:
+                        self._disk(op_type, src, dst, row["payload"])
+                    except OSError:
+                        pass
                 done = dst_exists
             else:
                 done = dst_exists and not (src_exists and rel_key(src) != rel_key(dst))
@@ -441,12 +475,33 @@ class FsOperationService:
             return False, "Ya fue deshecho"
         if not self.is_online():
             return False, "La biblioteca (G:) no esta disponible"
-        for row in rows:
+        for index, row in enumerate(rows):
             op_type = OpType(row["op_type"])
             if op_type is OpType.MKDIR:
                 target = self.abs(row["dst_rel"])
                 if not os.path.isdir(target) or os.listdir(target):
                     return False, f"La carpeta creada ya no esta vacia o no existe: {row['dst_rel']}"
+            elif op_type is OpType.UNMERGE_DIR:
+                return False, "Una operacion de deshacer una fusion no se puede deshacer"
+            elif op_type is OpType.MERGE_DIR:
+                report = merge_module.MergeReport.from_json(row["payload"] or "[]")
+                # later steps of the same group (e.g. renaming the survivor) may have moved the folder
+                survivor = row["dst_rel"]
+                src_will_be_free = False
+                for later in rows[index + 1:]:
+                    if OpType(later["op_type"]) in (OpType.RENAME_DIR, OpType.MOVE_DIR) and rel_key(
+                        later["src_rel"] or ""
+                    ) == rel_key(survivor):
+                        survivor = later["dst_rel"]
+                        src_will_be_free = src_will_be_free or rel_key(survivor) == rel_key(row["src_rel"] or "")
+                ok, reason = merge_module.can_undo(
+                    report,
+                    Path(self.abs(row["src_rel"])),
+                    Path(self.abs(survivor)),
+                    check_src=not src_will_be_free,
+                )
+                if not ok:
+                    return False, reason
             else:
                 if not os.path.exists(self.abs(row["dst_rel"])):
                     return False, f"El estado actual no coincide: falta {row['dst_rel']}"
@@ -469,6 +524,8 @@ class FsOperationService:
                     step = Step(OpType.RMDIR, row["dst_rel"], None)
                 elif op_type is OpType.RMDIR:
                     step = Step(OpType.MKDIR, None, row["src_rel"])
+                elif op_type is OpType.MERGE_DIR:
+                    step = Step(OpType.UNMERGE_DIR, row["dst_rel"], row["src_rel"], row["account_id"], row["payload"])
                 else:
                     step = Step(op_type, row["dst_rel"], row["src_rel"], row["account_id"])
                 self._run_step(group, seq, step, undo_of=int(row["id"]))

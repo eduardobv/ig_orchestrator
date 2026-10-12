@@ -8,6 +8,7 @@ from tkinter import messagebox, ttk
 from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
 from ig_orchestrator.library.account_lifecycle import AccountLifecycleService
+from ig_orchestrator.library.account_rename import AccountRenameService
 from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
 
 
@@ -69,7 +70,8 @@ def open_history(app) -> None:
             return
         group = selection[0]
         ok, reason = service.can_undo(group)
-        if not ok:
+        reason = reason or AccountRenameService(app.connection).undo_blocker(group)
+        if not ok or reason:
             messagebox.showinfo(t("ops.title"), reason, parent=window)
             return
         if not messagebox.askyesno(t("ops.title"), t("ops.confirm_undo"), parent=window):
@@ -77,6 +79,7 @@ def open_history(app) -> None:
         try:
             service.undo(group)
             AccountLifecycleService(app.connection).restore_after_undo(group)
+            AccountRenameService(app.connection).restore_after_undo(group)
         except FsOpsError as exc:
             messagebox.showerror(t("ops.title"), str(exc), parent=window)
             return

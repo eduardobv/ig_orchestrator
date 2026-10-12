@@ -470,6 +470,12 @@ class EditorPanelMixin:
         if self._history_guard("agregar o actualizar cuentas"):
             return
         account = self._editor_account()
+        resolved = self._resolve_editor_alias(account.username)
+        if resolved is None:
+            return
+        if resolved != account.username.strip().lstrip("@"):
+            self.username_var.set(resolved)
+            account = self._editor_account()
         if not self._confirm_if_deleted(account.username):
             return
         try:

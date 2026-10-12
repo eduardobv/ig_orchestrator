@@ -12,6 +12,8 @@ class OpType(StrEnum):
     MOVE_DIR = "MOVE_DIR"
     RENAME_DIR = "RENAME_DIR"
     RMDIR = "RMDIR"  # only used to undo a MKDIR (empty folders only)
+    MERGE_DIR = "MERGE_DIR"  # merge the files of src_rel into the folder dst_rel, then remove src_rel
+    UNMERGE_DIR = "UNMERGE_DIR"  # undo of MERGE_DIR (uses the recorded payload)
 
 
 class OpStatus(StrEnum):
@@ -28,6 +30,7 @@ class Step:
     src_rel: str | None
     dst_rel: str | None
     account_id: int | None = None
+    payload: str | None = None  # merge manifest (JSON) for MERGE_DIR / UNMERGE_DIR
 
 
 @dataclass(frozen=True, slots=True)

@@ -128,3 +128,14 @@ UI: **Catálogo → Revisar ids repetidos…** (`gui/library/owner_groups_dialog
 ## Fuera de alcance
 
 Detectar renombrados **automáticamente** al descargar (el bot no entrega el id), consultar Instagram, fusionar cuentas con `instagram_user_id` distinto.
+
+## Resultado de la implementación (2026-10-12, v3.7.0)
+
+- Implementado: renombrado simple (misma fila/id), fusión con `MERGE_DIR`/`UNMERGE_DIR` en el motor, alias (`account_usernames`, relleno automático de las cuentas existentes), grupos de ids repetidos con pistas, ignorar grupo, alias en el editor y en el story inbox, refresco de la GUI sin reiniciar, deshacer de renombrado y de fusión.
+- **Servicio nuevo `account_rename.py`** (no se amplió `account_lifecycle.py`) para mantener módulos pequeños.
+- **Superviviente automático:** primero la ubicación que sigue en uso (no `09.DELETED`/`06.EXCLUDED`/`-Deleted`), después la de más contenido, después la más antigua. Siempre editable en la ventana.
+- Una carpeta con el nombre nuevo **sin cuenta** en la app también se fusiona, pero exige confirmación (no hay id que comparar).
+- **Deshacer una fusión** no es posible si se unieron filas del mismo lote (se explica el motivo); el índice de ficheros del superviviente se vuelve a generar en el siguiente escaneo.
+- **No implementado:** pegar un `ownerId` en el buscador para seleccionar la cuenta (el índice `idx_catalog_accounts_owner` ya existe); la reescritura de URLs de stories es automática (solo lotes borrador/importados) y se informa en la vista previa en lugar de ofrecerse.
+- Tus datos actuales solo tienen 2 grupos de id repetido (los 69 de antes se resolvieron con la limpieza manual).
+- Sin probar contra `G:` real: probar primero con una cuenta de `10.TEMP`.

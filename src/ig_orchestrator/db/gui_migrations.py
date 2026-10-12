@@ -121,6 +121,8 @@ def _patch_gui_schema(connection: Connection) -> None:
     _add_column_if_missing(connection, "downloaded_files", "sha256", "TEXT")
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
     _patch_library_schema(connection)
+    _add_column_if_missing(connection, "fs_operations", "payload", "TEXT")
+    _add_column_if_missing(connection, "account_lifecycle", "payload", "TEXT")
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS instances (
@@ -244,6 +246,21 @@ def _patch_library_schema(connection: Connection) -> None:
             files INTEGER,
             bytes INTEGER
         );
+        CREATE TABLE IF NOT EXISTS account_usernames (
+            id INTEGER PRIMARY KEY,
+            catalog_account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            username TEXT NOT NULL COLLATE NOCASE,
+            valid_from TEXT,
+            valid_to TEXT,               -- NULL = current name
+            reason TEXT NOT NULL,        -- INITIAL | RENAMED | MANUAL
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_usernames_name ON account_usernames(username);
+        CREATE TABLE IF NOT EXISTS owner_dup_ignored (
+            owner_id TEXT PRIMARY KEY,
+            note TEXT,
+            created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS account_lifecycle (
             id INTEGER PRIMARY KEY,
             op_group TEXT,
@@ -253,7 +270,8 @@ def _patch_library_schema(connection: Connection) -> None:
             prev_favorite INTEGER,
             prev_rel_path TEXT,
             created_at TEXT NOT NULL,
-            undone INTEGER NOT NULL DEFAULT 0
+            undone INTEGER NOT NULL DEFAULT 0,
+            payload TEXT                 -- JSON snapshot for RENAME / MERGE undo
         );
         CREATE INDEX IF NOT EXISTS idx_account_lifecycle_group ON account_lifecycle(op_group);
         CREATE TABLE IF NOT EXISTS media_index_state (
@@ -265,6 +283,16 @@ def _patch_library_schema(connection: Connection) -> None:
             source TEXT NOT NULL,
             PRIMARY KEY (account_id, kind)
         );
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_account_usernames_account ON account_usernames(catalog_account_id)"
+    )
+    connection.execute(
+        """
+        INSERT INTO account_usernames (catalog_account_id, username, valid_from, valid_to, reason, created_at)
+        SELECT a.id, a.username, NULL, NULL, 'INITIAL', datetime('now') FROM catalog_accounts a
+        WHERE NOT EXISTS (SELECT 1 FROM account_usernames u WHERE u.catalog_account_id = a.id)
         """
     )
     connection.execute(

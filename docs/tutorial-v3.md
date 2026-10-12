@@ -11,6 +11,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 4 · Operaciones de disco desde el catálogo | v3.4.0 | [Feat 4](#feat-4--operaciones-de-disco-desde-el-catálogo-v340) |
 | 5 · Cuenta eliminada en Instagram | v3.5.0 | [Feat 5](#feat-5--cuenta-eliminada-en-instagram-v350) |
 | 6 · La laptop entrega sola (paquetes) | v3.6.0 | [Feat 6](#feat-6--la-laptop-entrega-sola-paquetes-v360) |
+| 7 · Cuenta que cambió de username | v3.7.0 | [Feat 7](#feat-7--cuenta-que-cambió-de-username-v370) |
 
 ---
 
@@ -510,3 +511,84 @@ Sigue existiendo para lotes **sin paquete**, pero ahora avisa de que **descarta 
 | «El paquete requiere la app 3.6.0…» | Las dos máquinas deben estar en la misma versión o superior a la del paquete. |
 | «Paquete dañado» | Algún fichero falta o cambió de tamaño tras publicar: vuelve a publicarlo. |
 | Una cuenta no trae ficheros | No tenía carpeta en el trabajo de la laptop: se avisa al publicar («Sin carpeta descargada»). |
+
+
+---
+
+## Feat 7 · Cuenta que cambió de username (v3.7.0)
+
+**Para qué sirve:** cuando una cuenta de Instagram cambia de nombre, lo resuelves **desde la app en un gesto**: se renombra (o se fusiona) la carpeta en `G:`, se actualiza la base de datos, el `accounts_lite` y la pantalla, **sin reiniciar la app**. El nombre antiguo queda como alias para no perder el historial.
+
+> **Primera vez:** pruébalo con una cuenta de `10.TEMP` y luego **Deshacer** desde `Catálogo → Operaciones de disco…`. `G:` debe estar conectada.
+
+### Dos casos
+
+| Caso | Cuándo | Qué hace |
+|---|---|---|
+| **Renombrado simple** | No existe ninguna carpeta ni cuenta con el nombre nuevo | Renombra la carpeta. La cuenta **conserva su id interno** (la misma fila), cambia el username y el nombre antiguo pasa a alias. |
+| **Fusión** | Ya existe `@nuevo` (típico: descargaste la cuenta con su nombre nuevo antes de enterarte) | Une las dos carpetas **sin perder ficheros** y deja una sola cuenta. |
+
+### Cómo se hace — clic derecho en la cuenta → **Cambió de username…**
+
+(también en el menú `Catálogo`). Escribe el username nuevo (sin @) y se abre la ventana de vista previa.
+
+**En un renombrado simple** verás la acción *Renombrar* (de → a) y, si la cuenta tiene URLs de stories en lotes borrador, cuántas se actualizarán al nombre nuevo.
+
+**En una fusión** además aparece:
+
+| Elemento | Qué es |
+|---|---|
+| Tabla *Cuenta · Carpeta · Contenido · Último contenido* | Las dos cuentas, para decidir. |
+| **Cuenta y carpeta que se conservan** | *Automático*: primero la ubicación que sigue en uso (no `09.DELETED`/`-Deleted`), luego la de más contenido. O elige *Esta cuenta* / *La que ya existe*. |
+| Resumen | Ej.: «120 se mueven, 15 idénticos (se retiran del origen), 3 duplicados semánticos (a `_duplicates`), 2 con sufijo». |
+| Casilla *Confirmo que son la misma cuenta* | Solo si falta el id de Instagram en una de las dos (no se puede comprobar). |
+
+**Reglas de la fusión (nada se borra por error):**
+
+| Situación del fichero | Qué pasa |
+|---|---|
+| Mismo nombre y mismo tamaño | Es idéntico: se retira del origen (queda el de la carpeta que se conserva). |
+| Mismo nombre, otro tamaño | Se mueve con sufijo `_1`, `_2`… |
+| Mismo id de publicación pero otro nombre | Duplicado: va a una carpeta `_duplicates` de la cuenta, **no se borra**. |
+| Cualquier otro | Se mueve a la misma subcarpeta (story, reels, highlights…). |
+
+**Bloqueos** (salen en rojo): los **ids de Instagram son distintos** (no se fusiona nunca), la cuenta está en un **lote en ejecución**, el username no es válido (letras, números, `.` y `_`, hasta 30), o `G:` no está disponible.
+
+### Revisar ids repetidos — `Catálogo → Revisar ids repetidos…`
+
+Lista las cuentas que comparten **el mismo id de Instagram** (probablemente la misma persona). Cada grupo trae una **pista**:
+
+| Pista | Significa |
+|---|---|
+| **Renombrado probable** | Una está en uso y las otras archivadas (`09.DELETED`/`-Deleted`) o mucho más antiguas. |
+| **Misma categoría** | Todas en la misma categoría: revisa y fusiona. |
+| **Revisión manual** | Categorías distintas. |
+| **Todas eliminadas** | Todas en `09.DELETED`: casi siempre se ignora. |
+
+Botones: **Resolver…** (eliges cuál es el username **vigente** —la sugerida lleva ★— y se fusionan las demás en esa cuenta, una ventana de vista previa por cada una), **No es renombrado** (el grupo deja de aparecer) y **Actualizar**. Hoy tu base tiene 2 grupos.
+
+### Nombres antiguos (alias)
+
+* **Editor:** si escribes un username antiguo, la app pregunta «@viejo ahora es @nuevo — ¿usar @nuevo?». *No* significa que es otra cuenta con ese nombre. Si el nombre lo usaron varias cuentas, no adivina.
+* **Organizar stories:** un fichero con el nombre antiguo se mueve a la cuenta actual y el resultado dice `MOVED_VIA_ALIAS` («@viejo ahora es @nuevo»).
+
+### Deshacer — `Catálogo → Operaciones de disco…`
+
+Selecciona la operación → **Deshacer**: carpetas, ficheros, username, alias y (en fusiones) la cuenta eliminada vuelven a su estado, con los **mismos id**. No se puede deshacer si: ya moviste esos ficheros, se unieron filas del **mismo lote**, o la cuenta volvió a cambiar de nombre (se explica el motivo).
+
+### Cómo probarlo
+
+1. Crea en `10.TEMP` una cuenta de prueba con una imagen. Clic derecho → **Cambió de username…** → `prueba2`: comprueba la carpeta, el árbol (sin reiniciar) y `Catálogo → Operaciones de disco…`.
+2. En el editor escribe el nombre antiguo y comprueba el aviso «@viejo ahora es @nuevo».
+3. **Deshacer** y comprueba que todo vuelve.
+4. Fusión: con dos cuentas de prueba con el mismo id de Instagram, renombra una al nombre de la otra, revisa el resumen y ejecuta; luego **Deshacer**.
+5. `Revisar ids repetidos…` → **Resolver…** con tus 2 grupos reales (empieza por el «renombrado probable»).
+
+### Problemas típicos
+
+| Síntoma | Causa |
+|---|---|
+| «Los ids de Instagram son distintos» | No es la misma cuenta: no se fusiona. Si el id guardado es erróneo, corrígelo con *Update* en el editor. |
+| Pide confirmar que son la misma cuenta | Falta el id en alguna: la app no puede comprobarlo; confirma solo si estás seguro. |
+| «La fusión unió filas del mismo lote» al deshacer | Ya no se puede revertir automáticamente; restaura el backup si lo necesitas. |
+| No sale en «ids repetidos» | Ya está resuelto, marcado como «No es renombrado», o falta el id de Instagram. |
