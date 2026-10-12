@@ -373,7 +373,7 @@ Los avisos y bloqueos (favorita, id compartido, lote en ejecución, destino exis
 
 ### Dónde se ven las cuentas eliminadas
 
-Las cuentas `DELETED` **no salen** en el catálogo normal (igual que las archivadas). Para verlas: `Ver → Mostrar biblioteca completa` (salen en color **lila**).
+En la **vista de árbol** las cuentas `DELETED` aparecen dentro de su carpeta (p. ej. `Adrianna-Eves-Deleted`) en color **lila**. En la **vista de lista** no salen (igual que las archivadas); para verlas ahí: `Ver → Mostrar biblioteca completa`.
 
 ### La vista previa (misma ventana del feat 4)
 

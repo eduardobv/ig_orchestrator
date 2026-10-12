@@ -250,6 +250,9 @@ class InstagramOrchestratorApp(
             if row is not None and str(row["value"]) in {"list", "tree"}:
                 self.catalog_view_mode = str(row["value"])
             self.catalog_colors = load_catalog_colors(connection)
+        if self.catalog_view_mode == "tree":
+            self.catalog_service.include_deleted = True
+            self.catalog_entries = self.catalog_service.list_entries()
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(

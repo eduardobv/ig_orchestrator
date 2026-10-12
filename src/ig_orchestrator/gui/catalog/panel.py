@@ -262,6 +262,9 @@ class CatalogPanelMixin:
             return
         self.catalog_view_mode = next_mode
         self._persist_catalog_view()
+        # Deleted accounts live in their -Deleted folders: show them in the tree only.
+        self.catalog_service.include_deleted = next_mode == "tree"
+        self._reload_catalog()
 
 
     def _persist_catalog_view(self) -> None:
@@ -389,7 +392,9 @@ class CatalogPanelMixin:
                             today=entry.username.casefold() in today,
                             palette=self.catalog_colors,
                         )
-                        if colors.get("background") == self.catalog_colors.get("disabled"):
+                        if entry.status is AccountHistoryStatus.DELETED:
+                            tags.append("deleted")
+                        elif colors.get("background") == self.catalog_colors.get("disabled"):
                             tags.append("disabled")
                         elif colors.get("background") == self.catalog_colors.get("in_batch"):
                             tags.append("in_batch")
@@ -585,6 +590,8 @@ class CatalogPanelMixin:
             ),
             None,
         )
+        if entry is None:
+            entry = self.catalog_service.find_entry(self.username_var.get().strip())
         if entry is None:
             return
         if entry.owner_id:

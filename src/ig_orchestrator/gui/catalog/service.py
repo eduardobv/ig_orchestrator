@@ -33,17 +33,43 @@ class AccountCatalogService:
     ) -> None:
         self.connection = connection
         self.include_archived = False  # "show the full library" toggle
+        self.include_deleted = False  # deleted accounts are shown in the tree view only
         self.batch_json_path = batch_json_path
         self.backup_dir = backup_dir
+
+    def _catalog_has_accounts(self) -> bool:
+        try:
+            return bool(self.connection.execute("SELECT 1 FROM catalog_accounts LIMIT 1").fetchone())
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_accounts
+            return False
 
     def list_entries(self) -> list[AccountCatalogEntry]:
         entries: list[AccountCatalogEntry] = []
         entries.extend(self._from_account_history())
-        entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
-        if not entries:
+        # The database is the source of truth once it has accounts: batch.json is only a
+        # bootstrap for an empty catalog (otherwise it resurrects ghost "no path" rows).
+        if not self._catalog_has_accounts():
+            entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
+        if not entries and not self._catalog_has_accounts():
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
         return sorted(_deduplicate(entries), key=_catalog_sort_key)
+
+    def find_entry(self, username: str) -> AccountCatalogEntry | None:
+        """Catalog entry for *username* whatever its status (also archived/deleted)."""
+
+        record = AccountHistoryRepository(self.connection).get_by_user_name(username)
+        if record is None:
+            return None
+        return AccountCatalogEntry(
+            username=record.user_name,
+            source="account_history",
+            owner_id=record.user_ig_id,
+            destination_path=record.field1,
+            start_init_date=record.field2,
+            status=record.status,
+            is_favorite=record.is_favorite,
+        )
 
     def list_empty_folder_paths(self) -> list[str]:
         """Catalog folders (excluding the root) with no account anywhere below them."""
@@ -115,7 +141,7 @@ class AccountCatalogService:
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
         for record in AccountHistoryRepository(self.connection).list_all(
-            include_archived=self.include_archived
+            include_archived=self.include_archived, include_deleted=self.include_deleted
         ):
             yield AccountCatalogEntry(
                 username=record.user_name,

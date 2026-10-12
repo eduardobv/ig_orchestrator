@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.5.2 - Corrección: cuentas «Sin ruta» fantasma y ruta antigua en el editor
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+**Causa:** el catálogo mezclaba `config/batch.json` (y las copias de `config/bkp`) con la base de datos. Una cuenta oculta de la lista (eliminada/archivada) o que ya no estaba en la base reaparecía desde el JSON como una fila «Sin ruta» y sin id. Además el editor conservaba los valores (id y carpeta) de antes de mover la cuenta.
+
+* La base de datos es la fuente de verdad: `batch.json` solo se usa para arrancar un catálogo vacío (ya no resucita cuentas, p. ej. `vinskawy`).
+* Las cuentas **eliminadas** se muestran en la **vista de árbol** dentro de su carpeta (p. ej. `Adrianna-Eves-Deleted`), en lila; en la vista de lista siguen ocultas (se ven con `Mostrar biblioteca completa`).
+* Tras cualquier operación de disco, el editor vuelve a leer el id y la carpeta de la cuenta que tiene cargada; el check *Update* y el seleccionar una cuenta usan `find_entry` (también para cuentas ocultas) en lugar de dejar el valor antiguo.
+* Tests: `tests/gui/test_catalog_ghost_entries.py` (reproduce el caso de `adrieves19` y `vinskawy`).
+
 ## v3.5.1 - Marcar como eliminada: destino editable
 
 Fecha: 2026-10-12 · Rama: `v3/integration`

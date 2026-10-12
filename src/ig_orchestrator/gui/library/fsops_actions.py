@@ -78,6 +78,23 @@ class FsOpsActionsMixin:
         self._mirror_lite_quietly()
         self.destination_paths = self.catalog_service.list_destination_paths()
         self._reload_catalog()
+        self._refresh_editor_catalog_fields()
+
+    def _refresh_editor_catalog_fields(self) -> None:
+        """Re-read owner id / destination path of the editor account from the catalog.
+
+        A disk operation may have changed its folder; without this the editor keeps the old path.
+        """
+
+        username = self.username_var.get().strip()
+        if not username or self.new_account_var.get():
+            return
+        entry = self.catalog_service.find_entry(username)
+        if entry is None:
+            return
+        if entry.owner_id:
+            self.owner_id_var.set(entry.owner_id)
+        self.destination_path_var.set(entry.destination_path or "")
 
     def _mirror_lite_quietly(self) -> None:
         try:

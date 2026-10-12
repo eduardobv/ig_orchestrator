@@ -74,8 +74,13 @@ class GuiCatalogRepository(AccountHistoryRepository):
         ).fetchone()
         return _row_to_history(row)
 
-    def list_all(self, include_archived: bool = False) -> list[AccountHistory]:
-        where = "" if include_archived else " WHERE cas.code NOT IN ('ARCHIVED', 'DELETED')"
+    def list_all(
+        self, include_archived: bool = False, include_deleted: bool = False
+    ) -> list[AccountHistory]:
+        hidden = [] if include_archived else ["'ARCHIVED'"]
+        if not (include_archived or include_deleted):
+            hidden.append("'DELETED'")
+        where = f" WHERE cas.code NOT IN ({', '.join(hidden)})" if hidden else ""
         rows = self.connection.execute(
             _CATALOG_SELECT + where + " ORDER BY ca.id"
         ).fetchall()
