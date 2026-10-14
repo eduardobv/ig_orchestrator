@@ -6,7 +6,7 @@ Este archivo sirve como instrucciones base para cualquier IA que implemente tare
 
 Cuando se pida implementar una tarea, leer primero:
 
-1. `PLAN.md`
+1. `tasks/done/PLAN.md` (plan inicial, histórico)
 2. `Agents.md`
 3. `tasks/TareaX.md`
 4. El codigo existente relacionado
@@ -175,6 +175,14 @@ Cada tarea debe actualizar `CHANGELOG.md` con:
 * pruebas ejecutadas.
 
 Si `CHANGELOG.md` no existe, crearlo.
+
+## Documentacion que se actualiza siempre
+
+En cada cambio, ademas de `CHANGELOG.md`:
+
+* `docs/manual-usuario.md`: obligatorio cuando se anade, cambia o elimina un menu, menu contextual, modal, boton o ajuste de la GUI. Debe describir que hace y a que invoca/abre.
+* `Agents.md`: actualizarlo si cambian estas instrucciones o el proceso de trabajo.
+* `CLAUDE.md`, `README.md`, `MODULE.md` del paquete y `docs/tutorial-v3.md` segun corresponda.
 
 ## Respuesta final de cada implementacion
 

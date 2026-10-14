@@ -163,7 +163,7 @@ Características:
 ### Para Tareas GUI, Persistencia v2 o Tests
 
 Leer primero:
-1. `PLAN.md`
+1. `tasks/done/PLAN.md` (plan inicial, histórico)
 2. `AGENTS.md`
 3. `tasks/TareaX.md`
 4. El código existente relacionado
@@ -196,6 +196,11 @@ Leer primero:
    - `MODULE.md` correspondiente: si cambian interfaces o responsabilidades de módulo
    - `tasks/Tarea_X.md` o directorio `tasks/done/`: registrar estado de las tareas
    - `README.md`: si cambia comportamiento visible al usuario o flujos operativos
+   - `docs/manual-usuario.md`: **siempre** que se añada, cambie o elimine un menú, menú contextual, modal, botón o ajuste de la GUI (qué hace y qué abre); el manual debe estar siempre al día
+   - `docs/tutorial-v3.md`: sección del feat si la serie v3 sigue en curso
+   - `AGENTS.md` (`Agents.md`): si cambian las instrucciones base para IA o este proceso
+
+   `CHANGELOG.md`, `docs/manual-usuario.md` y `AGENTS.md` se revisan en **cada** cambio, aunque solo sea para confirmar que no requieren edición.
 
 3. Las tareas completadas se mueven de `tasks/` a `tasks/done/`
 
@@ -382,7 +387,7 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ## Referencias
 
 - **AGENTS.md**: Instrucciones base para cualquier IA
-- **PLAN.md**: Plan general del proyecto
+- **tasks/done/PLAN.md**: Plan general inicial del proyecto (histórico, archivado)
 - **CHANGELOG.md**: Historial de versiones y cambios
 - **README.md**: Guía operativa completa
 - **tasks/TareaX.md**: Descripción de cada tarea

@@ -1,6 +1,6 @@
 # Copilot Instructions
 
-Read `PLAN.md`, `Agents.md`, and the active `tasks/TareaX.md` before implementing.
+Read `tasks/done/PLAN.md` (historical), `Agents.md`, and the active `tasks/TareaX.md` before implementing.
 
 Versioning maps each task to its own minor: `Tarea1.md` targets `v1.1.0`, `Tarea2.md` targets `v1.2.0`, and so on through `Tarea24.md` targeting `v1.24.0`. Fixes within the same task increment the patch, for example `v1.1.1`.
 
