@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.13.0 - feat-uc2-13: mover cuentas con sugerencias, búsqueda, nueva carpeta y selección múltiple
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+
+* `library/folder_suggestions.py`: `suggest_destinations` (hasta 3 sugerencias inversas `X ↔ X-Deleted/X-Inactive`, carpeta de eliminadas, dónde estaba antes; crea la hermana si falta) y `find_folder_matches`.
+* `tasks/done/v3/feat-uc2-13.md`; `tests/library/test_folder_suggestions.py`.
+
+### Modificado
+
+* `gui/library/folder_picker.py`: `pick_folder(..., account_ids=)` con **Sugerencias**, **Buscar carpeta** (salta en el árbol; Enter/flechas), **Nueva carpeta aquí…** (crea de inmediato, deshacible).
+* `gui/catalog/panel.py`: el clic derecho conserva la selección múltiple; la entrada del menú pasa a «Mover las N cuentas a otra carpeta…».
+* `gui/library/catalog_advanced.py` (pasa las cuentas al selector), locales, versión 3.13.0.
+* Reglas permanentes en `CLAUDE.md`/`Agents.md`: cada petición cierra con documentación completa y versión incremental.
+* Documentación: manual, tutorial (Feat 13), arquitectura, plan, README.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 541 passed. Prueba de GUI con copia de la base: selección múltiple conservada tras el clic derecho; selector con sugerencias y búsqueda. **No probado con `G:` real.**
+
 ## Docs (2026-10-14) - guía técnica para sesiones nuevas
 
 * Nuevo `docs/arquitectura-v3.md` (estado, módulos, modelo de datos, ajustes, invariantes, recetas, pruebas, limitaciones) y `docs/README.md` (índice).

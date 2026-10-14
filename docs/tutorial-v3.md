@@ -17,6 +17,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 10 · Renombrar sin G: | v3.10.0 | [Feat 10](#feat-10--renombrar-sin-la-unidad-g-v3100) |
 | 11 · Almacén y volcado | v3.11.0 | [Feat 11](#feat-11--almacen-y-volcado-a-g-v3110) |
 | 12 · Catálogo avanzado | v3.12.0 | [Feat 12](#feat-12--catalogo-avanzado-v3120) |
+| 13 · Mover con sugerencias | v3.13.0 | [Feat 13](#feat-13--mover-con-sugerencias-busqueda-y-seleccion-multiple-v3130) |
 
 ---
 
@@ -897,3 +898,34 @@ Clic derecho en una cuenta. *Copiar ruta* copia la ruta de cada cuenta seleccion
 | «Se omite: …» en el plan | Esa cuenta no puede moverse (mismo destino, carpeta repetida, lote en ejecución, sin carpeta). Las demás sí. |
 | «El sitio original está ocupado» al restaurar | Hay otra carpeta con ese nombre; muévela o renómbrala y restaura de nuevo. |
 | No puedo eliminar una cuenta | Está en un lote en ejecución, tiene datos en el almacén o `G:` no está conectada. |
+
+
+---
+
+## Feat 13 · Mover con sugerencias, búsqueda y selección múltiple (v3.13.0)
+
+**Para qué sirve:** mover cuentas rápido, sobre todo entre `Modelo`, `Modelo-Deleted` y `Modelo-Inactive`, sin recorrer el árbol a mano, y mover varias a la vez.
+
+### Mover varias cuentas
+1. En el catálogo (vista árbol) selecciona varias cuentas con **Ctrl** o **Mayús**.
+2. Clic derecho **dentro de la selección** → **Mover las N cuentas a otra carpeta…** (la selección se conserva).
+3. Elige la carpeta (abajo) y revisa el plan: un solo plan, un solo grupo en el historial.
+
+### El selector de carpeta
+| Qué | Cómo se usa |
+|---|---|
+| **Sugerencias** | Hasta tres botones con la carpeta lógica de destino. Si la cuenta está en `Ana-Model` → `Ana-Model-Deleted`, `Ana-Model-Inactive` y la carpeta de eliminadas; si está en `Ana-Model-Deleted` → `Ana-Model` y `Ana-Model-Inactive`; si está en `-Inactive` → `Ana-Model` y `Ana-Model-Deleted`. Un clic elige. Si la carpeta sugerida no existe sale **Crear «…»**: confirma y se crea junto a la actual. |
+| **Buscar carpeta** | Escribe `ana-model-del…`: el árbol salta a la carpeta. **Enter** pasa a la siguiente coincidencia. |
+| **Nueva carpeta aquí…** | Selecciona la carpeta padre en el árbol, pulsa el botón, escribe el nombre: se crea y queda seleccionada. |
+| **Elegir** / doble clic | Confirma la carpeta seleccionada en el árbol. |
+
+### Cómo probarlo
+1. Selecciona dos cuentas de `X-Model` → clic derecho → «Mover las 2 cuentas…» → clic en la sugerencia `X-Model-Deleted` → *Ejecutar*. Deshaz desde *Operaciones de disco*.
+2. Abre el selector de una cuenta y escribe parte de un nombre de carpeta: el árbol debe saltar a ella.
+3. Pulsa «Nueva carpeta aquí…» sobre una categoría y comprueba que aparece en `G:` y en el árbol.
+
+### Problemas típicos
+| Síntoma | Causa |
+|---|---|
+| No hay sugerencias | Las cuentas seleccionadas no tienen carpeta o están en carpetas distintas sin relación de nombre. Usa búsqueda o el árbol. |
+| «Crear …» pide confirmación | La carpeta hermana (`-Deleted`/`-Inactive`) no existe todavía. |

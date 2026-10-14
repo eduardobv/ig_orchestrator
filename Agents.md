@@ -180,6 +180,11 @@ Cada tarea debe actualizar `CHANGELOG.md` con:
 
 Si `CHANGELOG.md` no existe, crearlo.
 
+## Regla permanente: cada peticion cierra con documentacion completa y version incremental
+
+* Toda peticion que cambie algo se entrega con **toda** la documentacion actualizada en el mismo commit (CHANGELOG, manual de usuario, tutorial, arquitectura, MODULE.md, README, Agents/CLAUDE, nota del feat). El usuario no tiene que repetirlo.
+* Dentro de la serie activa (v3.x) una mejora pedida es un **feat incremental**: sube el **minor** (`v3.13.0`…), se llama `feat-<area>-<n>` (siguiente numero) y su spec va en `tasks/done/v3/`. Una correccion sube el **patch**. No abrir serie nueva sin peticion expresa.
+
 ## Documentacion que se actualiza siempre
 
 En cada cambio, ademas de `CHANGELOG.md`:

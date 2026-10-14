@@ -42,6 +42,7 @@ y renombra o mueve al workplace principal las carpetas descargadas por otras; re
 | 9 ✅ | [`feat-uc1-9`](../tasks/done/v3/feat-uc1-9.md) · Renombrado integrado | UC1 (sc2) · UC4 | Sin scripts externos; vista previa; renombrar desde cualquier carpeta | ⬤⬤⬤⬤ | **3**; rec.: 4 | 8–10 d |
 | 10 ✅ | [`feat-uc5-10`](../tasks/done/v3/feat-uc5-10.md) · Renombrar sin G: (usa el índice cargado en el feat 3) | UC5 | Renombrar con el disco apagado; movimiento pendiente | ⬤⬤⬤○ | **9**, **3**; rec.: 8 | 4–6 d |
 | 11 ✅ | [`feat-uc6-11`](../tasks/done/v3/feat-uc6-11.md) · Almacén y volcado a G: | UC6 · M7 | Conectas G: solo para volcar; cola «pendiente de volcar» | ⬤⬤⬤⬤ | **10**, **9**, **4** | 6–8 d |
+| 13 ✅ | [`feat-uc2-13`](../tasks/done/v3/feat-uc2-13.md) · Mover con sugerencias, búsqueda, nueva carpeta y multiselección (incremental) | UC2 | Selector de destino con sugerencias inversas; mover varias cuentas | ⬤⬤○○ | 12 | 1 d |
 | 12 ✅ | [`feat-uc2-12`](../tasks/done/v3/feat-uc2-12.md) · Catálogo avanzado | UC2 (fase 2) | Eliminar con cuarentena, fusionar, ficha editable, arrastrar y soltar | ⬤⬤⬤⬤ | **4**, **3**; rec.: 7, 8 | 8–10 d |
 
 Total orientativo: **59–76 días de desarrollo** (no incluye las pruebas manuales sobre datos reales, que conviene hacer feat a feat). Es una estimación gruesa para decidir orden, no un compromiso.

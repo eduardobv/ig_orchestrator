@@ -542,5 +542,19 @@
   "trash.restore": "Restaurar",
   "trash.purge_selected": "Eliminar definitivamente (selección)…",
   "trash.purge_all": "Vaciar papelera…",
-  "trash.purge_prompt": "Se borrarán PARA SIEMPRE {count} carpeta(s): {files} ficheros, {size}.\n\n{lines}\n\nEscribe {word} para confirmar:"
+  "trash.purge_prompt": "Se borrarán PARA SIEMPRE {count} carpeta(s): {files} ficheros, {size}.\n\n{lines}\n\nEscribe {word} para confirmar:",
+  "fsops.move_all": "Mover las {count} cuentas a otra carpeta…",
+  "picker.suggested": "Sugerencias",
+  "picker.search": "Buscar carpeta",
+  "picker.matches": "Coincidencia {current} de {total} (Enter / flechas para ir a la siguiente)",
+  "picker.no_matches": "Ninguna carpeta coincide",
+  "picker.no_suggestions": "Sin sugerencias para esta selección.",
+  "picker.suggested_create": "Crear «{name}»",
+  "picker.create_suggested": "La carpeta «{name}» no existe todavía. ¿Crearla en «{parent}» y mover allí?",
+  "picker.cannot_create": "No se puede crear la carpeta",
+  "picker.reason.deleted": "Eliminadas",
+  "picker.reason.inactive": "Inactivas",
+  "picker.reason.active": "Carpeta principal",
+  "picker.reason.previous": "Donde estaba antes",
+  "picker.reason.deleted_folder": "Carpeta de eliminadas"
 }

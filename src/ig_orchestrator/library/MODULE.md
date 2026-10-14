@@ -68,3 +68,7 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ## Tests
 
 `tests/library/test_audit.py`, `tests/gui/test_audit_dialog.py`.
+
+## folder_suggestions.py (v3.13)
+
+`suggest_destinations(conn, account_ids)` → hasta 3 `Suggestion` inversas (`X ↔ X-Deleted/-Inactive`, dónde estaba antes, carpeta de eliminadas; la hermana inexistente se ofrece para crear) y `find_folder_matches(folders, texto)`.

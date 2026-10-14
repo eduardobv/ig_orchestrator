@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v3.12.0** (tags `v3.2.0` … `v3.12.0`) |
+| Versión | **v3.13.0** (tags `v3.2.0` … `v3.13.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
 | Rama de trabajo | `v3/integration` (PR a `master` pendiente: se hace al terminar la serie v3) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -67,6 +67,7 @@ Cada paquete importante tiene `MODULE.md` con sus interfaces. Leer el del paquet
 | `account_rename.py` | «Cambió de username»: renombrar la cuenta (misma PK) o fusionarla con otra; reasigna `media_index`. |
 | `merge.py` | Fusión de carpetas sin sobrescribir (idéntico → omitir; mismo `media_id` → `_duplicates`; mismo nombre distinto tamaño → sufijo) con manifiesto para deshacer. |
 | `owner_groups.py` | Detección y resolución de ids de Instagram repetidos. |
+| `folder_suggestions.py` | Sugerencias de carpeta destino (inversas `X ↔ X-Deleted/-Inactive`, hasta 3; crea la hermana si falta) y búsqueda de carpetas por nombre. Usado por `gui/library/folder_picker.pick_folder`. |
 | `account_card.py` | Ficha: validar y guardar id, fecha del primer post, notas, favorita. |
 | `trash.py` | Papelera: cuarentena, restaurar, vaciar con palabra `ELIMINAR`. Tabla `trash_items` (se crea sola). |
 | `import_bdsc1.py` / `import_cli.py` | Importación única desde `accounts_lite/complete` (simulación + aplicar, con copia de seguridad). |

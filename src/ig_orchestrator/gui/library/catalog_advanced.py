@@ -140,7 +140,7 @@ class CatalogAdvancedMixin:
         ids = self._selected_catalog_account_ids()
         if not ids or not self._fsops_guard():
             return
-        dest = pick_folder(self.root, self.connection, t("fsops.move_to"))
+        dest = pick_folder(self.root, self.connection, t("fsops.move_to"), account_ids=ids)
         if dest is None:
             return
         self._plan_and_run(lambda s: s.plan_move_accounts(ids, dest))

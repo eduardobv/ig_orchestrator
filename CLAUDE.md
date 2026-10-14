@@ -205,6 +205,15 @@ Leer primero:
 - No depender de Telegram real en tests automatizados
 - Suite mínima obligatoria: settings, batch_json_parser, batch_importer, url_classifier, retry_policy, bot_response_parser, file_watcher, file_classifier, folder_service, file_mover, repositorios SQLite, markdown_report_builder, orquestadores
 
+### Cada petición del usuario = documentación completa + versión incremental
+
+**Regla permanente (no hace falta que el usuario la repita):**
+
+1. **Toda petición que cambie algo** (nueva función, mejora, ajuste de interfaz, corrección) debe cerrar con **toda la documentación actualizada en el mismo commit**: `CHANGELOG.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md` (sección del feat), `docs/arquitectura-v3.md` (si cambia arquitectura, modelo de datos, ajustes o limitaciones), `MODULE.md` del paquete, `README.md` si cambia lo visible, `AGENTS.md`/`Agents.md` y este `CLAUDE.md` si cambian reglas, y el `tasks/done/v3/feat-*.md` correspondiente con su «Resultado de la implementación». Si algún documento no requiere cambios, se revisa igualmente.
+2. **Versionado incremental dentro de la serie activa** (hoy v3.x en `v3/integration`): una mejora o función nueva pedida se trata como un **feat incremental** de la serie, **sin abrir serie nueva**: sube el **minor** (`v3.13.0`, `v3.14.0`…) y se nombra `feat-<área>-<n>` con el siguiente número (áreas: `uc1` renombrado, `uc2` catálogo/carpetas, `uc3` sincronización, `uc4` instancias, `uc5` sin G:, `uc6` almacén; `problemN` para problemas puntuales). Una corrección de algo ya entregado sube el **patch** (`v3.13.1`). Se hace commit y tag `vX.Y.Z`.
+3. Cada feat nuevo lleva su especificación breve en `tasks/done/v3/feat-<área>-<n>.md` (objetivo, qué se hizo, qué no) y una fila en `docs/plan-v3-features.md`.
+4. Una serie nueva (v4) solo se abre si el usuario lo pide explícitamente.
+
 ### Changelog y Commits
 
 **REGLA OBLIGATORIA**: Cada tarea que modifique código o archivos debe:

@@ -139,13 +139,22 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 | **Inactivo / Favorito / Quitar favorito** | Cambia estado/favorita. |
 | **Ocultar / Activar** | Estado Disabled / Activa. |
 | **Ficha de la cuenta…** | Editar id de Instagram y datos (§5.3). **Es la forma de corregir un ownerId.** |
-| **Mover a otra carpeta…** | Elige carpeta destino (selector de carpetas, con «Nueva carpeta aquí…»). Admite **varias cuentas** seleccionadas (Ctrl/Mayús). Muestra el plan antes de ejecutar. |
+| **Mover a otra carpeta…** / **Mover las N cuentas a otra carpeta…** | Abre el **selector de carpeta destino** (§5.1.1). Con varias cuentas seleccionadas (Ctrl/Mayús; el clic derecho conserva la selección) el menú dice «Mover las N cuentas…» y se mueven en un solo plan. Muestra el plan antes de ejecutar. |
 | **Abrir carpeta** | Abre la carpeta de la cuenta en el Explorador. |
 | **Copiar ruta** | Copia la ruta (una por línea si hay varias). |
 | **Eliminar (a la papelera)…** | Envía la carpeta a la papelera (§5.5). |
 | **Verificar cuenta seleccionada** | Sincroniza esa cuenta con el disco. |
 | **Cambió de username…** | Ver menú Catálogo. |
 | **Marcar como eliminada… / Restaurar cuenta eliminada…** | Ciclo de «eliminada en Instagram». |
+
+#### 5.1.1 Selector de carpeta destino
+
+| Zona | Qué hace |
+|---|---|
+| **Sugerencias** (hasta 3) | Carpetas «inversas» a donde está la cuenta: desde `X-Model` → `X-Model-Deleted`, `X-Model-Inactive` y la carpeta de eliminadas; desde `X-Model-Deleted` → `X-Model` y `X-Model-Inactive`; desde `X-Model-Inactive` → `X-Model` y `X-Model-Deleted`. También «donde estaba antes». Un clic elige la carpeta. Si la hermana no existe, aparece como **Crear «…»** (pide confirmación, la crea y la elige). |
+| **Buscar carpeta** | Escribe parte del nombre: el árbol expande y selecciona la coincidencia. **Enter** o las flechas ↑↓ pasan a la siguiente; se indica «Coincidencia n de m». |
+| **Árbol** | Todas las carpetas, también las archivadas. Doble clic o **Elegir** confirma la carpeta seleccionada. |
+| **Nueva carpeta aquí…** | Crea una carpeta dentro de la seleccionada (en disco y catálogo, registrada en *Operaciones de disco*, se puede deshacer) y la selecciona. |
 
 ### 5.2 Sobre una **carpeta** (vista árbol)
 

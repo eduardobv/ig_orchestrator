@@ -542,5 +542,19 @@
   "trash.restore": "Restore",
   "trash.purge_selected": "Delete permanently (selection)…",
   "trash.purge_all": "Empty trash…",
-  "trash.purge_prompt": "{count} folder(s) will be deleted FOR GOOD: {files} files, {size}.\n\n{lines}\n\nType {word} to confirm:"
+  "trash.purge_prompt": "{count} folder(s) will be deleted FOR GOOD: {files} files, {size}.\n\n{lines}\n\nType {word} to confirm:",
+  "fsops.move_all": "Move all {count} accounts to another folder…",
+  "picker.suggested": "Suggestions",
+  "picker.search": "Find folder",
+  "picker.matches": "Match {current} of {total} (Enter / arrows for the next one)",
+  "picker.no_matches": "No folder matches",
+  "picker.no_suggestions": "No suggestions for this selection.",
+  "picker.suggested_create": "Create “{name}”",
+  "picker.create_suggested": "The folder “{name}” does not exist yet. Create it in “{parent}” and move there?",
+  "picker.cannot_create": "The folder cannot be created",
+  "picker.reason.deleted": "Deleted",
+  "picker.reason.inactive": "Inactive",
+  "picker.reason.active": "Main folder",
+  "picker.reason.previous": "Where it was before",
+  "picker.reason.deleted_folder": "Deleted accounts folder"
 }

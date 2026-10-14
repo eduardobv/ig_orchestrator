@@ -213,6 +213,7 @@ class CatalogPanelMixin:
         self.catalog_menu.add_command(
             label=t("fsops.move_account"), command=self._catalog_move_selected
         )
+        self._catalog_move_menu_index = self.catalog_menu.index("end")
         self.catalog_menu.add_command(label=t("card.open_folder"), command=self._catalog_open_folder)
         self.catalog_menu.add_command(label=t("card.copy_path"), command=self._catalog_copy_path)
         self.catalog_menu.add_command(label=t("trash.delete"), command=self._catalog_delete_to_trash)
@@ -466,7 +467,9 @@ class CatalogPanelMixin:
                 return
             if not row.startswith("user:"):
                 return
-            self.catalog_tree.selection_set(row)
+            if row not in self.catalog_tree.selection():
+                self.catalog_tree.selection_set(row)  # keep a multi-selection when right-clicking inside it
+            self._update_catalog_menu_labels()
             self.catalog_menu.tk_popup(event.x_root, event.y_root)
             return
         index = self.catalog_list.nearest(event.y)
@@ -477,6 +480,13 @@ class CatalogPanelMixin:
         self.catalog_list.activate(index)
         self.catalog_menu.tk_popup(event.x_root, event.y_root)
 
+
+    def _update_catalog_menu_labels(self) -> None:
+        """The move entry says "all" when several accounts are selected."""
+
+        count = len(self._selected_catalog_usernames())
+        label = t("fsops.move_all", count=count) if count > 1 else t("fsops.move_account")
+        self.catalog_menu.entryconfigure(self._catalog_move_menu_index, label=label)
 
     def _selected_catalog_username(self) -> str | None:
         if getattr(self, "catalog_view_mode", "list") == "tree":
