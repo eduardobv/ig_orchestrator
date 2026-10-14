@@ -389,4 +389,5 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
 - **docs/modularizacion_v2.md**: Arquitectura de modularización v2
 - **docs/v3-status.md**, **docs/plan-v3-features.md**, **docs/feat-*.md**: Análisis, plan y propuestas de la serie v3 (integración de `sc1`/`sc2`, catálogo = disco, renombrado sin G:)
 - **docs/tutorial-v3.md**: Tutorial de uso feat a feat (opciones, campos, ejemplos y cómo probar); se amplía en cada feat de v3
+- **docs/manual-usuario.md**: Manual de uso por menú, menú contextual y modal (qué hace cada opción y qué abre); actualizar al añadir o cambiar opciones de GUI
 - **MODULE.md** en cada paquete: Documentación interna del módulo

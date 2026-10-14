@@ -1,5 +1,9 @@
 # Changelog
 
+## Docs (2026-10-14) - manual de uso
+
+* Nuevo `docs/manual-usuario.md`: cada menú, menú contextual y modal con lo que hace y a qué invoca; preguntas frecuentes (carpeta vacía, cambiar ownerId, eliminar cuenta/carpeta, añadir ficheros a mano). Sin cambios de código.
+
 ## v3.12.0 - feat-uc2-12: catálogo avanzado (ficha, multiselección, arrastrar, papelera)
 
 Fecha: 2026-10-12 · Rama: `v3/integration`
