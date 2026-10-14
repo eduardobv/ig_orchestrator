@@ -556,5 +556,8 @@
   "picker.reason.inactive": "Inactive",
   "picker.reason.active": "Main folder",
   "picker.reason.previous": "Where it was before",
-  "picker.reason.deleted_folder": "Deleted accounts folder"
+  "picker.reason.deleted_folder": "Deleted accounts folder",
+  "plan.status_change": "Status",
+  "plan.status_deleted": "Deleted",
+  "plan.status_active": "Reactivated"
 }

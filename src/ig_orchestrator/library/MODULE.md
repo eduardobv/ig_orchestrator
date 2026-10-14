@@ -72,3 +72,7 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ## folder_suggestions.py (v3.13)
 
 `suggest_destinations(conn, account_ids)` → hasta 3 `Suggestion` inversas (`X ↔ X-Deleted/-Inactive`, dónde estaba antes, carpeta de eliminadas; la hermana inexistente se ofrece para crear) y `find_folder_matches(folders, texto)`.
+
+## account_lifecycle: estado según carpeta (v3.14)
+
+`preview_status_changes(plan)`, `sync_with_location(ids, op_group)` y `affected_accounts(op_group)`: tras un `MOVE_DIR` desde la app, una cuenta en `…-Deleted` (o en la carpeta de eliminadas) pasa a DELETED y al salir vuelve a su estado previo. Solo movimientos (no renombrados).

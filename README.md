@@ -532,6 +532,10 @@ cuando la conectes, **Lote > Pendiente de volcar a G:...** fusiona lo almacenado
 Clic derecho en una cuenta: **Ficha de la cuenta…**, **Mover cuentas seleccionadas** (Ctrl/Mayús para varias), **Abrir carpeta**, **Copiar ruta**, **Eliminar (a la papelera)…**.
 También se puede arrastrar cuentas sobre una carpeta. **Catálogo → Papelera…** restaura o vacía (pide escribir `ELIMINAR`).
 
+### Estado según carpeta y ventanas
+
+Mover una cuenta a una carpeta `…-Deleted` la marca como eliminada (y sacarla la reactiva); la vista previa del plan lo muestra y *Deshacer* lo revierte. Las ventanas se abren centradas en el monitor.
+
 ### Mover cuentas
 
 *Mover a otra carpeta…* abre un selector con **sugerencias** (`X ↔ X-Deleted/-Inactive`), **búsqueda** por nombre y **Nueva carpeta aquí…**. Con varias cuentas seleccionadas el clic derecho dice «Mover las N cuentas…».

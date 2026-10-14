@@ -77,8 +77,10 @@ def open_history(app) -> None:
         if not messagebox.askyesno(t("ops.title"), t("ops.confirm_undo"), parent=window):
             return
         try:
-            service.undo(group)
-            AccountLifecycleService(app.connection).restore_after_undo(group)
+            undo_group = service.undo(group)
+            lifecycle = AccountLifecycleService(app.connection)
+            lifecycle.restore_after_undo(group)
+            lifecycle.sync_with_location(lifecycle.affected_accounts(undo_group), undo_group)
             AccountRenameService(app.connection).restore_after_undo(group)
         except FsOpsError as exc:
             messagebox.showerror(t("ops.title"), str(exc), parent=window)

@@ -33,7 +33,9 @@ Estados de una cuenta: **Activa**, **Inactiva**, **Oculta (Disabled)**, **Cambia
 | Consola / *Estado de ejecución* | Log en vivo (*Ver → Estado de ejecución…*): Copiar, Copiar todo, Limpiar. |
 | Barra de estado | Mensaje actual, nº de cuentas e items del lote, y el modo (*Nuevo lote*, *Editando lote*, *En ejecución*, *Histórico*). |
 
-Colores del catálogo (configurables en Configuración → Interfaz): favorito, en lote, hoy, inactivo, disabled.
+Colores del catálogo (configurables en Configuración → Interfaz): favorito, en lote, hoy, inactivo, disabled. Las cuentas **Eliminadas** usan el mismo color que *Disabled* (rojo suave).
+
+**Ventanas:** todas las modales se abren centradas en el monitor de la ventana principal (cualquier resolución).
 
 ---
 
@@ -146,6 +148,8 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 | **Verificar cuenta seleccionada** | Sincroniza esa cuenta con el disco. |
 | **Cambió de username…** | Ver menú Catálogo. |
 | **Marcar como eliminada… / Restaurar cuenta eliminada…** | Ciclo de «eliminada en Instagram». |
+
+**El estado sigue a la carpeta.** Al mover cuentas (o una carpeta con cuentas): si el destino es una carpeta `…-Deleted` (o la carpeta de eliminadas), las cuentas pasan a **Eliminada**; si salen de ella, vuelven a su estado anterior (o Activa). La vista previa del plan lo avisa («Estado: @cuenta → Eliminada/Reactivada») y *Deshacer* lo revierte. Renombrar una carpeta no cambia estados.
 
 #### 5.1.1 Selector de carpeta destino
 

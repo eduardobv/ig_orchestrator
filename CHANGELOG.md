@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.14.0 - feat-uc2-14: estado según carpeta, color único de eliminadas y ventanas centradas
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+
+* `gui/shared/window_position.py` (`install_auto_centering`, `center_on_monitor`, `centered_position`, `monitor_rect`).
+* `tasks/done/v3/feat-uc2-14.md`; `tests/library/test_status_follows_folder.py`; `tests/gui/test_window_position.py`.
+
+### Modificado
+
+* `gui/catalog/colors.py`: *Eliminada* usa el color de *Disabled*.
+* `library/account_lifecycle.py`: `sync_with_location`, `preview_status_changes`, `affected_accounts` (el estado sigue a la carpeta `-Deleted`); `library/fsops.py` (`_accounts_under` devuelve el estado).
+* `gui/library/fsops_actions.py` (vista previa con los cambios de estado y sincronización tras mover), `gui/library/fsops_history_dialog.py` (tras deshacer), `gui/shared/helpers.py`, `gui/shell/app.py`, locales.
+* Documentación: manual, tutorial (Feat 14), arquitectura, plan, README, `MODULE.md`; versión 3.14.0.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 556 passed. Prueba con la app real: todas las ventanas abiertas quedan centradas en el monitor (±1 px). **No probado con `G:` real.**
+
 ## v3.13.0 - feat-uc2-13: mover cuentas con sugerencias, búsqueda, nueva carpeta y selección múltiple
 
 Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)

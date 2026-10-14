@@ -9,6 +9,7 @@ from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.library.folder_picker import pick_folder
 from ig_orchestrator.gui.library.fsops_history_dialog import open_history
 from ig_orchestrator.gui.library.plan_dialog import confirm_plan
+from ig_orchestrator.library.account_lifecycle import AccountLifecycleService
 from ig_orchestrator.library.compat_lite import lite_path_from_settings, mirror_to_lite
 from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
 from ig_orchestrator.library.fsops_plan import Plan
@@ -61,13 +62,20 @@ class FsOpsActionsMixin:
         return True
 
     def _run_plan(self, plan: Plan) -> None:
-        if not confirm_plan(self.root, plan):
+        lifecycle = AccountLifecycleService(self.connection)
+        extra = [
+            (t("plan.status_change"), "@" + name, t("plan.status_deleted") if kind == "DELETE" else t("plan.status_active"))
+            for _id, name, kind in lifecycle.preview_status_changes(plan)
+        ]
+        if not confirm_plan(self.root, plan, extra_rows=extra or None):
             return
         try:
-            self._fsops_service().execute(plan)
+            group = self._fsops_service().execute(plan)
         except FsOpsError as exc:
             messagebox.showerror(t("plan.title"), str(exc), parent=self.root)
             return
+        for message in lifecycle.sync_with_location(lifecycle.affected_accounts(group), group):
+            self._write_console(message + "\n")
         self._write_console(f"{plan.title}: OK\n")
         self._set_status(plan.title)
         self._after_fsops_change()

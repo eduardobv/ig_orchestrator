@@ -149,6 +149,7 @@ from ig_orchestrator.gui.editor.panel import EditorPanelMixin
 from ig_orchestrator.gui.run.controller import RunControllerMixin
 from ig_orchestrator.gui.library.catalog_advanced import CatalogAdvancedMixin
 from ig_orchestrator.gui.library.index_actions import IndexActionsMixin
+from ig_orchestrator.gui.shared.window_position import install_auto_centering
 from ig_orchestrator.gui.library.staging_panel import StagingPanelMixin
 from ig_orchestrator.gui.run.integrated_rename import IntegratedRenameMixin
 from ig_orchestrator.gui.run.rename import RenameMixin
@@ -224,6 +225,7 @@ class InstagramOrchestratorApp(
         batch_json_path: Path,
     ) -> None:
         self.root = root
+        install_auto_centering()  # every window opens centred on the monitor of the main window
         self.connection = connection
         self.settings = settings
         self.catalog_service = AccountCatalogService(

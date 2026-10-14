@@ -18,6 +18,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 11 · Almacén y volcado | v3.11.0 | [Feat 11](#feat-11--almacen-y-volcado-a-g-v3110) |
 | 12 · Catálogo avanzado | v3.12.0 | [Feat 12](#feat-12--catalogo-avanzado-v3120) |
 | 13 · Mover con sugerencias | v3.13.0 | [Feat 13](#feat-13--mover-con-sugerencias-busqueda-y-seleccion-multiple-v3130) |
+| 14 · Estado según carpeta y ventanas centradas | v3.14.0 | [Feat 14](#feat-14--estado-segun-carpeta-color-unico-y-ventanas-centradas-v3140) |
 
 ---
 
@@ -929,3 +930,36 @@ Clic derecho en una cuenta. *Copiar ruta* copia la ruta de cada cuenta seleccion
 |---|---|
 | No hay sugerencias | Las cuentas seleccionadas no tienen carpeta o están en carpetas distintas sin relación de nombre. Usa búsqueda o el árbol. |
 | «Crear …» pide confirmación | La carpeta hermana (`-Deleted`/`-Inactive`) no existe todavía. |
+
+
+---
+
+## Feat 14 · Estado según carpeta, color único y ventanas centradas (v3.14.0)
+
+### 1) El estado sigue a la carpeta
+Al **mover** cuentas (clic derecho → *Mover…*, arrastrar y soltar, o mover una carpeta con cuentas):
+
+| Situación | Resultado |
+|---|---|
+| Destino = carpeta `Nombre-Model-Deleted` (o la carpeta de eliminadas de Ajustes) y la cuenta no está eliminada | Pasa a **Eliminada** |
+| La cuenta estaba **Eliminada** y se saca de una carpeta `-Deleted` | Se **reactiva** con el estado que tenía antes (Inactiva, Activa…); si no se sabe, Activa |
+| Cualquier otro movimiento | Sin cambios de estado |
+
+En la **vista previa del plan** verás las líneas «Estado: @cuenta → Eliminada / Reactivada» antes de pulsar *Ejecutar*. **Deshacer** (Catálogo → Operaciones de disco) devuelve también el estado. Renombrar una carpeta no cambia estados.
+
+### 2) Color único
+Las cuentas eliminadas (las antiguas y las nuevas) se ven del mismo rojo suave que *Disabled*. El color se cambia en Configuración → Interfaz (*Disabled*).
+
+### 3) Ventanas centradas
+Todas las ventanas se abren con su centro en el centro del monitor donde está la ventana principal, sea cual sea la resolución. Si tienes dos monitores, se centran en el de la ventana principal.
+
+### Cómo probarlo
+1. Mueve una cuenta de `X-Model` a `X-Model-Deleted` (usa la sugerencia): el plan avisa «Estado → Eliminada»; tras ejecutar, la fila queda roja.
+2. Muévela de vuelta: «Reactivada»; vuelve a su color anterior.
+3. Abre varias ventanas (Ajustes, Papelera, Operaciones de disco…): todas aparecen en el centro.
+
+### Problemas típicos
+| Síntoma | Causa |
+|---|---|
+| Moví fuera de la app (Explorador) y el estado no cambió | Solo los movimientos hechos desde la app cambian el estado; la sincronización no los toca. |
+| La carpeta se llama `-Inactive` y la cuenta sigue activa | Solo `-Deleted` cambia el estado automáticamente. |

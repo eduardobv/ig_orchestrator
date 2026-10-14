@@ -29,3 +29,7 @@ Lanzar `run_continue` ni mutar `self.accounts` (salvo pintar tag in_batch).
 ## Catálogo avanzado (v3.12)
 
 El árbol usa `selectmode="extended"`. `gui/library/catalog_advanced.py` (mixin) aporta ficha de cuenta, mover varias cuentas (`FsOperationService.plan_move_accounts`), arrastrar y soltar (`_drop_on_catalog_tree`), abrir carpeta/copiar ruta y la papelera (`library/trash.py`).
+
+## Colores y ventanas (v3.14)
+
+`colors.load_catalog_colors` fuerza que *Eliminada* use el color de *Disabled*. Todas las ventanas se centran con `gui/shared/window_position.py` (`install_auto_centering`).

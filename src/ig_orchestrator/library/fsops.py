@@ -111,7 +111,8 @@ class FsOperationService:
         return [
             r
             for r in self.conn.execute(
-                "SELECT id, username, rel_path FROM catalog_accounts WHERE rel_path IS NOT NULL"
+                "SELECT a.id, a.username, a.rel_path, s.code AS status FROM catalog_accounts a"
+                " JOIN catalog_account_statuses s ON s.id = a.status_id WHERE a.rel_path IS NOT NULL"
             )
             if _under(str(r["rel_path"]), rel)
         ]

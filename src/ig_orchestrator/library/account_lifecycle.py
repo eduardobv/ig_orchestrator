@@ -23,6 +23,7 @@ DEFAULT_DELETED_FOLDER = "09.DELETED"
 
 
 DELETED_NAME = re.compile(r"-(deleted?|inactive)$", re.IGNORECASE)
+DELETED_ONLY = re.compile(r"-deleted?$", re.IGNORECASE)
 
 
 def _is_deleted_location(parent: str, deleted_root: str) -> bool:
@@ -323,6 +324,104 @@ class AccountLifecycleService:
             count += 1
         self.conn.commit()
         return count
+
+    # ------------------------------------- status follows the folder (v3.14)
+    def _in_deleted_location(self, rel: str) -> bool:
+        """True when the account folder ``rel`` sits inside a ``-Deleted`` group or the deleted-accounts folder."""
+
+        parent = parent_rel(rel)
+        key, root = rel_key(parent), rel_key(self.deleted_folder)
+        if root and (key == root or key.startswith(root + "\\")):
+            return True
+        return any(DELETED_ONLY.search(part) for part in parent.split("\\") if part)
+
+    def preview_status_changes(self, plan: Plan) -> list[tuple[int, str, str]]:
+        """``[(account_id, username, 'DELETE' | 'ACTIVATE')]`` that the moves of ``plan`` will cause."""
+
+        changes: dict[int, tuple[int, str, str]] = {}
+        for step in plan.steps:
+            if step.op_type is not OpType.MOVE_DIR or not step.src_rel or not step.dst_rel:
+                continue
+            for row in self.fs._accounts_under(step.src_rel):  # noqa: SLF001 - same package
+                new_rel = step.dst_rel + str(row["rel_path"])[len(step.src_rel):]
+                deleted_now = str(row["status"]) == "DELETED"
+                deleted_after = self._in_deleted_location(new_rel)
+                if deleted_after and not deleted_now:
+                    changes[int(row["id"])] = (int(row["id"]), str(row["username"]), "DELETE")
+                elif deleted_now and not deleted_after:
+                    changes[int(row["id"])] = (int(row["id"]), str(row["username"]), "ACTIVATE")
+        return list(changes.values())
+
+    def affected_accounts(self, op_group: str) -> list[int]:
+        """Accounts currently under the source or destination of the moves of a disk-operation group."""
+
+        ids: dict[int, None] = {}
+        for row in self.conn.execute(
+            "SELECT src_rel, dst_rel FROM fs_operations WHERE op_group = ? AND op_type = 'MOVE_DIR'", (op_group,)
+        ):
+            for rel in (row["src_rel"], row["dst_rel"]):
+                if rel:
+                    for account in self.fs._accounts_under(str(rel)):  # noqa: SLF001
+                        ids[int(account["id"])] = None
+        return list(ids)
+
+    def _origin_of(self, rel: str, op_group: str) -> str | None:
+        for row in self.conn.execute(
+            "SELECT src_rel, dst_rel FROM fs_operations WHERE op_group = ? AND op_type = 'MOVE_DIR'", (op_group,)
+        ):
+            dst = str(row["dst_rel"] or "")
+            if dst and rel_key(rel).startswith(rel_key(dst)):
+                return str(row["src_rel"]) + rel[len(dst):]
+        return None
+
+    def sync_with_location(self, account_ids: list[int], op_group: str | None = None) -> list[str]:
+        """After a move: an account that now sits in a ``-Deleted`` folder becomes *Deleted*; one that left
+        it is reactivated (to the status it had before being deleted, or *Enabled*). Returns messages."""
+
+        messages: list[str] = []
+        now = _now()
+        for account_id in account_ids:
+            row = self.conn.execute(
+                "SELECT a.id, a.username, a.rel_path, a.status_id, a.is_favorite, s.code AS status"
+                " FROM catalog_accounts a JOIN catalog_account_statuses s ON s.id = a.status_id WHERE a.id = ?",
+                (account_id,),
+            ).fetchone()
+            if row is None or not row["rel_path"]:
+                continue
+            rel = str(row["rel_path"])
+            deleted_after = self._in_deleted_location(rel)
+            if deleted_after and row["status"] != "DELETED":
+                origin = self._origin_of(rel, op_group) if op_group else None
+                self.conn.execute(
+                    "INSERT INTO account_lifecycle (op_group, account_id, kind, prev_status_id, prev_favorite,"
+                    " prev_rel_path, created_at) VALUES (?, ?, 'DELETE', ?, ?, ?, ?)",
+                    (op_group, account_id, row["status_id"], row["is_favorite"], origin, now),
+                )
+                self.conn.execute(
+                    "UPDATE catalog_accounts SET status_id = ?, is_favorite = 0, deleted_at = ?, previous_rel_path = ?,"
+                    " updated_at = ? WHERE id = ?",
+                    (self._status_id("DELETED"), now, origin, now, account_id),
+                )
+                messages.append(f"@{row['username']}: marcada como eliminada (esta en una carpeta -Deleted)")
+            elif not deleted_after and row["status"] == "DELETED":
+                prev = self.conn.execute(
+                    "SELECT prev_status_id FROM account_lifecycle WHERE account_id = ? AND kind IN ('DELETE', 'LABEL')"
+                    " ORDER BY id DESC LIMIT 1",
+                    (account_id,),
+                ).fetchone()
+                status_id = int(prev["prev_status_id"]) if prev and prev["prev_status_id"] else self._status_id("ENABLED")
+                self.conn.execute(
+                    "UPDATE catalog_accounts SET status_id = ?, deleted_at = NULL, previous_rel_path = NULL, updated_at = ?"
+                    " WHERE id = ?",
+                    (status_id, now, account_id),
+                )
+                self.conn.execute(
+                    "INSERT INTO account_lifecycle (op_group, account_id, kind, created_at) VALUES (?, ?, 'RESTORE', ?)",
+                    (op_group, account_id, now),
+                )
+                messages.append(f"@{row['username']}: reactivada (salio de una carpeta -Deleted)")
+        self.conn.commit()
+        return messages
 
     # ------------------------------------------------------------ restore
     def plan_restore(self, account_id: int) -> LifecyclePlan:

@@ -556,5 +556,8 @@
   "picker.reason.inactive": "Inactivas",
   "picker.reason.active": "Carpeta principal",
   "picker.reason.previous": "Donde estaba antes",
-  "picker.reason.deleted_folder": "Carpeta de eliminadas"
+  "picker.reason.deleted_folder": "Carpeta de eliminadas",
+  "plan.status_change": "Estado",
+  "plan.status_deleted": "Eliminada",
+  "plan.status_active": "Reactivada"
 }

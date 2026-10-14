@@ -16,7 +16,7 @@ DEFAULT_CATALOG_COLORS = {
     "enabled": "",
     "changed": "#cfe2f3",
     "archived": "#e8eaed",
-    "deleted": "#d9d2e9",
+    "deleted": "#f4cccc",  # same colour as "disabled": both mean "deleted"
 }
 
 
@@ -42,6 +42,7 @@ def load_catalog_colors(connection: Connection) -> dict[str, str]:
         hex_color = row["color_hex"]
         if hex_color and str(hex_color).startswith("#"):
             colors[code] = str(hex_color)
+    colors["deleted"] = colors["disabled"]  # accounts marked deleted look like the old disabled ones
     return colors
 
 
