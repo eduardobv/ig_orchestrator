@@ -1,5 +1,22 @@
 # CLAUDE.md — ig_orchestrator
 
+## Cómo trabajar en una sesión nueva (LEER PRIMERO)
+
+Esta sesión puede no tener contexto previo. **Antes de responder una pregunta o de pedir/hacer un cambio, consulta la documentación del proyecto** en este orden y no te fíes de la memoria:
+
+1. `docs/arquitectura-v3.md` — guía técnica: estado, módulos, modelo de datos, ajustes, invariantes, recetas, pruebas, limitaciones y mapa de «dónde mirar cada cosa».
+2. `docs/manual-usuario.md` — qué hace cada menú, menú contextual y modal de la GUI, y qué abre.
+3. `docs/tutorial-v3.md` — cada feat de v3 con campos, ejemplos y cómo probarlo.
+4. `CHANGELOG.md` — qué cambió, cuándo, qué se probó.
+5. `tasks/done/v3/feat-*.md` (sección «Resultado de la implementación») y `docs/v3-status.md` — decisiones, qué no se hizo y por qué.
+6. `MODULE.md` del paquete afectado y el código.
+
+Reglas de sesión:
+- Para preguntas de «¿cómo funciona / dónde está / por qué?», responde desde esos documentos y verifica en el código/base de datos si hay duda; si el documento está desactualizado, corrígelo.
+- Para cambios, sigue el proceso de «Changelog y Commits» (más abajo): código + tests + CHANGELOG + manual + (tutorial) + MODULE.md + `docs/arquitectura-v3.md` si cambia la arquitectura, el modelo de datos, los ajustes o las limitaciones.
+- Responde en español y, cuando el usuario pregunte «dónde/cómo», con pasos cortos y no técnicos.
+- No ejecutes acciones destructivas sobre `G:` real; prueba en copias. Informa de lo que no se pudo probar.
+
 ## Propósito del Proyecto
 
 **ig_orchestrator** es un orquestador para preparar, trazar y procesar descargas manuales de Instagram mediante un bot de Telegram.
@@ -8,9 +25,10 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v2.1.0)
+### Estado Actual (v3.12.0)
 
-- Rama activa: `v2/gui-ux-stories`
+- Rama activa: `v3/integration` (tags `v3.2.0`…`v3.12.0`; PR a `master` pendiente). Detalle y limitaciones: `docs/arquitectura-v3.md`.
+- v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
 - El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o `--run`
 - La GUI de escritorio funciona con `python -m ig_orchestrator gui`
 - SQLite v2 (`data/orchestrator_gui.sqlite`) es la fuente de verdad en la GUI
@@ -24,6 +42,8 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 - Objetivo: estabilizar descarga, persistencia, reintentos y reportes
 - Última: v1.31.0
 - Rollback disponible si GUI v2 falla
+
+**Serie v3.x** — integración de sc1/sc2 y gestión de la biblioteca (rama `v3/integration`): ver `docs/arquitectura-v3.md`, `docs/tutorial-v3.md` y `docs/manual-usuario.md`.
 
 **Serie v2.x** — GUI mejorada con modularización, SQLite v2:
 - Rama: `v2/orchestrator` (merged a `master`, tag `v2.0.0`)
@@ -51,7 +71,12 @@ src/ig_orchestrator/
   telegram/      → Telethon, parser de respuestas del bot
   filesystem/    → Carpetas, watcher, clasificación, movimiento
   reports/       → Reporte Markdown
+  library/       → Catálogo=disco: operaciones de disco con diario, escáner, papelera, ficha, auditoría, importación
+  renaming/      → Renombrado integrado (port de sc2), índice como referencia
+  staging/       → Almacén de procesadas y volcado a la biblioteca
+  exchange/      → Intercambio entre instancias (publicar/traer/importar resultados)
 ```
+(Detalle módulo a módulo en `docs/arquitectura-v3.md`.)
 
 ### Reglas de Arquitectura (de AGENTS.md)
 
@@ -386,6 +411,8 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
 
 ## Referencias
 
+- **docs/arquitectura-v3.md**: Guía técnica de la arquitectura v3 (empezar por aquí)
+- **docs/README.md**: Índice de la documentación
 - **AGENTS.md**: Instrucciones base para cualquier IA
 - **tasks/done/PLAN.md**: Plan general inicial del proyecto (histórico, archivado)
 - **CHANGELOG.md**: Historial de versiones y cambios

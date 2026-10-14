@@ -1,5 +1,9 @@
 # Agents.md
 
+## Antes de empezar (sesion nueva)
+
+Leer `CLAUDE.md` y, para cualquier pregunta o cambio, consultar primero `docs/arquitectura-v3.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md` y `CHANGELOG.md` (indice en `docs/README.md`). No depender de la memoria de la conversacion.
+
 ## Proposito
 
 Este archivo sirve como instrucciones base para cualquier IA que implemente tareas de este proyecto.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Docs (2026-10-14) - guía técnica para sesiones nuevas
+
+* Nuevo `docs/arquitectura-v3.md` (estado, módulos, modelo de datos, ajustes, invariantes, recetas, pruebas, limitaciones) y `docs/README.md` (índice).
+* `CLAUDE.md`: sección «Cómo trabajar en una sesión nueva» (consultar siempre la documentación antes de responder o cambiar), estado actualizado a v3.12.0 y estructura con `library/`, `renaming/`, `staging/`, `exchange/`. `Agents.md` con el mismo aviso. Sin cambios de código.
+
 ## Docs (2026-10-14) - manual de uso
 
 * Nuevo `docs/manual-usuario.md`: cada menú, menú contextual y modal con lo que hace y a qué invoca; preguntas frecuentes (carpeta vacía, cambiar ownerId, eliminar cuenta/carpeta, añadir ficheros a mano). Sin cambios de código.
