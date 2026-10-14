@@ -256,6 +256,45 @@ class FsOperationService:
         plan.steps.append(Step(OpType.MOVE_DIR, src, dst, account_id))
         return plan
 
+    def plan_delete_empty_folder(self, folder_id: int) -> Plan:
+        """Delete a folder (and its empty sub-folders) from disk and catalog. Only if nothing is inside:
+        no files and no account. One ``RMDIR`` per folder, deepest first, so ``undo`` can recreate them."""
+
+        folder = self.folder(folder_id)
+        plan = Plan(f"Eliminar carpeta vacia '{folder.name}'")
+        if folder.parent_id is None or folder.rel_path == "":
+            plan.conflicts.append(Conflict("IS_ROOT", "No se puede eliminar la raiz de la biblioteca"))
+            return plan
+        if not self.is_online():
+            plan.conflicts.append(Conflict("OFFLINE", "La biblioteca (G:) no esta disponible"))
+            return plan
+        absolute = self.abs(folder.rel_path)
+        if not os.path.isdir(absolute):
+            plan.conflicts.append(Conflict("SRC_MISSING", f"No existe en disco: {folder.rel_path}"))
+            return plan
+        accounts = self._accounts_under(folder.rel_path)
+        if accounts:
+            names = ", ".join("@" + str(a["username"]) for a in accounts[:5])
+            plan.conflicts.append(Conflict("HAS_ACCOUNTS", f"Contiene {len(accounts)} cuenta(s) del catalogo: {names}"))
+        directories: list[str] = []
+        files = 0
+        sample = ""
+        for current, _dirs, names in os.walk(absolute):
+            directories.append(current)
+            files += len(names)
+            if names and not sample:
+                sample = names[0]
+        if files:
+            plan.conflicts.append(Conflict("NOT_EMPTY", f"Contiene {files} fichero(s) (por ejemplo {sample})"))
+        if plan.blocking:
+            return plan
+        for current in sorted(directories, key=len, reverse=True):  # deepest first
+            relative = os.path.relpath(current, absolute)
+            rel = folder.rel_path if relative == "." else folder.rel_path + "\\" + relative
+            plan.steps.append(Step(OpType.RMDIR, rel, None))
+        plan.affected_folders = len(directories)
+        return plan
+
     def plan_move_accounts(self, account_ids: list[int], dest_folder_id: int) -> Plan:
         """One plan for several accounts: the ones that cannot move are skipped (non-blocking notes)."""
 
@@ -527,6 +566,9 @@ class FsOperationService:
                 )
                 if not ok:
                     return False, reason
+            elif op_type is OpType.RMDIR:
+                if os.path.exists(self.abs(row["src_rel"])):
+                    return False, f"La carpeta ya existe de nuevo: {row['src_rel']}"
             else:
                 if not os.path.exists(self.abs(row["dst_rel"])):
                     return False, f"El estado actual no coincide: falta {row['dst_rel']}"

@@ -183,3 +183,15 @@ def test_settings_and_file_move_helpers(env, tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         conn.execute("DELETE FROM app_settings WHERE key = 'staging.root'")
         StagingService(conn).staging_root()
+
+
+def test_status_bar_text_summarises_what_waits_in_the_staging_area(env) -> None:
+    from ig_orchestrator.gui.library.staging_panel import staging_status_text
+
+    conn, _lib, _staging, downloads, _account_id, _ = env
+    assert staging_status_text(conn) == ""
+    stage(conn, downloads)
+
+    text = staging_status_text(conn)
+
+    assert text.startswith("Almac") and "1 cuenta" in text and "pendientes" in text

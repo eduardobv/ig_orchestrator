@@ -143,7 +143,46 @@ def run_audit(
         _check_app_vs_lite(report, app, lite)
     if complete:
         _check_complete(report, lite, complete)
+    if app_conn is not None:
+        _check_index(report, app_conn)
     return report
+
+
+def _check_index(report: AuditReport, conn: sqlite3.Connection) -> None:
+    """``INDEX_MISSING``: the account has files (per its counters) but no index rows.
+    ``INDEX_STALE``: a counter differs from the number of indexed files of that sub-folder."""
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT a.id, a.username, a.instagram_user_id, a.rel_path, a.posts_count, a.reels_count, a.story_count,
+                   a.highlights_count FROM catalog_accounts a WHERE a.rel_path IS NOT NULL AND a.disk_state = 'PRESENT'
+            """
+        ).fetchall()
+        counts = {
+            (int(r[0]), int(r[1])): int(r[2])
+            for r in conn.execute("SELECT account_id, kind, COUNT(*) FROM media_index GROUP BY account_id, kind")
+        }
+    except sqlite3.OperationalError:
+        return
+    labels = ("posts", "reels", "stories", "highlights")
+    for row in rows:
+        counters = [int(row[i] or 0) for i in (4, 5, 6, 7)]
+        if not any(counters):
+            continue
+        indexed = [counts.get((int(row["id"]), kind), 0) for kind in range(4)]
+        owner = _owner(row["instagram_user_id"])
+        if not any(indexed):
+            report.findings.append(Finding(
+                "INDEX_MISSING", Severity.WARNING, str(row["username"]), owner, (str(row["rel_path"]),),
+                f"{sum(counters)} ficheros en disco segun los contadores y ninguno en el indice",
+            ))
+            continue
+        diffs = [f"{labels[k]} {counters[k]} vs indice {indexed[k]}" for k in range(4) if counters[k] != indexed[k]]
+        if diffs:
+            report.findings.append(Finding(
+                "INDEX_STALE", Severity.INFO, str(row["username"]), owner, (str(row["rel_path"]),), "; ".join(diffs),
+            ))
 
 
 def _check_disk(

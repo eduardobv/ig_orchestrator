@@ -104,6 +104,7 @@ class IntegratedRenameMixin:
     def _finish_integrated_rename(self, result: RenameResult) -> None:
         text = describe_result(result)
         self._write_console(text + "\n")
+        self._refresh_staging_hint()
         self._reload_catalog()
         self._rename_cancel = None
         self._handle_rename_complete(0 if result.ok else 1)

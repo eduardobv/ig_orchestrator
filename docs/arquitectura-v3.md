@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v3.15.0** (tags `v3.2.0` … `v3.15.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
+| Versión | **v3.16.0** (tags `v3.2.0` … `v3.16.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
 | Rama de trabajo | `v3/integration` (PR a `master` pendiente: se hace al terminar la serie v3) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -69,7 +69,7 @@ Cada paquete importante tiene `MODULE.md` con sus interfaces. Leer el del paquet
 | `owner_groups.py` | Detección y resolución de ids de Instagram repetidos. |
 | `folder_suggestions.py` | Sugerencias de carpeta destino (inversas `X ↔ X-Deleted/-Inactive`, hasta 3; crea la hermana si falta) y búsqueda de carpetas por nombre. Usado por `gui/library/folder_picker.pick_folder`. |
 | `account_card.py` | Ficha: validar y guardar id, fecha del primer post, notas, favorita. |
-| `trash.py` | Papelera: cuarentena, restaurar, vaciar con palabra `ELIMINAR`. Tabla `trash_items` (se crea sola). |
+| `trash.py` | Papelera: cuarentena (caducidad según `trash.retention_days`), restaurar, vaciar con palabra `ELIMINAR`, `remove_from_catalog` (borra las filas de cuentas purgadas que no estén en un lote), `expired()`. Tabla `trash_items` (se crea sola). |
 | `import_bdsc1.py` / `import_cli.py` | Importación única desde `accounts_lite/complete` (simulación + aplicar, con copia de seguridad). |
 | `audit*.py` | Auditoría bdapp ↔ bdsc1 ↔ disco (códigos y gravedad; exporta MD/CSV). |
 | `compat_lite.py` | Espejo `accounts_lite`: `mirror_to_lite`, `add_to_lite`, `lite_path_from_settings` (respeta `compat.lite.enabled`). |
@@ -120,6 +120,7 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 | `compat.lite.enabled` | Mantener actualizado `accounts_lite` (1/0) |
 | `library.deleted_folder_rel`, `library.deleted_keep_group`, `library.*` (reglas) | Carpeta de eliminadas y reglas del escáner |
 | `renaming.engine` (`integrated`/`legacy_sc2`), `renaming.preview` | Motor y vista previa |
+| `trash.retention_days` | Días de retención de la papelera (0 = sin límite) |
 | `staging.root`, `staging.after_rename` (`ASK`/`STAGING`/`LIBRARY`) | Almacén |
 
 ---
@@ -186,12 +187,12 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 | Tema | Estado |
 |---|---|
 | PR `v3/integration` → `master` | Pendiente (tras validar). |
-| «Eliminar carpeta vacía» en el menú de carpetas | No existe; hoy se deshace la operación que la creó. Propuesto como v3.12.1. |
+| «Eliminar carpeta vacía» | Hecho en v3.16 (`plan_delete_empty_folder`). |
 | Probar con `G:` real | Renombrado sin `G:`, almacén/volcado, publicar/importar con inst1 y papelera **solo probados con copias/datos sintéticos**. |
-| Fusión genérica carpeta↔carpeta | Solo existe la fusión de cuentas (feat 7). |
-| Papelera | Sin «eliminar también del catálogo» ni retención automática en la UI (el servicio soporta `retention_days`). |
-| Almacén | Solo estructura `by_target`; sin indicador en barra de estado; segundo renombrado de una cuenta nueva ya almacenada queda sin ruta hasta volcar. |
-| Auditoría | Sin códigos `INDEX_STALE`/`INDEX_MISSING`. |
+| Fusión genérica carpeta↔carpeta | **Descartada** por riesgo (reasignar cuentas de grupos fusionados); solo existe la fusión de cuentas (feat 7). |
+| Papelera | Hecho en v3.16: retención configurable (avisa, nunca borra sola) y «quitar también del catálogo». |
+| Almacén | Solo estructura `by_target`; segundo renombrado de una cuenta nueva ya almacenada queda sin ruta hasta volcar. Indicador en la barra de estado hecho en v3.16. |
+| Auditoría | `INDEX_STALE`/`INDEX_MISSING` hechos en v3.16. |
 | Arrastrar y soltar | Probado por llamada directa al manejador, no con ratón. |
 | `compareProcess` de sc2 | Aparcado (feat propio si se quiere). |
 

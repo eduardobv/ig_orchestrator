@@ -560,5 +560,18 @@
   "plan.status_change": "Estado",
   "plan.status_deleted": "Eliminada",
   "plan.status_active": "Reactivada",
-  "plan.status_inactive": "Inactiva"
+  "plan.status_inactive": "Inactiva",
+  "fsops.delete_empty": "Eliminar carpeta vacía…",
+  "trash.expires": "Caduca",
+  "trash.col.expires": "Caduca",
+  "trash.expired": "{count} caducada(s)",
+  "trash.expired_hint": "Papelera: {count} elemento(s) han superado la retención; ábrela en Catálogo → Papelera… para vaciarlos.",
+  "trash.purge_expired": "Vaciar caducadas…",
+  "trash.no_expired": "No hay elementos caducados.",
+  "trash.type_word": "Debes escribir {word} para confirmar.",
+  "trash.forget_catalog": "¿Quitar también estas cuentas del catálogo?\n\nSolo se quitan las que no están en ningún lote; el resto se conserva.",
+  "trash.removed": "Papelera: {removed} cuenta(s) quitadas del catálogo, {kept} conservadas",
+  "settings.trash_retention": "Papelera: días antes de ofrecer el borrado definitivo (0 = sin límite)",
+  "staging.hint_offline": "G: desconectada",
+  "staging.hint_ready": "Hay cuentas pendientes de volcar y la biblioteca está conectada: Lote → Pendiente de volcar a G:…"
 }

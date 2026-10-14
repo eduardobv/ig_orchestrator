@@ -532,6 +532,10 @@ cuando la conectes, **Lote > Pendiente de volcar a G:...** fusiona lo almacenado
 Clic derecho en una cuenta: **Ficha de la cuenta…**, **Mover cuentas seleccionadas** (Ctrl/Mayús para varias), **Abrir carpeta**, **Copiar ruta**, **Eliminar (a la papelera)…**.
 También se puede arrastrar cuentas sobre una carpeta. **Catálogo → Papelera…** restaura o vacía (pide escribir `ELIMINAR`).
 
+### Eliminar carpeta vacía, papelera y almacén
+
+Clic derecho en una carpeta → *Eliminar carpeta vacía…* (solo sin ficheros ni cuentas; con *Deshacer*). La papelera tiene caducidad configurable y permite quitar también las cuentas del catálogo. La barra de estado muestra lo que espera en el almacén.
+
 ### Estado según carpeta y ventanas
 
 Mover una cuenta a una carpeta `…-Deleted` la marca como eliminada y a `…-Inactive` como inactiva (y sacarla de ellas la reactiva); la vista previa del plan lo muestra y *Deshacer* lo revierte. Las ventanas se abren centradas en el monitor.

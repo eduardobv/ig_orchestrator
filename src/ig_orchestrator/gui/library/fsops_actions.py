@@ -10,6 +10,7 @@ from ig_orchestrator.gui.library.folder_picker import pick_folder
 from ig_orchestrator.gui.library.fsops_history_dialog import open_history
 from ig_orchestrator.gui.library.plan_dialog import confirm_plan
 from ig_orchestrator.library.account_lifecycle import AccountLifecycleService
+from ig_orchestrator.library.trash import TrashService
 from ig_orchestrator.library.compat_lite import lite_path_from_settings, mirror_to_lite
 from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
 from ig_orchestrator.library.fsops_plan import Plan
@@ -140,6 +141,12 @@ class FsOpsActionsMixin:
             return
         self._plan_and_run(lambda s: s.plan_rename_folder(folder_id, name.strip()))
 
+    def _catalog_delete_empty_folder(self) -> None:
+        folder_id = self._selected_catalog_folder_id()
+        if folder_id is None or not self._fsops_guard():
+            return
+        self._plan_and_run(lambda s: s.plan_delete_empty_folder(folder_id))
+
     def _catalog_move_folder(self) -> None:
         folder_id = self._selected_catalog_folder_id()
         if folder_id is None or not self._fsops_guard():
@@ -183,6 +190,10 @@ class FsOpsActionsMixin:
                 messagebox.showinfo(t("plan.title"), "\n".join(messages), parent=self.root)
                 self._reload_catalog()
             self._mirror_lite_quietly()
+            late = TrashService(self.connection).expired()
+            if late:
+                self._write_console(t("trash.expired_hint", count=len(late)) + "\n")
+            self._refresh_staging_hint()
         except Exception as exc:  # noqa: BLE001 - never block start-up
             self._write_console(f"Recuperacion de operaciones de disco: {exc}\n")
 
@@ -195,10 +206,11 @@ class FsOpsActionsMixin:
             menu.add_command(label=t("fsops.new_folder"), command=self._catalog_new_folder)
             menu.add_command(label=t("fsops.rename_folder"), command=self._catalog_rename_folder)
             menu.add_command(label=t("fsops.move_to"), command=self._catalog_move_folder)
+            menu.add_command(label=t("fsops.delete_empty"), command=self._catalog_delete_empty_folder)
             menu.add_separator()
             menu.add_command(label=t("scan.category"), command=self._sync_category)
             self.catalog_folder_menu = menu
         state = "normal" if self._fsops_online() else "disabled"
-        for index in range(3):
+        for index in range(4):
             menu.entryconfigure(index, state=state)
         menu.tk_popup(event.x_root, event.y_root)

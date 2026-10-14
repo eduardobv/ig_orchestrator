@@ -560,5 +560,18 @@
   "plan.status_change": "Status",
   "plan.status_deleted": "Deleted",
   "plan.status_active": "Reactivated",
-  "plan.status_inactive": "Inactive"
+  "plan.status_inactive": "Inactive",
+  "fsops.delete_empty": "Delete empty folder…",
+  "trash.expires": "Expires",
+  "trash.col.expires": "Expires",
+  "trash.expired": "{count} expired",
+  "trash.expired_hint": "Trash: {count} item(s) are past the retention period; open Catalog → Trash… to empty them.",
+  "trash.purge_expired": "Empty expired…",
+  "trash.no_expired": "There are no expired items.",
+  "trash.type_word": "You must type {word} to confirm.",
+  "trash.forget_catalog": "Also remove these accounts from the catalog?\n\nOnly accounts not used by any batch are removed; the rest are kept.",
+  "trash.removed": "Trash: {removed} account(s) removed from the catalog, {kept} kept",
+  "settings.trash_retention": "Trash: days before offering permanent deletion (0 = no limit)",
+  "staging.hint_offline": "G: disconnected",
+  "staging.hint_ready": "Accounts are waiting to be dumped and the library is connected: Batch → Pending dump to G:…"
 }

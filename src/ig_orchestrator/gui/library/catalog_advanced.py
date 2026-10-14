@@ -269,11 +269,11 @@ class CatalogAdvancedMixin:
         frame.pack(fill=tk.BOTH, expand=True)
         info = tk.StringVar()
         ttk.Label(frame, textvariable=info).pack(anchor="w")
-        columns = ("files", "size", "date", "original")
+        columns = ("files", "size", "date", "expires", "original")
         tree = ttk.Treeview(frame, columns=columns, show="tree headings", selectmode="extended")
         tree.heading("#0", text=t("staging.col.account"))
         tree.column("#0", width=160)
-        for column, width in zip(columns, (70, 90, 150, 360), strict=True):
+        for column, width in zip(columns, (70, 90, 140, 140, 300), strict=True):
             tree.heading(column, text=t(f"trash.col.{column}"))
             tree.column(column, width=width)
         tree.pack(fill=tk.BOTH, expand=True, pady=8)
@@ -283,8 +283,11 @@ class CatalogAdvancedMixin:
             items = trash.list_items()
             for item in items:
                 tree.insert("", tk.END, iid=str(item.id), text="@" + item.username,
-                            values=(item.files, human_size(item.bytes), item.deleted_at[:16], item.original_rel))
-            info.set(t("trash.info", count=len(items), size=human_size(sum(i.bytes for i in items))))
+                            values=(item.files, human_size(item.bytes), item.deleted_at[:16], item.expires_at[:10] or "-",
+                                    item.original_rel))
+            late = len(trash.expired())
+            info.set(t("trash.info", count=len(items), size=human_size(sum(i.bytes for i in items)))
+                     + (" · " + t("trash.expired", count=late) if late else ""))
 
         def restore() -> None:
             for iid in tree.selection():
@@ -295,8 +298,13 @@ class CatalogAdvancedMixin:
             refresh()
             self._after_fsops_change()
 
-        def purge(selected: bool) -> None:
+        def purge(selected: bool, only_expired: bool = False) -> None:
             ids = [int(i) for i in tree.selection()] if selected else None
+            if only_expired:
+                ids = [i.id for i in trash.expired()]
+                if not ids:
+                    messagebox.showinfo(t("trash.title"), t("trash.no_expired"), parent=window)
+                    return
             pool = [i for i in trash.list_items() if ids is None or i.id in ids]
             if not pool:
                 return
@@ -307,10 +315,21 @@ class CatalogAdvancedMixin:
                 parent=window)
             if word is None:
                 return
+            if word.strip() != CONFIRM_WORD:
+                messagebox.showwarning(t("trash.title"), t("trash.type_word", word=CONFIRM_WORD), parent=window)
+                return
+            forget = messagebox.askyesno(t("trash.title"), t("trash.forget_catalog"), parent=window)
+            account_ids = [i.account_id for i in pool]
             try:
                 trash.purge(ids, word)
             except (TrashError, OSError) as exc:
                 messagebox.showwarning(t("trash.title"), str(exc), parent=window)
+                refresh()
+                return
+            if forget:
+                removed, kept = trash.remove_from_catalog(account_ids)
+                self._write_console(t("trash.removed", removed=removed, kept=len(kept)) + "\n")
+                self._after_fsops_change()
             refresh()
 
         buttons = ttk.Frame(frame)
@@ -318,6 +337,7 @@ class CatalogAdvancedMixin:
         ttk.Button(buttons, text=t("trash.restore"), command=restore).pack(side=tk.LEFT)
         ttk.Button(buttons, text=t("trash.purge_selected"), command=lambda: purge(True)).pack(side=tk.LEFT, padx=6)
         ttk.Button(buttons, text=t("trash.purge_all"), command=lambda: purge(False)).pack(side=tk.LEFT)
+        ttk.Button(buttons, text=t("trash.purge_expired"), command=lambda: purge(False, True)).pack(side=tk.LEFT, padx=6)
         ttk.Button(buttons, text=t("plan.cancel"), command=window.destroy).pack(side=tk.RIGHT)
         bind_escape_close(window, on_close=window.destroy)
         refresh()

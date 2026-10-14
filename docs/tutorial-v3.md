@@ -20,6 +20,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 13 · Mover con sugerencias | v3.13.0 | [Feat 13](#feat-13--mover-con-sugerencias-busqueda-y-seleccion-multiple-v3130) |
 | 14 · Estado según carpeta y ventanas centradas | v3.14.0 | [Feat 14](#feat-14--estado-segun-carpeta-color-unico-y-ventanas-centradas-v3140) |
 | 15 · Estado también con -Inactive | v3.15.0 | [Feat 15](#feat-15--el-estado-tambien-sigue-a-las-carpetas--inactive-v3150) |
+| 16 · Cierre de pendientes | v3.16.0 | [Feat 16](#feat-16--cierre-de-pendientes-v3160) |
 
 ---
 
@@ -986,3 +987,29 @@ La **vista previa del plan** lista «Estado: @cuenta → Inactiva / Eliminada / 
 2. Muévela de vuelta a `X-Model`: «Reactivada», vuelve a Activa.
 3. Muévela de `X-Model-Deleted` a `X-Model-Inactive`: pasa de Eliminada a Inactiva.
 4. Deshaz el último movimiento en *Operaciones de disco*: recupera su estado anterior.
+
+
+---
+
+## Feat 16 · Cierre de pendientes (v3.16.0)
+
+### 1) Eliminar carpeta vacía
+Clic derecho sobre una carpeta (vista árbol) → **Eliminar carpeta vacía…** → vista previa → *Ejecutar*.
+* Solo funciona si **no hay ficheros** ni **cuentas** dentro (ni en sus subcarpetas). Si no, el plan se bloquea y te dice qué lo impide («Contiene 3 ficheros…», «Contiene 1 cuenta del catálogo: @ana»).
+* Se borra en disco y del catálogo. **Deshacer** (Catálogo → Operaciones de disco) la vuelve a crear.
+
+### 2) Papelera con caducidad y «quitar del catálogo»
+* **Ajustes → Catálogo → «Papelera: días antes de ofrecer el borrado definitivo»**: con 30, lo que entra hoy caduca en 30 días (0 = nunca).
+* **Catálogo → Papelera…**: columna *Caduca*, contador «N caducadas» y botón **Vaciar caducadas…** (pide escribir `ELIMINAR`). Al arrancar la app avisa en la consola si hay caducadas. **No borra nada sola.**
+* Al borrar definitivamente pregunta **«¿Quitar también estas cuentas del catálogo?»**: *Sí* borra sus filas (se conservan las que están en algún lote); *No* las deja como «Eliminada» sin carpeta.
+
+### 3) Auditoría del índice
+**Catálogo → Auditar biblioteca…** muestra además `INDEX_MISSING` (hay ficheros según los contadores pero el índice está vacío: sincroniza esa cuenta) e `INDEX_STALE` (un contador no coincide con el índice, p. ej. «posts 120 vs índice 118»).
+
+### 4) Almacén visible
+Si hay cuentas esperando en el almacén, la barra de estado muestra `Almacén: N cuenta(s) · tamaño pendientes` y `· G: desconectada` si no está la biblioteca. Al arrancar con `G:` conectada, la consola recuerda que puedes volcar (*Lote → Pendiente de volcar a G:…*).
+
+### Cómo probarlo
+1. Crea una carpeta vacía en `10.TEMP` desde el menú y elimínala; deshaz la operación.
+2. Pon retención 1 día, elimina una cuenta de prueba, abre la Papelera y comprueba la columna *Caduca*.
+3. Renombra una descarga con destino *Almacén* y mira la barra de estado.

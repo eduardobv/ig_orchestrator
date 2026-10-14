@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.16.0 - feat-uc2-16: cierre de pendientes de v3
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-16.md`; `tests/library/test_delete_empty_folder.py`, `tests/library/test_trash_retention_audit_index.py`.
+
+### Modificado
+* **Eliminar carpeta vacía:** `FsOperationService.plan_delete_empty_folder` (+ `can_undo` de `RMDIR`), entrada en el menú de carpetas (`gui/library/fsops_actions.py`).
+* **Papelera:** `library/trash.py` (`configured_retention_days`, `remove_from_catalog`, caducidad al entrar), `gui/library/catalog_advanced.py` (columna *Caduca*, *Vaciar caducadas…*, «quitar también del catálogo»), Ajustes → Catálogo (`trash.retention_days`), aviso al arrancar.
+* **Auditoría:** `library/audit.py` (`INDEX_MISSING`, `INDEX_STALE`).
+* **Almacén:** indicador en la barra de estado (`gui/chrome/statusbar.py`, `gui/library/staging_panel.py`) y aviso al arrancar con `G:` conectada.
+* Estabilidad de `tests/gui/test_window_position.py`; locales; documentación (manual, tutorial Feat 16, arquitectura §8, plan, README, `MODULE.md`); versión 3.16.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 570 passed. Barra de estado comprobada con la app real. **No probado con `G:` real.**
+
 ## v3.15.0 - feat-uc2-15: el estado también sigue a las carpetas -Inactive
 
 Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)

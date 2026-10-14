@@ -38,6 +38,22 @@ def staging_status_text(connection: Connection) -> str:
 
 
 class StagingPanelMixin:
+    def _refresh_staging_hint(self) -> None:
+        """Status-bar text ``Almacen: N cuenta(s) · size pendientes · G: desconectada`` (empty when nothing waits)."""
+
+        hint = staging_status_text(self.connection)
+        if hint:
+            try:
+                online = StagingService(self.connection).fs.is_online()
+            except Exception:  # noqa: BLE001
+                online = False
+            hint += "" if online else " · " + t("staging.hint_offline")
+            if online and not getattr(self, "_staging_offered", False):
+                self._staging_offered = True
+                self._write_console(t("staging.hint_ready") + "\n")
+        self._staging_hint = hint
+        self._set_status(self.status_var.get())
+
     def _open_staging_panel(self) -> None:
         connection: Connection = self.connection
         service = StagingService(connection)
@@ -131,6 +147,7 @@ class StagingPanelMixin:
                     else:
                         result: DumpResult = payload
                         self._write_console(result.summary() + "\n")
+                        self._refresh_staging_hint()
                         for outcome in result.problems:
                             self._write_console(f"  @{outcome.username}: {outcome.status} - {outcome.detail}\n")
                         self._reload_catalog()

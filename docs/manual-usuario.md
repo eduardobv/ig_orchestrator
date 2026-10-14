@@ -31,7 +31,7 @@ Estados de una cuenta: **Activa**, **Inactiva**, **Oculta (Disabled)**, **Cambia
 | **Editor** (derecha) | Datos de la cuenta que vas a añadir al lote (§4). |
 | **Cuentas del lote actual** | Tabla de cuentas del lote con estado por colores; clic derecho (§6). |
 | Consola / *Estado de ejecución* | Log en vivo (*Ver → Estado de ejecución…*): Copiar, Copiar todo, Limpiar. |
-| Barra de estado | Mensaje actual, nº de cuentas e items del lote, y el modo (*Nuevo lote*, *Editando lote*, *En ejecución*, *Histórico*). |
+| Barra de estado | Mensaje actual, nº de cuentas e items del lote, el modo (*Nuevo lote*, *Editando lote*, *En ejecución*, *Histórico*) y, si hay cuentas esperando en el almacén, `Almacén: N cuenta(s) · tamaño pendientes` (y `· G: desconectada`). |
 
 Colores del catálogo (configurables en Configuración → Interfaz): favorito, en lote, hoy, inactivo, disabled. Las cuentas **Eliminadas** usan el mismo color que *Disabled* (rojo suave).
 
@@ -94,7 +94,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 | **Ocultar** | Estado *Disabled*: deja de mostrarse como activa (no toca disco). |
 | **Activar** | Vuelve a Activa. |
 | **Sincronizar con el disco ▸** | **Rápida** (solo lo que cambió), **Verificar categoría seleccionada**, **Verificar cuenta seleccionada**, **Verificación completa…** (lee todas las carpetas; lento), **Hallazgos de sincronización…** (ver §8). |
-| **Auditar biblioteca…** | Modal de auditoría: compara `accounts_lite`/`accounts_complete` con el disco y la app; exporta Markdown/CSV. |
+| **Auditar biblioteca…** | Modal de auditoría: compara `accounts_lite`/`accounts_complete` con el disco y la app, y revisa el índice de ficheros (`INDEX_MISSING`: hay ficheros según los contadores pero ninguno indexado; `INDEX_STALE`: un contador difiere del índice); exporta Markdown/CSV. |
 | **Ficha de la cuenta…** | Modal para editar id de Instagram, fecha del primer post, favorita, notas (§5.3). |
 | **Papelera…** | Modal de la papelera (§5.5). |
 | **Verificar índice con el disco** | Compara el índice de ficheros de la cuenta seleccionada con su carpeta (§8). |
@@ -167,9 +167,10 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 | **Nueva carpeta…** | Crea una subcarpeta en disco **y** en el catálogo. |
 | **Renombrar carpeta…** | Renombra en disco y actualiza las rutas de todas sus cuentas. |
 | **Mover a…** | Mueve la carpeta (con sus cuentas) a otra. |
+| **Eliminar carpeta vacía…** | Borra la carpeta (y sus subcarpetas) en disco y en el catálogo. **Solo** si no hay ficheros ni cuentas dentro; si no, el plan se bloquea y dice por qué. Con vista previa y *Deshacer*. |
 | **Verificar categoría seleccionada** | Sincroniza con el disco todas las cuentas de esa carpeta. |
 
-Estas cuatro son las únicas acciones sobre carpetas: **no hay «Eliminar carpeta»** (de momento). Una carpeta vacía puede quitarse con *Catálogo → Operaciones de disco… → Deshacer* de la operación que la creó.
+Las acciones sobre carpetas son estas cinco.
 Todas las operaciones de disco muestran primero una **vista previa** (*Operación de disco*: acciones, de/a, cuentas y carpetas afectadas) y solo se ejecutan con **Ejecutar**.
 
 ### 5.3 Ficha de la cuenta (modal)
@@ -192,7 +193,7 @@ En el árbol, arrastra una o varias cuentas seleccionadas (o una carpeta) sobre 
 | Acción | Qué hace |
 |---|---|
 | **Eliminar (a la papelera)…** | Mueve la carpeta a `.trash\<fecha>__<usuario>` (instantáneo, mismo disco). La cuenta queda como *Eliminada* y sin carpeta. Bloqueada si está en un lote en ejecución, tiene datos pendientes en el almacén o G: no está disponible. |
-| **Catálogo → Papelera…** | Lista lo eliminado (ficheros, tamaño, fecha, sitio original). **Restaurar** devuelve la carpeta si su sitio sigue libre. **Eliminar definitivamente / Vaciar papelera…** borra de verdad y exige escribir `ELIMINAR`. |
+| **Catálogo → Papelera…** | Lista lo eliminado (ficheros, tamaño, fecha, **caducidad**, sitio original). **Restaurar** devuelve la carpeta si su sitio sigue libre. **Eliminar definitivamente / Vaciar papelera… / Vaciar caducadas…** borra de verdad y exige escribir `ELIMINAR`; después pregunta si quitar también las cuentas del **catálogo** (se conservan las que estén en algún lote). La caducidad se configura en Ajustes → Catálogo; la app **nunca borra sola**, solo avisa. |
 
 Para quitar una cuenta del **catálogo y del disco**: *Eliminar (a la papelera)…* y después *Papelera… → Vaciar* (la carpeta se borra de G:). La fila de la cuenta queda en el catálogo como *Eliminada* (no se borra de la base de datos).
 
@@ -266,7 +267,7 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 | **General** | Idioma (reinicia la app). |
 | **Interfaz** | Colores del catálogo, posición de la ventana principal (izquierda/centro/derecha) y *Guardar posición*. |
 | **Procesamiento** | *Priorizar stories (dos barridas)*; **Motor de renombrado** (integrado o script externo) y **vista previa siempre**; *Vaciar tabla de ficheros descargados*. |
-| **Catálogo** | Carpeta de cuentas eliminadas y *Conservar la carpeta de grupo*; **Mantener actualizado accounts_lite**; **Almacén** (carpeta local) y **Tras renombrar** (preguntar / almacén / biblioteca). |
+| **Catálogo** | Carpeta de cuentas eliminadas y *Conservar la carpeta de grupo*; **Mantener actualizado accounts_lite**; **Almacén** (carpeta local) y **Tras renombrar** (preguntar / almacén / biblioteca); **Papelera: días de retención** (0 = sin límite). |
 | **Notificaciones** | Aviso por Telegram al terminar un lote: activar, destino, plantilla, errores del bot que avisan, *Enviar prueba*. |
 | **Instancias** | Registro de equipos: nombre, rol, es-local, carpeta de descargas, carpeta compartida (ruta desde este PC y en la propia), notas; *Añadir / Editar / Eliminar / Probar*. |
 
@@ -280,6 +281,6 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 
 **¿Cómo elimino una cuenta del catálogo y del disco?** *Eliminar (a la papelera)…* y luego *Papelera… → Vaciar*.
 
-**¿Cómo elimino una carpeta vacía?** *Catálogo → Operaciones de disco…* → deshacer la operación que la creó (hoy no hay «Eliminar carpeta»).
+**¿Cómo elimino una carpeta vacía?** Clic derecho sobre la carpeta (vista árbol) → **Eliminar carpeta vacía…**. Si tiene ficheros o cuentas, no se puede (el plan explica por qué).
 
 **G: está apagada, ¿qué puedo hacer?** Descargar, renombrar (con índice) y dejar en el almacén o pendiente de mover; ver, filtrar y editar fichas. No se pueden mover/eliminar/sincronizar carpetas.

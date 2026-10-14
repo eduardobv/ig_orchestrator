@@ -21,6 +21,23 @@ CONFIRM_WORD = "ELIMINAR"
 QUARANTINED, RESTORED, PURGED = "QUARANTINED", "RESTORED", "PURGED"
 
 
+RETENTION_SETTING = "trash.retention_days"
+
+
+def configured_retention_days(conn: sqlite3.Connection) -> int | None:
+    """Days a trashed account is kept before it is offered for permanent deletion (``None`` = no limit)."""
+
+    try:
+        row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (RETENTION_SETTING,)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    try:
+        days = int(str(row[0]).strip()) if row is not None else 0
+    except ValueError:
+        return None
+    return days if days > 0 else None
+
+
 class TrashError(RuntimeError):
     pass
 
@@ -40,6 +57,7 @@ class TrashItem:
     bytes: int
     deleted_at: str
     status: str
+    expires_at: str = ""
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -106,6 +124,7 @@ class TrashService:
 
     # ------------------------------------------------------------ actions
     def quarantine(self, account_id: int, *, retention_days: int | None = None) -> int:
+        retention_days = retention_days if retention_days is not None else configured_retention_days(self.conn)
         reasons = self.blockers(account_id)
         if reasons:
             raise TrashError("; ".join(reasons))
@@ -178,6 +197,42 @@ class TrashService:
         self.conn.commit()
         return len(items), files, size
 
+    def remove_from_catalog(self, account_ids: list[int]) -> tuple[int, list[str]]:
+        """Delete the catalog rows of accounts whose folder was purged. An account that is still referenced
+        (for example by a batch) is kept. Returns ``(removed, kept_usernames)``."""
+
+        removed = 0
+        kept: list[str] = []
+        for account_id in account_ids:
+            row = self.conn.execute("SELECT username FROM catalog_accounts WHERE id = ?", (account_id,)).fetchone()
+            if row is None:
+                continue
+            if self.conn.execute(
+                "SELECT 1 FROM trash_items WHERE catalog_account_id = ? AND status = 'QUARANTINED' LIMIT 1", (account_id,)
+            ).fetchone():
+                kept.append(str(row["username"]))  # another copy is still in the trash
+                continue
+            self.conn.execute("SAVEPOINT remove_account")
+            try:
+                for table, column in (
+                    ("trash_items", "catalog_account_id"), ("media_index", "account_id"), ("media_index_state", "account_id"),
+                    ("account_lifecycle", "account_id"), ("account_usernames", "catalog_account_id"),
+                    ("scan_findings", "account_id"), ("staged_accounts", "catalog_account_id"),
+                ):
+                    try:
+                        self.conn.execute(f"DELETE FROM {table} WHERE {column} = ?", (account_id,))
+                    except sqlite3.OperationalError:
+                        pass  # table not present in this database
+                self.conn.execute("DELETE FROM catalog_accounts WHERE id = ?", (account_id,))
+                self.conn.execute("RELEASE remove_account")
+                removed += 1
+            except sqlite3.IntegrityError:
+                self.conn.execute("ROLLBACK TO remove_account")
+                self.conn.execute("RELEASE remove_account")
+                kept.append(str(row["username"]))
+        self.conn.commit()
+        return removed, kept
+
     def expired(self) -> list[TrashItem]:
         now = _now().isoformat(timespec="seconds")
         rows = self.conn.execute(
@@ -200,7 +255,8 @@ class TrashService:
         ).fetchall()
         return [
             TrashItem(int(r["id"]), int(r["catalog_account_id"]), str(r["username"]), str(r["original_rel"]),
-                      str(r["trash_rel"]), int(r["files"] or 0), int(r["bytes"] or 0), str(r["deleted_at"]), str(r["status"]))
+                      str(r["trash_rel"]), int(r["files"] or 0), int(r["bytes"] or 0), str(r["deleted_at"]), str(r["status"]),
+                      str(r["expires_at"] or ""))
             for r in rows
         ]
 

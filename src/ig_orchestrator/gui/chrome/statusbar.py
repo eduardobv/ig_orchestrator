@@ -200,6 +200,7 @@ class StatusBarMixin:
             if items is not None:
                 parts.append(items.get())
             parts.append(text)
+            parts.append(getattr(self, "_staging_hint", ""))
             bar.set("  ·  ".join(part for part in parts if part))
 
 

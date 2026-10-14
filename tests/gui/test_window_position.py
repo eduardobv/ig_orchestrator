@@ -29,8 +29,26 @@ def test_centered_position(size, monitor, expected) -> None:
     assert centered_position(*size, monitor) == expected
 
 
-def pump(root, rounds: int = 6) -> None:
-    for _ in range(rounds):
+def pump(root, window: tk.Misc | None = None, timeout: float = 5.0) -> None:
+    """Run the event loop until ``window`` is shown, centred and opaque (or a time limit passes)."""
+
+    deadline = time.monotonic() + timeout
+    for _ in range(4):
+        root.update()
+        time.sleep(0.03)
+    while window is not None and time.monotonic() < deadline:
+        root.update()
+        try:
+            left, top, right, bottom = monitor_rect(root)
+            border = max(window.winfo_rootx() - window.winfo_x(), 0)
+            outer_width = window.winfo_width() + 2 * border
+            centred = abs(window.winfo_x() - (left + (right - left - outer_width) // 2)) <= 2
+            if window.winfo_ismapped() and centred and float(window.attributes("-alpha")) >= 1.0:
+                break
+        except tk.TclError:
+            break
+        time.sleep(0.03)
+    for _ in range(3):
         root.update()
         time.sleep(0.03)
 
@@ -51,7 +69,7 @@ def test_new_windows_open_centred_on_the_monitor(root) -> None:
     install_auto_centering()
     window = tk.Toplevel(root)
     window.geometry("640x360")  # size set after creation, like the real dialogs
-    pump(root)
+    pump(root, window)
     assert float(window.attributes("-alpha")) == 1.0  # visible again after being centred
 
     left, top, right, bottom = monitor_rect(root)
@@ -77,7 +95,7 @@ def test_popups_without_border_are_not_moved(root) -> None:
 def test_explicit_centering_helper(root) -> None:
     window = tk.Toplevel(root)
     window.geometry("500x300")
-    pump(root)
+    pump(root, window)
     center_on_monitor(window)
     pump(root)
     left, top, right, bottom = monitor_rect(root)

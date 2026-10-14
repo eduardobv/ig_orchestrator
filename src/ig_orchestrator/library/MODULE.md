@@ -80,3 +80,7 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ### v3.15
 
 `location_kind(rel)` → `deleted`/`inactive`/`normal`; la tabla de reglas `_transition(origen, destino, estado)` añade `INACTIVATE` (a `-Inactive`) y la reactivación por origen (de `-Deleted` o `-Inactive` a normal). `account_lifecycle.kind` admite `INACTIVATE`.
+
+## v3.16
+
+`FsOperationService.plan_delete_empty_folder(folder_id)` (RMDIR deepest-first; bloquea con `NOT_EMPTY`/`HAS_ACCOUNTS`; `can_undo` admite RMDIR). `trash.configured_retention_days`, `TrashService.remove_from_catalog`. `audit._check_index` añade `INDEX_MISSING`/`INDEX_STALE`.
