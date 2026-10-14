@@ -19,6 +19,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 12 · Catálogo avanzado | v3.12.0 | [Feat 12](#feat-12--catalogo-avanzado-v3120) |
 | 13 · Mover con sugerencias | v3.13.0 | [Feat 13](#feat-13--mover-con-sugerencias-busqueda-y-seleccion-multiple-v3130) |
 | 14 · Estado según carpeta y ventanas centradas | v3.14.0 | [Feat 14](#feat-14--estado-segun-carpeta-color-unico-y-ventanas-centradas-v3140) |
+| 15 · Estado también con -Inactive | v3.15.0 | [Feat 15](#feat-15--el-estado-tambien-sigue-a-las-carpetas--inactive-v3150) |
 
 ---
 
@@ -962,4 +963,26 @@ Todas las ventanas se abren con su centro en el centro del monitor donde está l
 | Síntoma | Causa |
 |---|---|
 | Moví fuera de la app (Explorador) y el estado no cambió | Solo los movimientos hechos desde la app cambian el estado; la sincronización no los toca. |
-| La carpeta se llama `-Inactive` y la cuenta sigue activa | Solo `-Deleted` cambia el estado automáticamente. |
+| La carpeta se llama `-Inactive` y la cuenta sigue activa | Desde v3.15 también cambia (ver Feat 15). Si usas una versión anterior, solo `-Deleted` lo hacía. |
+
+
+---
+
+## Feat 15 · El estado también sigue a las carpetas -Inactive (v3.15.0)
+
+Completa el Feat 14: ahora **`-Inactive`** funciona igual que `-Deleted`.
+
+| Al mover… | Resultado |
+|---|---|
+| …a `Nombre-Model-Deleted` o a la carpeta de eliminadas | **Eliminada** (rojo) |
+| …a `Nombre-Model-Inactive` | **Inactiva** (amarillo). Si estaba Eliminada, deja de estarlo |
+| …desde `-Deleted` o `-Inactive` a una carpeta normal | Vuelve al estado que tenía **antes** (o Activa si no se conoce) |
+| …entre carpetas normales | Sin cambios (una cuenta Inactiva puesta a mano sigue Inactiva) |
+
+La **vista previa del plan** lista «Estado: @cuenta → Inactiva / Eliminada / Reactivada» y **Deshacer** devuelve el estado.
+
+### Cómo probarlo
+1. Mueve una cuenta Activa de `X-Model` a `X-Model-Inactive` (sugerencia del selector): el plan avisa «→ Inactiva»; tras ejecutar, la fila queda amarilla.
+2. Muévela de vuelta a `X-Model`: «Reactivada», vuelve a Activa.
+3. Muévela de `X-Model-Deleted` a `X-Model-Inactive`: pasa de Eliminada a Inactiva.
+4. Deshaz el último movimiento en *Operaciones de disco*: recupera su estado anterior.

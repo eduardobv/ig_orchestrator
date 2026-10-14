@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v3.14.0** (tags `v3.2.0` … `v3.14.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
+| Versión | **v3.15.0** (tags `v3.2.0` … `v3.15.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
 | Rama de trabajo | `v3/integration` (PR a `master` pendiente: se hace al terminar la serie v3) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -63,7 +63,7 @@ Cada paquete importante tiene `MODULE.md` con sus interfaces. Leer el del paquet
 | `scanner.py` | Sincronización incremental por fecha de carpeta (`dir_mtime_*`). Ámbitos: `ALL`, `CATEGORY`, `ACCOUNT`, `DEEP`. Genera **hallazgos** (`scan_findings`): `NEW_FOLDER`, `MOVED_FOLDER`, `MISSING_FOLDER`, `OWNER_CHANGED`, `USERNAME_DUP`. Reemplaza `media_index` de cada `(cuenta, kind)` que relee. `scan_findings.accept_finding` hace que la app siga al disco. |
 | `rules.py` | Reglas de sc1 configurables (`library.*`): carpetas no-cuenta (incluye `.trash`), subcarpetas de medios, extensiones, profundidad. |
 | `filenames.py` | Parser de nombres `AAAA-MM-DD HH.MM.SS {media_id}_{owner}{sufijo}.{ext}`. |
-| `account_lifecycle.py` | «Eliminada en Instagram»: mover a carpeta `-Deleted`/eliminadas con destino editable; restaurar; sugerir; etiquetar. **El estado sigue a la carpeta** tras un `MOVE_DIR` hecho desde la app: `preview_status_changes` (vista previa), `sync_with_location` (aplica: `-Deleted`/carpeta de eliminadas → DELETED; salir → estado previo), `affected_accounts(grupo)`; se llama desde `gui/library/fsops_actions._run_plan` y tras deshacer. |
+| `account_lifecycle.py` | «Eliminada en Instagram»: mover a carpeta `-Deleted`/eliminadas con destino editable; restaurar; sugerir; etiquetar. **El estado sigue a la carpeta** tras un `MOVE_DIR` hecho desde la app: `location_kind` (deleted/inactive/normal), `_transition` (reglas: a `-Deleted` → DELETED; a `-Inactive` → INACTIVE; de `-Deleted`/`-Inactive` a normal → estado previo, según el **origen**), `preview_status_changes` (vista previa), `sync_with_location` (aplica; filas `DELETE`/`INACTIVATE`/`RESTORE` en `account_lifecycle`), `affected_accounts(grupo)`; se llama desde `gui/library/fsops_actions._run_plan` y tras deshacer. |
 | `account_rename.py` | «Cambió de username»: renombrar la cuenta (misma PK) o fusionarla con otra; reasigna `media_index`. |
 | `merge.py` | Fusión de carpetas sin sobrescribir (idéntico → omitir; mismo `media_id` → `_duplicates`; mismo nombre distinto tamaño → sufijo) con manifiesto para deshacer. |
 | `owner_groups.py` | Detección y resolución de ids de Instagram repetidos. |

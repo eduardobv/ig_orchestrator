@@ -559,5 +559,6 @@
   "picker.reason.deleted_folder": "Deleted accounts folder",
   "plan.status_change": "Status",
   "plan.status_deleted": "Deleted",
-  "plan.status_active": "Reactivated"
+  "plan.status_active": "Reactivated",
+  "plan.status_inactive": "Inactive"
 }

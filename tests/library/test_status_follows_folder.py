@@ -12,14 +12,14 @@ from ig_orchestrator.library.fsops import FsOperationService
 @pytest.fixture()
 def env(tmp_path: Path):
     lib = tmp_path / "4K"
-    for rel in ("00.FAV\\Ana-Model", "00.FAV\\Ana-Model-Deleted", "00.FAV\\Ana-Model-Inactive", "09.DELETED"):
+    for rel in ("00.FAV\\Ana-Model", "00.FAV\\Ana-Model-Deleted", "00.FAV\\Ana-Model-Inactive", "00.FAV\\Bea-Model", "09.DELETED"):
         (lib / rel).mkdir(parents=True)
     db = tmp_path / "gui.sqlite"
     init_gui_database(db)
     conn = connect(db)
     conn.execute("UPDATE path_roots SET path = ? WHERE code = 'LIBRARY'", (str(lib),))
     fs = FsOperationService(conn)
-    for rel in ("00.FAV\\Ana-Model", "00.FAV\\Ana-Model-Deleted", "00.FAV\\Ana-Model-Inactive", "09.DELETED"):
+    for rel in ("00.FAV\\Ana-Model", "00.FAV\\Ana-Model-Deleted", "00.FAV\\Ana-Model-Inactive", "00.FAV\\Bea-Model", "09.DELETED"):
         fs.ensure_folder_rows(rel)
 
     def account(name: str, parent: str, status: int = 1) -> int:
@@ -75,7 +75,7 @@ def test_moving_between_normal_folders_changes_nothing(env) -> None:
     conn, fs, lifecycle, account, _lib = env
     aid = account("ana3", "00.FAV\\Ana-Model")
 
-    _g, preview, messages = move(fs, lifecycle, aid, "00.FAV\\Ana-Model-Inactive")
+    _g, preview, messages = move(fs, lifecycle, aid, "00.FAV\\Bea-Model")
 
     assert preview == [] and messages == [] and status(conn, aid) == "ENABLED"
 
@@ -120,3 +120,54 @@ def test_moving_a_whole_group_folder_into_a_deleted_folder(env) -> None:
     plan = fs.plan_move_folder(fs.folder_id_for_rel("00.FAV\\Ana-Model-Inactive\\box"), fs.folder_id_for_rel("00.FAV\\Ana-Model-Deleted"))
     assert lifecycle.preview_status_changes(plan) == []  # empty folder: no accounts involved
     assert status(conn, a1) == "ENABLED"
+
+
+def test_moving_into_an_inactive_folder_marks_the_account_inactive_and_out_restores(env) -> None:
+    conn, fs, lifecycle, account, _lib = env
+    aid = account("ana8", "00.FAV\\Ana-Model", status=1)
+    conn.execute("UPDATE catalog_accounts SET is_favorite = 1 WHERE id = ?", (aid,))
+    conn.commit()
+
+    _g, preview, messages = move(fs, lifecycle, aid, "00.FAV\\Ana-Model-Inactive")
+
+    assert preview == [(aid, "ana8", "INACTIVATE")] and "inactiva" in messages[0]
+    assert status(conn, aid) == "INACTIVE"
+
+    _g, preview, messages = move(fs, lifecycle, aid, "00.FAV\\Ana-Model")
+
+    assert preview == [(aid, "ana8", "ACTIVATE")] and "reactivada" in messages[0]
+    assert status(conn, aid) == "ENABLED"  # the status it had before
+
+
+def test_inactive_account_moved_between_normal_folders_stays_inactive(env) -> None:
+    conn, fs, lifecycle, account, _lib = env
+    aid = account("ana9", "00.FAV\\Ana-Model", status=2)  # manually inactive, in a normal folder
+
+    _g, preview, _m = move(fs, lifecycle, aid, "00.FAV\\Bea-Model")
+
+    assert preview == [] and status(conn, aid) == "INACTIVE"
+
+
+def test_deleted_to_inactive_and_inactive_to_deleted(env) -> None:
+    conn, fs, lifecycle, account, _lib = env
+    aid = account("ana10", "00.FAV\\Ana-Model-Deleted", status=6)
+
+    _g, preview, _m = move(fs, lifecycle, aid, "00.FAV\\Ana-Model-Inactive")
+    assert preview == [(aid, "ana10", "INACTIVATE")] and status(conn, aid) == "INACTIVE"
+    assert conn.execute("SELECT deleted_at FROM catalog_accounts WHERE id = ?", (aid,)).fetchone()[0] is None
+
+    _g, preview, _m = move(fs, lifecycle, aid, "00.FAV\\Ana-Model-Deleted")
+    assert preview == [(aid, "ana10", "DELETE")] and status(conn, aid) == "DELETED"
+
+
+def test_undoing_a_move_into_inactive_restores_the_status(env) -> None:
+    conn, fs, lifecycle, account, _lib = env
+    aid = account("ana11", "00.FAV\\Ana-Model", status=1)
+    group, _p, _m = move(fs, lifecycle, aid, "00.FAV\\Ana-Model-Inactive")
+    assert status(conn, aid) == "INACTIVE"
+
+    undo_group = fs.undo(group)
+    lifecycle.restore_after_undo(group)
+    lifecycle.sync_with_location(lifecycle.affected_accounts(undo_group), undo_group)
+
+    assert status(conn, aid) == "ENABLED"

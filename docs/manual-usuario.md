@@ -149,7 +149,7 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 | **Cambió de username…** | Ver menú Catálogo. |
 | **Marcar como eliminada… / Restaurar cuenta eliminada…** | Ciclo de «eliminada en Instagram». |
 
-**El estado sigue a la carpeta.** Al mover cuentas (o una carpeta con cuentas): si el destino es una carpeta `…-Deleted` (o la carpeta de eliminadas), las cuentas pasan a **Eliminada**; si salen de ella, vuelven a su estado anterior (o Activa). La vista previa del plan lo avisa («Estado: @cuenta → Eliminada/Reactivada») y *Deshacer* lo revierte. Renombrar una carpeta no cambia estados.
+**El estado sigue a la carpeta.** Al mover cuentas (o una carpeta con cuentas): si el destino es una carpeta `…-Deleted` (o la carpeta de eliminadas), las cuentas pasan a **Eliminada**; si es una carpeta `…-Inactive`, pasan a **Inactiva**; si salen de una de ellas hacia una carpeta normal, vuelven a su estado anterior (o Activa). La vista previa del plan lo avisa («Estado: @cuenta → Eliminada / Inactiva / Reactivada») y *Deshacer* lo revierte. Renombrar una carpeta no cambia estados.
 
 #### 5.1.1 Selector de carpeta destino
 

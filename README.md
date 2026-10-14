@@ -534,7 +534,7 @@ También se puede arrastrar cuentas sobre una carpeta. **Catálogo → Papelera�
 
 ### Estado según carpeta y ventanas
 
-Mover una cuenta a una carpeta `…-Deleted` la marca como eliminada (y sacarla la reactiva); la vista previa del plan lo muestra y *Deshacer* lo revierte. Las ventanas se abren centradas en el monitor.
+Mover una cuenta a una carpeta `…-Deleted` la marca como eliminada y a `…-Inactive` como inactiva (y sacarla de ellas la reactiva); la vista previa del plan lo muestra y *Deshacer* lo revierte. Las ventanas se abren centradas en el monitor.
 
 ### Mover cuentas
 

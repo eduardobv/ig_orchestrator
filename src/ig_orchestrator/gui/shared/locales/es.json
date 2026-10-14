@@ -559,5 +559,6 @@
   "picker.reason.deleted_folder": "Carpeta de eliminadas",
   "plan.status_change": "Estado",
   "plan.status_deleted": "Eliminada",
-  "plan.status_active": "Reactivada"
+  "plan.status_active": "Reactivada",
+  "plan.status_inactive": "Inactiva"
 }

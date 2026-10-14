@@ -15,6 +15,9 @@ from ig_orchestrator.library.fsops import FsOperationService, FsOpsError
 from ig_orchestrator.library.fsops_plan import Plan
 
 
+STATUS_TEXT = {"DELETE": "plan.status_deleted", "INACTIVATE": "plan.status_inactive", "ACTIVATE": "plan.status_active"}
+
+
 class FsOpsActionsMixin:
     """Catalog folder/account actions backed by ``FsOperationService``."""
 
@@ -64,7 +67,7 @@ class FsOpsActionsMixin:
     def _run_plan(self, plan: Plan) -> None:
         lifecycle = AccountLifecycleService(self.connection)
         extra = [
-            (t("plan.status_change"), "@" + name, t("plan.status_deleted") if kind == "DELETE" else t("plan.status_active"))
+            (t("plan.status_change"), "@" + name, t(STATUS_TEXT[kind]))
             for _id, name, kind in lifecycle.preview_status_changes(plan)
         ]
         if not confirm_plan(self.root, plan, extra_rows=extra or None):

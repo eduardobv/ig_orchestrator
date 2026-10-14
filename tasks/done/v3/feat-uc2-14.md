@@ -20,7 +20,7 @@ Feat incremental de v3 (catálogo, UC2) pedido tras probar el movimiento de cuen
 ## No incluido
 
 - Renombrar una carpeta a `…-Deleted` no cambia el estado de sus cuentas (solo los movimientos).
-- `-Inactive` no cambia el estado a Inactiva automáticamente.
+- `-Inactive` no cambiaba el estado en esta versión (resuelto en `feat-uc2-15`, v3.15.0).
 - Mover cuentas fuera de la app (Explorador) lo detecta la sincronización, que no cambia estados.
 
 ## Pruebas

@@ -76,3 +76,7 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ## account_lifecycle: estado según carpeta (v3.14)
 
 `preview_status_changes(plan)`, `sync_with_location(ids, op_group)` y `affected_accounts(op_group)`: tras un `MOVE_DIR` desde la app, una cuenta en `…-Deleted` (o en la carpeta de eliminadas) pasa a DELETED y al salir vuelve a su estado previo. Solo movimientos (no renombrados).
+
+### v3.15
+
+`location_kind(rel)` → `deleted`/`inactive`/`normal`; la tabla de reglas `_transition(origen, destino, estado)` añade `INACTIVATE` (a `-Inactive`) y la reactivación por origen (de `-Deleted` o `-Inactive` a normal). `account_lifecycle.kind` admite `INACTIVATE`.

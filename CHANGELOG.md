@@ -1,5 +1,23 @@
 # Changelog
 
+## v3.15.0 - feat-uc2-15: el estado también sigue a las carpetas -Inactive
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-15.md`; pruebas nuevas en `tests/library/test_status_follows_folder.py`.
+
+### Modificado
+* `library/account_lifecycle.py`: `location_kind` (deleted / inactive / normal), `_transition` (tabla de reglas), `sync_with_location` y `preview_status_changes` con **origen** y destino; nuevo tipo `INACTIVATE` en `account_lifecycle` (también deshecho por `restore_after_undo`).
+* `gui/library/fsops_actions.py` (texto «Inactiva» en la vista previa), locales.
+* Documentación: manual, tutorial (Feat 14/15), arquitectura, plan, README, `MODULE.md`; versión 3.15.0.
+
+### Comportamiento
+* Mover a `…-Inactive` → **Inactiva**; mover de `-Deleted`/`-Inactive` a una carpeta normal → estado anterior (o Activa). De `-Deleted` a `-Inactive` (y al revés) cambia directamente. Una cuenta Inactiva a mano que se mueve entre carpetas normales no cambia.
+
+### Pruebas ejecutadas
+`python -m pytest`: 559 passed (1 omitido).
+
 ## v3.14.0 - feat-uc2-14: estado según carpeta, color único de eliminadas y ventanas centradas
 
 Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
