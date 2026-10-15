@@ -75,7 +75,8 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 |---|---|
 | **Ejecutar** | Lanza el lote actual: envía URLs al bot de Telegram, espera descargas y las mueve a la carpeta de trabajo. Progreso en consola y tabla. |
 | **Detener** | Detiene el proceso en curso (descarga o renombrado integrado; este último para antes de la siguiente cuenta). |
-| **Pausar / Reanudar** | Pausa el lote sin perder el estado. |
+| **Pausar / Reanudar** | Con una cola, pausa/reanuda la secuencia. Con un lote suelto, **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
+| **Ejecutar tras Detener/Pausar** | Con un lote ya iniciado, Ejecutar lo **reanuda** (no intenta registrarlo de nuevo, así que no aparece «Batch name … already exists»). |
 | **Organizar stories…** | Modal *Stories Inbox*: elige la carpeta de entrada, *Guardar rutas* y *Ejecutar* para mover stories sueltas a la carpeta `story` de cada cuenta; muestra un log de movimientos. |
 | **Traer descargas…** | Modal para traer carpetas descargadas por otra instancia (origen, destino, comparar con lote, *Escanear*, *Traer seleccionadas/todas*, *Importar paquetes*). |
 | **Publicar descargas…** | (En una instancia worker) crea un paquete en la carpeta compartida con carpetas y resultados del lote; modo *Mover* o *Copiar*. |

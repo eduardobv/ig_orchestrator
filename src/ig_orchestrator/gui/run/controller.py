@@ -140,6 +140,10 @@ class RunControllerMixin:
         self.last_run_was_dry_run = False
         self.cancel_requested = False
         self.active_process_kind = None
+        if getattr(self, "paused_batch_id", None) is not None:
+            self.paused_batch_id = None
+            self._set_pause_button_mode(False)
+            self.pause_button.configure(state="disabled")
         self.batch_name_var.set(_generate_default_batch_name())
         today = date.today().isoformat()
         self.default_date_var.set(today)
@@ -278,6 +282,23 @@ class RunControllerMixin:
                 "No se puede ejecutar un lote vacío. Agrega al menos una cuenta.",
             )
             return
+        # A batch already started (stopped/paused -> PARTIAL) lives in SQLite
+        # under its name: resume it instead of trying to register it again.
+        if (
+            self.saved_batch_id is None
+            and self.active_batch_id is not None
+            and self.saved_draft_signature == _draft_signature(draft)
+        ):
+            row = self.connection.execute(
+                "SELECT status FROM input_batches WHERE id = ?",
+                (self.active_batch_id,),
+            ).fetchone()
+            if row is not None and str(row["status"]) not in {"DRAFT", "COMPLETED"}:
+                self.paused_batch_id = None
+                self._set_pause_button_mode(False)
+                self._set_status_tone(STATUS_TONE_IDLE)
+                self._start_batch(self.active_batch_id)
+                return
         batch_id = (
             self.saved_batch_id
             if self.saved_batch_id is not None
@@ -491,7 +512,15 @@ class RunControllerMixin:
         self._set_process_running(False)
         if not cancelled and exit_code == 0 and not self.last_run_was_dry_run:
             self._auto_publish_after_run(self._batches_to_publish(batch_id, queued))
-        if cancelled:
+        if cancelled and self.paused_batch_id == batch_id:
+            self.pause_button.configure(state="normal")
+            self._set_pause_button_mode(True)
+            self._set_status(f"Lote {batch_id} en pausa")
+            self._write_console(
+                f"Lote {batch_id} en pausa (PARTIAL). Pulsa Reanudar o Run para continuar.\n"
+            )
+        elif cancelled:
+            self.paused_batch_id = None
             self._set_status(f"Lote {batch_id} interrumpido; queda pendiente")
             self._write_console(
                 f"Lote {batch_id} detenido. SQLite conserva el trabajo y el batch "
@@ -532,13 +561,42 @@ class RunControllerMixin:
             self._set_status("Deteniendo proceso...")
             self._write_console("Detencion solicitada.\n")
 
+    def _set_pause_button_mode(self, resume: bool) -> None:
+        self.pause_button.configure(
+            image=self.icons.get("play" if resume else "pause"),
+            tooltip=t("tooltip.resume" if resume else "tooltip.pause"),
+        )
+
+    def _pause_single_batch(self) -> None:
+        """Pause a batch run outside any queue: stop the process, keep it resumable."""
+        if self.process_runner.cancel():
+            self.paused_batch_id = self.active_batch_id
+            self.cancel_requested = True
+            self._set_status("Pausando lote...")
+            self._write_console(
+                "Pausa solicitada: el proceso se detiene y el lote queda PARTIAL; "
+                "pulsa Reanudar para continuar.\n"
+            )
+
+    def _resume_single_batch(self) -> None:
+        batch_id = self.paused_batch_id
+        self.paused_batch_id = None
+        self._set_pause_button_mode(False)
+        if batch_id is not None:
+            self._start_batch(batch_id)
+
     def _toggle_pause_resume(self) -> None:
         if self.active_queue_id is None:
-            messagebox.showwarning(
-                t("warning"),
-                "No hay cola en ejecución",
-                parent=self.root
-            )
+            if self.paused_batch_id is not None and not self.process_runner.is_running():
+                self._resume_single_batch()
+            elif self.process_runner.is_running() and self.active_process_kind == "batch":
+                self._pause_single_batch()
+            else:
+                messagebox.showwarning(
+                    t("warning"),
+                    "No hay lote en ejecución ni pausado",
+                    parent=self.root,
+                )
             return
         queue = get_queue(self.connection, self.active_queue_id)
         if queue.status == QueueStatus.PAUSED.value:

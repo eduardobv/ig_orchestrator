@@ -169,3 +169,78 @@ def test_gui_console_prefixes_every_line_with_millisecond_timestamp() -> None:
     )
 
 
+
+
+def _pause_app(status: str):
+    """Minimal app double for pause/resume and Run-after-Stop (feat-uc2-17)."""
+    from types import SimpleNamespace
+
+    from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
+    from ig_orchestrator.gui.shared.helpers import _draft_signature
+
+    class Var:
+        def __init__(self, value):
+            self.value = value
+
+        def get(self):
+            return self.value
+
+    class Conn:
+        def execute(self, *_a):
+            return SimpleNamespace(fetchone=lambda: {"status": status})
+
+    class Runner:
+        running = True
+        cancelled = False
+
+        def is_running(self):
+            return self.running
+
+        def cancel(self):
+            self.cancelled = True
+            return True
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.process_runner = Runner()
+    app.connection = Conn()
+    app.history_readonly = False
+    app.batch_name_var = Var("b")
+    app.default_date_var = Var("2026-01-01")
+    app.accounts = [AccountDraft(username="u", download_stories=True)]
+    draft = BatchDraft("b", "2026-01-01", list(app.accounts))
+    app.saved_batch_id = None
+    app.saved_draft_signature = _draft_signature(draft)
+    app.active_batch_id = 7
+    app.active_queue_id = None
+    app.paused_batch_id = None
+    app.active_process_kind = "batch"
+    app.cancel_requested = False
+    app.started = []
+    app._start_batch = app.started.append
+    app._set_status = lambda *_: None
+    app._set_status_tone = lambda *_: None
+    app._write_console = lambda *_: None
+    app._set_pause_button_mode = lambda *_: None
+    return app
+
+
+def test_pause_without_queue_stops_process_and_remembers_batch() -> None:
+    app = _pause_app("IMPORTED")
+    app._toggle_pause_resume()
+    assert app.process_runner.cancelled and app.cancel_requested
+    assert app.paused_batch_id == 7
+
+
+def test_resume_after_pause_restarts_same_batch() -> None:
+    app = _pause_app("PARTIAL")
+    app.process_runner.running = False
+    app.paused_batch_id = 7
+    app._toggle_pause_resume()
+    assert app.started == [7] and app.paused_batch_id is None
+
+
+def test_run_after_stop_resumes_partial_batch_without_resaving() -> None:
+    app = _pause_app("PARTIAL")
+    app.process_runner.running = False
+    app._execute()
+    assert app.started == [7]

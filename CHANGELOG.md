@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.17.0 - feat-uc2-17: pausa y reanudación de lotes
+
+Fecha: 2026-10-15 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-17.md`; 3 pruebas en `tests/gui/test_run.py`.
+
+### Modificado
+* `gui/run/controller.py`: **Pausar** funciona también sin cola (detiene el proceso, lote PARTIAL, `paused_batch_id`, icono Reanudar); **Ejecutar** sobre un lote ya iniciado (PARTIAL/IMPORTED) lo reanuda en lugar de re-registrarlo (antes: «Batch name … already exists»). `gui/shell/app.py`: `paused_batch_id`.
+* Documentación: manual, tutorial (Feat 17), arquitectura (versión), plan; versión 3.17.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 573 passed (un test de `file_watcher` es intermitente, pasa aislado). **No probado con Telegram real.**
+
 ## v3.16.0 - feat-uc2-16: cierre de pendientes de v3
 
 Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)

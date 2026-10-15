@@ -21,6 +21,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 14 · Estado según carpeta y ventanas centradas | v3.14.0 | [Feat 14](#feat-14--estado-segun-carpeta-color-unico-y-ventanas-centradas-v3140) |
 | 15 · Estado también con -Inactive | v3.15.0 | [Feat 15](#feat-15--el-estado-tambien-sigue-a-las-carpetas--inactive-v3150) |
 | 16 · Cierre de pendientes | v3.16.0 | [Feat 16](#feat-16--cierre-de-pendientes-v3160) |
+| 17 · Pausa y reanudación de lotes | v3.17.0 | [Feat 17](#feat-17--pausa-y-reanudacion-de-lotes-v3170) |
 
 ---
 
@@ -1013,3 +1014,8 @@ Si hay cuentas esperando en el almacén, la barra de estado muestra `Almacén: N
 1. Crea una carpeta vacía en `10.TEMP` desde el menú y elimínala; deshaz la operación.
 2. Pon retención 1 día, elimina una cuenta de prueba, abre la Papelera y comprueba la columna *Caduca*.
 3. Renombra una descarga con destino *Almacén* y mira la barra de estado.
+
+
+## Feat 17 · Pausa y reanudación de lotes (v3.17.0)
+
+1. Lanza un lote con **Ejecutar**. 2. Pulsa **Pausar**: el proceso se detiene, el lote queda `PARTIAL` y el icono cambia a *Reanudar*. 3. Pulsa **Reanudar** (o **Ejecutar**): el mismo lote continúa desde SQLite. Lo mismo tras **Detener**: ya no sale «No hay cola en ejecución» ni «Batch name … already exists»; no hace falta reiniciar la app.

@@ -248,6 +248,7 @@ class InstagramOrchestratorApp(
         self.dry_run_var = tk.BooleanVar(value=False)
         self.active_batch_id: int | None = None
         self.active_queue_id: int | None = None
+        self.paused_batch_id: int | None = None
         self.cancel_requested = False
         self.active_process_kind: str | None = None
         self._batches_dialog: tk.Toplevel | None = None
