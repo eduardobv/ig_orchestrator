@@ -326,11 +326,8 @@ class InstagramOrchestratorApp(
             return
         self.active_queue_id = queue.id
         if queue.status == QueueStatus.PAUSED.value:
-            self.pause_button.configure(
-                image=self.icons.get("play"),
-                tooltip=t("tooltip.resume"),
-                state="normal"
-            )
+            self._set_pause_button_mode(True)
+            self.pause_button.configure(state="normal")
         elif queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
             self.batch_ready_for_rename = True
             self.rename_button.configure(state="normal")

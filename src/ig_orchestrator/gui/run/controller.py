@@ -562,10 +562,10 @@ class RunControllerMixin:
             self._write_console("Detencion solicitada.\n")
 
     def _set_pause_button_mode(self, resume: bool) -> None:
-        self.pause_button.configure(
-            image=self.icons.get("play" if resume else "pause"),
-            tooltip=t("tooltip.resume" if resume else "tooltip.pause"),
-        )
+        self.pause_button.configure(image=self.icons.get("play" if resume else "pause"))
+        tip = getattr(self.pause_button, "tooltip", None)
+        if tip is not None:
+            tip.text = t("tooltip.resume" if resume else "tooltip.pause")
 
     def _pause_single_batch(self) -> None:
         """Pause a batch run outside any queue: stop the process, keep it resumable."""
@@ -609,10 +609,7 @@ class RunControllerMixin:
             return
         try:
             pause_queue(self.connection, self.active_queue_id)
-            self.pause_button.configure(
-                image=self.icons.get("play"),
-                tooltip=t("tooltip.resume")
-            )
+            self._set_pause_button_mode(True)
             self._write_console("Cola pausada.\n")
         except Exception as e:
             messagebox.showerror(
@@ -626,10 +623,7 @@ class RunControllerMixin:
             return
         try:
             start_or_resume_queue(self.connection, self.active_queue_id)
-            self.pause_button.configure(
-                image=self.icons.get("pause"),
-                tooltip=t("tooltip.pause")
-            )
+            self._set_pause_button_mode(False)
             self._write_console("Cola reanudada.\n")
         except Exception as e:
             messagebox.showerror(

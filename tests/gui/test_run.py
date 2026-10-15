@@ -244,3 +244,17 @@ def test_run_after_stop_resumes_partial_batch_without_resaving() -> None:
     app.process_runner.running = False
     app._execute()
     assert app.started == [7]
+
+
+def test_pause_button_mode_only_uses_valid_ttk_options() -> None:
+    class Button:
+        tooltip = SimpleNamespace(text="")
+
+        def configure(self, **kwargs):
+            assert set(kwargs) <= {"image", "state"}, kwargs
+
+    app = object.__new__(InstagramOrchestratorApp)
+    app.pause_button = Button()
+    app.icons = {"play": "p", "pause": "q"}
+    app._set_pause_button_mode(True)
+    assert app.pause_button.tooltip.text

@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.17.1 - fix: icono/tooltip del botón Pausar
+
+Fecha: 2026-10-15. `_set_pause_button_mode` usaba la opción inexistente `-tooltip` de ttk (TclError al pulsar Run tras Pausar; el mismo fallo latente en pausa/reanudar de colas y `_restore_open_queue`). `icon_button` guarda ahora su `Tooltip` en `button.tooltip` y el texto se cambia ahí. Prueba nueva en `tests/gui/test_run.py` con un botón que rechaza opciones inválidas; 574 passed.
+
 ## v3.17.0 - feat-uc2-17: pausa y reanudación de lotes
 
 Fecha: 2026-10-15 · Rama: `v3/integration` (feat incremental de v3)
