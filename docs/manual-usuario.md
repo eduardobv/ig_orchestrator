@@ -27,7 +27,7 @@ Estados de una cuenta: **Activa**, **Inactiva**, **Oculta (Disabled)**, **Cambia
 | Zona | Contenido |
 |---|---|
 | Barra de botones (iconos) | Nuevo lote, Registrar/actualizar, Lotes/ejecuciones, Ejecutar, Detener, Pausar/Reanudar, Renombrar, Renombrar manual, Organizar stories (mismos atajos que los menús; cada icono tiene tooltip). |
-| **Catálogo** (izquierda) | Filtro de búsqueda, botón pegar, cambio lista/árbol. Clic derecho: ver §5. |
+| **Catálogo** (izquierda) | Filtro de búsqueda, botón pegar, cambio lista/árbol. Clic derecho: ver §5. El filtro busca por **username** (parte del nombre) o por **Owner ID**: pega el número (≥5 dígitos) de la página de Instagram y se muestra la cuenta cuyo Owner ID coincide exactamente, **entre todas las cuentas, también archivadas y eliminadas** aunque la vista no las muestre; el árbol abre su carpeta y la selecciona, y la barra de estado indica usuario y estado. Si no hay coincidencia, no pasa nada (los números no se toman como username). |
 | **Editor** (derecha) | Datos de la cuenta que vas a añadir al lote (§4). |
 | **Cuentas del lote actual** | Tabla de cuentas del lote con estado por colores; clic derecho (§6). |
 | Consola / *Estado de ejecución* | Log en vivo (*Ver → Estado de ejecución…*): Copiar, Copiar todo, Limpiar. |

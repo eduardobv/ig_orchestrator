@@ -13,6 +13,7 @@ from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogService,
     filter_catalog_entries,
+    parse_owner_id,
     list_usernames_active_on_date,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
@@ -237,6 +238,16 @@ class CatalogPanelMixin:
 
     def _apply_catalog_pasted_text(self, raw: str) -> None:
         pasted = normalize_username(first_clipboard_line(raw))
+        owner_id = parse_owner_id(pasted)
+        if owner_id is not None:
+            # An Instagram owner id: search by id; if it is a known account, bind the
+            # editor to that account instead of to the digits.
+            self.catalog_filter_var.set(owner_id)
+            found = self.catalog_service.find_entries_by_owner_id(owner_id)
+            if len(found) == 1:
+                self.username_var.set(found[0].username)
+                self._apply_username_identity(found[0].username)
+            return
         self.catalog_filter_var.set(pasted)
         self.username_var.set(pasted)
         self._apply_username_identity(pasted)
@@ -331,6 +342,17 @@ class CatalogPanelMixin:
         visible: list[str] = []
         filtered = filter_catalog_entries(self.catalog_entries, query)
         focus_username = catalog_focus_username(query, filtered, selected_username)
+        owner_id = parse_owner_id(query)
+        if owner_id is not None:
+            # Owner-id search covers the whole catalog (also archived/deleted).
+            by_owner = self.catalog_service.find_entries_by_owner_id(owner_id)
+            if by_owner:
+                filtered = by_owner
+                focus_username = by_owner[0].username
+                self._set_status(
+                    f"Owner ID {owner_id}: "
+                    + ", ".join(f"@{e.username} ({e.status.value})" for e in by_owner)
+                )
         self.catalog_list.delete(0, tk.END)
         palette = getattr(self, "catalog_colors", _CATALOG_COLORS)
         for entry in filtered:

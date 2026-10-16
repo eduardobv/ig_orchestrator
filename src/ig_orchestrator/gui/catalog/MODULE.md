@@ -37,3 +37,9 @@ El árbol usa `selectmode="extended"`. `gui/library/catalog_advanced.py` (mixin)
 ## v3.16
 
 Menú de carpeta: *Eliminar carpeta vacía…* (`fsops_actions._catalog_delete_empty_folder`). Papelera con caducidad y «quitar del catálogo» (`catalog_advanced._open_trash_dialog`). Barra de estado: `StagingPanelMixin._refresh_staging_hint`.
+  Si el texto es un Owner ID (solo dígitos, ≥5; `parse_owner_id`), el filtro busca por
+  id en **todo** el catálogo (`find_entries_by_owner_id`, incluye ARCHIVED/DELETED) y
+  sustituye la lista filtrada por las coincidencias (feat-uc2-20).
+
+## Tests
+`tests/gui/test_catalog_owner_search.py`

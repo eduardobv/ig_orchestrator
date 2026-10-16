@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -9,6 +10,15 @@ from typing import Iterable
 
 from ig_orchestrator.db import AccountHistoryRepository
 from ig_orchestrator.models import AccountHistoryStatus
+
+
+_OWNER_ID_RE = re.compile(r'''^["']?(\d{5,})["']?$''')
+
+
+def parse_owner_id(query: str) -> str | None:
+    """Instagram owner id typed/pasted in the search box (digits only), else ``None``."""
+    match = _OWNER_ID_RE.match(query.strip())
+    return match.group(1) if match else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +79,35 @@ class AccountCatalogService:
             start_init_date=record.field2,
             status=record.status,
             is_favorite=record.is_favorite,
+        )
+
+    def find_entries_by_owner_id(self, owner_id: str) -> list[AccountCatalogEntry]:
+        """Accounts whose owner id equals *owner_id*, whatever their status.
+
+        Searches the whole catalog (also ARCHIVED and DELETED), independently of
+        what the catalog view currently shows.
+        """
+        wanted = parse_owner_id(owner_id) or owner_id.strip()
+        if not wanted:
+            return []
+        records = AccountHistoryRepository(self.connection).list_all(
+            include_archived=True, include_deleted=True
+        )
+        return sorted(
+            (
+                AccountCatalogEntry(
+                    username=record.user_name,
+                    source="account_history",
+                    owner_id=record.user_ig_id,
+                    destination_path=record.field1,
+                    start_init_date=record.field2,
+                    status=record.status,
+                    is_favorite=record.is_favorite,
+                )
+                for record in records
+                if (record.user_ig_id or "").strip() == wanted
+            ),
+            key=_catalog_sort_key,
         )
 
     def list_empty_folder_paths(self) -> list[str]:
@@ -331,5 +370,6 @@ __all__ = [
     "AccountCatalogEntry",
     "AccountCatalogService",
     "filter_catalog_entries",
+    "parse_owner_id",
     "list_usernames_active_on_date",
 ]

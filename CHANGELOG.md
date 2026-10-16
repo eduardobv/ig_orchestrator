@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.20.0 - feat-uc2-20: buscar cuentas por Owner ID en el catálogo
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-20.md`; `tests/gui/test_catalog_owner_search.py` (3 pruebas).
+
+### Modificado
+* `gui/catalog/service.py`: `parse_owner_id` (solo dígitos, ≥5, admite comillas) y `AccountCatalogService.find_entries_by_owner_id` (compara exacto contra todo el catálogo, **incluidas ARCHIVED y DELETED**, aunque la vista no las muestre). Reexportados en `gui/account_catalog_service.py`.
+* `gui/catalog/panel.py`: el mismo cuadro de filtro del catálogo acepta un Owner ID (escrito o pegado). Si coincide, el árbol/lista muestra solo esa(s) cuenta(s), con su carpeta expandida y seleccionada, y la barra de estado indica `@usuario (ESTADO)`. Al pegar, si hay una única coincidencia el editor se vincula a ese username (los dígitos nunca pasan a ser username). Sin coincidencia exacta, el filtro por username funciona como siempre.
+* Documentación: manual, tutorial (Feat 20), arquitectura (versión), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.20.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 583 passed. **No probado con la GUI abierta.**
+
 ## v3.19.0 - feat-uc2-19: mover cuentas a un nuevo lote GUARDADO con nombre elegido
 
 Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)

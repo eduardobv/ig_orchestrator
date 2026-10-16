@@ -24,6 +24,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 17 · Pausa y reanudación de lotes | v3.17.0 | [Feat 17](#feat-17--pausa-y-reanudacion-de-lotes-v3170) |
 | 18 · Pausar cuentas de un lote | v3.18.0 | [Feat 18](#feat-18--pausar-cuentas-de-un-lote-v3180) |
 | 19 · Mover cuentas a un nuevo lote | v3.19.0 | [Feat 19](#feat-19--mover-cuentas-a-un-nuevo-lote-guardado-v3190) |
+| 20 · Buscar por Owner ID | v3.20.0 | [Feat 20](#feat-20--buscar-por-owner-id-v3200) |
 
 ---
 
@@ -1045,3 +1046,13 @@ Igual que el Feat 18 pero eligiendo tú el nombre del lote destino.
 4. Las cuentas salen del lote actual y quedan en el lote GUARDADO; el lote actual termina sin ellas. Ejecútalo después desde *Lotes guardados*.
 
 Errores esperables: nombre vacío, el del propio lote o el de un lote que ya no es borrador («elige otro nombre»); cuentas que ya empezaron (opción deshabilitada).
+
+
+## Feat 20 · Buscar por Owner ID (v3.20.0)
+
+1. En el **Catálogo**, pega (botón de pegar o Ctrl+V) o escribe en el cuadro de filtro el Owner ID de Instagram, p. ej. `1234567890`.
+2. Si algún registro del catálogo tiene ese Owner ID —**incluidos archivados y eliminados**, aunque no estén visibles—, el catálogo muestra solo esa cuenta: en árbol, su carpeta se abre y queda seleccionada. La barra de estado dice `Owner ID …: @usuario (ESTADO)`.
+3. Si pegaste el ID y hay una única coincidencia, el editor de cuentas se carga con ese username.
+4. Para volver, vacía el filtro (❌). Los textos que no son solo dígitos (o con menos de 5) se siguen buscando como username.
+
+Probar: toma el Owner ID de una cuenta archivada (ficha de la cuenta), pégalo y comprueba que aparece aunque *Mostrar biblioteca completa* esté desactivado.
