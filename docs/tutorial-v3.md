@@ -22,6 +22,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 15 · Estado también con -Inactive | v3.15.0 | [Feat 15](#feat-15--el-estado-tambien-sigue-a-las-carpetas--inactive-v3150) |
 | 16 · Cierre de pendientes | v3.16.0 | [Feat 16](#feat-16--cierre-de-pendientes-v3160) |
 | 17 · Pausa y reanudación de lotes | v3.17.0 | [Feat 17](#feat-17--pausa-y-reanudacion-de-lotes-v3170) |
+| 18 · Pausar cuentas de un lote | v3.18.0 | [Feat 18](#feat-18--pausar-cuentas-de-un-lote-v3180) |
 
 ---
 
@@ -1019,3 +1020,15 @@ Si hay cuentas esperando en el almacén, la barra de estado muestra `Almacén: N
 ## Feat 17 · Pausa y reanudación de lotes (v3.17.0)
 
 1. Lanza un lote con **Ejecutar**. 2. Pulsa **Pausar**: el proceso se detiene, el lote queda `PARTIAL` y el icono cambia a *Reanudar*. 3. Pulsa **Reanudar** (o **Ejecutar**): el mismo lote continúa desde SQLite. Lo mismo tras **Detener**: ya no sale «No hay cola en ejecución» ni «Batch name … already exists»; no hace falta reiniciar la app.
+
+
+## Feat 18 · Pausar cuentas de un lote (v3.18.0)
+
+Caso: lote de 20 cuentas y una tiene tantas URLs que tardaría horas. Quieres terminar el resto y dejar esa para después.
+
+1. Con el lote cargado (ejecutándose o no), selecciona la cuenta (Ctrl/Shift+clic para varias) en **Cuentas del lote actual**.
+2. Clic derecho → **Pausar (mover a lote guardado)…** y confirma. Solo se permite si la cuenta está **sin empezar** (pendiente, sin URLs enviadas); si no, la opción sale deshabilitada.
+3. Las cuentas pasan al lote **GUARDADO** `<lote>_PAUSA` (consola: «lote GUARDADO … nuevo/ampliado»). Pausar más cuentas después las añade al mismo lote.
+4. El lote original acaba sin ellas (queda listo para renombrar). Para descargar las pausadas, abre *Lotes guardados* y ejecuta `<lote>_PAUSA` cuando quieras.
+
+Probar: crea un lote de 3 cuentas, pulsa Ejecutar y, mientras procesa la primera, pausa la tercera; el lote termina con 2 cuentas y aparece `<lote>_PAUSA` en *Lotes guardados*.

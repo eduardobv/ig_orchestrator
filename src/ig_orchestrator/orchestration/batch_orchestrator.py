@@ -398,7 +398,12 @@ class BatchOrchestrator:
             if (
                 current_account is None
                 or current_account.status not in PROCESSABLE_ACCOUNT_STATUSES
+                or (
+                    current_account.batch_id is not None
+                    and current_account.batch_id != batch_id
+                )
             ):
+                # Also covers accounts paused (moved to another batch) from the GUI.
                 logger.info(
                     "Skipping batch account after external status change: "
                     "batch_id={} account_id={} previous_status={} current_status={} scope={}",
@@ -440,6 +445,8 @@ class BatchOrchestrator:
                 continue
             current = self._account_repository.get_by_id(account.id)
             if current is None or current.status not in PROCESSABLE_ACCOUNT_STATUSES:
+                continue
+            if current.batch_id is not None and current.batch_id != account.batch_id:
                 continue
             jobs = self._url_job_repository.list_by_account(account.id)
             if any(is_open_job(job) for job in jobs):

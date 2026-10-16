@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.18.0 - feat-uc2-18: pausar cuentas de un lote (mover a lote GUARDADO)
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/batches/pause.py` (`pause_accounts_to_new_batch`, `pausable_usernames`, `PauseAccountsError`); `tests/gui/test_pause_accounts.py` (5 pruebas); `tasks/done/v3/feat-uc2-18.md`.
+
+### Modificado
+* `gui/batch_accounts/panel.py` + `progress.py`: clic derecho → **Pausar (mover a lote guardado)…** (multiselección; solo habilitado si todas las cuentas están sin empezar). `gui/batch_resume_service.py`: reexporta el servicio.
+* `orchestration/batch_orchestrator.py`: el bucle omite (y `_finalize_idle_accounts` ignora) las cuentas que ya no pertenecen al lote, de modo que pausar con el lote en ejecución funciona y el lote termina (`AWAITING_RENAME`) sin ellas.
+* Documentación: manual (§6), tutorial (Feat 18), arquitectura, plan, `gui/batches/MODULE.md`, `CLAUDE.md`; versión 3.18.0.
+
+### Comportamiento
+* Solo cuentas `PENDING` con todas sus URLs `PENDING` (sin empezar), en un lote IMPORTED/PROCESSING/PARTIAL; todo o nada; no se puede vaciar el lote.
+* Destino: lote `DRAFT` («GUARDADO») `<nombre>_PAUSA`; si ya existe como borrador se amplía, si el nombre está ocupado por un lote no borrador se usa `_PAUSA2`, `_PAUSA3`…
+* Una sola transacción (`BEGIN IMMEDIATE`) con `UPDATE` condicionado al estado PENDING, para no competir con el proceso en ejecución.
+
+### Pruebas ejecutadas
+`python -m pytest`: 578 passed, 1 skipped (incluye las 5 nuevas). **No probado con Telegram real ni con la GUI abierta.**
+
 ## v3.17.1 - fix: icono/tooltip del botón Pausar
 
 Fecha: 2026-10-15. `_set_pause_button_mode` usaba la opción inexistente `-tooltip` de ttk (TclError al pulsar Run tras Pausar; el mismo fallo latente en pausa/reanudar de colas y `_restore_open_queue`). `icon_button` guarda ahora su `Tooltip` en `button.tooltip` y el texto se cambia ahí. Prueba nueva en `tests/gui/test_run.py` con un botón que rechaza opciones inválidas; 574 passed.

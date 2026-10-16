@@ -193,6 +193,10 @@ class BatchAccountsPanelMixin:
         self.batch_menu.add_command(
             label="Completar", command=self._complete_selected_account
         )
+        self.batch_menu.add_command(
+            label="Pausar (mover a lote guardado)…",
+            command=self._pause_selected_accounts,
+        )
         self.batch_menu.add_separator()
         self.batch_menu.add_command(
             label="Ver URLs completadas…",

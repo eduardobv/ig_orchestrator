@@ -210,6 +210,7 @@ Clic derecho sobre un nombre: mismo menú de cuenta (las acciones de carpeta y l
 |---|---|
 | Doble clic | *Ver URLs…* de la cuenta (problemáticas). |
 | Clic derecho → **Completar** | Marca la cuenta como completada manualmente. |
+| Clic derecho → **Pausar (mover a lote guardado)…** | Selecciona una o varias cuentas **sin empezar** (estado pendiente, ninguna URL enviada) —también con el lote en ejecución— y pide confirmación. Las cuentas salen del lote y pasan a un lote **GUARDADO** (borrador) llamado `<lote>_PAUSA` (se amplía si ya existe; `_PAUSA2`… si el nombre está ocupado). El lote actual se da por terminado sin ellas y queda listo para renombrar; el lote guardado se ejecuta después desde *Lotes guardados*. Deshabilitado si alguna cuenta ya empezó o si pausarías todas. |
 | **Ver URLs completadas / en reintento / fallidas…** | Modal con las URLs de ese estado; clic derecho en una URL: **Copiar**, **Abrir en Chrome**, **Copiar todas**. |
 | **Abrir carpeta** | Abre la carpeta de descargas de la cuenta. |
 | Botón **Eliminar** | Quita la cuenta del lote. |

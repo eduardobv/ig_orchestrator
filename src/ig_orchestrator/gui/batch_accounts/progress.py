@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from sqlite3 import IntegrityError
+from sqlite3 import IntegrityError, OperationalError
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
@@ -40,6 +40,9 @@ from ig_orchestrator.gui.batch_queue_service import (
     start_or_resume_queue,
 )
 from ig_orchestrator.gui.batch_resume_service import (
+    PauseAccountsError,
+    pausable_usernames,
+    pause_accounts_to_new_batch,
     AccountRuntimeProgress,
     ProblemUrlKind,
     activate_draft_batch,
@@ -171,6 +174,16 @@ class BatchProgressMixin:
         )
         complete_state = "disabled" if self.history_readonly else "normal"
         self.batch_menu.entryconfigure("Completar", state=complete_state)
+        pause_state = "disabled"
+        if not self.history_readonly and self.active_batch_id is not None:
+            selected = self._selected_batch_usernames()
+            if selected and selected <= pausable_usernames(
+                self.connection, self.active_batch_id
+            ):
+                pause_state = "normal"
+        self.batch_menu.entryconfigure(
+            "Pausar (mover a lote guardado)…", state=pause_state
+        )
         self.batch_menu.entryconfigure("Ver URLs completadas…", state=completed_state)
         self.batch_menu.entryconfigure("Ver URLs en reintento…", state=retry_state)
         self.batch_menu.entryconfigure("Ver URLs fallidas…", state=failed_state)
@@ -252,3 +265,57 @@ class BatchProgressMixin:
         )
         self._update_pending_button_label()
 
+
+
+    def _pause_selected_accounts(self) -> None:
+        """Move the selected not-started accounts to a saved ``<name>_PAUSA`` batch."""
+        if self._history_guard("pausar cuentas"):
+            return
+        if self.active_batch_id is None:
+            return
+        usernames = sorted(self._selected_batch_usernames())
+        if not usernames:
+            return
+        listed = ", ".join(f"@{name}" for name in usernames[:10])
+        if len(usernames) > 10:
+            listed += f" … (+{len(usernames) - 10})"
+        if not messagebox.askyesno(
+            "Pausar cuentas",
+            f"¿Pausar {len(usernames)} cuenta(s) sin empezar?\n\n{listed}\n\n"
+            "Saldrán de este lote y pasarán a un lote GUARDADO "
+            "(mismo nombre + «_PAUSA»). El lote actual podrá darse por terminado "
+            "sin ellas.",
+        ):
+            return
+        try:
+            result = pause_accounts_to_new_batch(
+                self.connection,
+                batch_id=self.active_batch_id,
+                usernames=usernames,
+            )
+        except (PauseAccountsError, OperationalError) as exc:
+            messagebox.showerror("Pausar cuentas", str(exc))
+            return
+        paused = {name.casefold() for name in result.usernames}
+        self.accounts = [
+            account for account in self.accounts if account.username.casefold() not in paused
+        ]
+        self.selected_index = None
+        self.runtime_progress = {}
+        try:
+            self.saved_draft_signature = _draft_signature(
+                load_batch_draft(self.connection, self.active_batch_id)
+            )
+        except ValueError:
+            self.saved_draft_signature = None
+        self._clear_editor()
+        self._refresh_runtime_progress()
+        self._refresh_table()
+        self._refresh_catalog()
+        self._update_pending_button_label()
+        self._write_console(
+            f"{len(result.usernames)} cuenta(s) pausadas ({result.url_count} URL) → "
+            f"lote GUARDADO «{result.target_batch_name}» (id={result.target_batch_id}"
+            f"{', nuevo' if result.created else ', ampliado'}).\n"
+        )
+        self._set_status(f"Pausadas {len(result.usernames)} → {result.target_batch_name}")
