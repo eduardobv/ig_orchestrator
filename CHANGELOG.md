@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.19.0 - feat-uc2-19: mover cuentas a un nuevo lote GUARDADO con nombre elegido
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-19.md`; 1 prueba en `tests/gui/test_pause_accounts.py`.
+
+### Modificado
+* `gui/batches/pause.py`: `pause_accounts_to_new_batch(..., target_name=)` (crea el borrador, amplía uno existente o rechaza si el nombre es del propio lote / de un lote no borrador / vacío) y `suggest_split_name` (`<padre>_PARTE2`, `_PARTE3`…). `gui/batch_resume_service.py` lo reexporta.
+* `gui/batch_accounts/progress.py` + `panel.py`: clic derecho → **Mover a nuevo lote guardado…** (pregunta el nombre con sugerencia basada en el lote padre); **Pausar** se mantiene tal cual (nombre automático `_PAUSA`). Ambas comparten `_split_selected_accounts` y funcionan con el lote en ejecución.
+* Documentación: manual (§6), tutorial (Feat 19), arquitectura (versión), plan, `gui/batches/MODULE.md`, `CLAUDE.md`; versión 3.19.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 579 passed, 1 skipped. **No probado con Telegram real ni con la GUI abierta.**
+
 ## v3.18.0 - feat-uc2-18: pausar cuentas de un lote (mover a lote GUARDADO)
 
 Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)

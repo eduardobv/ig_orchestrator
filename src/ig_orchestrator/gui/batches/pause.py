@@ -29,12 +29,15 @@ def pause_accounts_to_new_batch(
     *,
     batch_id: int,
     usernames: list[str],
+    target_name: str | None = None,
 ) -> PauseAccountsResult:
     """Move not-started accounts (PENDING, every URL PENDING) to ``<name>_PAUSA``.
 
     The target is a DRAFT batch ("GUARDADO"). If ``<name>_PAUSA`` already exists as
     DRAFT the accounts are appended to it; otherwise a new batch is created
     (``_PAUSA2``, ``_PAUSA3``... when the name is taken by a non-draft batch).
+    With ``target_name`` the accounts go to that batch instead: created as DRAFT if
+    the name is free, appended if it is an existing DRAFT, error otherwise.
     All-or-nothing: if any account is not pausable nothing is changed.
     """
     if not is_gui_schema(connection):
@@ -63,7 +66,12 @@ def pause_accounts_to_new_batch(
         connection.execute("BEGIN IMMEDIATE")
         accounts = _load_accounts(connection, batch_id, wanted)
         _validate(connection, batch_id, accounts, wanted)
-        target_id, target_name, created = _find_or_create_target(connection, batch)
+        if target_name is None:
+            target_id, target_name, created = _find_or_create_target(connection, batch)
+        else:
+            target_id, target_name, created = _find_or_create_named_target(
+                connection, batch, target_name.strip(), source_id=batch_id
+            )
         url_count = _move(connection, batch_id, target_id, accounts)
         connection.execute(
             "UPDATE batches SET updated_at = datetime('now') WHERE id IN (?, ?)",
@@ -153,6 +161,56 @@ def _validate(connection: Connection, batch_id: int, accounts: list, wanted: lis
         )
 
 
+def suggest_split_name(connection: Connection, batch_id: int) -> str:
+    """Free name derived from the parent batch: ``<padre>_PARTE2``, ``_PARTE3``..."""
+    row = connection.execute("SELECT name FROM batches WHERE id = ?", (batch_id,)).fetchone()
+    base = f"{row['name'] if row else 'lote'}_PARTE"
+    number = 2
+    while connection.execute(
+        "SELECT 1 FROM batches WHERE name = ?", (f"{base}{number}",)
+    ).fetchone():
+        number += 1
+    return f"{base}{number}"
+
+
+def _find_or_create_named_target(
+    connection: Connection, batch, name: str, *, source_id: int
+) -> tuple[int, str, bool]:
+    if not name:
+        raise PauseAccountsError("El nombre del nuevo lote no puede estar vacío")
+    row = connection.execute(
+        """
+        SELECT b.id, bs.code AS status
+        FROM batches b JOIN batch_statuses bs ON bs.id = b.status_id
+        WHERE b.name = ?
+        """,
+        (name,),
+    ).fetchone()
+    if row is None:
+        return _create_draft(connection, batch, name), name, True
+    if int(row["id"]) == source_id or str(row["status"]) != "DRAFT":
+        raise PauseAccountsError(
+            f"Ya existe un lote «{name}» que no es un borrador GUARDADO; elige otro nombre"
+        )
+    return int(row["id"]), name, False
+
+
+def _create_draft(connection: Connection, batch, name: str) -> int:
+    draft_id = connection.execute(
+        "SELECT id FROM batch_statuses WHERE code = 'DRAFT'"
+    ).fetchone()[0]
+    cursor = connection.execute(
+        """
+        INSERT INTO batches (
+            name, schema_version, status_id, start_date, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        """,
+        (name, batch["schema_version"], draft_id, batch["start_date"]),
+    )
+    return int(cursor.lastrowid)
+
+
 def _find_or_create_target(connection: Connection, batch) -> tuple[int, str, bool]:
     base = f"{batch['name']}{PAUSE_SUFFIX}"
     number = 1
@@ -167,19 +225,7 @@ def _find_or_create_target(connection: Connection, batch) -> tuple[int, str, boo
             (name,),
         ).fetchone()
         if row is None:
-            draft_id = connection.execute(
-                "SELECT id FROM batch_statuses WHERE code = 'DRAFT'"
-            ).fetchone()[0]
-            cursor = connection.execute(
-                """
-                INSERT INTO batches (
-                    name, schema_version, status_id, start_date, created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-                """,
-                (name, batch["schema_version"], draft_id, batch["start_date"]),
-            )
-            return int(cursor.lastrowid), name, True
+            return _create_draft(connection, batch, name), name, True
         if str(row["status"]) == "DRAFT":
             return int(row["id"]), name, False
         number += 1
@@ -230,4 +276,5 @@ __all__ = [
     "PauseAccountsResult",
     "pausable_usernames",
     "pause_accounts_to_new_batch",
+    "suggest_split_name",
 ]

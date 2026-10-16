@@ -210,3 +210,42 @@ def test_running_batch_skips_account_paused_midway_and_finishes(tmp_path: Path) 
         paused = AccountRepository(connection).get_by_id(accounts["cris"].id)
         assert paused.status is AccountStatus.PENDING
         assert paused.batch_id != result.batch.id
+
+
+def test_move_to_named_batch_suggests_parent_name_and_validates(tmp_path: Path) -> None:
+    from ig_orchestrator.gui.batch_resume_service import suggest_split_name
+
+    with connect(_gui_db(tmp_path)) as connection:
+        result = _batch(connection, usernames=("ana", "bea", "cris", "dora"))
+        assert suggest_split_name(connection, result.batch.id) == "lote_PARTE2"
+
+        moved = pause_accounts_to_new_batch(
+            connection,
+            batch_id=result.batch.id,
+            usernames=["bea"],
+            target_name="  lote_PARTE2 ",
+        )
+        assert moved.created and moved.target_batch_name == "lote_PARTE2"
+        assert suggest_split_name(connection, result.batch.id) == "lote_PARTE3"
+
+        # An existing DRAFT receives more accounts.
+        more = pause_accounts_to_new_batch(
+            connection,
+            batch_id=result.batch.id,
+            usernames=["cris"],
+            target_name="lote_PARTE2",
+        )
+        assert not more.created
+        assert _usernames(connection, moved.target_batch_id) == ["bea", "cris"]
+
+        # The same batch, a non-draft batch or a blank name are refused.
+        activate_draft_batch(connection, moved.target_batch_id)
+        for bad in ("lote", "lote_PARTE2", "  "):
+            with pytest.raises(PauseAccountsError):
+                pause_accounts_to_new_batch(
+                    connection,
+                    batch_id=result.batch.id,
+                    usernames=["dora"],
+                    target_name=bad,
+                )
+        assert _usernames(connection, result.batch.id) == ["ana", "dora"]

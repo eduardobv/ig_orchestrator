@@ -23,6 +23,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 16 · Cierre de pendientes | v3.16.0 | [Feat 16](#feat-16--cierre-de-pendientes-v3160) |
 | 17 · Pausa y reanudación de lotes | v3.17.0 | [Feat 17](#feat-17--pausa-y-reanudacion-de-lotes-v3170) |
 | 18 · Pausar cuentas de un lote | v3.18.0 | [Feat 18](#feat-18--pausar-cuentas-de-un-lote-v3180) |
+| 19 · Mover cuentas a un nuevo lote | v3.19.0 | [Feat 19](#feat-19--mover-cuentas-a-un-nuevo-lote-guardado-v3190) |
 
 ---
 
@@ -1032,3 +1033,15 @@ Caso: lote de 20 cuentas y una tiene tantas URLs que tardaría horas. Quieres te
 4. El lote original acaba sin ellas (queda listo para renombrar). Para descargar las pausadas, abre *Lotes guardados* y ejecuta `<lote>_PAUSA` cuando quieras.
 
 Probar: crea un lote de 3 cuentas, pulsa Ejecutar y, mientras procesa la primera, pausa la tercera; el lote termina con 2 cuentas y aparece `<lote>_PAUSA` en *Lotes guardados*.
+
+
+## Feat 19 · Mover cuentas a un nuevo lote guardado (v3.19.0)
+
+Igual que el Feat 18 pero eligiendo tú el nombre del lote destino.
+
+1. Selecciona una o varias cuentas **sin empezar** (el lote puede estar ejecutándose).
+2. Clic derecho → **Mover a nuevo lote guardado…**.
+3. Aparece el nombre sugerido (`<lote>_PARTE2`); acéptalo o cámbialo. Si pones el nombre de un borrador existente, se añaden a ese lote.
+4. Las cuentas salen del lote actual y quedan en el lote GUARDADO; el lote actual termina sin ellas. Ejecútalo después desde *Lotes guardados*.
+
+Errores esperables: nombre vacío, el del propio lote o el de un lote que ya no es borrador («elige otro nombre»); cuentas que ya empezaron (opción deshabilitada).
