@@ -247,12 +247,10 @@ class InstagramOrchestratorApp(
         self.last_run_was_dry_run = False
         self.dry_run_var = tk.BooleanVar(value=False)
         self.active_batch_id: int | None = None
-        self.active_queue_id: int | None = None
         self.paused_batch_id: int | None = None
         self.cancel_requested = False
         self.active_process_kind: str | None = None
         self._batches_dialog: tk.Toplevel | None = None
-        self._refresh_queue_panel = None
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
@@ -314,30 +312,7 @@ class InstagramOrchestratorApp(
         self._refresh_table()
         self._update_pending_button_label()
         self._update_batch_context()
-        self._restore_open_queue()
         self.root.after(600, self._fsops_startup)
-
-
-    def _restore_open_queue(self) -> None:
-        """Pick up a sequence persisted by this or another instance."""
-        queue = get_open_queue(self.connection)
-        if queue is None:
-            self.active_queue_id = None
-            return
-        self.active_queue_id = queue.id
-        if queue.status == QueueStatus.PAUSED.value:
-            self._set_pause_button_mode(True)
-            self.pause_button.configure(state="normal")
-        elif queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
-            self.batch_ready_for_rename = True
-            self.rename_button.configure(state="normal")
-            try:
-                params = collect_queue_rename_parameters(self.connection, queue.id)
-            except (BatchQueueError, ValueError):
-                self.active_queue_id = None
-                return
-            self.default_date_var.set(params.start_now_date)
-            self.rename_new_accounts = params.new_accounts
 
 
     def _build_widgets(self) -> None:

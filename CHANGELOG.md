@@ -1,5 +1,27 @@
 # Changelog
 
+## v3.21.0 - feat-uc2-21: gestión de lotes en la modal «Lotes guardados y ejecuciones»; fuera las colas de la GUI
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/batches/manage.py` (`create_empty_draft_batch`, `rename_batch`, `list_batch_accounts`, `list_draft_targets`, `is_batch_unstarted`, `restore_batch_to_draft`, `delete_unstarted_batch`); `tests/gui/test_batch_management.py` (6 pruebas, incluida la modal con Tk real); `tasks/done/v3/feat-uc2-21.md`.
+
+### Modificado
+* `gui/batches/dialog.py`: **eliminado** el panel «Cola de ejecución» y sus botones (Añadir/Quitar de cola, Subir, Bajar, Ejecutar secuencia, Renombrar cola). En su lugar, al seleccionar un lote activo se muestra la tabla **Cuentas del lote** (username, prio, URLs, stories, start date). Nuevos botones: **Nuevo lote** (borrador vacío), **Cambiar nombre**, **Borrar lote** (vacío o con cuentas), **Mover cuentas a…** (a un lote GUARDADO existente o nuevo) y, en Históricos, **Recuperar**. Se quita **Traer descargas** de la modal; «Recuperar / Modificar» → **Editar** y «Reanudar / Ejecutar» → **Ejecutar** (con traducciones es/en). Tras cada cambio se sincroniza la ventana principal si tenía abierto el lote afectado.
+* `gui/batches/pause.py`: `move_accounts_to_batch` (origen → lote GUARDADO existente; un borrador origen puede quedar vacío; un lote ya registrado solo cede cuentas sin empezar). `_validate(allow_empty_source=)`.
+* Colas fuera de la GUI: `gui/run/controller.py` (sin `_start_queue_sequence`/`_continue_queue_after_batch`/pausa de cola), `gui/run/rename.py` (renombrado siempre sobre el lote activo), `gui/shell/app.py` (sin `active_queue_id` ni `_restore_open_queue`), `gui/exchange/publish_dialog.py` (`_batches_to_publish` retirado). El servicio `gui/batch_queue_service.py`, sus tablas y `tests/gui/test_queue.py` **se conservan** (solo se retira la GUI).
+* `gui/shared/locales/es.json` y `en.json`: claves `batches.*`.
+* Documentación: manual, tutorial (Feat 21), arquitectura, plan, README, `gui/batches`, `gui/queue`, `gui/run`, `gui/MODULE.md`, `CLAUDE.md`; versión 3.21.0.
+
+### Reglas
+* Mover: el destino debe ser GUARDADO; un lote en ejecución solo cede cuentas sin empezar y no puede quedarse vacío; si la cuenta ya está en el destino se rechaza todo.
+* Borrar: lotes GUARDADOS (vacíos o con cuentas) o lotes que nunca se iniciaron; con ejecuciones se rechaza.
+* Recuperar del histórico: solo COMPLETED que nunca se iniciaron (sin ejecuciones, cuentas y URLs en PENDING).
+
+### Pruebas ejecutadas
+`python -m pytest`: 589 passed (algún test dependiente de display/watcher puede saltarse de forma intermitente). **No probado con Telegram real.**
+
 ## v3.20.0 - feat-uc2-20: buscar cuentas por Owner ID en el catálogo
 
 Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)

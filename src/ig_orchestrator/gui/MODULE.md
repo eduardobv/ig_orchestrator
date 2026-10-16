@@ -11,7 +11,7 @@
 | Tabla de cuentas del lote | `gui/batch_accounts` |
 | Ejecutar / detener | `gui/run` |
 | Diálogo Lotes | `gui/batches` |
-| Cola de secuencia | `gui/queue` |
+| Cola de secuencia (sin GUI desde v3.21) | `gui/queue` |
 | Configuración | `gui/settings` |
 | Draft en memoria/SQLite | `gui/draft` |
 | Organizar stories | `gui/stories` |

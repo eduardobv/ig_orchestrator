@@ -305,12 +305,12 @@ cuando participa en un lote real; un dry-run no modifica este estado.
   **Ejecutado en otra instancia**) el lote pasa a `AWAITING_RENAME`
   (`POR RENOMBRAR`): se puede **Renombrar** o **Finalizar sin renombrar**.
   Solo entonces pasa a `COMPLETED` y sale de Activos. En Activos se pueden
-  seleccionar varios lotes, **añadirlos a la cola**, ordenarlos y
-  **Ejecutar secuencia** (uno tras otro). Los lotes que aún no han empezado
-  se pueden **quitar de la cola** aunque otro esté corriendo. Al terminar
-  (o al pulsar **Renombrar cola / selección** sobre varios POR RENOMBRAR)
-  el renombrador se llama **una vez** con todos los `--new-account` y
-  `--move-renamed`. La cola vive en SQLite: se puede ejecutar en una
+  seleccionar un lote para ver sus **cuentas** (username, prio, URLs,
+  stories, start date), **mover cuentas** a otro lote GUARDADO (o a uno
+  nuevo), crear lotes vacíos, cambiar su nombre o borrarlos (las colas de
+  ejecución se retiraron de la GUI en v3.21). En **Históricos** se puede
+  **Recuperar** un lote que nunca se inició. Los lotes POR RENOMBRAR se
+  renombran uno a uno; se puede ejecutar en una
   instancia y renombrar en otra. **Exportar** genera un JSON portable;
   **Importar** crea un DRAFT nuevo (nombre único si hay colisión).
 * **Históricos** — lotes `COMPLETED` (carga al abrir la pestaña). Solo se
@@ -390,14 +390,14 @@ cuando finaliza correctamente una ejecución real o cuando, tras detenerla,
 todas las cuentas pendientes se han completado manualmente. No se habilita tras
 un dry-run ni mientras queden cuentas abiertas. Al pulsarlo ejecuta en segundo
 plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
-`Start date` global (o la fecha más reciente si hay una cola de varios lotes),
+`Start date` global,
 agrega un bloque `--new-account USERNAME OWNER_ID START_INIT_DATE PATH` por
 cada fila marcada como nueva y finalmente aplica `--no-duplicated
 --move-renamed`. Tras el proceso se inspecciona `WORKING_FOLDER`: si quedan
 carpetas de cuenta (no se llegaron a mover), el lote no se cierra y el botón
 sigue activo para reintentar. Las rutas con espacios se transmiten como un
 unico argumento y toda la salida se muestra en la misma consola con timestamp.
-Justo antes de construir el comando, la GUI vuelve a leer el lote (o la cola)
+Justo antes de construir el comando, la GUI vuelve a leer el lote
 desde SQLite; por ello una cancelacion, cierre y recuperacion conserva
 `ownerId`, `path`, `startInitDate` y el flag de cuenta nueva.
 
@@ -500,7 +500,7 @@ python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ### Publicación automática (instancia 24/7)
 
 En la instancia WORKER (laptop): `Ajustes > Instancias`, registra la instancia local como `WORKER` con su «Carpeta compartida: ruta en ELLA misma», activa
-**Publicar automáticamente** y elige MOVER/COPIAR. Al terminar un lote (o la cola) deja un paquete en la compartida; tambien `Lote > Publicar descargas...`.
+**Publicar automáticamente** y elige MOVER/COPIAR. Al terminar un lote deja un paquete en la compartida; tambien `Lote > Publicar descargas...`.
 En la principal: `Lote > Traer descargas...` muestra los paquetes; **Importar paquetes** copia los ficheros y crea el lote con los estados reales (listo para Renombrar).
 Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el manifiesto se escribe el ultimo (`*.partial` = incompleto).
 

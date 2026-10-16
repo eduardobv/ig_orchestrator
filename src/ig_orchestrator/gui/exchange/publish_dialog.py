@@ -74,15 +74,6 @@ class PublishDialogMixin:
         self.root.after(300, poll)
 
     # ----------------------------------------------------------- automatic
-    def _batches_to_publish(self, batch_id: int, queued: bool) -> list[int]:
-        ids = [batch_id]
-        if queued and getattr(self, "active_queue_id", None) is not None:
-            try:
-                ids = list(get_queue(self.connection, self.active_queue_id).rename_batch_ids) or ids
-            except BatchQueueError:
-                pass
-        return ids
-
     def _auto_publish_after_run(self, batch_ids: list[int]) -> None:
         """After a successful run on a WORKER instance with auto-publish on. Never blocks the next batch."""
 

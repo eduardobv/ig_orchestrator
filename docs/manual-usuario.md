@@ -75,11 +75,28 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 |---|---|
 | **Ejecutar** | Lanza el lote actual: envía URLs al bot de Telegram, espera descargas y las mueve a la carpeta de trabajo. Progreso en consola y tabla. |
 | **Detener** | Detiene el proceso en curso (descarga o renombrado integrado; este último para antes de la siguiente cuenta). |
-| **Pausar / Reanudar** | Con una cola, pausa/reanuda la secuencia. Con un lote suelto, **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
+| **Pausar / Reanudar** | **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
 | **Ejecutar tras Detener/Pausar** | Con un lote ya iniciado, Ejecutar lo **reanuda** (no intenta registrarlo de nuevo, así que no aparece «Batch name … already exists»). |
+| **Lotes guardados y ejecuciones…** | Modal para organizar los lotes (ver «Modal» más abajo). |
 | **Organizar stories…** | Modal *Stories Inbox*: elige la carpeta de entrada, *Guardar rutas* y *Ejecutar* para mover stories sueltas a la carpeta `story` de cada cuenta; muestra un log de movimientos. |
 | **Traer descargas…** | Modal para traer carpetas descargadas por otra instancia (origen, destino, comparar con lote, *Escanear*, *Traer seleccionadas/todas*, *Importar paquetes*). |
 | **Publicar descargas…** | (En una instancia worker) crea un paquete en la carpeta compartida con carpetas y resultados del lote; modo *Mover* o *Copiar*. |
+
+#### Modal «Lotes guardados y ejecuciones»
+
+Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos** (COMPLETED). Ya no existe la cola de ejecución. Al seleccionar un lote activo, abajo aparece **Cuentas del lote**: username, prio, URLs, stories y start date.
+
+| Elemento | Qué hace |
+|---|---|
+| **Nuevo lote** | Pide un nombre y crea un lote GUARDADO vacío. |
+| **Cambiar nombre** | Cambia el nombre del lote seleccionado (único; no el lote que se está ejecutando). |
+| **Borrar lote** | Borra un lote GUARDADO, vacío o con cuentas, o uno que nunca se inició (pide confirmación). Un lote con ejecuciones no se borra: usa *Finalizar sin renombrar*. |
+| **Mover cuentas a…** | Con cuentas seleccionadas en la tabla de abajo: pide destino (un lote GUARDADO existente o **Nuevo lote…** con nombre sugerido). El destino debe ser GUARDADO. De un lote en ejecución solo se pueden mover cuentas sin empezar. Si la cuenta ya está en el destino, no se mueve nada. |
+| **Editar** | Abre el lote GUARDADO en la ventana principal para modificarlo. |
+| **Ejecutar** | Ejecuta (o reanuda) el lote seleccionado. Doble clic en la fila hace lo mismo. |
+| **Renombrar** | Renombrado de ficheros de un lote POR RENOMBRAR. |
+| **Finalizar sin renombrar / Ejecutado en otra instancia / Exportar / Importar** | Como antes. |
+| **Recuperar** (Históricos) | Devuelve a GUARDADO un lote del histórico **que nunca se inició**. Los que ya se ejecutaron solo se abren en lectura. |
 | **Renombrar** | Modal **Renombrar descargas** (§7.1). Con el motor externo, lanza `ManualRenameFiles`. |
 | **Mover renombradas pendientes…** | Mueve a G: las carpetas renombradas mientras G: no estaba disponible (§7.2). |
 | **Pendiente de volcar a G:…** | Panel del almacén (§7.3). |

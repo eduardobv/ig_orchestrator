@@ -123,7 +123,7 @@ from ig_orchestrator.orchestration.processing_policy import (
 
 
 class RunControllerMixin:
-    """Mixin: save/execute/cancel batch and queue sequence."""
+    """Mixin: save/execute/cancel batch."""
 
     def _start_new_batch(self) -> None:
         """Leave any loaded batch untouched in SQLite and open a clean draft."""
@@ -312,85 +312,6 @@ class RunControllerMixin:
         self._start_batch(batch_id)
 
 
-    def _start_queue_sequence(self, queue_id: int) -> None:
-        if self.process_runner.is_running():
-            raise BatchQueueError("Ya hay un proceso en ejecución")
-        item = start_or_resume_queue(self.connection, queue_id)
-        self.active_queue_id = queue_id
-        self._write_console(
-            f"Secuencia de cola {queue_id}: ejecutando lote "
-            f"{item.batch_id} ({item.batch_name}).\n"
-        )
-        if self._refresh_queue_panel is not None:
-            self._refresh_queue_panel()
-        self._start_batch(item.batch_id)
-
-
-    def _continue_queue_after_batch(self, *, cancelled: bool, exit_code: int) -> bool:
-        """Advance the persisted queue. Return True if another batch was started."""
-        if self.active_queue_id is None:
-            return False
-        queue_id = self.active_queue_id
-        if cancelled or exit_code != 0:
-            pause_queue(self.connection, queue_id)
-            if self._refresh_queue_panel is not None:
-                self._refresh_queue_panel()
-            self._write_console(
-                f"Cola {queue_id} en pausa. Los lotes pendientes se pueden "
-                "quitar o la secuencia se puede reanudar.\n"
-            )
-            return False
-        if self.last_run_was_dry_run:
-            pause_queue(self.connection, queue_id)
-            if self._refresh_queue_panel is not None:
-                self._refresh_queue_panel()
-            return False
-        next_item = mark_current_item_completed(self.connection, queue_id)
-        if self._refresh_queue_panel is not None:
-            self._refresh_queue_panel()
-        if next_item is None:
-            try:
-                queue = get_queue(self.connection, queue_id)
-            except BatchQueueError:
-                self.active_queue_id = None
-                return False
-            if queue.status == QueueStatus.CANCELLED.value or not queue.rename_batch_ids:
-                self.active_queue_id = None
-                return False
-            self.batch_ready_for_rename = True
-            self.rename_button.configure(state="normal")
-            try:
-                params = collect_queue_rename_parameters(self.connection, queue_id)
-            except BatchQueueError as exc:
-                self.active_queue_id = None
-                self._write_console(f"Cola {queue_id} lista para renombrar: {exc}\n")
-                return False
-            self.rename_new_accounts = params.new_accounts
-            self.default_date_var.set(params.start_now_date)
-            self._write_console(
-                f"Cola {queue_id} terminada. Renombrar usará "
-                f"{len(params.batch_ids)} lote(s), startNowDate "
-                f"{params.start_now_date} y {len(params.new_accounts)} "
-                "cuenta(s) nueva(s).\n"
-            )
-            if params.has_mixed_dates:
-                self._write_console(
-                    "Aviso: los lotes tenían startNowDate distintos; "
-                    "se usó la fecha más reciente.\n"
-                )
-            return False
-        self._write_console(
-            f"Cola {queue_id}: siguiente lote {next_item.batch_id} "
-            f"({next_item.batch_name}).\n"
-        )
-        try:
-            self._start_queue_sequence(queue_id)
-        except BatchQueueError as exc:
-            self._write_console(f"No se pudo continuar la cola: {exc}\n")
-            return False
-        return True
-
-
     def _start_batch(self, batch_id: int) -> None:
         if self.process_runner.is_running():
             return
@@ -488,30 +409,12 @@ class RunControllerMixin:
             and not self.cancel_requested
             and is_batch_ready_for_rename(self.connection, batch_id)
         )
-        queued = False
-        if self.active_queue_id is not None:
-            try:
-                queue = get_queue(self.connection, self.active_queue_id)
-            except BatchQueueError:
-                self.active_queue_id = None
-            else:
-                queued = queue.is_running_batch(batch_id)
-                if not queued and not queue.is_open:
-                    self.active_queue_id = None
         cancelled = self.cancel_requested
         self.cancel_requested = False
         self.active_process_kind = None
-        if queued:
-            continued = self._continue_queue_after_batch(
-                cancelled=cancelled,
-                exit_code=exit_code,
-            )
-            if continued:
-                self._update_pending_button_label()
-                return
         self._set_process_running(False)
         if not cancelled and exit_code == 0 and not self.last_run_was_dry_run:
-            self._auto_publish_after_run(self._batches_to_publish(batch_id, queued))
+            self._auto_publish_after_run([batch_id])
         if cancelled and self.paused_batch_id == batch_id:
             self.pause_button.configure(state="normal")
             self._set_pause_button_mode(True)
@@ -568,7 +471,7 @@ class RunControllerMixin:
             tip.text = t("tooltip.resume" if resume else "tooltip.pause")
 
     def _pause_single_batch(self) -> None:
-        """Pause a batch run outside any queue: stop the process, keep it resumable."""
+        """Pause a batch run: stop the process, keep it resumable."""
         if self.process_runner.cancel():
             self.paused_batch_id = self.active_batch_id
             self.cancel_requested = True
@@ -586,49 +489,13 @@ class RunControllerMixin:
             self._start_batch(batch_id)
 
     def _toggle_pause_resume(self) -> None:
-        if self.active_queue_id is None:
-            if self.paused_batch_id is not None and not self.process_runner.is_running():
-                self._resume_single_batch()
-            elif self.process_runner.is_running() and self.active_process_kind == "batch":
-                self._pause_single_batch()
-            else:
-                messagebox.showwarning(
-                    t("warning"),
-                    "No hay lote en ejecución ni pausado",
-                    parent=self.root,
-                )
-            return
-        queue = get_queue(self.connection, self.active_queue_id)
-        if queue.status == QueueStatus.PAUSED.value:
-            self._resume_batch()
+        if self.paused_batch_id is not None and not self.process_runner.is_running():
+            self._resume_single_batch()
+        elif self.process_runner.is_running() and self.active_process_kind == "batch":
+            self._pause_single_batch()
         else:
-            self._pause_batch()
-
-    def _pause_batch(self) -> None:
-        if self.active_queue_id is None:
-            return
-        try:
-            pause_queue(self.connection, self.active_queue_id)
-            self._set_pause_button_mode(True)
-            self._write_console("Cola pausada.\n")
-        except Exception as e:
-            messagebox.showerror(
-                t("error"),
-                f"Error al pausar: {e}",
-                parent=self.root
+            messagebox.showwarning(
+                t("warning"),
+                "No hay lote en ejecución ni pausado",
+                parent=self.root,
             )
-
-    def _resume_batch(self) -> None:
-        if self.active_queue_id is None:
-            return
-        try:
-            start_or_resume_queue(self.connection, self.active_queue_id)
-            self._set_pause_button_mode(False)
-            self._write_console("Cola reanudada.\n")
-        except Exception as e:
-            messagebox.showerror(
-                t("error"),
-                f"Error al reanudar: {e}",
-                parent=self.root
-            )
-

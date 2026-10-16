@@ -90,6 +90,91 @@ def pause_accounts_to_new_batch(
     )
 
 
+def move_accounts_to_batch(
+    connection: Connection,
+    *,
+    source_batch_id: int,
+    target_batch_id: int,
+    usernames: list[str],
+) -> PauseAccountsResult:
+    """Move accounts from one batch to an existing saved (DRAFT) batch.
+
+    A DRAFT source may give away any account (even all of them); an already
+    registered source (IMPORTED/PROCESSING/PARTIAL) only not-started ones and it
+    cannot be emptied. All-or-nothing.
+    """
+    if not is_gui_schema(connection):
+        raise PauseAccountsError("Mover cuentas solo está disponible en la base de la GUI")
+    wanted = [name.strip().casefold() for name in usernames if name.strip()]
+    if not wanted:
+        raise PauseAccountsError("Selecciona al menos una cuenta")
+    if source_batch_id == target_batch_id:
+        raise PauseAccountsError("El lote de origen y el de destino son el mismo")
+    rows = {
+        int(r["id"]): r
+        for r in connection.execute(
+            """
+            SELECT b.id, b.name, bs.code AS status
+            FROM batches b JOIN batch_statuses bs ON bs.id = b.status_id
+            WHERE b.id IN (?, ?)
+            """,
+            (source_batch_id, target_batch_id),
+        )
+    }
+    source, target = rows.get(source_batch_id), rows.get(target_batch_id)
+    if source is None or target is None:
+        raise PauseAccountsError("Lote no encontrado")
+    if str(target["status"]) != "DRAFT":
+        raise PauseAccountsError(
+            "El lote de destino debe estar GUARDADO (borrador): "
+            f"«{target['name']}» está {target['status']}"
+        )
+    source_is_draft = str(source["status"]) == "DRAFT"
+    if not source_is_draft and str(source["status"]) not in PAUSABLE_BATCH_STATUSES:
+        raise PauseAccountsError(
+            f"No se pueden mover cuentas de un lote {source['status']}"
+        )
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        accounts = _load_accounts(connection, source_batch_id, wanted)
+        _validate(
+            connection, source_batch_id, accounts, wanted,
+            allow_empty_source=source_is_draft,
+        )
+        clash = connection.execute(
+            """
+            SELECT ca.username
+            FROM batch_accounts mine
+            JOIN batch_accounts other ON other.catalog_account_id = mine.catalog_account_id
+                                      AND other.batch_id = ?
+            JOIN catalog_accounts ca ON ca.id = mine.catalog_account_id
+            WHERE mine.id IN (%s)
+            """ % ",".join("?" for _ in accounts),
+            (target_batch_id, *[row["id"] for row in accounts]),
+        ).fetchall()
+        if clash:
+            raise PauseAccountsError(
+                "Ya están en el lote de destino: "
+                + ", ".join(f"@{r['username']}" for r in clash)
+            )
+        url_count = _move(connection, source_batch_id, target_batch_id, accounts)
+        connection.execute(
+            "UPDATE batches SET updated_at = datetime('now') WHERE id IN (?, ?)",
+            (source_batch_id, target_batch_id),
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    return PauseAccountsResult(
+        target_batch_id=target_batch_id,
+        target_batch_name=str(target["name"]),
+        created=False,
+        usernames=tuple(str(row["username"]) for row in accounts),
+        url_count=url_count,
+    )
+
+
 def pausable_usernames(connection: Connection, batch_id: int) -> set[str]:
     """Usernames (casefolded) of the batch accounts that could be paused now."""
     if not is_gui_schema(connection):
@@ -127,7 +212,14 @@ def _load_accounts(connection: Connection, batch_id: int, wanted: list[str]) -> 
     return [row for row in rows if str(row["username"]).casefold() in set(wanted)]
 
 
-def _validate(connection: Connection, batch_id: int, accounts: list, wanted: list[str]) -> None:
+def _validate(
+    connection: Connection,
+    batch_id: int,
+    accounts: list,
+    wanted: list[str],
+    *,
+    allow_empty_source: bool = False,
+) -> None:
     found = {str(row["username"]).casefold() for row in accounts}
     missing = sorted(set(wanted) - found)
     if missing:
@@ -155,7 +247,7 @@ def _validate(connection: Connection, batch_id: int, accounts: list, wanted: lis
     total = connection.execute(
         "SELECT COUNT(*) FROM batch_accounts WHERE batch_id = ?", (batch_id,)
     ).fetchone()[0]
-    if len(accounts) >= int(total):
+    if not allow_empty_source and len(accounts) >= int(total):
         raise PauseAccountsError(
             "No se pueden pausar todas las cuentas: el lote se quedaría vacío"
         )
@@ -275,6 +367,7 @@ __all__ = [
     "PauseAccountsError",
     "PauseAccountsResult",
     "pausable_usernames",
+    "move_accounts_to_batch",
     "pause_accounts_to_new_batch",
     "suggest_split_name",
 ]

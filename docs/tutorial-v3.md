@@ -25,6 +25,7 @@ Se amplía con cada feat terminado (regla del plan: un feat no está cerrado sin
 | 18 · Pausar cuentas de un lote | v3.18.0 | [Feat 18](#feat-18--pausar-cuentas-de-un-lote-v3180) |
 | 19 · Mover cuentas a un nuevo lote | v3.19.0 | [Feat 19](#feat-19--mover-cuentas-a-un-nuevo-lote-guardado-v3190) |
 | 20 · Buscar por Owner ID | v3.20.0 | [Feat 20](#feat-20--buscar-por-owner-id-v3200) |
+| 21 · Gestión de lotes en la modal (sin colas) | v3.21.0 | [Feat 21](#feat-21--gestion-de-lotes-en-la-modal-sin-colas-v3210) |
 
 ---
 
@@ -1056,3 +1057,17 @@ Errores esperables: nombre vacío, el del propio lote o el de un lote que ya no 
 4. Para volver, vacía el filtro (❌). Los textos que no son solo dígitos (o con menos de 5) se siguen buscando como username.
 
 Probar: toma el Owner ID de una cuenta archivada (ficha de la cuenta), pégalo y comprueba que aparece aunque *Mostrar biblioteca completa* esté desactivado.
+
+
+## Feat 21 · Gestión de lotes en la modal, sin colas (v3.21.0)
+
+`Lote → Lotes guardados y ejecuciones…`. Las colas de la GUI desaparecen; ahora organizas los lotes directamente.
+
+1. **Ver cuentas:** en *Activos*, selecciona un lote: abajo salen sus cuentas (username, prio, URLs, stories, start date).
+2. **Nuevo lote vacío:** *Nuevo lote* → nombre → aparece como GUARDADO.
+3. **Mover cuentas:** selecciona cuentas en la tabla de abajo → *Mover cuentas a…* → elige un lote GUARDADO o *Nuevo lote…* (nombre sugerido `<lote>_PARTE2`). Las tablas se actualizan. Un borrador puede quedarse vacío; de un lote en ejecución solo se mueven cuentas sin empezar.
+4. **Cambiar nombre / Borrar lote:** con el lote seleccionado; borrar funciona con lotes vacíos o con cuentas (GUARDADOS o nunca iniciados).
+5. **Recuperar del histórico:** pestaña *Históricos* → seleccionar → *Recuperar* (solo si el lote nunca se inició; vuelve a GUARDADO).
+6. Botones renombrados: **Editar** (antes Recuperar / Modificar) y **Ejecutar** (antes Reanudar / Ejecutar). «Traer descargas» ya no está en esta modal (sigue en el menú Lote).
+
+Probar: crea dos lotes con *Nuevo lote*, pasa cuentas de uno a otro con *Mover cuentas a…* y comprueba que las dos tablas cambian; abre el lote en la ventana principal con *Editar*.

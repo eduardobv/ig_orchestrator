@@ -1,10 +1,10 @@
 # Módulo: gui/run
 
 ## Propósito
-Ejecutar lote / cola, cancelar, renombrar, leftovers.
+Ejecutar lote, cancelar, renombrar, leftovers.
 
 ## Archivos
-- `controller.py` — save/execute/queue/cancel, callbacks de proceso
+- `controller.py` — save/execute/cancel, callbacks de proceso
 - `process_runner.py` — subprocess + comandos
 - `rename.py` — rename manual; pinta la barra (busy / success / warning / error)
 - `leftovers.py` — carpetas no movidas, `rename_status_tone`
