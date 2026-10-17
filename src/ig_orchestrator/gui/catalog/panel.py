@@ -122,7 +122,7 @@ class CatalogPanelMixin:
     """Mixin: catalog list/tree, filter, contextual menu."""
 
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
-        parent.rowconfigure(2, weight=1)
+        parent.rowconfigure(3, weight=1)
         parent.columnconfigure(0, weight=1)
         header = ttk.Frame(parent)
         header.grid(row=0, column=0, sticky="ew")
@@ -134,8 +134,22 @@ class CatalogPanelMixin:
             tooltip=t("tooltip.catalog_view"),
         )
         self.catalog_view_button.pack(side=tk.RIGHT)
+        self.catalog_suffix_row = ttk.Frame(parent)
+        self.catalog_suffix_row.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        ttk.Checkbutton(
+            self.catalog_suffix_row,
+            text=t("catalog.show_deleted"),
+            variable=self.catalog_show_deleted_var,
+            command=self._on_catalog_suffix_toggle,
+        ).pack(side=tk.LEFT)
+        ttk.Checkbutton(
+            self.catalog_suffix_row,
+            text=t("catalog.show_inactive"),
+            variable=self.catalog_show_inactive_var,
+            command=self._on_catalog_suffix_toggle,
+        ).pack(side=tk.LEFT, padx=(8, 0))
         filter_row = ttk.Frame(parent)
-        filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
+        filter_row.grid(row=2, column=0, sticky="ew", pady=(6, 6))
         filter_row.columnconfigure(0, weight=1)
         self.catalog_filter_entry = ttk.Entry(
             filter_row, textvariable=self.catalog_filter_var
@@ -168,7 +182,7 @@ class CatalogPanelMixin:
             exportselection=False,
             width=width_chars,
         )
-        self.catalog_list.grid(row=2, column=0, sticky="nsew")
+        self.catalog_list.grid(row=3, column=0, sticky="nsew")
         self.catalog_list.bind(
             "<ButtonRelease-1>", lambda _event: self._load_catalog()
         )
@@ -179,7 +193,7 @@ class CatalogPanelMixin:
         self.catalog_tree = ttk.Treeview(
             parent, show="tree", selectmode="extended"
         )
-        self.catalog_tree.grid(row=2, column=0, sticky="nsew")
+        self.catalog_tree.grid(row=3, column=0, sticky="nsew")
         self.catalog_tree.bind(
             "<<TreeviewSelect>>", lambda _event: self._load_catalog()
         )
@@ -314,9 +328,33 @@ class CatalogPanelMixin:
         if self.catalog_view_mode == "tree":
             self.catalog_list.grid_remove()
             self.catalog_tree.grid()
+            self.catalog_suffix_row.grid()
         else:
             self.catalog_tree.grid_remove()
             self.catalog_list.grid()
+            self.catalog_suffix_row.grid_remove()
+
+
+    def _on_catalog_suffix_toggle(self) -> None:
+        """Persist the "show -Deleted / -Inactive folders" checkboxes and redraw the tree."""
+
+        if is_gui_schema(self.connection):
+            for key, var in (
+                ("ui.catalog_show_deleted", self.catalog_show_deleted_var),
+                ("ui.catalog_show_inactive", self.catalog_show_inactive_var),
+            ):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES (?, ?, 'BOOLEAN', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key, "1" if var.get() else "0"),
+                )
+            self.connection.commit()
+        self._refresh_catalog()
 
 
     def _toggle_full_library(self) -> None:
@@ -411,6 +449,9 @@ class CatalogPanelMixin:
             list(entries),
             unrouted_label=t("label.unrouted"),
             extra_folder_paths=None if query.strip() else self.catalog_service.list_empty_folder_paths(),
+            # A search always looks everywhere; the checkboxes only declutter the browsing tree.
+            hide_deleted=not query.strip() and not self.catalog_show_deleted_var.get(),
+            hide_inactive=not query.strip() and not self.catalog_show_inactive_var.get(),
         )
         match = query.strip().casefold()
 

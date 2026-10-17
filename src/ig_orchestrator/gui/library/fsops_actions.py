@@ -209,6 +209,17 @@ class FsOpsActionsMixin:
             menu.add_command(label=t("fsops.delete_empty"), command=self._catalog_delete_empty_folder)
             menu.add_separator()
             menu.add_command(label=t("scan.category"), command=self._sync_category)
+            menu.add_separator()
+            menu.add_checkbutton(
+                label=t("catalog.show_deleted"),
+                variable=self.catalog_show_deleted_var,
+                command=self._on_catalog_suffix_toggle,
+            )
+            menu.add_checkbutton(
+                label=t("catalog.show_inactive"),
+                variable=self.catalog_show_inactive_var,
+                command=self._on_catalog_suffix_toggle,
+            )
             self.catalog_folder_menu = menu
         state = "normal" if self._fsops_online() else "disabled"
         for index in range(4):

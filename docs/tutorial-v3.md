@@ -1083,3 +1083,15 @@ Probar: crea dos lotes con *Nuevo lote*, pasa cuentas de uno a otro con *Mover c
 4. **Forzar mover (sobrescribir):** activo si hay duplicados; tras confirmar reemplaza el fichero existente de la carpeta `story` de la cuenta con el del inbox.
 
 Probar: deja en el inbox un fichero cuyo nombre ya exista en `story` de su cuenta y otro de una cuenta inexistente; Ejecutar → 2 problemas y 2 sobrantes; Forzar mover → el duplicado desaparece del inbox.
+
+## Feat 23 · Ocultar carpetas -Deleted / -Inactive en el árbol (v3.23.0)
+
+En la vista **árbol** del catálogo, justo encima del buscador hay dos casillas: **Ver -Deleted** y **Ver -Inactive** (marcadas por defecto, como antes).
+
+1. Desmarca **Ver -Deleted** → desaparecen del árbol las carpetas cuyo nombre acaba en `-Deleted` (o `-Delete`) y las cuentas que contienen. Igual con **Ver -Inactive** (`-Inactive`, `-Inactiva`, `-Inactivo`).
+2. Clic derecho sobre cualquier carpeta del árbol (p. ej. la raíz `G:\4K Stogram`) → las mismas dos opciones, sincronizadas con las casillas.
+3. Solo afecta al árbol: los diálogos de elegir carpeta (mover, copiar, crear, destino de eliminadas) siguen mostrando todas.
+4. Si escribes en el buscador (texto u Owner ID), la búsqueda ignora el filtro y encuentra también las cuentas ocultas.
+5. La elección se recuerda entre sesiones (`ui.catalog_show_deleted` / `ui.catalog_show_inactive`).
+
+Probar: desmarca ambas; las carpetas `…-Deleted`/`…-Inactive` desaparecen; abre `Mover a…` y compruébalas en el selector; busca una cuenta oculta y aparece.

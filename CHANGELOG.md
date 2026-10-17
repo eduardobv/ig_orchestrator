@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.23.0 - feat-uc2-23: ocultar carpetas -Deleted / -Inactive en el árbol del catálogo
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-23.md`; 3 pruebas en `tests/gui/test_catalog_tree.py`.
+
+### Modificado
+* `gui/catalog/tree.py`: `build_catalog_tree(hide_deleted=, hide_inactive=)`, `folder_suffix_kind`, `path_is_hidden`.
+* `gui/catalog/panel.py`: casillas **Ver -Deleted** / **Ver -Inactive** sobre el buscador (solo vista árbol), `_on_catalog_suffix_toggle`; la búsqueda ignora el filtro.
+* `gui/library/fsops_actions.py`: las mismas opciones (casillas) en el clic derecho de una carpeta. `gui/shell/app.py`: variables y ajustes `ui.catalog_show_deleted`/`ui.catalog_show_inactive` (por defecto visibles). Locales es/en.
+* Los selectores de carpeta (mover/copiar/crear) no se ven afectados: listan todas.
+* Documentación: manual, tutorial (Feat 23), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.23.0. README, AGENTS y arquitectura revisados (solo versión).
+
+### Pruebas ejecutadas
+`python -m pytest`: 596 passed (el test del watcher falló una vez por intermitencia y pasa aislado). **No probado visualmente en la GUI real.**
+
 ## v3.22.0 - feat-uc2-22: informe en la modal Stories Inbox (problemas, sobrantes, forzar mover)
 
 Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)

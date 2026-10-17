@@ -121,6 +121,8 @@
   "settings.tabs.processing": "Procesamiento",
   "settings.tabs.catalog": "Catálogo",
   "settings.tabs.notify": "Notificaciones",
+  "catalog.show_deleted": "Ver -Deleted",
+  "catalog.show_inactive": "Ver -Inactive",
   "label.unrouted": "Sin ruta",
   "settings.colors": "Colores del catálogo",
   "settings.color_favorite": "Favorito",
