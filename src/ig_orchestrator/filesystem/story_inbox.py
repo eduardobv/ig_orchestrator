@@ -27,6 +27,7 @@ class StoryInboxError(ValueError):
 class StoryInboxStatus(StrEnum):
     MOVED = "MOVED"
     MOVED_VIA_ALIAS = "MOVED_VIA_ALIAS"  # the username in the file name is an old name of the account
+    OVERWRITTEN = "OVERWRITTEN"  # forced move: replaced the file that already existed
     NO_USERNAME_IN_NAME = "NO_USERNAME_IN_NAME"
     USERNAME_NOT_IN_DB = "USERNAME_NOT_IN_DB"
     EMPTY_PATH = "EMPTY_PATH"
@@ -205,10 +206,37 @@ def organize_story_inbox(
     return results
 
 
+def force_move_conflicts(
+    results: list[StoryInboxResult],
+    *,
+    app_connection: sqlite3.Connection | None = None,
+    accounts_db: Path | str | None = None,
+) -> list[StoryInboxResult]:
+    """Retry the ``DESTINATION_EXISTS`` results overwriting the existing file."""
+
+    connection: sqlite3.Connection | None = None
+    if accounts_db and Path(accounts_db).is_file():
+        try:
+            connection = _connect_accounts_db(Path(accounts_db))
+        except sqlite3.Error:
+            connection = None
+    forced: list[StoryInboxResult] = []
+    try:
+        for item in results:
+            if item.status is not StoryInboxStatus.DESTINATION_EXISTS or not item.source.is_file():
+                continue
+            forced.append(_move_one(connection, item.source, app_connection, overwrite=True))
+    finally:
+        if connection is not None:
+            connection.close()
+    return forced
+
+
 def _move_one(
     connection: sqlite3.Connection | None,
     source: Path,
     app_connection: sqlite3.Connection | None = None,
+    overwrite: bool = False,
 ) -> StoryInboxResult:
     username = username_from_story_filename(source.name)
     if not username:
@@ -267,7 +295,7 @@ def _move_one(
         )
     destination_dir = account_root / STORY_SUBFOLDER
     destination = destination_dir / source.name
-    if destination.exists():
+    if destination.exists() and not overwrite:
         return StoryInboxResult(
             source=source,
             username=username,
@@ -277,6 +305,9 @@ def _move_one(
         )
     try:
         destination_dir.mkdir(parents=False, exist_ok=True)
+        existed = destination.exists()
+        if existed:
+            destination.unlink()
         shutil.move(str(source), str(destination))
     except OSError as exc:
         return StoryInboxResult(
@@ -290,25 +321,66 @@ def _move_one(
         source=source,
         username=username,
         destination=destination,
-        status=StoryInboxStatus.MOVED_VIA_ALIAS if alias_note else StoryInboxStatus.MOVED,
+        status=(
+            StoryInboxStatus.OVERWRITTEN
+            if existed
+            else StoryInboxStatus.MOVED_VIA_ALIAS
+            if alias_note
+            else StoryInboxStatus.MOVED
+        ),
         detail=alias_note,
     )
 
 
+_MOVED_STATUSES = (
+    StoryInboxStatus.MOVED,
+    StoryInboxStatus.MOVED_VIA_ALIAS,
+    StoryInboxStatus.OVERWRITTEN,
+)
+
+
 def summarize_results(results: list[StoryInboxResult]) -> tuple[int, int]:
-    moved = sum(
-        1 for item in results if item.status in (StoryInboxStatus.MOVED, StoryInboxStatus.MOVED_VIA_ALIAS)
-    )
+    moved = sum(1 for item in results if item.status in _MOVED_STATUSES)
     errors = len(results) - moved
     return moved, errors
+
+
+@dataclass(frozen=True, slots=True)
+class StoryInboxReport:
+    """What matters after a run: total moved, the problems and what is still in the inbox."""
+
+    moved: int
+    problems: tuple[StoryInboxResult, ...]
+    leftovers: tuple[Path, ...]
+
+    @property
+    def conflicts(self) -> tuple[StoryInboxResult, ...]:
+        return tuple(p for p in self.problems if p.status is StoryInboxStatus.DESTINATION_EXISTS)
+
+    @property
+    def is_clean(self) -> bool:
+        return not self.problems and not self.leftovers
+
+
+def build_report(inbox: Path | str, results: list[StoryInboxResult]) -> StoryInboxReport:
+    """Summarise *results* and re-scan *inbox* for files that stayed there."""
+
+    return StoryInboxReport(
+        moved=sum(1 for item in results if item.status in _MOVED_STATUSES),
+        problems=tuple(item for item in results if item.status not in _MOVED_STATUSES),
+        leftovers=tuple(list_inbox_media(Path(inbox))),
+    )
 
 
 __all__ = [
     "STORY_MEDIA_EXTENSIONS",
     "STORY_SUBFOLDER",
     "StoryInboxError",
+    "StoryInboxReport",
     "StoryInboxResult",
     "StoryInboxStatus",
+    "build_report",
+    "force_move_conflicts",
     "list_inbox_media",
     "organize_story_inbox",
     "summarize_results",

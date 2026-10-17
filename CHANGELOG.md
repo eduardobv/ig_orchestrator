@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.22.0 - feat-uc2-22: informe en la modal Stories Inbox (problemas, sobrantes, forzar mover)
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tests/filesystem/test_story_inbox_report.py` (3), `tests/gui/test_stories_report_dialog.py` (1); `tasks/done/v3/feat-uc2-22.md`.
+
+### Modificado
+* `filesystem/story_inbox.py`: `OVERWRITTEN`, `StoryInboxReport`, `build_report`, `force_move_conflicts`; los movidos (incl. sobrescritos) cuentan como éxito.
+* `gui/stories/dialog.py`: sustituye el log por banner de resumen, tabla solo de problemas, lista de ficheros que siguen en la carpeta («carpeta vacía» si no queda ninguno) y botón **Forzar mover (sobrescribir)** con confirmación. Locales es/en.
+* Documentación: manual, tutorial (Feat 22), arquitectura, plan, `gui/stories/MODULE.md`, `CLAUDE.md`; versión 3.22.0. README y AGENTS revisados sin cambios.
+
+### Pruebas ejecutadas
+`python -m pytest`: 593 passed. **No probado con la carpeta real de stories.**
+
 ## v3.21.0 - feat-uc2-21: gestión de lotes en la modal «Lotes guardados y ejecuciones»; fuera las colas de la GUI
 
 Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)

@@ -1071,3 +1071,15 @@ Probar: toma el Owner ID de una cuenta archivada (ficha de la cuenta), pégalo y
 6. Botones renombrados: **Editar** (antes Recuperar / Modificar) y **Ejecutar** (antes Reanudar / Ejecutar). «Traer descargas» ya no está en esta modal (sigue en el menú Lote).
 
 Probar: crea dos lotes con *Nuevo lote*, pasa cuentas de uno a otro con *Mover cuentas a…* y comprueba que las dos tablas cambian; abre el lote en la ventana principal con *Editar*.
+
+
+## Feat 22 · Informe de Stories Inbox (v3.22.0)
+
+`Lote → Organizar stories…` (o el icono de stories). Tras **Ejecutar** ya no hay un log:
+
+1. **Banner de resumen:** verde «Todo movido (N ficheros) y la carpeta ha quedado vacía» o ámbar «N movidos · X con problema · Y siguen en la carpeta».
+2. **Ficheros con problema:** tabla solo con los fallos (duplicado, carpeta inexistente, cuenta no encontrada, nombre sin usuario, error al mover) y su detalle. Los movidos solo se cuentan.
+3. **Ficheros que siguen en la carpeta Stories:** «N fichero(s) han quedado sin mover» con sus nombres, o «Carpeta vacía».
+4. **Forzar mover (sobrescribir):** activo si hay duplicados; tras confirmar reemplaza el fichero existente de la carpeta `story` de la cuenta con el del inbox.
+
+Probar: deja en el inbox un fichero cuyo nombre ya exista en `story` de su cuenta y otro de una cuenta inexistente; Ejecutar → 2 problemas y 2 sobrantes; Forzar mover → el duplicado desaparece del inbox.

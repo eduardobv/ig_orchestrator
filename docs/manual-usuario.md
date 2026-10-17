@@ -78,7 +78,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 | **Pausar / Reanudar** | **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
 | **Ejecutar tras Detener/Pausar** | Con un lote ya iniciado, Ejecutar lo **reanuda** (no intenta registrarlo de nuevo, así que no aparece «Batch name … already exists»). |
 | **Lotes guardados y ejecuciones…** | Modal para organizar los lotes (ver «Modal» más abajo). |
-| **Organizar stories…** | Modal *Stories Inbox*: elige la carpeta de entrada, *Guardar rutas* y *Ejecutar* para mover stories sueltas a la carpeta `story` de cada cuenta; muestra un log de movimientos. |
+| **Organizar stories…** | Modal *Stories Inbox*: elige la carpeta de entrada, *Guardar rutas* y *Ejecutar* para mover stories sueltas a la carpeta `story` de cada cuenta; al terminar muestra un **informe**: total movido, solo los ficheros con problema (duplicado, carpeta inexistente, cuenta no encontrada…), los ficheros que siguen en la carpeta (con nombre) o «carpeta vacía». **Forzar mover (sobrescribir)** reintenta los duplicados reemplazando el existente (pide confirmación). |
 | **Traer descargas…** | Modal para traer carpetas descargadas por otra instancia (origen, destino, comparar con lote, *Escanear*, *Traer seleccionadas/todas*, *Importar paquetes*). |
 | **Publicar descargas…** | (En una instancia worker) crea un paquete en la carpeta compartida con carpetas y resultados del lote; modo *Mover* o *Copiar*. |
 

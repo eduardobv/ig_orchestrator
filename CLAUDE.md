@@ -25,9 +25,9 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v3.21.0)
+### Estado Actual (v3.22.0)
 
-- Rama activa: `v3/integration` (tags `v3.2.0`…`v3.21.0`; PR a `master` pendiente). Detalle y limitaciones: `docs/arquitectura-v3.md`.
+- Rama activa: `v3/integration` (tags `v3.2.0`…`v3.22.0`; PR a `master` pendiente). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
 - El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o `--run`
 - La GUI de escritorio funciona con `python -m ig_orchestrator gui`

@@ -25,8 +25,10 @@ The module is responsible for:
 
 1. **UI Dialog**: Modal window (Toplevel) with:
    - Input field for inbox folder path (+ Browse button)
-   - Text log area for results
-   - Save, Run, and Close buttons
+   - Summary banner (green = all moved and inbox empty; amber otherwise)
+   - Table of problem files only (successes are just counted)
+   - List of files still in the inbox
+   - Save, Run, Force move (overwrite duplicates) and Close buttons
 
 2. **Storage**: Persist paths in `app_settings`:
    - `stories.inbox_path` → folder with story files
@@ -50,7 +52,7 @@ The module is responsible for:
 5. User clicks **Run**:
    - Validates the inbox path is not empty
    - Calls `organize_story_inbox()` with the inbox path and the app connection
-   - Writes results to text log
+   - Builds a `StoryInboxReport` (`build_report`) and renders it; **Force move** calls `force_move_conflicts` (status `OVERWRITTEN`) after confirmation
    - Disables/enables Run button while processing
 
 ## Error Handling
@@ -76,6 +78,7 @@ Required i18n keys (see `shared/locales/es.json` and `en.json`):
 - `stories.saved` — Status message when paths saved
 - `stories.paths_required` — Error when paths are empty
 - `stories.summary` — Summary line with moved/errors/total counts
+- `stories.idle/problems/col.*/leftovers*/empty/all_ok/partial/force*/status.*` — report banner, table, leftovers and force-move texts (v3.22)
 
 ## External Dependencies
 
@@ -86,5 +89,6 @@ Required i18n keys (see `shared/locales/es.json` and `en.json`):
 
 ## Testing
 
+- `tests/gui/test_stories_report_dialog.py`, `tests/filesystem/test_story_inbox_report.py` — report, leftovers and forced move
 - `tests/gui/test_stories_dialog.py` — Verify modal opens/closes, paths load/save
 - `tests/filesystem/test_story_inbox.py` — Test move logic with mock files/DB
