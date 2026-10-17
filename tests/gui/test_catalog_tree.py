@@ -69,3 +69,24 @@ def test_build_catalog_tree_hides_empty_suffixed_folders() -> None:
     roots = build_catalog_tree([], extra_folder_paths=extra, hide_deleted=True)
     group = roots[0].children[0]
     assert [c.name for c in group.children] == ["Bea"]
+
+
+def test_open_catalog_folders_lists_only_expanded_folder_nodes() -> None:
+    import tkinter as tk
+    from tkinter import ttk
+
+    from ig_orchestrator.gui.catalog.panel import CatalogPanelMixin
+
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        return
+    try:
+        tree = ttk.Treeview(root)
+        tree.insert("", tk.END, iid="folder:A", text="A", open=True)
+        tree.insert("folder:A", tk.END, iid="folder:A\B", text="B", open=False)
+        tree.insert("folder:A", tk.END, iid="folder:A\C", text="C", open=True)
+        tree.insert("folder:A\C", tk.END, iid="user:x", text="x", open=True)
+        assert sorted(CatalogPanelMixin._open_catalog_folders(tree)) == ["folder:A", "folder:A\C"]
+    finally:
+        root.destroy()

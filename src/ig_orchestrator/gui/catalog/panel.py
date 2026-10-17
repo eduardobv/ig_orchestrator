@@ -441,6 +441,9 @@ class CatalogPanelMixin:
         tree = getattr(self, "catalog_tree", None)
         if tree is None:
             return
+        # Rebuilding collapses everything: remember what was open and where the view was.
+        open_folders = self._open_catalog_folders(tree)
+        tree_yview = tree.yview()[0]
         tree.delete(*tree.get_children())
         for key, color in self.catalog_colors.items():
             if color:
@@ -494,7 +497,25 @@ class CatalogPanelMixin:
                     tree.item(folder_id, open=True)
 
         insert_nodes("", roots)
+        for folder_id in open_folders:
+            if tree.exists(folder_id):
+                tree.item(folder_id, open=True)
         self._select_catalog_tree_leaf(focus_username)
+        if not focus_username or not tree.exists(f"user:{focus_username}"):
+            tree.yview_moveto(tree_yview)
+
+    @staticmethod
+    def _open_catalog_folders(tree) -> list[str]:
+        """Ids of the expanded folder nodes currently shown in *tree*."""
+
+        found: list[str] = []
+        stack = list(tree.get_children())
+        while stack:
+            iid = str(stack.pop())
+            if iid.startswith("folder:") and tree.item(iid, "open"):
+                found.append(iid)
+            stack.extend(tree.get_children(iid))
+        return found
 
 
     def _select_catalog_tree_leaf(self, username: str | None) -> None:

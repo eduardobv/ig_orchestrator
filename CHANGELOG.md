@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.24.0 - feat-uc2-24: el árbol del catálogo conserva lo expandido; -Deleted/-Inactive ocultas por defecto
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-24.md`; 1 prueba en `tests/gui/test_catalog_tree.py`.
+
+### Modificado
+* `gui/catalog/panel.py`: `_refresh_catalog_tree` restaura carpetas expandidas y scroll (`_open_catalog_folders`).
+* `gui/shell/app.py`: casillas Ver -Deleted / Ver -Inactive desmarcadas por defecto.
+* Documentación: manual, tutorial (Feat 24), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.24.0. README, AGENTS y arquitectura revisados (solo versión).
+
+### Pruebas ejecutadas
+`python -m pytest`: 597 passed. **No probado visualmente en la GUI real.**
+
 ## v3.23.0 - feat-uc2-23: ocultar carpetas -Deleted / -Inactive en el árbol del catálogo
 
 Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)

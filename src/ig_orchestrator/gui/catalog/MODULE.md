@@ -7,7 +7,7 @@ Panel izquierdo: lista/árbol de cuentas históricas.
 - `panel.py` — mixin widgets + handlers
 - `service.py` — lectura/escritura SQLite (sin Tk)
 - `colors.py` — paleta
-- `tree.py` — `build_catalog_tree` (`hide_deleted`/`hide_inactive` ocultan carpetas `-Deleted`/`-Inactive` solo en el árbol; `folder_suffix_kind`, `path_is_hidden`). Casillas en `panel.py` (`_on_catalog_suffix_toggle`), ajustes `ui.catalog_show_deleted`/`ui.catalog_show_inactive`.
+- `tree.py` — `build_catalog_tree` (`hide_deleted`/`hide_inactive` ocultan carpetas `-Deleted`/`-Inactive` solo en el árbol; `folder_suffix_kind`, `path_is_hidden`). `_refresh_catalog_tree` conserva carpetas expandidas y scroll (`_open_catalog_folders`). Casillas (desmarcadas por defecto) en `panel.py` (`_on_catalog_suffix_toggle`), ajustes `ui.catalog_show_deleted`/`ui.catalog_show_inactive`.
 
 ## Estado que lee / escribe (en App)
 Lee: `connection`, `catalog_entries`, `catalog_view_mode`, `catalog_colors`, `accounts`

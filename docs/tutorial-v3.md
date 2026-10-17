@@ -1086,7 +1086,7 @@ Probar: deja en el inbox un fichero cuyo nombre ya exista en `story` de su cuent
 
 ## Feat 23 · Ocultar carpetas -Deleted / -Inactive en el árbol (v3.23.0)
 
-En la vista **árbol** del catálogo, justo encima del buscador hay dos casillas: **Ver -Deleted** y **Ver -Inactive** (marcadas por defecto, como antes).
+En la vista **árbol** del catálogo, justo encima del buscador hay dos casillas: **Ver -Deleted** y **Ver -Inactive** (desmarcadas por defecto).
 
 1. Desmarca **Ver -Deleted** → desaparecen del árbol las carpetas cuyo nombre acaba en `-Deleted` (o `-Delete`) y las cuentas que contienen. Igual con **Ver -Inactive** (`-Inactive`, `-Inactiva`, `-Inactivo`).
 2. Clic derecho sobre cualquier carpeta del árbol (p. ej. la raíz `G:\4K Stogram`) → las mismas dos opciones, sincronizadas con las casillas.
@@ -1095,3 +1095,9 @@ En la vista **árbol** del catálogo, justo encima del buscador hay dos casillas
 5. La elección se recuerda entre sesiones (`ui.catalog_show_deleted` / `ui.catalog_show_inactive`).
 
 Probar: desmarca ambas; las carpetas `…-Deleted`/`…-Inactive` desaparecen; abre `Mover a…` y compruébalas en el selector; busca una cuenta oculta y aparece.
+
+## Feat 24 · El árbol conserva lo expandido al refrescarse (v3.24.0)
+
+Al refrescar el árbol del catálogo (marcar/desmarcar **Ver -Deleted**/**Ver -Inactive**, mover o crear carpetas, sincronizar, etc.) se mantienen las carpetas que estaban expandidas y la posición de scroll. Si hay una cuenta seleccionada, el árbol se sitúa en ella. Una carpeta renombrada o movida pierde su estado abierto (su identificador cambia). Además, **Ver -Deleted** y **Ver -Inactive** pasan a estar **desmarcadas por defecto** (quien ya las cambió conserva su elección).
+
+Probar: expande varias carpetas, marca/desmarca **Ver -Deleted**: el árbol sigue abierto donde estaba.

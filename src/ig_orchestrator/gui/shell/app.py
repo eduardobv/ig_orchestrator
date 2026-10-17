@@ -276,10 +276,10 @@ class InstagramOrchestratorApp(
         self.default_date_var = tk.StringVar(value=today)
         self.catalog_filter_var = tk.StringVar()
         self.catalog_show_deleted_var = tk.BooleanVar(
-            value=_gui_setting(connection, "ui.catalog_show_deleted", "1") == "1"
+            value=_gui_setting(connection, "ui.catalog_show_deleted", "0") == "1"
         )
         self.catalog_show_inactive_var = tk.BooleanVar(
-            value=_gui_setting(connection, "ui.catalog_show_inactive", "1") == "1"
+            value=_gui_setting(connection, "ui.catalog_show_inactive", "0") == "1"
         )
         self.batch_filter_var = tk.StringVar()
         self.batch_count_var = tk.StringVar(value=t("label.batch_count", count=0))
