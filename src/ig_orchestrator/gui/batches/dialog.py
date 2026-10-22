@@ -772,6 +772,11 @@ class BatchesDialogMixin:
         ):
             detail_tree.heading(column, text=t(title_key))
             detail_tree.column(column, width=width, anchor=anchor)
+        bind_treeview_sort(
+            detail_tree,
+            ("username", "prio", "urls", "stories", "start"),
+            title_for=lambda column: t(f"batches.col.{column}"),
+        )
         detail_tree.grid(row=0, column=0, sticky="nsew")
         detail_scroll = ttk.Scrollbar(
             detail_frame,

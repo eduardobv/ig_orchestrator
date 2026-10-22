@@ -8,7 +8,10 @@ from pathlib import Path
 from sqlite3 import Connection
 from typing import Iterable
 
+from dataclasses import replace
+
 from ig_orchestrator.db import AccountHistoryRepository
+from ig_orchestrator.library.account_card import list_private_usernames, set_account_private
 from ig_orchestrator.models import AccountHistoryStatus
 
 
@@ -31,6 +34,7 @@ class AccountCatalogEntry:
     start_init_date: str | None = None
     status: AccountHistoryStatus = AccountHistoryStatus.ENABLED
     is_favorite: bool = False
+    is_private: bool = False
 
 
 class AccountCatalogService:
@@ -63,7 +67,14 @@ class AccountCatalogService:
         if not entries and not self._catalog_has_accounts():
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
-        return sorted(_deduplicate(entries), key=_catalog_sort_key)
+        private = list_private_usernames(self.connection)
+        deduplicated = _deduplicate(entries)
+        if private:
+            deduplicated = [
+                replace(entry, is_private=True) if entry.username.casefold() in private else entry
+                for entry in deduplicated
+            ]
+        return sorted(deduplicated, key=_catalog_sort_key)
 
     def find_entry(self, username: str) -> AccountCatalogEntry | None:
         """Catalog entry for *username* whatever its status (also archived/deleted)."""
@@ -79,7 +90,25 @@ class AccountCatalogService:
             start_init_date=record.field2,
             status=record.status,
             is_favorite=record.is_favorite,
+            is_private=record.user_name.casefold() in list_private_usernames(self.connection),
         )
+
+    def set_private(self, username: str, *, private: bool) -> bool:
+        """Mark/unmark the catalog account as private (the bot cannot download its posts)."""
+
+        return set_account_private(self.connection, username, private)
+
+    def list_container_paths(self) -> list[str]:
+        """Top-level folders of the library (``G:\4K Stogram\00.MODELS-A``...), alphabetical."""
+
+        try:
+            rows = self.connection.execute(
+                "SELECT c.full_path FROM catalog_folders c JOIN catalog_folders p ON p.id = c.parent_id"
+                " WHERE p.parent_id IS NULL ORDER BY c.full_path COLLATE NOCASE"
+            ).fetchall()
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_folders
+            return []
+        return [str(row[0]) for row in rows]
 
     def find_entries_by_owner_id(self, owner_id: str) -> list[AccountCatalogEntry]:
         """Accounts whose owner id equals *owner_id*, whatever their status.

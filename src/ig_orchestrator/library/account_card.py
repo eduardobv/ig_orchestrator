@@ -37,6 +37,29 @@ class CardData:
     previous_names: list[str] = field(default_factory=list)
     operations: list[str] = field(default_factory=list)
     batches: list[str] = field(default_factory=list)
+    is_private: bool = False
+
+
+def card_summary_text(card: CardData, abs_path: str = "") -> str:
+    """Plain-text dump of the whole card (what the "Copy all" button puts in the clipboard)."""
+
+    lines = [
+        f"Username: {card.username}",
+        f"Instagram ID: {card.instagram_user_id or '-'}",
+        f"Start date: {card.start_init_date or '-'}",
+        f"Favorite: {'yes' if card.is_favorite else 'no'}",
+        f"Private: {'yes' if card.is_private else 'no'}",
+        f"Status: {card.status}",
+        f"Path: {abs_path or card.rel_path or '-'}",
+        f"Disk: {card.disk_state or '-'}",
+        f"Posts/Reels/Stories/Highlights: {card.posts} / {card.reels} / {card.stories} / {card.highlights}",
+        f"Last media: {card.last_media_at or '-'}",
+        f"Previous names: {', '.join(card.previous_names) or '-'}",
+        f"Batches: {', '.join(card.batches) or '-'}",
+    ]
+    if card.notes:
+        lines.append(f"Notes: {card.notes}")
+    return "\n".join(lines)
 
 
 def ensure_notes_column(conn: sqlite3.Connection) -> None:
@@ -45,8 +68,37 @@ def ensure_notes_column(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def ensure_private_column(conn: sqlite3.Connection) -> None:
+    if "is_private" not in {r[1] for r in conn.execute("PRAGMA table_info(catalog_accounts)")}:
+        conn.execute("ALTER TABLE catalog_accounts ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+
+
+def list_private_usernames(conn: sqlite3.Connection) -> set[str]:
+    """Case-folded usernames of the accounts marked as private (empty on a schema without the table)."""
+
+    try:
+        ensure_private_column(conn)
+        return {str(r[0]).casefold() for r in conn.execute("SELECT username FROM catalog_accounts WHERE is_private = 1")}
+    except sqlite3.Error:
+        return set()
+
+
+def set_account_private(conn: sqlite3.Connection, username: str, private: bool) -> bool:
+    """Mark/unmark *username* as a private Instagram account. False when it is not in the catalog."""
+
+    ensure_private_column(conn)
+    cursor = conn.execute(
+        "UPDATE catalog_accounts SET is_private = ?, updated_at = ? WHERE username = ? COLLATE NOCASE",
+        (int(private), datetime.now(timezone.utc).isoformat(timespec="seconds"), username.strip().lstrip("@")),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
 def load_card(conn: sqlite3.Connection, account_id: int) -> CardData:
     ensure_notes_column(conn)
+    ensure_private_column(conn)
     row = conn.execute(
         "SELECT a.*, s.code AS status_code FROM catalog_accounts a JOIN catalog_account_statuses s ON s.id = a.status_id"
         " WHERE a.id = ?", (account_id,)
@@ -69,6 +121,7 @@ def load_card(conn: sqlite3.Connection, account_id: int) -> CardData:
         disk_state=str(row["disk_state"] or ""), posts=int(row["posts_count"] or 0), reels=int(row["reels_count"] or 0),
         stories=int(row["story_count"] or 0), highlights=int(row["highlights_count"] or 0),
         last_media_at=str(row["last_media_at"] or ""), previous_names=names, operations=operations, batches=batches,
+        is_private=bool(row["is_private"]),
     )
 
 
@@ -106,7 +159,8 @@ def validate_card(conn: sqlite3.Connection, account_id: int, owner_id: str, star
 
 
 def save_card(
-    conn: sqlite3.Connection, account_id: int, *, owner_id: str, start_date: str, notes: str, favorite: bool
+    conn: sqlite3.Connection, account_id: int, *, owner_id: str, start_date: str, notes: str, favorite: bool,
+    private: bool | None = None,
 ) -> list[CardIssue]:
     """Validate and save. Returns the issues; nothing is written when one is blocking."""
 
@@ -114,6 +168,9 @@ def save_card(
     if any(i.blocking for i in issues):
         return issues
     ensure_notes_column(conn)
+    if private is not None:
+        ensure_private_column(conn)
+        conn.execute("UPDATE catalog_accounts SET is_private = ? WHERE id = ?", (int(private), account_id))
     conn.execute(
         "UPDATE catalog_accounts SET instagram_user_id = ?, start_init_date = ?, notes = ?, is_favorite = ?, updated_at = ?"
         " WHERE id = ?",

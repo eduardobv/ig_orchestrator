@@ -35,7 +35,19 @@ def describe_result(result: RenameResult) -> str:
 class IntegratedRenameMixin:
     _rename_cancel: threading.Event | None = None
 
+    def _confirm_rename_without_library(self) -> bool:
+        """False when the user cancels: the library (G:) is offline, so folders are renamed in place only."""
+
+        if self._fsops_online():
+            return True
+        return messagebox.askokcancel(
+            t("rename.dialog.title"), t("rename.offline_confirm"), icon="warning", parent=self.root
+        )
+
     def _start_integrated_rename(self, start_now_date: str, new_accounts: tuple) -> None:
+        if not self._confirm_rename_without_library():
+            self._set_status(t("rename.offline_cancelled"))
+            return
         working = str(self.settings.working_folder)
         if preview_required(self.connection):
             show_rename_dialog(

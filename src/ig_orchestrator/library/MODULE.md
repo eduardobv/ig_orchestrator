@@ -84,3 +84,6 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ## v3.16
 
 `FsOperationService.plan_delete_empty_folder(folder_id)` (RMDIR deepest-first; bloquea con `NOT_EMPTY`/`HAS_ACCOUNTS`; `can_undo` admite RMDIR). `trash.configured_retention_days`, `TrashService.remove_from_catalog`. `audit._check_index` añade `INDEX_MISSING`/`INDEX_STALE`.
+
+## v3.25 (feat-uc2-25)
+- `account_card.py`: `ensure_private_column`, `list_private_usernames`, `set_account_private`, `card_summary_text`; `CardData.is_private`; `save_card(private=)`.

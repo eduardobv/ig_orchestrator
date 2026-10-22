@@ -57,7 +57,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 | **Pegar/Agregar** | Pega del portapapeles un username (y URLs) y lo añade/actualiza en el lote de una vez. |
 | **Agregar/Actualizar** | Añade el contenido del editor al lote, o actualiza la cuenta si ya está. |
 | **Pegar** | Pega URLs del portapapeles en el cuadro de URLs. |
-| **Normalizar** | Limpia y deduplica las URLs del editor. |
+| ~~Normalizar~~ | Oculto desde v3.25 (se usaba poco); la función sigue en el código. |
 | **Limpiar editor** | Vacía los campos del editor. |
 | **Eliminar selección / Eliminar todo** | Quita cuentas del lote actual (no toca el catálogo ni el disco). |
 
@@ -84,7 +84,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 
 #### Modal «Lotes guardados y ejecuciones»
 
-Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos** (COMPLETED). Ya no existe la cola de ejecución. Al seleccionar un lote activo, abajo aparece **Cuentas del lote**: username, prio, URLs, stories y start date.
+Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos** (COMPLETED). Ya no existe la cola de ejecución. Al seleccionar un lote activo, abajo aparece **Cuentas del lote**: username, prio, URLs, stories y start date; haz clic en el título de cualquier columna para ordenar (otra vez para invertir).
 
 | Elemento | Qué hace |
 |---|---|
@@ -138,11 +138,11 @@ Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos**
 
 | Campo | Para qué |
 |---|---|
-| **Lote / Fecha** | Nombre del lote (único) y fecha de inicio (`startNowDate`, usada al renombrar). |
-| **Username** | Cuenta a añadir. Botones: pegar y limpiar. |
-| **URLs** | Una por línea. |
+| **Lote / Fecha** | Nombre del lote (único; cuadro de 48 caracteres) y fecha de inicio (`startNowDate`, usada al renombrar). |
+| **Username** | Cuenta a añadir. Botones: pegar y limpiar. A la derecha, **OwnerId:** muestra el id de Instagram de la cuenta (solo lectura, se puede seleccionar y copiar). |
+| **URLs** | Una por línea. Si alguna es de una publicación de una **cuenta privada** (id muy largo, p. ej. `/p/Deh0qN5tt…/`), al Agregar sale un aviso, **no se agrega** la cuenta y se ofrece marcarla como privada; el contador muestra «privadas: N». |
 | **Stories** (casilla) / **Priority** | Genera la story de la cuenta y/o la prioriza. |
-| **New account** | Marca una cuenta nueva. Muestra *Datos de cuenta nueva*: **Owner Id**, **Fecha del primer post**, **Ruta** (carpeta de la biblioteca donde irá). |
+| **New account** | Marca una cuenta nueva. Muestra *Datos de cuenta nueva*: **Owner Id**, **Fecha del primer post**, **Ruta** (carpeta de la biblioteca donde irá). La Ruta es un campo con sugerencias: escribe `models-d` y lista esa carpeta primero, luego su contenido y el resto por orden alfabético; vacío (o con ▾) muestra primero las contenedoras (`00.MODELS-A`, `00.MODELS-B`…) y luego las demás. Flechas ↑↓ + Enter, clic para elegir, Esc para cerrar. |
 | **Update** | Cuenta existente: muestra *Datos de catálogo (Actualizar)* con sus datos actuales. |
 
 Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla igualmente.
@@ -155,17 +155,22 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 
 | Opción | Qué hace |
 |---|---|
-| **Abrir** | Carga la cuenta en el editor. |
-| **Inactivo / Favorito / Quitar favorito** | Cambia estado/favorita. |
-| **Ocultar / Activar** | Estado Disabled / Activa. |
-| **Ficha de la cuenta…** | Editar id de Instagram y datos (§5.3). **Es la forma de corregir un ownerId.** |
-| **Mover a otra carpeta…** / **Mover las N cuentas a otra carpeta…** | Abre el **selector de carpeta destino** (§5.1.1). Con varias cuentas seleccionadas (Ctrl/Mayús; el clic derecho conserva la selección) el menú dice «Mover las N cuentas…» y se mueven en un solo plan. Muestra el plan antes de ejecutar. |
-| **Abrir carpeta** | Abre la carpeta de la cuenta en el Explorador. |
-| **Copiar ruta** | Copia la ruta (una por línea si hay varias). |
-| **Eliminar (a la papelera)…** | Envía la carpeta a la papelera (§5.5). |
-| **Verificar cuenta seleccionada** | Sincroniza esa cuenta con el disco. |
-| **Cambió de username…** | Ver menú Catálogo. |
-| **Marcar como eliminada… / Restaurar cuenta eliminada…** | Ciclo de «eliminada en Instagram». |
+El menú está dividido en seis grupos separados por líneas:
+
+| Grupo | Opción | Qué hace |
+|---|---|---|
+| Ver | **Abrir** | Abre el perfil en Instagram y carga la cuenta en el editor. |
+| Ver | **Ficha de la cuenta…** | Editar y copiar los datos de la cuenta (§5.3). **Es la forma de corregir un ownerId.** |
+| Marcas | **Favorito / Quitar favorito** | Marca o desmarca favorita. |
+| Marcas | **Marcar como privada / Quitar privada** | Cuenta privada de Instagram (el bot no descarga sus publicaciones). Se ve con **texto morado** en el catálogo. |
+| Estado | **Activar** · **Inactivo** · **Ocultar** | Estado Activa / Inactive / Disabled. |
+| Estado | **Marcar como eliminada… / Restaurar cuenta eliminada…** | Ciclo de «eliminada en Instagram». |
+| Carpeta | **Abrir carpeta** | Abre la carpeta de la cuenta en el Explorador. |
+| Carpeta | **Copiar ruta** | Copia la ruta completa (una por línea si hay varias). |
+| Carpeta | **Mover a otra carpeta…** / **Mover las N cuentas a otra carpeta…** | Abre el **selector de carpeta destino** (§5.1.1). Con varias cuentas seleccionadas (Ctrl/Mayús; el clic derecho conserva la selección) el menú dice «Mover las N cuentas…». |
+| Mantenimiento | **Verificar cuenta seleccionada** | Sincroniza esa cuenta con el disco. |
+| Mantenimiento | **Cambió de username…** | Ver menú Catálogo. |
+| Papelera | **Eliminar (a la papelera)…** | Envía la carpeta a la papelera (§5.5). |
 
 **El estado sigue a la carpeta.** Al mover cuentas (o una carpeta con cuentas): si el destino es una carpeta `…-Deleted` (o la carpeta de eliminadas), las cuentas pasan a **Eliminada**; si es una carpeta `…-Inactive`, pasan a **Inactiva**; si salen de una de ellas hacia una carpeta normal, vuelven a su estado anterior (o Activa). La vista previa del plan lo avisa («Estado: @cuenta → Eliminada / Inactiva / Reactivada») y *Deshacer* lo revierte. Renombrar una carpeta no cambia estados.
 
@@ -186,19 +191,24 @@ Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla
 | **Renombrar carpeta…** | Renombra en disco y actualiza las rutas de todas sus cuentas. |
 | **Mover a…** | Mueve la carpeta (con sus cuentas) a otra. |
 | **Eliminar carpeta vacía…** | Borra la carpeta (y sus subcarpetas) en disco y en el catálogo. **Solo** si no hay ficheros ni cuentas dentro; si no, el plan se bloquea y dice por qué. Con vista previa y *Deshacer*. |
+| **Copiar ruta** | Copia al portapapeles la ruta completa de la carpeta en el disco. |
 | **Verificar categoría seleccionada** | Sincroniza con el disco todas las cuentas de esa carpeta. |
 
-Las acciones sobre carpetas son estas cinco.
+Las acciones sobre carpetas son estas seis.
 Todas las operaciones de disco muestran primero una **vista previa** (*Operación de disco*: acciones, de/a, cuentas y carpetas afectadas) y solo se ejecutan con **Ejecutar**.
 
 ### 5.3 Ficha de la cuenta (modal)
 
+Todos los campos se pueden seleccionar y tienen un botón **Copiar**; **Copiar todo** deja un resumen de la cuenta en el portapapeles.
+
 | Campo | Efecto |
 |---|---|
+| **Username** | Editable. Si lo cambias, al guardar se abre el flujo de **cambio de username** (vista previa; necesita G: conectada). |
 | **Id de Instagram** | Solo dígitos. Avisa si otro registro tiene el mismo id, o si los ficheros de la cuenta son mayoritariamente de otro id. **No renombra ficheros.** |
 | **Fecha del primer post** | `AAAA-MM-DD`, no futura. La usa el renombrado de cuentas nuevas. |
-| **Favorita / Notas** | Libres. |
-| Solo lectura | Estado, carpeta, estado de disco, contadores (posts/reels/stories/highlights), último contenido, nombres anteriores, últimos lotes y operaciones. |
+| **Favorita / Cuenta privada / Notas** | Libres. |
+| **Ruta completa en disco** | Ruta absoluta de la carpeta de la cuenta (solo lectura, copiable). |
+| Solo lectura | Estado, ruta relativa, estado de disco, contadores (posts/reels/stories/highlights), último contenido, nombres anteriores, últimos lotes y operaciones. |
 
 *Guardar* valida; los errores bloquean, los avisos permiten «guardar de todos modos». Actualiza también `accounts_lite` si el espejo está activo.
 
@@ -214,6 +224,10 @@ En el árbol, arrastra una o varias cuentas seleccionadas (o una carpeta) sobre 
 | **Catálogo → Papelera…** | Lista lo eliminado (ficheros, tamaño, fecha, **caducidad**, sitio original). **Restaurar** devuelve la carpeta si su sitio sigue libre. **Eliminar definitivamente / Vaciar papelera… / Vaciar caducadas…** borra de verdad y exige escribir `ELIMINAR`; después pregunta si quitar también las cuentas del **catálogo** (se conservan las que estén en algún lote). La caducidad se configura en Ajustes → Catálogo; la app **nunca borra sola**, solo avisa. |
 
 Para quitar una cuenta del **catálogo y del disco**: *Eliminar (a la papelera)…* y después *Papelera… → Vaciar* (la carpeta se borra de G:). La fila de la cuenta queda en el catálogo como *Eliminada* (no se borra de la base de datos).
+
+### 5.5b Barra de desplazamiento
+
+El catálogo (lista y árbol) tiene una barra vertical siempre visible a la derecha: arrástrala o haz clic para subir/bajar rápido sin la rueda del ratón.
 
 ### 5.6 Vista lista
 
@@ -248,7 +262,7 @@ Clic derecho sobre un nombre: mismo menú de cuenta (las acciones de carpeta y l
 | **Usar el índice de la app** | Usa el índice en lugar de leer G:. Automático si G: no está. |
 | **Destino de las procesadas** | *Biblioteca (G:)* o *Almacén (volcar después)*. |
 | **Vista previa / Otra semilla** | Calcula todo sin tocar nada (árbol cuenta → fichero → nombre nuevo → fecha). Cualquier cambio de opción invalida la vista previa. |
-| **Ejecutar** | Confirma y renombra en segundo plano; resumen por cuenta. |
+| **Ejecutar** | Confirma y renombra en segundo plano; resumen por cuenta. Si la unidad de la biblioteca (G:) **no está conectada**, antes de empezar sale una modal: «se renombrará pero no se moverá a G:». **Aceptar** renombra las carpetas en su sitio (quedan pendientes de mover); **Cancelar** no hace nada. |
 
 Estados: *Renombrar*, *Cuenta nueva*, *Omitida* (con motivo), aviso `!`, *Conflicto al mover*, *Pendiente de mover*, *Referencia: índice*.
 

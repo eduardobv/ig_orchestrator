@@ -43,3 +43,8 @@ Menú de carpeta: *Eliminar carpeta vacía…* (`fsops_actions._catalog_delete_e
 
 ## Tests
 `tests/gui/test_catalog_owner_search.py`
+
+## v3.25 (feat-uc2-25)
+- Menú contextual de cuenta en seis grupos con separadores; `_set_catalog_account_private`. Marca privada: `AccountCatalogEntry.is_private`, `AccountCatalogService.set_private` / `list_container_paths`; color de texto `private_fg` (`colors.py`, tag `private` en el árbol).
+- Barras de desplazamiento permanentes (`catalog_list_scroll`, `catalog_tree_scroll`).
+- Clic derecho en carpeta: Copiar ruta (`gui/library/fsops_actions.py::_catalog_copy_folder_path`).

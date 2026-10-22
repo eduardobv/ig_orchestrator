@@ -25,3 +25,8 @@ cualquier otra con el mismo rank pasa a 0.
 
 ## Tests
 `tests/gui/test_editor.py`, `tests/gui/test_text_edit.py`
+
+## v3.25 (feat-uc2-25)
+- `path_suggest.py` — `rank_destination_paths` (puro) y `PathSuggestEntry`: campo Ruta con sugerencias al escribir (contenedoras primero sin texto). Sustituye al combobox; `set_values(paths, containers)`.
+- `panel.py` — `_block_private_urls` (URLs de cuentas privadas: avisa, no agrega y ofrece marcar la cuenta), `_refresh_owner_display` (etiqueta OwnerId junto al username), botón Normalizar creado pero sin empaquetar (`normalize_button`).
+- Tests: `tests/gui/test_feat_uc2_25.py`.

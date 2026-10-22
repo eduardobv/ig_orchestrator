@@ -26,6 +26,7 @@ _CATALOG_COLORS = {
     "in_batch": "#f5c08c",
     "today": "#fff59d",
     "disabled": "#f4cccc",
+    "private_fg": "#7b1fa2",
 }
 
 _BATCH_COLUMNS = (

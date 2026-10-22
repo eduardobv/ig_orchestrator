@@ -1101,3 +1101,16 @@ Probar: desmarca ambas; las carpetas `…-Deleted`/`…-Inactive` desaparecen; a
 Al refrescar el árbol del catálogo (marcar/desmarcar **Ver -Deleted**/**Ver -Inactive**, mover o crear carpetas, sincronizar, etc.) se mantienen las carpetas que estaban expandidas y la posición de scroll. Si hay una cuenta seleccionada, el árbol se sitúa en ella. Una carpeta renombrada o movida pierde su estado abierto (su identificador cambia). Además, **Ver -Deleted** y **Ver -Inactive** pasan a estar **desmarcadas por defecto** (quien ya las cambió conserva su elección).
 
 Probar: expande varias carpetas, marca/desmarca **Ver -Deleted**: el árbol sigue abierto donde estaba.
+
+## Feat 25 · Cuentas privadas, OwnerId, aviso sin G:, ficha copiable y mejoras de la GUI (v3.25.0)
+
+1. **URLs de cuentas privadas.** Pega en el editor una URL como `https://www.instagram.com/p/Deh0qN5ttVEyvPscCYJ-17mfc4agkbIQxnNcOM0/` (id largo) y pulsa Agregar: sale el aviso, la cuenta **no se agrega** y, si existe en el catálogo, pregunta si la marcas como privada. Las privadas se ven con **texto morado** en el catálogo (también: clic derecho → *Marcar como privada* / *Quitar privada*, o la casilla de la ficha).
+2. **OwnerId** junto a la ❌ del username: selecciona una cuenta del catálogo y aparece su id (copiable).
+3. **Renombrar sin G:** desconecta la unidad (o prueba con la ruta de biblioteca inexistente) → *Renombrar* → modal «no se moverá a G:». Cancelar no renombra.
+4. **Modal de lotes:** selecciona un lote activo y haz clic en los títulos de la tabla *Cuentas del lote* para ordenar.
+5. **Clic derecho en una cuenta:** seis grupos con separadores (ver, marcas, estado, carpeta, mantenimiento, papelera).
+6. **Ficha:** cada dato tiene **Copiar**; el username es editable (lanza el cambio de username con vista previa); **Ruta completa en disco**; **Copiar todo**.
+7. **Ruta de cuenta nueva:** marca *New account*, escribe `models-d` en *Ruta* y elige con ↑↓ + Enter; vacío o con ▾ salen primero las contenedoras.
+8. Nombre de lote más ancho (48). 9. Barra de scroll del catálogo. 10. Clic derecho en una carpeta → **Copiar ruta**. 11. **Normalizar** oculto (la función sigue en el código).
+
+Probar: `python -m pytest tests/gui/test_feat_uc2_25.py`; después abrir la GUI y repasar los puntos 1–11.

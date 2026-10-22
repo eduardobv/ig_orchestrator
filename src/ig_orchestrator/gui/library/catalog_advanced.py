@@ -9,7 +9,8 @@ from tkinter import messagebox, simpledialog, ttk
 from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.library.folder_picker import pick_folder
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
-from ig_orchestrator.library.account_card import load_card, save_card, validate_card
+from ig_orchestrator.gui.text_edit import bind_edit_context_menu
+from ig_orchestrator.library.account_card import card_summary_text, load_card, save_card, validate_card
 from ig_orchestrator.library.fsops import FsOpsError
 from ig_orchestrator.library.trash import CONFIRM_WORD, TrashError, TrashService
 
@@ -45,48 +46,93 @@ class CatalogAdvancedMixin:
         return ids
 
     # ---------------------------------------------------------------- card
+    def _card_abs_path(self, rel_path: str) -> str:
+        if not rel_path:
+            return ""
+        try:
+            return self._fsops_service().abs(rel_path)
+        except FsOpsError:
+            return rel_path
+
     def _catalog_edit_card(self) -> None:
         ids = self._selected_catalog_account_ids()
         if not ids:
             return
         card = load_card(self.connection, ids[0])
+        abs_path = self._card_abs_path(card.rel_path)
         window = tk.Toplevel(self.root)
         window.title(t("card.title", username=card.username))
         window.transient(self.root)
-        window.geometry("620x560")
+        window.geometry("720x660")
         frame = ttk.Frame(window, padding=12)
         frame.pack(fill=tk.BOTH, expand=True)
         frame.columnconfigure(1, weight=1)
+        username_var = tk.StringVar(value=card.username)
         owner_var = tk.StringVar(value=card.instagram_user_id)
         date_var = tk.StringVar(value=card.start_init_date)
         fav_var = tk.BooleanVar(value=card.is_favorite)
+        private_var = tk.BooleanVar(value=card.is_private)
         message = tk.StringVar()
-        ttk.Label(frame, text=t("card.owner")).grid(row=0, column=0, sticky="w")
-        ttk.Entry(frame, textvariable=owner_var).grid(row=0, column=1, sticky="ew", pady=2)
-        ttk.Label(frame, text=t("card.owner_help"), wraplength=560, foreground="#666666").grid(row=1, column=0, columnspan=2, sticky="w")
-        ttk.Label(frame, text=t("card.start_date")).grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(frame, textvariable=date_var).grid(row=2, column=1, sticky="ew", pady=(8, 2))
-        ttk.Checkbutton(frame, text=t("card.favorite"), variable=fav_var).grid(row=3, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Label(frame, text=t("card.notes")).grid(row=4, column=0, sticky="nw")
-        notes = tk.Text(frame, height=5, wrap="word")
+
+        def copy_text(value: str) -> None:
+            window.clipboard_clear()
+            window.clipboard_append(value)
+            self._set_status(t("card.copied", value=value[:60]))
+
+        def field(row: int, label: str, var: tk.StringVar, *, readonly: bool = False, pady=(2, 2)) -> ttk.Entry:
+            """Label + selectable entry + copy button."""
+
+            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="w", pady=pady)
+            entry = ttk.Entry(frame, textvariable=var, state="readonly" if readonly else "normal")
+            entry.grid(row=row, column=1, sticky="ew", pady=pady)
+            bind_edit_context_menu(entry)
+            ttk.Button(frame, text=t("card.copy"), width=8, command=lambda: copy_text(var.get())).grid(
+                row=row, column=2, padx=(6, 0), pady=pady
+            )
+            return entry
+
+        field(0, t("card.username"), username_var)
+        field(1, t("card.owner"), owner_var)
+        ttk.Label(frame, text=t("card.owner_help"), wraplength=640, foreground="#666666").grid(
+            row=2, column=0, columnspan=3, sticky="w"
+        )
+        field(3, t("card.start_date"), date_var, pady=(8, 2))
+        flags = ttk.Frame(frame)
+        flags.grid(row=4, column=0, columnspan=3, sticky="w", pady=4)
+        ttk.Checkbutton(flags, text=t("card.favorite"), variable=fav_var).pack(side=tk.LEFT)
+        ttk.Checkbutton(flags, text=t("card.private"), variable=private_var).pack(side=tk.LEFT, padx=(16, 0))
+        ttk.Label(frame, text=t("card.notes")).grid(row=5, column=0, sticky="nw")
+        notes = tk.Text(frame, height=4, wrap="word")
         notes.insert("1.0", card.notes)
-        notes.grid(row=4, column=1, sticky="ew", pady=2)
+        notes.grid(row=5, column=1, columnspan=2, sticky="ew", pady=2)
+        bind_edit_context_menu(notes)
+        field(6, t("card.full_path"), tk.StringVar(value=abs_path or "-"), readonly=True, pady=(8, 2))
         info = [
             (t("card.info.status"), card.status),
-            (t("card.info.path"), card.rel_path or "-"),
+            (t("card.info.rel_path"), card.rel_path or "-"),
             (t("card.info.disk"), card.disk_state),
             (t("card.info.counts"), f"{card.posts} / {card.reels} / {card.stories} / {card.highlights}"),
             (t("card.info.last"), card.last_media_at or "-"),
             (t("card.info.names"), ", ".join(card.previous_names) or "-"),
             (t("card.info.batches"), ", ".join(card.batches) or "-"),
-            (t("card.info.ops"), "\n".join(card.operations) or "-"),
         ]
-        for row, (label, value) in enumerate(info, start=5):
-            ttk.Label(frame, text=label).grid(row=row, column=0, sticky="nw", pady=1)
-            ttk.Label(frame, text=value, wraplength=420, justify="left").grid(row=row, column=1, sticky="w", pady=1)
-        ttk.Label(frame, textvariable=message, wraplength=580, foreground="#aa3300").grid(row=14, column=0, columnspan=2, sticky="w", pady=6)
+        for row, (label, value) in enumerate(info, start=7):
+            field(row, label, tk.StringVar(value=value), readonly=True)
+        ttk.Label(frame, text=t("card.info.ops")).grid(row=14, column=0, sticky="nw", pady=1)
+        ops = tk.Text(frame, height=4, wrap="word")
+        ops.insert("1.0", "\n".join(card.operations) or "-")
+        ops.configure(state="disabled")  # read-only but selectable/copyable
+        ops.grid(row=14, column=1, columnspan=2, sticky="ew", pady=1)
+        bind_edit_context_menu(ops)
+        ttk.Label(frame, textvariable=message, wraplength=680, foreground="#aa3300").grid(
+            row=15, column=0, columnspan=3, sticky="w", pady=6
+        )
 
         def save() -> None:
+            new_username = username_var.get().strip().lstrip("@")
+            renamed = bool(new_username) and new_username != card.username
+            if renamed and not self._fsops_guard():
+                return
             issues = validate_card(self.connection, card.id, owner_var.get(), date_var.get())
             if any(i.blocking for i in issues):
                 message.set("\n".join(i.message for i in issues if i.blocking))
@@ -95,12 +141,15 @@ class CatalogAdvancedMixin:
             if warnings and not messagebox.askyesno(t("card.title", username=card.username), "\n".join(warnings) + "\n\n" + t("card.save_anyway"), parent=window):
                 return
             save_card(self.connection, card.id, owner_id=owner_var.get(), start_date=date_var.get(),
-                      notes=notes.get("1.0", tk.END), favorite=fav_var.get())
+                      notes=notes.get("1.0", tk.END), favorite=fav_var.get(), private=private_var.get())
             self._after_fsops_change()
             window.destroy()
+            if renamed:
+                self._rename_account_flow(card.id, new_username)
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=15, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        buttons.grid(row=16, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+        ttk.Button(buttons, text=t("card.copy_all"), command=lambda: copy_text(card_summary_text(card, abs_path))).pack(side=tk.LEFT)
         ttk.Button(buttons, text=t("plan.cancel"), command=window.destroy).pack(side=tk.RIGHT, padx=(6, 0))
         ttk.Button(buttons, text=t("card.save"), command=save).pack(side=tk.RIGHT)
         bind_escape_close(window, on_close=window.destroy)

@@ -1,5 +1,30 @@
 # Changelog
 
+## v3.25.0 - feat-uc2-25: cuentas privadas, OwnerId en el editor, aviso sin G:, ficha copiable, menú reorganizado y mejoras pequeñas de la GUI
+
+Fecha: 2026-10-22 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/editor/path_suggest.py` (`rank_destination_paths`, `PathSuggestEntry`); `tests/gui/test_feat_uc2_25.py` (12 pruebas); `tasks/done/v3/feat-uc2-25.md`.
+
+### Modificado
+* **1 · URLs de cuentas privadas:** `input/url_classifier.py` (`is_private_post_url`, `find_private_post_urls`: `/p/`, `/reel/`, `/tv/` con id de más de 14 caracteres). `gui/editor/panel.py`: al Agregar/Actualizar avisa y **no agrega** la cuenta (`_block_private_urls`); si la cuenta está en el catálogo ofrece marcarla como privada; el indicador de URLs muestra «privadas: N». Marca persistente: columna `catalog_accounts.is_private` (se crea sola, como `notes`) en `library/account_card.py` (`ensure_private_column`, `list_private_usernames`, `set_account_private`); `AccountCatalogEntry.is_private`, `AccountCatalogService.set_private`. Color diferencial: **texto morado** (`private_fg`) en lista y árbol, que se suma al fondo del estado. Clic derecho: **Marcar como privada / Quitar privada**; casilla en la ficha.
+* **2 · OwnerId en el editor:** junto a la ❌ del username, etiqueta **OwnerId:** y campo de solo lectura (copiable) con el id (`_refresh_owner_display`).
+* **3 · Renombrar sin G::** `gui/run/integrated_rename.py` (`_confirm_rename_without_library`): si la unidad de la biblioteca no está conectada, modal de confirmación («se renombrará pero no se moverá a G:»); al cancelar no se hace nada.
+* **4 · Modal de lotes:** la tabla *Cuentas del lote* se ordena por cualquier columna (`bind_treeview_sort`).
+* **5 · Clic derecho en cuentas reorganizado** (`gui/catalog/panel.py`) en seis grupos con separadores: ver (Abrir, Ficha) · marcas (Favorito, Quitar favorito, Privada, Quitar privada) · estado (Activar, Inactivo, Ocultar, Marcar como eliminada, Restaurar) · carpeta (Abrir carpeta, Copiar ruta, Mover) · mantenimiento (Verificar, Cambió de username) · papelera sola al final.
+* **6 · Ficha de la cuenta** (`gui/library/catalog_advanced.py`): todos los campos son entradas seleccionables con botón **Copiar**; el **username es editable** (si cambia, al guardar se lanza el flujo de cambio de username con vista previa); nueva **Ruta completa en disco** y **Ruta relativa**; casilla **Cuenta privada**; **Copiar todo** (`card_summary_text`).
+* **7 · Ruta del editor:** el desplegable es ahora un campo con sugerencias: al escribir (`models-d`) lista esa carpeta primero, luego su contenido y el resto por orden alfabético (ignora el prefijo `00.` y las mayúsculas); sin texto (o con ▾) muestra primero las carpetas contenedoras (`00.MODELS-A`, `00.MODELS-B`…) y luego las demás ordenadas. Flechas ↑↓ + Enter, clic o Esc. `AccountCatalogService.list_container_paths`.
+* **8 ·** El cuadro del nombre del lote pasa de 28 a 48 caracteres.
+* **9 ·** Barra de desplazamiento vertical permanente en el catálogo (lista y árbol).
+* **10 ·** Clic derecho en una carpeta del árbol: **Copiar ruta** (`_catalog_copy_folder_path`).
+* **11 ·** El botón **Normalizar** del editor está oculto; `_normalize_urls` y `self.normalize_button` se conservan (basta `pack()` para recuperarlo).
+* `gui/catalog/colors.py`, `gui/shared/helpers.py` (`private_fg`); locales es/en (claves `private.*`, `card.*`, `fsops.copy_path`, `rename.offline_*`).
+* Documentación: manual, tutorial (Feat 25), arquitectura (modelo de datos), plan, `MODULE.md` de editor, catálogo y library, `CLAUDE.md`; versión 3.25.0. README y AGENTS revisados (sin cambios).
+
+### Pruebas ejecutadas
+`python -m pytest`: 609 passed. Prueba de humo con la GUI real sobre una **copia** de la base: menú, barras, OwnerId, color privado, sugerencias de ruta y copiar ruta de carpeta correctos. **No probado visualmente con ojos en la ventana ni con G: realmente desconectada.**
+
 ## v3.24.0 - feat-uc2-24: el árbol del catálogo conserva lo expandido; -Deleted/-Inactive ocultas por defecto
 
 Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)

@@ -124,6 +124,7 @@ class CatalogPanelMixin:
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
         parent.rowconfigure(3, weight=1)
         parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=0)
         header = ttk.Frame(parent)
         header.grid(row=0, column=0, sticky="ew")
         ttk.Label(header, text=t("label.catalog")).pack(side=tk.LEFT)
@@ -183,6 +184,15 @@ class CatalogPanelMixin:
             width=width_chars,
         )
         self.catalog_list.grid(row=3, column=0, sticky="nsew")
+        # Permanent scrollbars (one per view) to jump around without the mouse wheel.
+        self.catalog_list_scroll = ttk.Scrollbar(
+            parent,
+            orient=tk.VERTICAL,
+            command=self.catalog_list.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        self.catalog_list_scroll.grid(row=3, column=1, sticky="ns")
+        self.catalog_list.configure(yscrollcommand=self.catalog_list_scroll.set)
         self.catalog_list.bind(
             "<ButtonRelease-1>", lambda _event: self._load_catalog()
         )
@@ -194,6 +204,14 @@ class CatalogPanelMixin:
             parent, show="tree", selectmode="extended"
         )
         self.catalog_tree.grid(row=3, column=0, sticky="nsew")
+        self.catalog_tree_scroll = ttk.Scrollbar(
+            parent,
+            orient=tk.VERTICAL,
+            command=self.catalog_tree.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        self.catalog_tree_scroll.grid(row=3, column=1, sticky="ns")
+        self.catalog_tree.configure(yscrollcommand=self.catalog_tree_scroll.set)
         self.catalog_tree.bind(
             "<<TreeviewSelect>>", lambda _event: self._load_catalog()
         )
@@ -204,46 +222,45 @@ class CatalogPanelMixin:
         self._setup_catalog_drag_and_drop()
         self._apply_catalog_view_visibility()
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
-        self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
-        self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(
-            label="Inactivo", command=self._set_catalog_account_inactive
-        )
-        self.catalog_menu.add_command(
+        menu = self.catalog_menu
+        # 1. Look at the account
+        menu.add_command(label="Abrir", command=self._open_catalog_account)
+        menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
+        menu.add_separator()
+        # 2. Marks (do not change the state)
+        menu.add_command(
             label="Favorito", command=lambda: self._set_catalog_account_favorite(True)
         )
-        self.catalog_menu.add_command(
+        menu.add_command(
             label="Quitar favorito",
             command=lambda: self._set_catalog_account_favorite(False),
         )
-        self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(
-            label=t("menu.catalog.delete"), command=self._disable_catalog_account
+        menu.add_command(
+            label=t("private.mark"), command=lambda: self._set_catalog_account_private(True)
         )
-        self.catalog_menu.add_command(
-            label="Activar", command=self._enable_catalog_account
+        menu.add_command(
+            label=t("private.unmark"), command=lambda: self._set_catalog_account_private(False)
         )
-        self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
-        self.catalog_menu.add_command(
-            label=t("fsops.move_account"), command=self._catalog_move_selected
-        )
-        self._catalog_move_menu_index = self.catalog_menu.index("end")
-        self.catalog_menu.add_command(label=t("card.open_folder"), command=self._catalog_open_folder)
-        self.catalog_menu.add_command(label=t("card.copy_path"), command=self._catalog_copy_path)
-        self.catalog_menu.add_command(label=t("trash.delete"), command=self._catalog_delete_to_trash)
-        self.catalog_menu.add_command(
-            label=t("scan.account"), command=self._sync_account
-        )
-        self.catalog_menu.add_command(
-            label=t("rename.menu"), command=self._catalog_username_changed
-        )
-        self.catalog_menu.add_command(
-            label=t("life.mark_deleted"), command=self._catalog_mark_deleted
-        )
-        self.catalog_menu.add_command(
-            label=t("life.restore"), command=self._catalog_restore_deleted
-        )
+        menu.add_separator()
+        # 3. State of the account
+        menu.add_command(label="Activar", command=self._enable_catalog_account)
+        menu.add_command(label="Inactivo", command=self._set_catalog_account_inactive)
+        menu.add_command(label=t("menu.catalog.delete"), command=self._disable_catalog_account)
+        menu.add_command(label=t("life.mark_deleted"), command=self._catalog_mark_deleted)
+        menu.add_command(label=t("life.restore"), command=self._catalog_restore_deleted)
+        menu.add_separator()
+        # 4. Its folder on disk
+        menu.add_command(label=t("card.open_folder"), command=self._catalog_open_folder)
+        menu.add_command(label=t("card.copy_path"), command=self._catalog_copy_path)
+        menu.add_command(label=t("fsops.move_account"), command=self._catalog_move_selected)
+        self._catalog_move_menu_index = menu.index("end")
+        menu.add_separator()
+        # 5. Maintenance
+        menu.add_command(label=t("scan.account"), command=self._sync_account)
+        menu.add_command(label=t("rename.menu"), command=self._catalog_username_changed)
+        menu.add_separator()
+        # 6. Destructive, on its own
+        menu.add_command(label=t("trash.delete"), command=self._catalog_delete_to_trash)
 
 
     def _clear_catalog_filter(self) -> None:
@@ -327,11 +344,15 @@ class CatalogPanelMixin:
     def _apply_catalog_view_visibility(self) -> None:
         if self.catalog_view_mode == "tree":
             self.catalog_list.grid_remove()
+            self.catalog_list_scroll.grid_remove()
             self.catalog_tree.grid()
+            self.catalog_tree_scroll.grid()
             self.catalog_suffix_row.grid()
         else:
             self.catalog_tree.grid_remove()
+            self.catalog_tree_scroll.grid_remove()
             self.catalog_list.grid()
+            self.catalog_list_scroll.grid()
             self.catalog_suffix_row.grid_remove()
 
 
@@ -446,8 +467,9 @@ class CatalogPanelMixin:
         tree_yview = tree.yview()[0]
         tree.delete(*tree.get_children())
         for key, color in self.catalog_colors.items():
-            if color:
+            if color and key != "private_fg":
                 tree.tag_configure(key, background=color)
+        tree.tag_configure("private", foreground=self.catalog_colors.get("private_fg") or "#7b1fa2")
         roots = build_catalog_tree(
             list(entries),
             unrouted_label=t("label.unrouted"),
@@ -482,6 +504,8 @@ class CatalogPanelMixin:
                             tags.append("inactive")
                         elif colors.get("background") == self.catalog_colors.get("favorite"):
                             tags.append("favorite")
+                    if entry is not None and entry.is_private:
+                        tags.append("private")
                     tree.insert(
                         parent,
                         tk.END,
@@ -642,6 +666,15 @@ class CatalogPanelMixin:
         except ValueError as exc:
             messagebox.showerror("Catalogo", str(exc))
             return
+        self._reload_catalog()
+
+
+    def _set_catalog_account_private(self, private: bool) -> None:
+        usernames = self._selected_catalog_usernames()
+        if not usernames:
+            return
+        for username in usernames:
+            self.catalog_service.set_private(username, private=private)
         self._reload_catalog()
 
 

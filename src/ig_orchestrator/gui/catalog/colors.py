@@ -16,6 +16,7 @@ DEFAULT_CATALOG_COLORS = {
     "enabled": "",
     "changed": "#cfe2f3",
     "archived": "#e8eaed",
+    "private_fg": "#7b1fa2",  # text colour of accounts marked as private
     "deleted": "#f4cccc",  # same colour as "disabled": both mean "deleted"
 }
 
@@ -83,6 +84,19 @@ def colors_for_entry(
     *,
     in_batch: bool = False,
     today: bool = False,
+) -> dict[str, str]:
+    colors = _status_colors(entry, palette, in_batch=in_batch, today=today)
+    if getattr(entry, "is_private", False) and palette.get("private_fg"):
+        colors = {**colors, "foreground": palette["private_fg"]}
+    return colors
+
+
+def _status_colors(
+    entry: AccountCatalogEntry,
+    palette: dict[str, str],
+    *,
+    in_batch: bool,
+    today: bool,
 ) -> dict[str, str]:
     if entry.status is AccountHistoryStatus.DELETED:
         return _bg(palette.get("deleted"))

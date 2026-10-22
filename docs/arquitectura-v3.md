@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v3.24.0** (tags `v3.2.0` … `v3.18.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
+| Versión | **v3.25.0** (tags `v3.2.0` … `v3.18.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
 | Rama de trabajo | `v3/integration` (PR a `master` pendiente: se hace al terminar la serie v3) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -97,7 +97,7 @@ Tablas principales (los parches viven en `db/gui_migrations.py`; todos son **adi
 | Grupo | Tablas |
 |---|---|
 | Lotes y descargas (v2) | `batches`, `batch_accounts`, `batch_urls`, `batch_runs`, `batch_queues`, `batch_queue_items`, `downloaded_files`, `bot_errors`, `duplicate_urls`, tablas de estados (`*_statuses`), `url_sources`, `media_types`, `publication_types` |
-| Catálogo | `catalog_accounts` (`username`, `instagram_user_id`, `folder_id`, `status_id`, `is_favorite`, `start_init_date`, `rel_path`, contadores, `last_media_at`, `disk_state`, `scan_state`, `dir_mtime_*`, `notes`, `previous_rel_path`, `deleted_at`, `legacy_lite_id`), `catalog_folders` (`rel_path`, `kind`), `catalog_account_statuses` (ENABLED, INACTIVE, DISABLED, CHANGED, ARCHIVED, DELETED), `account_usernames`, `account_lifecycle`, `owner_dup_ignored`, `path_roots` (`LIBRARY`, `WORKING`, `TELEGRAM_DESKTOP`, `FINAL_BASE`) |
+| Catálogo | `catalog_accounts` (`username`, `instagram_user_id`, `folder_id`, `status_id`, `is_favorite`, `start_init_date`, `rel_path`, contadores, `last_media_at`, `disk_state`, `scan_state`, `dir_mtime_*`, `notes`, `is_private` (cuenta privada de Instagram; columna añadida en caliente como `notes`), `previous_rel_path`, `deleted_at`, `legacy_lite_id`), `catalog_folders` (`rel_path`, `kind`), `catalog_account_statuses` (ENABLED, INACTIVE, DISABLED, CHANGED, ARCHIVED, DELETED), `account_usernames`, `account_lifecycle`, `owner_dup_ignored`, `path_roots` (`LIBRARY`, `WORKING`, `TELEGRAM_DESKTOP`, `FINAL_BASE`) |
 | Disco | `fs_operations` (diario), `scan_runs`, `scan_findings`, `library_import_issues`, `trash_items` |
 | Índice | `media_index`, `media_index_state` |
 | Renombrado | `rename_runs`, `rename_run_accounts` (incluye columnas de pendiente: `manual_path`, `destination`, `account_id`, `spec`, `resolved`) |

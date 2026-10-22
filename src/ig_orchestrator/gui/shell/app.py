@@ -399,7 +399,7 @@ class InstagramOrchestratorApp(
         self.stories_button.grid(row=0, column=8, padx=(0, 12))
         ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=9, sticky="w")
         self.batch_name_entry = ttk.Entry(
-            top, textvariable=self.batch_name_var, width=28
+            top, textvariable=self.batch_name_var, width=48
         )
         self.batch_name_entry.grid(row=0, column=10, sticky="ew", padx=(6, 12))
         bind_edit_context_menu(self.batch_name_entry)

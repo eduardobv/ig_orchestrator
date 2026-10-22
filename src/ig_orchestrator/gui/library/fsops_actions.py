@@ -120,6 +120,22 @@ class FsOpsActionsMixin:
             self._write_console(f"accounts_lite pendiente de actualizar ({exc}).\n")
 
     # ----------------------------------------------------------- actions
+    def _catalog_copy_folder_path(self) -> None:
+        """Copy the full disk path of the selected catalog folder to the clipboard."""
+
+        tree = getattr(self, "catalog_tree", None)
+        selection = tree.selection() if tree is not None else ()
+        if not selection or not str(selection[0]).startswith("folder:"):
+            return
+        row = self.connection.execute(
+            "SELECT full_path FROM catalog_folders WHERE lower(full_path) = lower(?)",
+            (str(selection[0])[len("folder:"):],),
+        ).fetchone()
+        path = str(row[0]) if row is not None else str(selection[0])[len("folder:"):]
+        self.root.clipboard_clear()
+        self.root.clipboard_append(path)
+        self._set_status(t("fsops.path_copied", path=path))
+
     def _catalog_new_folder(self) -> None:
         folder_id = self._selected_catalog_folder_id()
         if folder_id is None or not self._fsops_guard():
@@ -207,6 +223,7 @@ class FsOpsActionsMixin:
             menu.add_command(label=t("fsops.rename_folder"), command=self._catalog_rename_folder)
             menu.add_command(label=t("fsops.move_to"), command=self._catalog_move_folder)
             menu.add_command(label=t("fsops.delete_empty"), command=self._catalog_delete_empty_folder)
+            menu.add_command(label=t("fsops.copy_path"), command=self._catalog_copy_folder_path)
             menu.add_separator()
             menu.add_command(label=t("scan.category"), command=self._sync_category)
             menu.add_separator()

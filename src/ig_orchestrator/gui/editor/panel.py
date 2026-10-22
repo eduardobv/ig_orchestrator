@@ -109,6 +109,7 @@ from ig_orchestrator.gui.shared.helpers import (
     filter_batch_accounts,
     stories_cell_text,
 )
+from ig_orchestrator.gui.editor.path_suggest import PathSuggestEntry
 from ig_orchestrator.gui.text_edit import (
     bind_edit_context_menu,
     first_clipboard_line,
@@ -117,6 +118,7 @@ from ig_orchestrator.gui.text_edit import (
 from ig_orchestrator.gui.theme import Tooltip, compact_icon_button, icon_button
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
+from ig_orchestrator.input.url_classifier import find_private_post_urls
 from ig_orchestrator.models import AccountHistoryStatus
 from ig_orchestrator.orchestration.processing_policy import (
     read_stories_first_enabled,
@@ -185,6 +187,21 @@ class EditorPanelMixin:
         )
         self.clear_username_button.grid(row=0, column=2, sticky="e", padx=(4, 0))
         Tooltip(self.clear_username_button, t("tooltip.clear_username"))
+        ttk.Label(username_row, text=t("label.owner_id_short")).grid(
+            row=0, column=3, sticky="e", padx=(12, 4)
+        )
+        self.owner_display_var = tk.StringVar(value="")
+        # Read-only entry (not a label) so the id can be selected and copied.
+        self.owner_display_entry = ttk.Entry(
+            username_row,
+            textvariable=self.owner_display_var,
+            width=20,
+            state="readonly",
+        )
+        self.owner_display_entry.grid(row=0, column=4, sticky="w")
+        bind_edit_context_menu(self.owner_display_entry)
+        self.username_var.trace_add("write", lambda *_: self._refresh_owner_display())
+        self.owner_id_var.trace_add("write", lambda *_: self._refresh_owner_display())
 
         flags = ttk.Frame(parent)
         flags.grid(row=2, column=2, columnspan=2, sticky="w", pady=(8, 0))
@@ -278,14 +295,15 @@ class EditorPanelMixin:
         self.path_row = ttk.Frame(self.new_account_frame)
         self.path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
         self.path_row.columnconfigure(0, weight=1)
-        self.destination_path_combo = ttk.Combobox(
+        self.destination_path_combo = PathSuggestEntry(
             self.path_row,
             textvariable=self.destination_path_var,
             values=self.destination_paths,
+            containers=self._destination_containers(),
             width=56,
         )
         self.destination_path_combo.grid(row=0, column=0, sticky="ew")
-        bind_edit_context_menu(self.destination_path_combo)
+        bind_edit_context_menu(self.destination_path_combo.entry)
         paste_path_btn = compact_icon_button(
             self.path_row,
             image=self.icons.get_compact("clipboard-black"),
@@ -321,12 +339,14 @@ class EditorPanelMixin:
             command=self._paste_urls,
             tooltip=t("tooltip.paste"),
         ).pack(side=tk.TOP, pady=1)
-        icon_button(
+        # Normalize is hidden (rarely used) but kept working: call ``_normalize_urls`` or
+        # ``self.normalize_button.pack(side=tk.TOP, pady=1)`` to bring it back.
+        self.normalize_button = icon_button(
             self.url_actions,
             image=self.icons.get("wand"),
             command=self._normalize_urls,
             tooltip=t("tooltip.normalize"),
-        ).pack(side=tk.TOP, pady=1)
+        )
         icon_button(
             self.url_actions,
             image=self.icons.get("eraser"),
@@ -470,6 +490,8 @@ class EditorPanelMixin:
         if self._history_guard("agregar o actualizar cuentas"):
             return
         account = self._editor_account()
+        if self._block_private_urls(account):
+            return
         resolved = self._resolve_editor_alias(account.username)
         if resolved is None:
             return
@@ -529,7 +551,9 @@ class EditorPanelMixin:
             self.username_combo.configure(
                 values=[entry.username for entry in self.catalog_entries]
             )
-            self.destination_path_combo.configure(values=self.destination_paths)
+            self.destination_path_combo.set_values(
+                self.destination_paths, self._destination_containers()
+            )
         query = self.batch_filter_var.get() if getattr(self, "batch_filter_var", None) else ""
         if not batch_username_matches_filter(stored.username, query):
             self.batch_filter_var.set("")
@@ -538,6 +562,57 @@ class EditorPanelMixin:
         self._update_batch_context()
         self._clear_editor()
         self._reveal_batch_row(reveal_index)
+
+
+    def _block_private_urls(self, account: AccountDraft) -> bool:
+        """True (after warning) when the URLs include posts of a private account.
+
+        The download bot cannot fetch those links, so the account is not added. The user
+        may mark the catalog account as private so it is highlighted in the catalog.
+        """
+
+        private_urls = find_private_post_urls(account.urls)
+        if not private_urls:
+            return False
+        shown = chr(10).join(private_urls[:5])
+        if len(private_urls) > 5:
+            shown += chr(10) + "…"
+        username = account.username.strip().lstrip("@")
+        text = t("private.urls_warning", count=len(private_urls), urls=shown)
+        entry = self.catalog_service.find_entry(username) if username else None
+        if entry is not None and not entry.is_private:
+            if messagebox.askyesno(
+                t("private.title"),
+                text + chr(10) * 2 + t("private.ask_mark", username=entry.username),
+                icon="warning",
+            ):
+                self.catalog_service.set_private(entry.username, private=True)
+                self._reload_catalog()
+            return True
+        messagebox.showwarning(t("private.title"), text)
+        return True
+
+
+    def _destination_containers(self) -> list[str]:
+        service = getattr(self, "catalog_service", None)
+        return service.list_container_paths() if service is not None else []
+
+
+    def _refresh_owner_display(self) -> None:
+        """Show the Instagram owner id of the account in the editor next to its username."""
+
+        var = getattr(self, "owner_display_var", None)
+        if var is None:
+            return
+        owner_id = self.owner_id_var.get().strip()
+        username = self.username_var.get().strip().lstrip("@")
+        if not owner_id and username:
+            entry = next(
+                (e for e in self.catalog_entries if e.username.casefold() == username.casefold()),
+                None,
+            )
+            owner_id = (entry.owner_id or "") if entry is not None else ""
+        var.set(owner_id)
 
 
     def _history_guard(self, action: str) -> bool:
@@ -683,9 +758,11 @@ class EditorPanelMixin:
             self.indicators_var.set(str(exc))
             return
         types = ", ".join(summary.publication_types) or "-"
+        private_count = len(find_private_post_urls(account.urls))
+        private_text = f" | {t('private.indicator', count=private_count)}" if private_count else ""
         self.indicators_var.set(
             f"URLs: {summary.url_count} | duplicadas: {summary.duplicate_count} | "
-            f"invalidas: {len(summary.invalid_urls)} | tipos: {types}"
+            f"invalidas: {len(summary.invalid_urls)} | tipos: {types}{private_text}"
         )
 
 
