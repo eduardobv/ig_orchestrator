@@ -26,6 +26,7 @@ _CATALOG_COLORS = {
     "in_batch": "#f5c08c",
     "today": "#fff59d",
     "disabled": "#f4cccc",
+    "private_fg": "#7b1fa2",
 }
 
 _BATCH_COLUMNS = (
@@ -412,12 +413,9 @@ def center_modal_on_parent(
     parent: tk.Tk | tk.Toplevel,
     is_parent_maximized: bool = False,
 ) -> None:
-    modal.update_idletasks()
-    screen_width = modal.winfo_screenwidth()
-    screen_height = modal.winfo_screenheight()
-    x = (screen_width - modal.winfo_width()) // 2
-    y = (screen_height - modal.winfo_height()) // 2
-    modal.geometry(f"+{x}+{y}")
+    from ig_orchestrator.gui.shared.window_position import center_on_monitor
+
+    center_on_monitor(modal, parent)
 
 
 def bind_escape_close(window: tk.Toplevel, on_close: callable = None) -> None:

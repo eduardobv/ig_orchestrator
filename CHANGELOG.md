@@ -1,5 +1,660 @@
 # Changelog
 
+## v3.26.0 - cierre de la serie v3
+
+Fecha: 2026-10-22 · Rama: `v3/integration` → `master`
+
+### Modificado
+* Versión 3.26.0 (`pyproject.toml`, `__init__.py`, `tests/test_package_smoke.py`); `docs/arquitectura-v3.md` y `CLAUDE.md` marcan v3 como cerrada y apuntan a la rama `v4/main`.
+* `CLAUDE.md`: se incluyen los cambios del usuario (sección «Estructura de Carpetas» y «Configuración de Entorno» retiradas; el detalle vive en `docs/arquitectura-v3.md`).
+* Sin cambios de código funcional. Pendientes aceptados: lo relacionado con `G:` real solo se probó con copias (ver `docs/arquitectura-v3.md` §8); `compareProcess` aparcado.
+
+### Pruebas
+* `python -m pytest`: 609 passed. **No probado con Telegram real ni con `G:` real.**
+
+## v3.25.0 - feat-uc2-25: cuentas privadas, OwnerId en el editor, aviso sin G:, ficha copiable, menú reorganizado y mejoras pequeñas de la GUI
+
+Fecha: 2026-10-22 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/editor/path_suggest.py` (`rank_destination_paths`, `PathSuggestEntry`); `tests/gui/test_feat_uc2_25.py` (12 pruebas); `tasks/done/v3/feat-uc2-25.md`.
+
+### Modificado
+* **1 · URLs de cuentas privadas:** `input/url_classifier.py` (`is_private_post_url`, `find_private_post_urls`: `/p/`, `/reel/`, `/tv/` con id de más de 14 caracteres). `gui/editor/panel.py`: al Agregar/Actualizar avisa y **no agrega** la cuenta (`_block_private_urls`); si la cuenta está en el catálogo ofrece marcarla como privada; el indicador de URLs muestra «privadas: N». Marca persistente: columna `catalog_accounts.is_private` (se crea sola, como `notes`) en `library/account_card.py` (`ensure_private_column`, `list_private_usernames`, `set_account_private`); `AccountCatalogEntry.is_private`, `AccountCatalogService.set_private`. Color diferencial: **texto morado** (`private_fg`) en lista y árbol, que se suma al fondo del estado. Clic derecho: **Marcar como privada / Quitar privada**; casilla en la ficha.
+* **2 · OwnerId en el editor:** junto a la ❌ del username, etiqueta **OwnerId:** y campo de solo lectura (copiable) con el id (`_refresh_owner_display`).
+* **3 · Renombrar sin G::** `gui/run/integrated_rename.py` (`_confirm_rename_without_library`): si la unidad de la biblioteca no está conectada, modal de confirmación («se renombrará pero no se moverá a G:»); al cancelar no se hace nada.
+* **4 · Modal de lotes:** la tabla *Cuentas del lote* se ordena por cualquier columna (`bind_treeview_sort`).
+* **5 · Clic derecho en cuentas reorganizado** (`gui/catalog/panel.py`) en seis grupos con separadores: ver (Abrir, Ficha) · marcas (Favorito, Quitar favorito, Privada, Quitar privada) · estado (Activar, Inactivo, Ocultar, Marcar como eliminada, Restaurar) · carpeta (Abrir carpeta, Copiar ruta, Mover) · mantenimiento (Verificar, Cambió de username) · papelera sola al final.
+* **6 · Ficha de la cuenta** (`gui/library/catalog_advanced.py`): todos los campos son entradas seleccionables con botón **Copiar**; el **username es editable** (si cambia, al guardar se lanza el flujo de cambio de username con vista previa); nueva **Ruta completa en disco** y **Ruta relativa**; casilla **Cuenta privada**; **Copiar todo** (`card_summary_text`).
+* **7 · Ruta del editor:** el desplegable es ahora un campo con sugerencias: al escribir (`models-d`) lista esa carpeta primero, luego su contenido y el resto por orden alfabético (ignora el prefijo `00.` y las mayúsculas); sin texto (o con ▾) muestra primero las carpetas contenedoras (`00.MODELS-A`, `00.MODELS-B`…) y luego las demás ordenadas. Flechas ↑↓ + Enter, clic o Esc. `AccountCatalogService.list_container_paths`.
+* **8 ·** El cuadro del nombre del lote pasa de 28 a 48 caracteres.
+* **9 ·** Barra de desplazamiento vertical permanente en el catálogo (lista y árbol).
+* **10 ·** Clic derecho en una carpeta del árbol: **Copiar ruta** (`_catalog_copy_folder_path`).
+* **11 ·** El botón **Normalizar** del editor está oculto; `_normalize_urls` y `self.normalize_button` se conservan (basta `pack()` para recuperarlo).
+* `gui/catalog/colors.py`, `gui/shared/helpers.py` (`private_fg`); locales es/en (claves `private.*`, `card.*`, `fsops.copy_path`, `rename.offline_*`).
+* Documentación: manual, tutorial (Feat 25), arquitectura (modelo de datos), plan, `MODULE.md` de editor, catálogo y library, `CLAUDE.md`; versión 3.25.0. README y AGENTS revisados (sin cambios).
+
+### Pruebas ejecutadas
+`python -m pytest`: 609 passed. Prueba de humo con la GUI real sobre una **copia** de la base: menú, barras, OwnerId, color privado, sugerencias de ruta y copiar ruta de carpeta correctos. **No probado visualmente con ojos en la ventana ni con G: realmente desconectada.**
+
+## v3.24.0 - feat-uc2-24: el árbol del catálogo conserva lo expandido; -Deleted/-Inactive ocultas por defecto
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-24.md`; 1 prueba en `tests/gui/test_catalog_tree.py`.
+
+### Modificado
+* `gui/catalog/panel.py`: `_refresh_catalog_tree` restaura carpetas expandidas y scroll (`_open_catalog_folders`).
+* `gui/shell/app.py`: casillas Ver -Deleted / Ver -Inactive desmarcadas por defecto.
+* Documentación: manual, tutorial (Feat 24), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.24.0. README, AGENTS y arquitectura revisados (solo versión).
+
+### Pruebas ejecutadas
+`python -m pytest`: 597 passed. **No probado visualmente en la GUI real.**
+
+## v3.23.0 - feat-uc2-23: ocultar carpetas -Deleted / -Inactive en el árbol del catálogo
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-23.md`; 3 pruebas en `tests/gui/test_catalog_tree.py`.
+
+### Modificado
+* `gui/catalog/tree.py`: `build_catalog_tree(hide_deleted=, hide_inactive=)`, `folder_suffix_kind`, `path_is_hidden`.
+* `gui/catalog/panel.py`: casillas **Ver -Deleted** / **Ver -Inactive** sobre el buscador (solo vista árbol), `_on_catalog_suffix_toggle`; la búsqueda ignora el filtro.
+* `gui/library/fsops_actions.py`: las mismas opciones (casillas) en el clic derecho de una carpeta. `gui/shell/app.py`: variables y ajustes `ui.catalog_show_deleted`/`ui.catalog_show_inactive` (por defecto visibles). Locales es/en.
+* Los selectores de carpeta (mover/copiar/crear) no se ven afectados: listan todas.
+* Documentación: manual, tutorial (Feat 23), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.23.0. README, AGENTS y arquitectura revisados (solo versión).
+
+### Pruebas ejecutadas
+`python -m pytest`: 596 passed (el test del watcher falló una vez por intermitencia y pasa aislado). **No probado visualmente en la GUI real.**
+
+## v3.22.0 - feat-uc2-22: informe en la modal Stories Inbox (problemas, sobrantes, forzar mover)
+
+Fecha: 2026-10-17 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tests/filesystem/test_story_inbox_report.py` (3), `tests/gui/test_stories_report_dialog.py` (1); `tasks/done/v3/feat-uc2-22.md`.
+
+### Modificado
+* `filesystem/story_inbox.py`: `OVERWRITTEN`, `StoryInboxReport`, `build_report`, `force_move_conflicts`; los movidos (incl. sobrescritos) cuentan como éxito.
+* `gui/stories/dialog.py`: sustituye el log por banner de resumen, tabla solo de problemas, lista de ficheros que siguen en la carpeta («carpeta vacía» si no queda ninguno) y botón **Forzar mover (sobrescribir)** con confirmación. Locales es/en.
+* Documentación: manual, tutorial (Feat 22), arquitectura, plan, `gui/stories/MODULE.md`, `CLAUDE.md`; versión 3.22.0. README y AGENTS revisados sin cambios.
+
+### Pruebas ejecutadas
+`python -m pytest`: 593 passed. **No probado con la carpeta real de stories.**
+
+## v3.21.0 - feat-uc2-21: gestión de lotes en la modal «Lotes guardados y ejecuciones»; fuera las colas de la GUI
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/batches/manage.py` (`create_empty_draft_batch`, `rename_batch`, `list_batch_accounts`, `list_draft_targets`, `is_batch_unstarted`, `restore_batch_to_draft`, `delete_unstarted_batch`); `tests/gui/test_batch_management.py` (6 pruebas, incluida la modal con Tk real); `tasks/done/v3/feat-uc2-21.md`.
+
+### Modificado
+* `gui/batches/dialog.py`: **eliminado** el panel «Cola de ejecución» y sus botones (Añadir/Quitar de cola, Subir, Bajar, Ejecutar secuencia, Renombrar cola). En su lugar, al seleccionar un lote activo se muestra la tabla **Cuentas del lote** (username, prio, URLs, stories, start date). Nuevos botones: **Nuevo lote** (borrador vacío), **Cambiar nombre**, **Borrar lote** (vacío o con cuentas), **Mover cuentas a…** (a un lote GUARDADO existente o nuevo) y, en Históricos, **Recuperar**. Se quita **Traer descargas** de la modal; «Recuperar / Modificar» → **Editar** y «Reanudar / Ejecutar» → **Ejecutar** (con traducciones es/en). Tras cada cambio se sincroniza la ventana principal si tenía abierto el lote afectado.
+* `gui/batches/pause.py`: `move_accounts_to_batch` (origen → lote GUARDADO existente; un borrador origen puede quedar vacío; un lote ya registrado solo cede cuentas sin empezar). `_validate(allow_empty_source=)`.
+* Colas fuera de la GUI: `gui/run/controller.py` (sin `_start_queue_sequence`/`_continue_queue_after_batch`/pausa de cola), `gui/run/rename.py` (renombrado siempre sobre el lote activo), `gui/shell/app.py` (sin `active_queue_id` ni `_restore_open_queue`), `gui/exchange/publish_dialog.py` (`_batches_to_publish` retirado). El servicio `gui/batch_queue_service.py`, sus tablas y `tests/gui/test_queue.py` **se conservan** (solo se retira la GUI).
+* `gui/shared/locales/es.json` y `en.json`: claves `batches.*`.
+* Documentación: manual, tutorial (Feat 21), arquitectura, plan, README, `gui/batches`, `gui/queue`, `gui/run`, `gui/MODULE.md`, `CLAUDE.md`; versión 3.21.0.
+
+### Reglas
+* Mover: el destino debe ser GUARDADO; un lote en ejecución solo cede cuentas sin empezar y no puede quedarse vacío; si la cuenta ya está en el destino se rechaza todo.
+* Borrar: lotes GUARDADOS (vacíos o con cuentas) o lotes que nunca se iniciaron; con ejecuciones se rechaza.
+* Recuperar del histórico: solo COMPLETED que nunca se iniciaron (sin ejecuciones, cuentas y URLs en PENDING).
+
+### Pruebas ejecutadas
+`python -m pytest`: 589 passed (algún test dependiente de display/watcher puede saltarse de forma intermitente). **No probado con Telegram real.**
+
+## v3.20.0 - feat-uc2-20: buscar cuentas por Owner ID en el catálogo
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-20.md`; `tests/gui/test_catalog_owner_search.py` (3 pruebas).
+
+### Modificado
+* `gui/catalog/service.py`: `parse_owner_id` (solo dígitos, ≥5, admite comillas) y `AccountCatalogService.find_entries_by_owner_id` (compara exacto contra todo el catálogo, **incluidas ARCHIVED y DELETED**, aunque la vista no las muestre). Reexportados en `gui/account_catalog_service.py`.
+* `gui/catalog/panel.py`: el mismo cuadro de filtro del catálogo acepta un Owner ID (escrito o pegado). Si coincide, el árbol/lista muestra solo esa(s) cuenta(s), con su carpeta expandida y seleccionada, y la barra de estado indica `@usuario (ESTADO)`. Al pegar, si hay una única coincidencia el editor se vincula a ese username (los dígitos nunca pasan a ser username). Sin coincidencia exacta, el filtro por username funciona como siempre.
+* Documentación: manual, tutorial (Feat 20), arquitectura (versión), plan, `gui/catalog/MODULE.md`, `CLAUDE.md`; versión 3.20.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 583 passed. **No probado con la GUI abierta.**
+
+## v3.19.0 - feat-uc2-19: mover cuentas a un nuevo lote GUARDADO con nombre elegido
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-19.md`; 1 prueba en `tests/gui/test_pause_accounts.py`.
+
+### Modificado
+* `gui/batches/pause.py`: `pause_accounts_to_new_batch(..., target_name=)` (crea el borrador, amplía uno existente o rechaza si el nombre es del propio lote / de un lote no borrador / vacío) y `suggest_split_name` (`<padre>_PARTE2`, `_PARTE3`…). `gui/batch_resume_service.py` lo reexporta.
+* `gui/batch_accounts/progress.py` + `panel.py`: clic derecho → **Mover a nuevo lote guardado…** (pregunta el nombre con sugerencia basada en el lote padre); **Pausar** se mantiene tal cual (nombre automático `_PAUSA`). Ambas comparten `_split_selected_accounts` y funcionan con el lote en ejecución.
+* Documentación: manual (§6), tutorial (Feat 19), arquitectura (versión), plan, `gui/batches/MODULE.md`, `CLAUDE.md`; versión 3.19.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 579 passed, 1 skipped. **No probado con Telegram real ni con la GUI abierta.**
+
+## v3.18.0 - feat-uc2-18: pausar cuentas de un lote (mover a lote GUARDADO)
+
+Fecha: 2026-10-16 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `gui/batches/pause.py` (`pause_accounts_to_new_batch`, `pausable_usernames`, `PauseAccountsError`); `tests/gui/test_pause_accounts.py` (5 pruebas); `tasks/done/v3/feat-uc2-18.md`.
+
+### Modificado
+* `gui/batch_accounts/panel.py` + `progress.py`: clic derecho → **Pausar (mover a lote guardado)…** (multiselección; solo habilitado si todas las cuentas están sin empezar). `gui/batch_resume_service.py`: reexporta el servicio.
+* `orchestration/batch_orchestrator.py`: el bucle omite (y `_finalize_idle_accounts` ignora) las cuentas que ya no pertenecen al lote, de modo que pausar con el lote en ejecución funciona y el lote termina (`AWAITING_RENAME`) sin ellas.
+* Documentación: manual (§6), tutorial (Feat 18), arquitectura, plan, `gui/batches/MODULE.md`, `CLAUDE.md`; versión 3.18.0.
+
+### Comportamiento
+* Solo cuentas `PENDING` con todas sus URLs `PENDING` (sin empezar), en un lote IMPORTED/PROCESSING/PARTIAL; todo o nada; no se puede vaciar el lote.
+* Destino: lote `DRAFT` («GUARDADO») `<nombre>_PAUSA`; si ya existe como borrador se amplía, si el nombre está ocupado por un lote no borrador se usa `_PAUSA2`, `_PAUSA3`…
+* Una sola transacción (`BEGIN IMMEDIATE`) con `UPDATE` condicionado al estado PENDING, para no competir con el proceso en ejecución.
+
+### Pruebas ejecutadas
+`python -m pytest`: 578 passed, 1 skipped (incluye las 5 nuevas). **No probado con Telegram real ni con la GUI abierta.**
+
+## v3.17.1 - fix: icono/tooltip del botón Pausar
+
+Fecha: 2026-10-15. `_set_pause_button_mode` usaba la opción inexistente `-tooltip` de ttk (TclError al pulsar Run tras Pausar; el mismo fallo latente en pausa/reanudar de colas y `_restore_open_queue`). `icon_button` guarda ahora su `Tooltip` en `button.tooltip` y el texto se cambia ahí. Prueba nueva en `tests/gui/test_run.py` con un botón que rechaza opciones inválidas; 574 passed.
+
+## v3.17.0 - feat-uc2-17: pausa y reanudación de lotes
+
+Fecha: 2026-10-15 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-17.md`; 3 pruebas en `tests/gui/test_run.py`.
+
+### Modificado
+* `gui/run/controller.py`: **Pausar** funciona también sin cola (detiene el proceso, lote PARTIAL, `paused_batch_id`, icono Reanudar); **Ejecutar** sobre un lote ya iniciado (PARTIAL/IMPORTED) lo reanuda en lugar de re-registrarlo (antes: «Batch name … already exists»). `gui/shell/app.py`: `paused_batch_id`.
+* Documentación: manual, tutorial (Feat 17), arquitectura (versión), plan; versión 3.17.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 573 passed (un test de `file_watcher` es intermitente, pasa aislado). **No probado con Telegram real.**
+
+## v3.16.0 - feat-uc2-16: cierre de pendientes de v3
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-16.md`; `tests/library/test_delete_empty_folder.py`, `tests/library/test_trash_retention_audit_index.py`.
+
+### Modificado
+* **Eliminar carpeta vacía:** `FsOperationService.plan_delete_empty_folder` (+ `can_undo` de `RMDIR`), entrada en el menú de carpetas (`gui/library/fsops_actions.py`).
+* **Papelera:** `library/trash.py` (`configured_retention_days`, `remove_from_catalog`, caducidad al entrar), `gui/library/catalog_advanced.py` (columna *Caduca*, *Vaciar caducadas…*, «quitar también del catálogo»), Ajustes → Catálogo (`trash.retention_days`), aviso al arrancar.
+* **Auditoría:** `library/audit.py` (`INDEX_MISSING`, `INDEX_STALE`).
+* **Almacén:** indicador en la barra de estado (`gui/chrome/statusbar.py`, `gui/library/staging_panel.py`) y aviso al arrancar con `G:` conectada.
+* Estabilidad de `tests/gui/test_window_position.py`; locales; documentación (manual, tutorial Feat 16, arquitectura §8, plan, README, `MODULE.md`); versión 3.16.0.
+
+### Pruebas ejecutadas
+`python -m pytest`: 570 passed. Barra de estado comprobada con la app real. **No probado con `G:` real.**
+
+## v3.15.0 - feat-uc2-15: el estado también sigue a las carpetas -Inactive
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+* `tasks/done/v3/feat-uc2-15.md`; pruebas nuevas en `tests/library/test_status_follows_folder.py`.
+
+### Modificado
+* `library/account_lifecycle.py`: `location_kind` (deleted / inactive / normal), `_transition` (tabla de reglas), `sync_with_location` y `preview_status_changes` con **origen** y destino; nuevo tipo `INACTIVATE` en `account_lifecycle` (también deshecho por `restore_after_undo`).
+* `gui/library/fsops_actions.py` (texto «Inactiva» en la vista previa), locales.
+* Documentación: manual, tutorial (Feat 14/15), arquitectura, plan, README, `MODULE.md`; versión 3.15.0.
+
+### Comportamiento
+* Mover a `…-Inactive` → **Inactiva**; mover de `-Deleted`/`-Inactive` a una carpeta normal → estado anterior (o Activa). De `-Deleted` a `-Inactive` (y al revés) cambia directamente. Una cuenta Inactiva a mano que se mueve entre carpetas normales no cambia.
+
+### Pruebas ejecutadas
+`python -m pytest`: 559 passed (1 omitido).
+
+## v3.14.0 - feat-uc2-14: estado según carpeta, color único de eliminadas y ventanas centradas
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+
+* `gui/shared/window_position.py` (`install_auto_centering`, `center_on_monitor`, `centered_position`, `monitor_rect`).
+* `tasks/done/v3/feat-uc2-14.md`; `tests/library/test_status_follows_folder.py`; `tests/gui/test_window_position.py`.
+
+### Modificado
+
+* `gui/catalog/colors.py`: *Eliminada* usa el color de *Disabled*.
+* `library/account_lifecycle.py`: `sync_with_location`, `preview_status_changes`, `affected_accounts` (el estado sigue a la carpeta `-Deleted`); `library/fsops.py` (`_accounts_under` devuelve el estado).
+* `gui/library/fsops_actions.py` (vista previa con los cambios de estado y sincronización tras mover), `gui/library/fsops_history_dialog.py` (tras deshacer), `gui/shared/helpers.py`, `gui/shell/app.py`, locales.
+* Documentación: manual, tutorial (Feat 14), arquitectura, plan, README, `MODULE.md`; versión 3.14.0.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 556 passed. Prueba con la app real: todas las ventanas abiertas quedan centradas en el monitor (±1 px). **No probado con `G:` real.**
+
+## v3.13.0 - feat-uc2-13: mover cuentas con sugerencias, búsqueda, nueva carpeta y selección múltiple
+
+Fecha: 2026-10-14 · Rama: `v3/integration` (feat incremental de v3)
+
+### Creado
+
+* `library/folder_suggestions.py`: `suggest_destinations` (hasta 3 sugerencias inversas `X ↔ X-Deleted/X-Inactive`, carpeta de eliminadas, dónde estaba antes; crea la hermana si falta) y `find_folder_matches`.
+* `tasks/done/v3/feat-uc2-13.md`; `tests/library/test_folder_suggestions.py`.
+
+### Modificado
+
+* `gui/library/folder_picker.py`: `pick_folder(..., account_ids=)` con **Sugerencias**, **Buscar carpeta** (salta en el árbol; Enter/flechas), **Nueva carpeta aquí…** (crea de inmediato, deshacible).
+* `gui/catalog/panel.py`: el clic derecho conserva la selección múltiple; la entrada del menú pasa a «Mover las N cuentas a otra carpeta…».
+* `gui/library/catalog_advanced.py` (pasa las cuentas al selector), locales, versión 3.13.0.
+* Reglas permanentes en `CLAUDE.md`/`Agents.md`: cada petición cierra con documentación completa y versión incremental.
+* Documentación: manual, tutorial (Feat 13), arquitectura, plan, README.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 541 passed. Prueba de GUI con copia de la base: selección múltiple conservada tras el clic derecho; selector con sugerencias y búsqueda. **No probado con `G:` real.**
+
+## Docs (2026-10-14) - guía técnica para sesiones nuevas
+
+* Nuevo `docs/arquitectura-v3.md` (estado, módulos, modelo de datos, ajustes, invariantes, recetas, pruebas, limitaciones) y `docs/README.md` (índice).
+* `CLAUDE.md`: sección «Cómo trabajar en una sesión nueva» (consultar siempre la documentación antes de responder o cambiar), estado actualizado a v3.12.0 y estructura con `library/`, `renaming/`, `staging/`, `exchange/`. `Agents.md` con el mismo aviso. Sin cambios de código.
+
+## Docs (2026-10-14) - manual de uso
+
+* Nuevo `docs/manual-usuario.md`: cada menú, menú contextual y modal con lo que hace y a qué invoca; preguntas frecuentes (carpeta vacía, cambiar ownerId, eliminar cuenta/carpeta, añadir ficheros a mano). Sin cambios de código.
+
+## v3.12.0 - feat-uc2-12: catálogo avanzado (ficha, multiselección, arrastrar, papelera)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+### Creado
+
+* `library/account_card.py` + `gui/library/catalog_advanced.py`: **Ficha de la cuenta** (id de Instagram, fecha del primer post, favorita, notas; solo lectura: carpeta, estado de disco, contadores, nombres anteriores, últimos lotes y operaciones) con validaciones (id numérico, avisa si otro registro tiene el mismo id o si difiere del id mayoritario de los ficheros; fecha válida y no futura). Columna `catalog_accounts.notes`.
+* **Selección múltiple** en el árbol del catálogo y **Mover cuentas seleccionadas** como un único plan (`FsOperationService.plan_move_accounts`): las que no se pueden mover se omiten con una nota y todas forman un solo grupo deshacible.
+* **Arrastrar y soltar** cuentas (o una carpeta) sobre una carpeta del árbol: abre la vista previa del plan, nunca ejecuta directamente.
+* **Abrir carpeta** y **Copiar ruta** en el menú contextual.
+* `library/trash.py` + tabla `trash_items`: **papelera** (`LIBRARY\.trash\<fecha>__<usuario>`, mismo volumen, instantánea), **restaurar** (si el sitio original está libre), **vaciar** con confirmación escribiendo `ELIMINAR`. Bloqueos: lote en ejecución, datos pendientes en el almacén, biblioteca no disponible. `.trash` se añade a las carpetas que el escáner no toma como cuentas.
+* Tests: `tests/library/test_catalog_advanced.py`.
+
+### Modificado
+
+`library/fsops.py`, `library/rules.py`, `gui/catalog/panel.py` (selectmode extended, arrastre, menú), `gui/chrome/menubar.py` (Catálogo → Ficha / Papelera), `gui/shell/app.py`, locales, `README.md`, versión 3.12.0. `docs/feat-uc2-12.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 535 passed. Prueba de GUI con copia de la base: soltar 2 cuentas sobre una carpeta (plan de 2 pasos, movidas) y enviar otra a la papelera. **No probado con tu `G:` real.**
+
+## v3.11.0 - feat-uc6-11: almacén de procesadas y volcado a G:
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Renombrar y entregar a la biblioteca pasan a ser pasos separados: las carpetas renombradas pueden quedarse en un **almacén local** y se **vuelcan** a `G:` cuando quieras.
+
+### Creado
+
+* `src/ig_orchestrator/staging/` (`StagingService`: registro del almacén, plan de volcado, volcado verificado y reanudable, `MODULE.md`).
+* Tablas `staged_accounts` y `dump_runs`.
+* GUI: **Lote → Pendiente de volcar a G:…** (`gui/library/staging_panel.py`): cuentas, ficheros, tamaño, destino (Nueva / Fusionar / Conflicto), *Volcar seleccionadas*, *Volcar todo*.
+* Ventana de Renombrar: selector **Destino de las procesadas** (Biblioteca / Almacén) y las opciones invalidan la vista previa si cambian.
+* Ajustes → Catálogo: **carpeta del almacén** y **qué hacer tras renombrar** (preguntar / almacén / biblioteca).
+* `mover.move_folder_to` / `preview_move_to` (destino explícito).
+* Tests: `tests/staging/test_staging.py`.
+
+### Comportamiento
+
+* El almacén replica la estructura de la biblioteca (`categoría\grupo\carpeta`), así que el volcado es una fusión directa.
+* Volcado: copia cada fichero, comprueba el tamaño y solo entonces lo borra del almacén; nunca sobrescribe (si un nombre ya existe, esa cuenta queda en *Conflicto*). Si se corta, se vuelve a lanzar y continúa sin duplicar.
+* El destino se recalcula al volcar: si la cuenta se movió o renombró en el catálogo mientras esperaba, va a su sitio nuevo.
+* Tras volcar: contadores e índice se refrescan, las cuentas nuevas reciben su ruta (y entran en `accounts_lite` si el espejo está activo).
+* Se comprueba el espacio libre del almacén antes de mover.
+
+### Modificado
+
+`renaming/service.py`, `renaming/mover.py`, `renaming/settings.py`, `db/gui_migrations.py`, `gui/run/rename_preview_dialog.py`, `gui/settings/dialog.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, `CLAUDE.md`, versión 3.11.0. `docs/feat-uc6-11.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 528 passed. Prueba de GUI con copia de la base: renombrar hacia el almacén y abrir el panel. **No probado con tu `G:` real.**
+
+## v3.10.0 - feat-uc5-10: renombrar sin la unidad G: (índice en la app)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+El renombrado puede usar el **índice de ficheros de la app** (`media_index`, por id de cuenta) en lugar de leer la biblioteca. Con `G:` desconectada, renombra en su sitio y deja la carpeta **pendiente de mover**.
+
+### Creado
+
+* `renaming/consult.py` - `IndexConsultProvider` (mismos datos que el proveedor de disco), `write_through` (los ficheros recién renombrados entran en el índice), `has_index`, `index_status`, `verify_index`.
+* `gui/library/index_actions.py` - **Lote → Mover renombradas pendientes…** y **Catálogo → Verificar índice con el disco**.
+* Columnas nuevas en `rename_run_accounts` (`manual_path`, `destination`, `account_id`, `spec`, `resolved`) para recordar lo pendiente.
+* Tests: `tests/renaming/test_offline_index.py`.
+
+### Comportamiento
+
+* **Referencia automática:** si la carpeta de la cuenta es accesible se lee del disco (exacto); si no, del índice. Casilla **«Usar el índice de la app»** para forzar el índice.
+* **Sin índice y sin disco:** la cuenta se omite con motivo `NO_INDEX`.
+* **Biblioteca no disponible:** se renombra en la carpeta de descargas, estado `RENAMED_PENDING_MOVE`; las cuentas nuevas se registran al mover. «Mover renombradas pendientes» las mueve cuando vuelve `G:` y refresca contadores e índice.
+* **Equivalencia comprobada:** con la misma semilla, índice y disco dan los mismos nombres.
+* **Verificar índice:** lista altas/bajas respecto al disco y permite aceptar el disco (reindexa la cuenta).
+
+### Modificado
+
+`renaming/service.py`, `db/gui_migrations.py`, `gui/run/rename_preview_dialog.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.10.0. `docs/feat-uc5-10.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+`python -m pytest`: 520 passed. No probado con `G:` real desconectada físicamente.
+
+## v3.9.0 - feat-uc1-9: renombrado integrado (port de `sc2 newRename`)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+El renombrado se ejecuta **dentro de la app**, con el mismo resultado que `ManualRenameFiles --newRename`: sin subproceso, sin rutas fijas a `D:\Archivos\Scripts\...`, leyendo las cuentas de la base de datos de la app (no de `accounts_lite`) y con **vista previa** de lo que se va a hacer.
+
+### Creado
+
+* `src/ig_orchestrator/renaming/` - `files.py`, `timeline.py` (asignación de fechas, con el mismo orden de llamadas al azar que `sc2`), `planner.py` (recorrido de carpetas con `DryOps`/`RealOps`: la vista previa y la ejecución son el mismo código), `mover.py` (mover/fusionar a la biblioteca sin sobrescribir), `service.py` (`RenameService.preview/run`), `settings.py`, `MODULE.md`.
+* Tablas `rename_runs` y `rename_run_accounts` (historial de cada renombrado).
+* GUI: ventana **Renombrar descargas** (`gui/run/rename_preview_dialog.py`): «¿Dónde están los ficheros?» (tu carpeta de trabajo o las carpetas de las instancias registradas, o cualquier ruta), opciones, **Vista previa** (árbol cuenta → fichero → nombre nuevo y fecha) y **Otra semilla**; ejecución en segundo plano con resultado por cuenta (`gui/run/integrated_rename.py`).
+* Ajustes: **motor de renombrado** (integrado / script externo `sc2`) y «mostrar siempre la vista previa» en `Ajustes → Procesamiento`; casilla **«Mantener actualizado accounts_lite»** (`compat.lite.enabled`) en `Ajustes → Catálogo`.
+* `compat_lite.add_to_lite` (cuentas nuevas registradas también en lite mientras el espejo esté activo).
+* Tests: `tests/renaming/` (paridad con `sc2`, servicio, ajustes).
+
+### Comportamiento
+
+* **Paridad con `sc2`:** con la misma semilla y el mismo reloj, ambos motores dejan exactamente los mismos nombres (9 casos: cuentas existentes y nuevas, bloques por debajo/entre/por encima de la biblioteca, duplicados, subcarpetas).
+* **Cuentas** salen de la app: registrada = tiene ruta en la biblioteca. Una cuenta nueva (declarada en el lote) se **registra una sola vez en la app** (id de Instagram, fecha de inicio, ruta, carpeta) y, si está activo el espejo, también en `accounts_lite`.
+* **Escritura inmediata:** tras mover una carpeta, se refrescan los contadores, la fecha del último contenido y el índice de ficheros de esa cuenta (sin esperar a «Sincronizar»).
+* La vista previa usa una **semilla**; lo que ves es lo que se aplica. «Cancelar» durante la ejecución para antes de la siguiente cuenta.
+
+### Modificado
+
+* `gui/run/rename.py` (elige motor), `gui/run/controller.py`, `gui/settings/dialog.py`, `gui/shell/app.py`, `db/gui_migrations.py`, locales, `README.md`, versión 3.9.0.
+* `docs/feat-uc1-9.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 511 passed. Prueba de la GUI con una copia de tu base: vista previa → ejecutar → ficheros renombrados y movidos a la carpeta de la cuenta, descargas vacías, historial guardado. **No probado con tu `G:` real.**
+
+## v3.8.0 - feat-uc3-8: sincronización incremental disco ↔ app (sustituye a `sc1`)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Mantiene `bdapp` al día con el disco **leyendo lo mínimo**: una consulta de fecha de modificación por carpeta de cuenta y subcarpeta decide qué relistar. Solo a petición, nunca al arrancar, y **no escribe en el disco**.
+
+### Creado
+
+* `library/scanner.py` (`LibraryScanner.scan(scope, deep=…)`, `accept_finding`, `ignore_finding`, `list_findings`), `library/rules.py` (reglas de `sc1` ahora configurables en `app_settings`), `library/scan_cli.py`, `filenames.parse_instagram_filename` (mismo parser que `sc1`).
+* Tablas `scan_runs`, `scan_findings`; columnas `catalog_accounts.dir_mtime_{root,story,reels,highlights}` y `scan_state`.
+* Comando `python -m ig_orchestrator scan [--scope all|category|account] [--path REL] [--account USER] [--deep]`.
+* GUI: `Catálogo → Sincronizar con el disco` (**Rápida**, **Verificar categoría**, **Verificar cuenta**, **Verificación completa…**, **Hallazgos…**), clic derecho en cuenta/carpeta, ventana de **hallazgos** (Aceptar / Ignorar).
+* Tests: `tests/library/test_scanner.py` (14) y `tests/gui/test_scan_actions.py`.
+
+### Cómo funciona
+
+* **Primera vez tras importar:** se toma la importación como base (solo se anota la fecha de cada carpeta) y se relistan únicamente las cuentas sin id de Instagram. Las siguientes sincronizaciones relistan solo las carpetas cuya fecha cambió.
+* **Detecta (sin aplicar solo):** carpeta nueva, carpeta movida/renombrada (misma cuenta o mismo id), carpeta ausente (se marca `disk_state = MISSING`, **no se borra nada**), id de Instagram distinto, username repetido.
+* **Mantiene:** contadores de posts/reels/story/highlights, fecha del último contenido, id de Instagram (solo rellena vacíos) y el índice de ficheros de las carpetas que cambiaron.
+* Si hubo errores de lectura no se marca ninguna cuenta como ausente. Con `G:` desconectada no se puede sincronizar.
+* **Paridad con `sc1`:** la verificación completa produce los mismos id, contadores, último contenido y filas de índice que `generatedirmap.py --complete` sobre un árbol de prueba.
+
+### Modificado
+
+* `db/gui_migrations.py`, `cli/main.py`, `gui/chrome/menubar.py`, `gui/catalog/panel.py`, `gui/library/fsops_actions.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.8.0.
+* `docs/feat-uc3-8.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 484 passed (1 omitido: prueba de Tk). Sobre una **copia** de tu base y tu `G:` real (solo lectura): 1 169 cuentas revisadas en ~0,5 s, 4 676 consultas de carpeta, 0 hallazgos, dos veces seguidas.
+
+## v3.7.0 - feat-problem1-7: cuenta renombrada en Instagram (renombrar o fusionar)
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Cuando una cuenta cambia de username se resuelve **desde la app, en un gesto**: carpeta en disco, base de datos, `accounts_lite` y GUI, con historial de nombres. El renombrado simple conserva **la misma fila (mismo id)**.
+
+### Creado
+
+* `library/account_rename.py` (`AccountRenameService`: `plan_rename`, `execute`, `undo_blocker`, `restore_after_undo`, `resolve_alias`), `library/merge.py` (fusión de carpetas sin perder ficheros: idénticos, duplicados por `media_id`, conflictos de tamaño, deshacer), `library/owner_groups.py` (grupos de cuentas con el mismo id de Instagram y su clasificación).
+* Tablas `account_usernames` (historial de nombres, relleno con el nombre vigente de las 1 169 cuentas), `owner_dup_ignored`; columnas `fs_operations.payload` y `account_lifecycle.payload`; operaciones `MERGE_DIR` / `UNMERGE_DIR` en el motor de disco (con recuperación y deshacer).
+* GUI: **Cambió de username…** (clic derecho y menú Catálogo) con ventana de vista previa (renombrado o fusión, qué cuenta se conserva, resumen de ficheros), **Revisar ids repetidos…** (grupos con pista y «Resolver…» / «No es renombrado»), aviso en el editor «@old ahora es @new».
+* Story inbox: `MOVED_VIA_ALIAS` cuando el fichero lleva un nombre antiguo (solo si es inequívoco).
+* Tests: `test_account_rename.py` (15), `test_owner_groups.py`, `test_story_inbox_alias.py`, `test_catalog_refresh_after_rename.py`.
+
+### Modificado
+
+* Al terminar, la GUI se refresca sin reiniciar: lista, árbol, editor y tabla del lote abierto.
+* `fsops.py`, `fsops_plan.py`, `db/gui_migrations.py`, `filesystem/story_inbox.py`, `gui/stories/dialog.py`, `gui/library/fsops_history_dialog.py`, `gui/editor/panel.py`, `gui/catalog/panel.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.7.0.
+* `docs/feat-problem1-7.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 469 passed. Prueba con una copia de tu base de datos: tus 2 grupos de id repetido restantes se clasifican (1 «renombrado probable», 1 «revisión manual») y se resolvió el probable (`dianaseyx` → `exkeysi`, conservando la carpeta activa). **No probado contra `G:` real.**
+
+## v3.6.0 - feat-uc4-6: publicación automática desde la instancia 24/7 + importación fiel
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+La instancia `WORKER` entrega sola lo que descarga en un **paquete** atómico (carpetas + `manifest.json` con el resultado real de cada URL) y la principal lo **importa fielmente**: estados reales de las URLs y datos de renombrado, sin «Ejecutado en otra instancia».
+
+### Creado
+
+* `exchange/manifest.py` (formato `ig_orchestrator.batch_result` v1: `build_manifest`, `write_manifest`, `read_package`, `scan_packages`, validación de versión), `exchange/publish.py` (`publish_batches`, `unpublished_batches`, ajustes de publicación, limpieza de `.partial`), `exchange/result_import.py` (`import_package`).
+* Tablas `exchange_publications` y `exchange_imports`.
+* GUI: `Lote → Publicar descargas…` (`gui/exchange/publish_dialog.py`), publicación **automática** al terminar un lote o una cola (si la instancia local es `WORKER` y está activada), sección de publicación en `Ajustes → Instancias`, filas «Paquete» en **Traer descargas** con el botón **Importar paquetes**.
+* Tests: `tests/exchange/test_publish_import.py` (15) y `test_publish_settings.py`.
+
+### Modificado
+
+* `exchange/inbox_scan.py` ya no ofrece paquetes ni `*.partial` como carpetas sueltas.
+* El aviso de **Ejecutado en otra instancia** explica que descarta los resultados reales y remite a *Importar paquetes*.
+* `gui/run/controller.py` (disparo de la publicación), `gui/chrome/menubar.py`, `gui/shell/app.py`, `gui/settings/instances_tab.py`, `gui/batches/dialog.py`, `db/gui_migrations.py`, locales, `README.md`, versión 3.6.0.
+* `docs/feat-uc4-6.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 442 passed. Prueba con una copia de tu base de datos: publicar el lote 121 (3 cuentas con carpeta) y, en una segunda copia, importarlo (7 URLs `COMPLETED`, ficheros traídos, segunda importación sin cambios). **No probado con dos máquinas reales.**
+
+## v3.5.2 - Corrección: cuentas «Sin ruta» fantasma y ruta antigua en el editor
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+**Causa:** el catálogo mezclaba `config/batch.json` (y las copias de `config/bkp`) con la base de datos. Una cuenta oculta de la lista (eliminada/archivada) o que ya no estaba en la base reaparecía desde el JSON como una fila «Sin ruta» y sin id. Además el editor conservaba los valores (id y carpeta) de antes de mover la cuenta.
+
+* La base de datos es la fuente de verdad: `batch.json` solo se usa para arrancar un catálogo vacío (ya no resucita cuentas, p. ej. `vinskawy`).
+* Las cuentas **eliminadas** se muestran en la **vista de árbol** dentro de su carpeta (p. ej. `Adrianna-Eves-Deleted`), en lila; en la vista de lista siguen ocultas (se ven con `Mostrar biblioteca completa`).
+* Tras cualquier operación de disco, el editor vuelve a leer el id y la carpeta de la cuenta que tiene cargada; el check *Update* y el seleccionar una cuenta usan `find_entry` (también para cuentas ocultas) en lugar de dejar el valor antiguo.
+* Tests: `tests/gui/test_catalog_ghost_entries.py` (reproduce el caso de `adrieves19` y `vinskawy`).
+
+## v3.5.1 - Marcar como eliminada: destino editable
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+* Al marcar una cuenta como eliminada se abre una ventana con **De → A** y el motivo. El destino se **sugiere**: la carpeta `<Modelo>-Deleted` (o `-Delete`) hermana de la carpeta de la modelo si existe; si no, la carpeta de eliminadas (`09.DELETED`).
+* Se puede **cambiar el destino** (una o varias filas): elegir otra carpeta del catálogo o **crear una carpeta nueva** desde el selector (`Nueva carpeta aquí…`); se crea y se mueve la cuenta en el mismo gesto (vista previa, historial y deshacer como siempre). Botones: *Usar carpeta de eliminadas*, *Restablecer sugerido*, casilla *sufijo _2*.
+* Una cuenta que ya está en una carpeta `-Deleted`/`-Inactive` o en la de eliminadas solo cambia de estado.
+* `AccountLifecycleService.suggest_destination` y `plan_mark_deleted(..., dest_overrides=)`; `FsOperationService.ensure_folder_rows` registra en el catálogo carpetas que existen en disco pero no tenían fila (el destino puede ser una carpeta creada en el Explorador).
+* Tests: `tests/library/test_lifecycle_destinations.py`, `tests/gui/test_delete_destination.py`.
+
+## v3.5.0 - feat-problem1-5: cuenta eliminada en Instagram
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Una sola acción para marcar una cuenta como eliminada: cambia su estado a `DELETED` y mueve su carpeta a `09.DELETED`, con vista previa, deshacer y restaurar.
+
+### Creado
+
+* `library/account_lifecycle.py` (`AccountLifecycleService`: `plan_mark_deleted`, `execute_mark_deleted`, `plan_restore`, `execute_restore`, `restore_after_undo`, `find_unlabeled_deleted`, `label_deleted`, `suggest_deleted`).
+* Estado `DELETED` (id 6), columnas `catalog_accounts.deleted_at` y `previous_rel_path`, tabla `account_lifecycle` (estado y favorito anteriores, para deshacer/restaurar).
+* GUI (`gui/library/lifecycle_actions.py`): **Marcar como eliminada…**, **Marcar varias como eliminadas…** (pegar usernames), **Restaurar cuenta eliminada…**, **Sugerir eliminadas…**, **Etiquetar 09.DELETED…**; confirmación al añadir al editor una cuenta eliminada.
+* Ajustes → Catálogo: carpeta de eliminadas (`library.deleted_folder_rel`) y conservar grupo (`library.deleted_keep_group`).
+* Tests: `tests/library/test_account_lifecycle.py` (11).
+
+### Modificado
+
+* El menú «Delete» pasa a llamarse **Ocultar** (sigue siendo `DISABLED`); `DELETED` se oculta del catálogo como `ARCHIVED` (visible con `Ver → Mostrar biblioteca completa`, color lila).
+* El Deshacer de `Catálogo → Operaciones de disco…` también restaura estado y favorito.
+* `models/account_history.py`, `db/gui_migrations.py`, `db/v2/catalog/repository.py`, `gui/catalog/{colors,service,panel}.py`, `gui/chrome/menubar.py`, `gui/editor/panel.py`, `gui/settings/dialog.py`, `gui/library/{plan_dialog,fsops_history_dialog}.py`, locales, `README.md`, versión 3.5.0.
+* `docs/feat-problem1-5.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 412 passed. Prueba de humo de la GUI con una copia de tu BD y biblioteca temporal: marcar, ocultar, restaurar, etiquetar. **No probado contra `G:` real.**
+
+## v3.4.1 - Organizar stories sin accounts_lite
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+* `Organizar stories` ya **no depende de `accounts_lite`**: se quitó el campo de la base antigua del diálogo y la carpeta de cada cuenta se resuelve solo desde `bdapp` (`rel_path` + raíz `LIBRARY`; si una cuenta no tiene `rel_path`, su carpeta de catálogo + username).
+* `save_story_inbox_settings` guarda solo la carpeta de stories (el ajuste `stories.accounts_db_path` se conserva porque lo usan la auditoría y la importación como valor por defecto).
+* `filesystem/story_inbox.py` conserva el parámetro `accounts_db` solo por compatibilidad (respaldo opcional, no usado por la GUI).
+* Tests: resolución desde `bdapp` con y sin `rel_path`.
+
+## v3.4.0 - feat-uc2-4: operaciones de disco desde el catálogo
+
+Fecha: 2026-10-12 · Rama: `v3/integration`
+
+Primera vez que la app **modifica la biblioteca**: crear, renombrar y mover carpetas y cuentas desde el árbol del catálogo, con vista previa, diario y deshacer. Disco y `bdapp` cambian juntos.
+
+### Creado
+
+* `library/fsops.py` (`FsOperationService`: `plan_mkdir`, `plan_rename_folder`, `plan_move_folder`, `plan_move_account`, `execute`, `recover`, `undo`, `history`), `library/fsops_plan.py` (`Plan`, `Step`, `Conflict`, `validate_name`), `library/compat_lite.py` (espejo `bdapp → accounts_lite`).
+* Tabla `fs_operations` (diario: `PLANNED → DISK_DONE → COMMITTED`, `undo_of`).
+* GUI: menú contextual del árbol (carpetas: **Nueva carpeta…**, **Renombrar carpeta…**, **Mover a…**; cuentas: **Mover a otra carpeta…**), `gui/library/{plan_dialog,folder_picker,fsops_history_dialog,fsops_actions}.py`, `Catálogo → Operaciones de disco…` (historial + Deshacer).
+* El árbol muestra las carpetas vacías (p. ej. recién creadas).
+* Recuperación automática al abrir la app (completa o descarta operaciones interrumpidas) y reconciliación del espejo de lite.
+* Tests: `tests/library/test_fsops.py` (18), `tests/gui/test_catalog_actions.py`.
+
+### Reglas de seguridad
+
+Nunca sobrescribe (conflicto `DEST_EXISTS`); nunca sale de la raíz `LIBRARY`; no mueve una carpeta dentro de sí misma; bloquea cuentas de un lote en ejecución (`PROCESSING`); desactivado si `G:` no está disponible; una sola operación a la vez; renombrado solo de mayúsculas en dos pasos (NTFS).
+
+### Modificado
+
+* `db/gui_migrations.py`, `gui/catalog/{panel,service,tree}.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, locales, `README.md`, versión 3.4.0.
+* `docs/feat-uc2-4.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 400 passed. Prueba de humo de la GUI con una copia de tu BD y una biblioteca temporal: nueva carpeta, mover cuenta, historial. **No se probó contra `G:` real.**
+
+## v3.3.1 - Informe de simulación claro (feat 3)
+
+* El informe empieza con un **veredicto** (Correcto / Se puede importar con avisos / No importar) y explica que la importación es segura.
+* Secciones **SOBRAN** (carpetas de `accounts_complete` que ya no están en lite) y **FALTAN** (en lite pero no en complete), con listas; incidencias con ejemplos.
+* Las carpetas que solo están en `accounts_complete` (y no en lite) **ya no se importan**: lite manda sobre qué carpetas existen. Evita crear cuentas fantasma.
+* Botón **Guardar informe completo…** y opción CLI `--report`.
+* Tutorial: `--update` no borra carpetas obsoletas; `--complete` limpia.
+
+## v3.3.0 - feat-uc1-3: catálogo completo en bdapp + índice de ficheros
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+`bdapp` pasa a conocer toda la biblioteca (rutas, contadores, fecha del último contenido) y el índice de ficheros que usará el renombrado. **Estrategia A (aditiva):** no se reconstruye el catálogo; se amplía. No escribe en `accounts_*` ni en disco.
+
+### Creado
+
+* `library/import_bdsc1.py` (`import_from_bdsc1`, informe, simulación, idempotente), `library/paths.py`, `library/filenames.py`, `library/import_cli.py`.
+* Comando `python -m ig_orchestrator import-bdsc1 [--lite] [--complete] [--root] [--dry-run] [--no-media]`.
+* `gui/library/import_dialog.py` - `Catálogo → Importar desde bdsc1…` (Simular / Importar, copia de seguridad automática).
+* Esquema (aditivo en `_patch_gui_schema`): `catalog_accounts` (`rel_path`, contadores, `last_media_at`, `last_scan_at`, `disk_state`, `legacy_lite_id`), `catalog_folders` (`rel_path`, `kind`), tablas `media_index` (solo `account_id`, `kind`, `media_id`, `taken_at`, `owner_id`, `ext`, `suffix`), `media_index_state`, `library_import_issues`, raíz `LIBRARY` en `path_roots`, estado `ARCHIVED`.
+* Copia de seguridad automática antes de la migración (`data/bkp/orchestrator_gui_pre_v3_*.sqlite`) y antes de cada importación real (`..._pre_import_*`).
+* Tests: `tests/library/test_import_bdsc1.py` y ampliaciones en `tests/db/test_gui_database.py` y `tests/filesystem/test_story_inbox.py`.
+
+### Modificado
+
+* Story inbox resuelve la carpeta desde `bdapp` (con respaldo a `accounts_dir`); la base antigua pasa a ser opcional.
+* Las cuentas `ARCHIVED` no salen en el catálogo/editor por defecto (`Ver → Mostrar biblioteca completa`); al usarlas en el editor o en un lote pasan a `ENABLED`.
+* `models/account_history.py`, `db/v2/catalog/repository.py`, `db/account_history_repository.py`, `gui/catalog/{service,colors,panel}.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, `input/gui_batch_creation.py`, `gui/stories/dialog.py`, locales, `README.md`, versión 3.3.0.
+* `docs/feat-uc1-3.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 374 passed. Importación real sobre una **copia** de tus datos (14 s): 924 cuentas `ARCHIVED` creadas, 331 actualizadas, 107 carpetas, 908 560 ficheros indexados; las 334 cuentas previas conservan estado; segunda ejecución: 0 cambios. La BD pasa de 8,8 a 64 MB.
+
+## v3.2.2 - Traer descargas: «Comparar con lote» dentro de la tabla
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+* `gui/exchange/pull_dialog.py`: al elegir un lote la tabla añade la columna **En el lote** y muestra como filas en gris las cuentas del lote que aún no están en la carpeta compartida (antes solo había un texto con listas largas bajo la tabla, que ahora es un resumen con contadores).
+* `docs/tutorial-v3.md`: explica qué ve y qué no ve la app (cada instancia tiene su BD; solo se mira la carpeta compartida) y el significado de cada estado.
+
+## v3.2.1 - Tutorial v3 y etiquetas de Instancias
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+* Creado `docs/tutorial-v3.md`: guía feat a feat (feats 1 y 2) con campos, botones, ejemplos con rutas reales y pruebas. Regla nueva en el plan: cada feat añade su sección.
+* Formulario de **Ajustes → Instancias**: etiquetas más claras (ruta «desde ESTE PC» vs «en ELLA misma») y texto de ayuda.
+* `CLAUDE.md` referencia el tutorial.
+
+## v3.2.0 - feat-uc4-2: Registro de instancias y «Traer descargas…»
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Elimina el paso manual de copiar de la carpeta compartida de otra instancia a la carpeta de trabajo. No toca la biblioteca ni `accounts_lite`.
+
+### Creado
+
+* Tabla `instances` (se crea con `CREATE TABLE IF NOT EXISTS` en `_patch_gui_schema`) y `db/instances_repository.py` (`Instance`, `InstanceRepository`; solo una instancia local).
+* `src/ig_orchestrator/exchange/` - `inbox_scan.py` (carpetas, tamaño, estabilidad por `mtime`, prefijo extendido de Windows), `pull.py` (plan + copia verificada con `.part`, política `merge_skip_identical`/`abort`, cancelación, espacio libre), `compare.py` (comparar con lote, sondeo de ruta con timeout), `MODULE.md`.
+* `gui/settings/instances_tab.py` - pestaña **Ajustes → Instancias** (alta/edición/baja y «Probar»; guarda al instante).
+* `gui/exchange/pull_dialog.py` - **Lote → Traer descargas…** (también botón en el diálogo de lotes): origen por instancia o ruta libre, estados Lista/En uso/Ya existe/Vacía, comparar con lote, progreso, cancelar, oferta de «Ejecutado en otra instancia».
+* Aviso al pulsar **Renombrar** si la carpeta de trabajo está vacía y hay carpetas estables en el intercambio de una instancia.
+* Tests: `tests/exchange/test_pull.py`, `tests/gui/test_pull_dialog.py`.
+
+### Modificado
+
+* `db/gui_migrations.py`, `db/__init__.py`, `gui/shell/app.py`, `gui/chrome/menubar.py`, `gui/batches/dialog.py`, `gui/run/rename.py`, `gui/settings/dialog.py`, `gui/shared/locales/{es,en}.json`, `README.md`, versión 3.2.0.
+* `docs/feat-uc4-2.md` movido a `tasks/done/v3/`.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 361 passed. Prueba de humo real de la GUI con una copia de la BD: escaneo automático, «Traer todas las listas» (movió el fichero y limpió la carpeta de origen), pestaña de ajustes.
+
+## v3.1.0 - feat-uc3-1: Auditoría de biblioteca (solo lectura)
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Informe de discrepancias entre `bdapp`, `accounts_lite`, `accounts_complete` y el disco. No escribe en ninguna BD ni en disco.
+
+### Creado
+
+* `src/ig_orchestrator/library/` - `audit.py` (`run_audit`), `audit_report.py` (`Finding`, `AuditReport`, Markdown/CSV), `audit_cli.py`, `MODULE.md`.
+* `src/ig_orchestrator/gui/library/audit_dialog.py` - Diálogo `Catálogo > Auditar biblioteca…` (hilo aparte, filtro por código, exportar MD/CSV, abrir en Explorer).
+* Comando CLI `python -m ig_orchestrator audit-library [--lite] [--complete] [--md] [--csv] [--no-disk]`.
+* Tests: `tests/library/test_audit.py`, `tests/gui/test_audit_dialog.py`.
+
+### Modificado
+
+* `cli/main.py`, `gui/chrome/menubar.py`, `gui/shell/app.py`, `gui/locales/{es,en}.json`, `README.md`, versión a 3.1.0.
+* `docs/feat-uc3-1.md` movido a `tasks/done/v3/` (con los resultados medidos).
+
+### Correcciones (v3.1.1)
+
+* Textos de la auditoría movidos a `gui/shared/locales/{es,en}.json` (los de `gui/locales` no se cargan): el menú y el diálogo mostraban las claves.
+* Rutas del diálogo siempre con separadores de Windows (`native_path_text`), también las leídas del ajuste y las del selector de archivos.
+
+### Pruebas ejecutadas
+
+* `python -m pytest`: 344 passed (342 antes de la corrección). Auditoría real (0,4 s): PATH_MISSING 15, OWNER_DUP 69, OWNER_MISMATCH 4, FOLDER_MISMATCH 1, ONLY_IN_APP 5, ONLY_IN_LITE 902, COMPLETE_STALE 394, LAST_MODIFIED_MIXED 1; `mtime` de las BD sin cambios.
+
+## v3 (planificación) - Análisis y plan de mejoras
+
+Fecha: 2026-10-11 · Rama: `v3/integration`
+
+Solo documentación: no cambia código ni la versión de la app (sigue en v2.2.0).
+
+### Creado
+
+* `docs/v3-status.md` - Estado actual de la app, `sc1` (GenerateDirMap), `sc2` (ManualRenameFiles), las bases de datos (`bdapp`, `accounts_lite`, `accounts_complete`) y los procesos manuales, con mediciones reales.
+* `docs/feat-uc3-1.md`, `feat-uc4-2.md`, `feat-uc1-3.md`, `feat-uc2-4.md`, `feat-problem1-5.md`, `feat-uc4-6.md`, `feat-problem1-7.md`, `feat-uc3-8.md`, `feat-uc1-9.md`, `feat-uc5-10.md`, `feat-uc6-11.md`, `feat-uc2-12.md` - Una propuesta independiente por mejora (sufijo = dificultad 1–12).
+* `docs/plan-v3-features.md` - Orden de ejecución, dependencias, puntos de decisión y retirada gradual de los scripts.
+
+### Modificado
+
+* `CLAUDE.md` - Referencias a los nuevos documentos.
+* Revisión 2026-10-11 (decisiones del usuario): `accounts_complete` como fuente principal e índice de renombrado importado en el feat 3, BD única reestructurable, registro de instancias (feat 2), estado final explícito. Afecta a `v3-status.md`, `plan-v3-features.md` y `feat-uc1-3/uc4-2/uc4-6/uc3-8/uc1-9/uc5-10`.
+
+### Pruebas ejecutadas
+
+* No aplica (sin cambios de código). Los datos citados se midieron en solo lectura sobre `orchestrator_gui.sqlite`, `accounts_lite.sqlite` y `accounts_complete.sqlite`.
+
 ## v2.2.0 - GUI UX Improvements (En desarrollo)
 
 Fecha: 2026-10-06

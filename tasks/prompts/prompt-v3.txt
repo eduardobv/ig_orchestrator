@@ -1,0 +1,65 @@
+Realiza un analisis sobre las diferentes acciones que hago manualmente y que quisiera integrar en esta app.
+
+Para optimizar las referecias vamos a usar variables a cada item:
+app = orquestador
+bdapp = base datos del orquestador orchestrator_gui.sqlite
+sc1 = script GenerateDirMap
+bdsc1 = base datos del sc1 accounts_lite.sqlite
+sc2 = script ManualRenameFiles
+inst1 = instacia donde se ejecuta 24/7 batches y lotes.
+pc1 = pc principal donde yo trabajo y que apago constantemente.
+
+1)- Actualmente esta app tiene una base de datos data/orchestrator_gui.sqlite y contiene la info que maneja el orquestador.
+
+2)- También tengo un disco duro externo, donde almaceno todos los ficheros que voy descargando.
+En esta unidad G:, he generado a través de un script python (GenerateDirMap), una base de datos con todas las carpetas de cada cuenta de instagram que tengo dentro de G:\4K Stogram. Es decir, el script recorre todas las subcarpetas y carpetas dentro de la raiz G:\4K Stogram y empieza analizar el nombre de la carpeta y su contenido y genera la base de datos: G:\4K Stogram\accounts_lite.sqlite. 
+- Este script esta ubicado en: D:\Archivos\Scripts\IG\GenerateDirMap
+
+3)- También tengo un script de renombrado de ficheros (ManualRenameFiles). Este script es llamado desde el orquestador una vez que se terminan de descargar todas las cuentas de instagram y tras ejecutarse este script, se renombran al formato requerido y se mueven a la unidad G: en sus respectivas carpetas.
+
+4)- También tengo un ordenador portátil donde tengo una copia de la app y ejecuto \\DESKTOP-OM856P7\ig_orchestrator 24/7 batches, no siempre se ejecutan pero si a veces lo dejo de una noche hasta el otro dia. Luego lo que hago manualmente entrar remotamente a la pc DESKTOP-OM856P7, y dentro lo que hago es copiar de la carpeta donde se descargaron las cuentas, normalmente es C:\Users\eduba\Downloads\DW\Telegram_Desktop a una carpeta compartida dentro de la app C:\Eduardo\ig_orchestrator\tmp, y que desde mi pc puedo ver con esta ruta: \\DESKTOP-OM856P7\ig_orchestrator\tmp.
+Una vez tengo las cuentas descargadas en \\DESKTOP-OM856P7\ig_orchestrator\tmp, las copio a mi C:\Users\eduba\Downloads\DW\Telegram_Desktop, abro la instancia de la app en mi ordenador pc1 y le doy al batch "Ejecutado en otra instancia" y renombro. Pero para renombrar tengo que tener la unidad de Disco duro conectado sino es imposible renombrar.
+
+Problemas y casos de usos recurrentes:
+
+- Problema1: Muchas veces hay cuentas de instagram que pasan a ser eliminadas o cambiadas de nombre, y esto es un problema que tengo que resolver manualmente. 
+- Cuando son eliminadas además de ponerles en la app el flag de deleted, me gustaría poder mover la carpeta del username eliminado a otra carpeta. Y esto tengo que hacerlo manualmente, luego entrar a las bases de datos y actualizar a la nueva ruta donde la he movido.
+- Cuando una cuenta es renombrada, es decir el username cambia, por ejemplo de usernam_e1 a user_name1 aunque estas cuentas tienen el mismo id, tengo que manualmente encontrar por el id en las bases de datos (ownerId o instagram_user_id) luego renombrar al nuevo nombre en ambas bases de datos y cerrar la app y volver abrir para que refresque los valores.
+
+- CasoUso1: Quisiera tener todo integrado en la app, quisiera que todo se maneje en la bdapp. Para esto necesito que analices los scripts sc1 sc2, en algunos script hay configuración que a veces no se usa desde la app. la idea es integrar esa lógica en la app, traerla en modulos de manera que no sea necesario ejecutar scripts aparte, evitando problemas de sincronización e incongruencia de datos. La idea no es traer todo tal cual está. 
+
+- CasoUso2: Quisiera que el catalogo (arbol) de la app sea más poderoso, actualmente solo sirve para visualizar y para mediante click derecho hacer algunas opciones que no realizan ninguna acción sobre el disco duro. Me encantaria poder mover carpetas, eliminarlas, renombrar, editar info de cada username como su id. Para esto analiza las base de datos bdapp y bdsc1 y fijate como se pueden integrar y mantenerse unicamente ya sea en una tabla o en dos tablas pero la idea es que el catalogo de la app refleje lo que hay en el disco duro y que cualquier acción a realizar en el catalogo se replique en el disco duro y la bases de datos reflejen lo que hay en el disco duro.
+
+- CasoUso3: Sincronización, piensa que hay que sincronizar disco duro con base de datos, esto no se puede hacer a cada rato y tampoco al iniciar la aplicación. Leer miles de carpetas del disco duro y analizarlas para generar la bdsc1 toma muchos minutos y además es un desgaste del disco duro en lectura. Para esto quisiera que pienses una manera de reducir la lectura y escritura del disco duro, actualmente la bdsc1 está sincronizada con el disco duro, puede ser que haya alguna discrepancia, pero es mínima, por lo que se deberia poder arreglar manualmente desde la app.
+
+- CasoUso4: Ejecución en otra instancia, me gustaría poder desde las opciones de la app, mover, de una instancia a otra los ficheros descargados, ya que hay carpetas compartidas, quizás ampliar la configuración para poder elegir donde se deben descargar las cuentas y en una instancia elegir una carpeta compartida y desde la instancia de mi pc1 poder cogerlas y moverlas, o directamente renombrar desde esa carpeta compartida, a lo mejor el botón renombrar abre una modal donde me pregunta donde están los ficheros a renombrar. 
+
+- CasoUso5: Sobre la posibilidad de renombrar sin tener la unidad G conectada. Es decir, que tras analizar el sc2, me gustaría que en vez de usar el disco duro con info de los ficheros, para ver qué numeración y fecha le corresponde a los nombres, esta consulta ya esté en una tabla, donde se guarde el ultimo nombre registrado o la ultima fecha (o el parámetro que necesite el sc2) así se puedan renombrar los fichero sin necesidad de tener la unidad G conectada.
+
+- CasoUso6: Si el casouso6 es posible, se deberia tras el renombrado, poder elegir donde mover las carpetas procesadas, ya sea desde una modal o desde una opción, y así poder ir almacenando las cuentas renombradas.
+Luego mediante otra opción, se puede hacer un "volcado" de carpetas procesadas y almacenadas hacia la unidad G. Asi solo conectaría la unidad G cuando vaya hacer el volcado o traspaso.
+
+Acciones a realizar por tu parte:
+
+1)- Analizar la app, los scripts, las base de datos, los procesos manuales.
+2)- Genera un fichero markdown docs/ con el nombre v3-status.md que contendrá todo lo que te acabo de contar y donde registraras tu analisis del estado actual de cada app, script, bd, procesos manuales.
+3)- Genera un fichero markdown docs/ con las propuestas de tus mejoras, sugerencias, implementaciones, soluciones, etc. Divide estas propuestas y ordenalas por nivel de dificultad y por funcionalidad a implementar y valor agregado a entregar. Por ejemplo: feat-uc1-1.md,feat-uc2-5.md, feat-problem1-7.md, donde el nivel de dificultad (sufijo -N) es el numero de 1 al N, donde 1 es más fácil y N el más dificil. Quiero que cada feat tenga su propio MD. Puede ser cada caso de uso o problema un md con su solución o como veas.
+4)- Genera un plan markdown en docs/ con el nombre plan-v3-features.md que engloble lo que hay que hacer para poder ejecutar todas estas mejoras feat a feat, ordenado por dificultad, haciendo referencia a los md generados en el paso anterior.
+
+La idea que quiero es leer los MDs y si quiero ejecutar el plan poder hacerlo progresivamente, quizas implementar el primer feat, probarlo y ver si va bien y luego continuar. Cada feat tiene que ser independiente y debe entregar un valor.
+
+Genera estos markdows. Si es necesario información o accesos pidelo.
+
+---------------------------------------------------------------------
+
+Respondiendo a tus hallazgos:
+- La app solo conoce 334, efectivamente ya que el catálogo actual se he ido alimentando conforme he ido agregando o actualizando cuentas. 
+- accounts_lite es una base datos lite de accounts_complete, la carga de accounts_complete es compleja y tiene un algoritmo más estructurado.
+  En un primer momento no te lo mencioné ya que desconocía que había información necesaria para el renombrado. Entonces quizás como primer paso sea actualizar accounts_complete.sqlite y coger las columnas que interesen para el renombrado y también para el catálogo y llevarlo a la bdapp.
+- quiero recalcar que debe existir una unica bbdd la de bdapp, si es necesario reestructurarla, cambiar relaciones, cambiar tablas, exportar datos. Solo decir que importan solo los datos del catalogo, el resto da igual. los batches, colas, urls, etc... no es importante en caso de que haya que redefinir la bdapp.
+- La idea es que al final de todas los feats. La app del orquestador sea capaz con su propia base de datos, cargar el catalogo completo tal cual están las carpetas en G:, mover, eliminar, renombrar tanto usernames como nodos del catalogo y que se vea reflejado en disco. Intereactuar con carpetas descargadas de otras instancias (para lo que seguro es problable tener un apartado para registrar instancias y tener sus paths) para renombrar esas carpetas o moverlas al workplace de la instancia principal. Renombrar sin necesidad de consultar ningun script ni base de datos externa, solo la bdapp y el codigo de renombrado en el app. Capaz de renombrar sin necesidad de tener una unidad G conectada, y sincronizar disco con catalogo.
+Ahora actualiza con esto los mds que creas conveniente en caso de que no hayas tenido en cuenta algo que acabo de escribir. Actualiza la tabla de mejoras que me acabas de presentar.
+
+---------------------------------------------------------------------
+
+Muy bien, ahora agrega que por cada feat que se haga se moverá el md a tasks/done/v3. y ahora para asegurarme que me has entendido y que todo está bien, te iré haciendo preguntas, para saber en qué feat o md se encuentra dicha parte. ok? La idea es que no se haya pasado nada. Me tienes que responde donde está y como se hará, una breve descripcion no necesito detalle tecnico ni una respuesta larga.

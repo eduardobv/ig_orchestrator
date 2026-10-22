@@ -291,6 +291,14 @@ def _ensure_catalog_id(
         (username,),
     ).fetchone()
     if row is not None:
+        connection.execute(
+            """
+            UPDATE catalog_accounts SET status_id = ?, updated_at = ?
+            WHERE id = ? AND status_id = (
+                SELECT id FROM catalog_account_statuses WHERE code = 'ARCHIVED')
+            """,
+            (enabled_status_id, now, int(row["id"])),
+        )
         return int(row["id"])
     cursor = connection.execute(
         """

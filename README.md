@@ -305,12 +305,12 @@ cuando participa en un lote real; un dry-run no modifica este estado.
   **Ejecutado en otra instancia**) el lote pasa a `AWAITING_RENAME`
   (`POR RENOMBRAR`): se puede **Renombrar** o **Finalizar sin renombrar**.
   Solo entonces pasa a `COMPLETED` y sale de Activos. En Activos se pueden
-  seleccionar varios lotes, **añadirlos a la cola**, ordenarlos y
-  **Ejecutar secuencia** (uno tras otro). Los lotes que aún no han empezado
-  se pueden **quitar de la cola** aunque otro esté corriendo. Al terminar
-  (o al pulsar **Renombrar cola / selección** sobre varios POR RENOMBRAR)
-  el renombrador se llama **una vez** con todos los `--new-account` y
-  `--move-renamed`. La cola vive en SQLite: se puede ejecutar en una
+  seleccionar un lote para ver sus **cuentas** (username, prio, URLs,
+  stories, start date), **mover cuentas** a otro lote GUARDADO (o a uno
+  nuevo), crear lotes vacíos, cambiar su nombre o borrarlos (las colas de
+  ejecución se retiraron de la GUI en v3.21). En **Históricos** se puede
+  **Recuperar** un lote que nunca se inició. Los lotes POR RENOMBRAR se
+  renombran uno a uno; se puede ejecutar en una
   instancia y renombrar en otra. **Exportar** genera un JSON portable;
   **Importar** crea un DRAFT nuevo (nombre único si hay colisión).
 * **Históricos** — lotes `COMPLETED` (carga al abrir la pestaña). Solo se
@@ -390,14 +390,14 @@ cuando finaliza correctamente una ejecución real o cuando, tras detenerla,
 todas las cuentas pendientes se han completado manualmente. No se habilita tras
 un dry-run ni mientras queden cuentas abiertas. Al pulsarlo ejecuta en segundo
 plano `ManualRenameFiles\main.py` con `--newRename`, toma `--startNowDate` del
-`Start date` global (o la fecha más reciente si hay una cola de varios lotes),
+`Start date` global,
 agrega un bloque `--new-account USERNAME OWNER_ID START_INIT_DATE PATH` por
 cada fila marcada como nueva y finalmente aplica `--no-duplicated
 --move-renamed`. Tras el proceso se inspecciona `WORKING_FOLDER`: si quedan
 carpetas de cuenta (no se llegaron a mover), el lote no se cierra y el botón
 sigue activo para reintentar. Las rutas con espacios se transmiten como un
 unico argumento y toda la salida se muestra en la misma consola con timestamp.
-Justo antes de construir el comando, la GUI vuelve a leer el lote (o la cola)
+Justo antes de construir el comando, la GUI vuelve a leer el lote
 desde SQLite; por ello una cancelacion, cierre y recuperacion conserva
 `ownerId`, `path`, `startInitDate` y el flag de cuenta nueva.
 
@@ -496,6 +496,103 @@ Tambien puedes pasar una ruta concreta:
 ```bash
 python -m ig_orchestrator init-db --db-path data\orchestrator.db
 ```
+
+### Publicación automática (instancia 24/7)
+
+En la instancia WORKER (laptop): `Ajustes > Instancias`, registra la instancia local como `WORKER` con su «Carpeta compartida: ruta en ELLA misma», activa
+**Publicar automáticamente** y elige MOVER/COPIAR. Al terminar un lote deja un paquete en la compartida; tambien `Lote > Publicar descargas...`.
+En la principal: `Lote > Traer descargas...` muestra los paquetes; **Importar paquetes** copia los ficheros y crea el lote con los estados reales (listo para Renombrar).
+Formato: `<instancia>_<lote>_<fecha>/{manifest.json, data/<cuenta>/...}`; el manifiesto se escribe el ultimo (`*.partial` = incompleto).
+
+### Flujo de dos instancias (traer descargas)
+
+1. `Ajustes > Instancias`: registra la otra instancia (p. ej. `inst1`) con su carpeta compartida (`exchange_path`, UNC o unidad) y pulsa **Probar**.
+2. `Lote > Traer descargas…` (o el boton del dialogo de lotes): elige la instancia, escanea y pulsa **Traer todas las listas**.
+   Copia verificada (`.part` + comprobacion de tamano), no sobrescribe (sufijo `_1` si el tamano difiere), no trae carpetas en uso y se puede cancelar.
+3. Opcional: «Comparar con lote» y marcar el lote como **Ejecutado en otra instancia**; despues **Renombrar**.
+
+### Renombrado integrado
+
+`Renombrar` abre **Renombrar descargas**: elige dónde están los ficheros (tu carpeta de trabajo, la de otra instancia registrada o cualquier ruta), pulsa **Vista previa**,
+revisa los nombres nuevos y **Ejecutar**. Mismo algoritmo que `ManualRenameFiles` (paridad probada), sin scripts externos. Ajustes: `Ajustes > Procesamiento` (motor integrado o `sc2`, vista previa)
+y `Ajustes > Catalogo` (mantener `accounts_lite` actualizado o no).
+
+### Renombrar sin la unidad G:
+
+Si la biblioteca no está disponible, **Renombrar** usa el índice de la app y deja las carpetas renombradas en la carpeta de descargas como *pendientes de mover*.
+Cuando vuelvas a conectar `G:`: **Lote → Mover renombradas pendientes…**. **Catálogo → Verificar índice con el disco** compara el índice de una cuenta con sus carpetas.
+
+### Almacén y volcado
+
+`Ajustes > Catalogo` define una carpeta local de **almacén**. En *Renombrar* eliges el destino de las procesadas (Biblioteca o Almacén). Con el almacén, `G:` puede estar apagada:
+cuando la conectes, **Lote > Pendiente de volcar a G:...** fusiona lo almacenado en su sitio (sin sobrescribir, con comprobación de tamaño).
+
+### Catálogo avanzado
+
+Clic derecho en una cuenta: **Ficha de la cuenta…**, **Mover cuentas seleccionadas** (Ctrl/Mayús para varias), **Abrir carpeta**, **Copiar ruta**, **Eliminar (a la papelera)…**.
+También se puede arrastrar cuentas sobre una carpeta. **Catálogo → Papelera…** restaura o vacía (pide escribir `ELIMINAR`).
+
+### Eliminar carpeta vacía, papelera y almacén
+
+Clic derecho en una carpeta → *Eliminar carpeta vacía…* (solo sin ficheros ni cuentas; con *Deshacer*). La papelera tiene caducidad configurable y permite quitar también las cuentas del catálogo. La barra de estado muestra lo que espera en el almacén.
+
+### Estado según carpeta y ventanas
+
+Mover una cuenta a una carpeta `…-Deleted` la marca como eliminada y a `…-Inactive` como inactiva (y sacarla de ellas la reactiva); la vista previa del plan lo muestra y *Deshacer* lo revierte. Las ventanas se abren centradas en el monitor.
+
+### Mover cuentas
+
+*Mover a otra carpeta…* abre un selector con **sugerencias** (`X ↔ X-Deleted/-Inactive`), **búsqueda** por nombre y **Nueva carpeta aquí…**. Con varias cuentas seleccionadas el clic derecho dice «Mover las N cuentas…».
+
+### Sincronizar con el disco
+
+`Catalogo > Sincronizar con el disco`: **Rapida** (solo relee lo que cambio, segundos), **Verificar categoria / cuenta** y **Verificacion completa** (relee todo, como `sc1 --complete`).
+Solo a peticion. No toca el disco; lo distinto (carpetas nuevas, movidas, ausentes, ids distintos) aparece en **Hallazgos** para aceptarlo o ignorarlo.
+Consola: `python -m ig_orchestrator scan [--scope all|category|account] [--path REL] [--account USER] [--deep]`.
+
+### Cuenta que cambió de username
+
+Clic derecho en la cuenta (o `Catalogo`) > **Cambio de username...**: renombra la carpeta, la cuenta (mismo id interno) y guarda el nombre antiguo como alias.
+Si ya existe una cuenta/carpeta con el nombre nuevo se **fusionan** sin perder ficheros (identicos se retiran, duplicados por id de publicacion van a `_duplicates`).
+`Catalogo > Revisar ids repetidos...` lista las cuentas que comparten id de Instagram (con pista) para resolverlas. Todo se puede **Deshacer** desde `Operaciones de disco`.
+
+### Cuentas eliminadas en Instagram
+
+`Catalogo > Marcar como eliminada...` (o clic derecho sobre la cuenta): pone la cuenta en `DELETED` y mueve su carpeta a `09.DELETED\<cuenta>`, con vista previa.
+`Marcar varias...` acepta usernames pegados; `Restaurar cuenta eliminada...` la devuelve a su carpeta y estado anteriores; `Sugerir eliminadas...` propone candidatas
+(cuentas con "no encontrada" en 2 o mas lotes; solo una pista); `Etiquetar 09.DELETED...` clasifica sin mover las cuentas que ya estan en esa carpeta.
+**Ocultar** (antes "Delete") solo oculta la cuenta del catalogo (`DISABLED`) y no mueve nada.
+
+### Operaciones de disco desde el catálogo
+
+En el árbol del catálogo (`Ver` → vista de árbol): clic derecho en una **carpeta** → *Nueva carpeta…*, *Renombrar carpeta…*, *Mover a…*;
+clic derecho en una **cuenta** → *Mover a otra carpeta…*. Siempre hay una vista previa; nada se sobrescribe. `Catalogo > Operaciones de disco...`
+muestra el historial y permite **Deshacer**. Con `G:` desconectada las acciones se desactivan. Mientras exista, `accounts_lite` se mantiene al dia.
+
+### Importar la biblioteca a la app (bdsc1 → bdapp)
+
+Una sola vez (y cuando quieras refrescar): `Catalogo > Importar desde bdsc1...` o
+
+```bash
+python -m ig_orchestrator import-bdsc1 [--lite RUTA] [--complete RUTA] [--dry-run] [--no-media]
+```
+
+Antes: con G: conectada, ejecuta `sc1 --lite` y `--update` para refrescar `accounts_complete`.
+Usa `--dry-run` / **Simular** para ver el resultado sin escribir. Hace copia de seguridad en `data/bkp/`.
+Las cuentas que solo existen en G: entran como `ARCHIVED` (ocultas; `Ver > Mostrar biblioteca completa`).
+
+### Auditar la biblioteca (solo lectura)
+
+Compara `bdapp`, `accounts_lite`, `accounts_complete` y el disco, sin modificar nada:
+
+```bash
+python -m ig_orchestrator audit-library [--lite RUTA] [--complete RUTA] [--md salida.md] [--csv salida.csv] [--no-disk]
+```
+
+Sin `--lite` usa el ajuste `stories.accounts_db_path`; `--complete` por defecto es
+`accounts_complete.sqlite` junto a lite. En la GUI: `Catalogo > Auditar biblioteca...`.
+Codigos: `PATH_MISSING`, `OWNER_DUP`, `OWNER_MISMATCH`, `FOLDER_MISMATCH`, `ONLY_IN_APP`,
+`ONLY_IN_LITE`, `COMPLETE_STALE`, `LAST_MODIFIED_MIXED`, `NAME_CASE`, `USERNAME_DUP`, `DISK_OFFLINE`.
 
 ### Ejecutar dry-run por linea de comando
 
@@ -702,7 +799,7 @@ sequenceDiagram
 
 ## Que hace cada modulo
 
-- `main.py`: punto de entrada. Soporta `init-db`, `--input ... --run` y `--input ... --dry-run`.
+- `main.py`: punto de entrada. Soporta `init-db`, `audit-library`, `--input ... --run` y `--input ... --dry-run`.
 - `settings.py`: lee `.env`, valida variables obligatorias y convierte rutas/numeros.
 - `input/batch_json_parser.py`: valida el JSON de entrada.
 - `input/batch_importer.py`: guarda batch, cuentas, settings no sensibles y URLs en SQLite.

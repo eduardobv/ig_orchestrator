@@ -7,7 +7,7 @@ Panel izquierdo: lista/árbol de cuentas históricas.
 - `panel.py` — mixin widgets + handlers
 - `service.py` — lectura/escritura SQLite (sin Tk)
 - `colors.py` — paleta
-- `tree.py` — `build_catalog_tree`
+- `tree.py` — `build_catalog_tree` (`hide_deleted`/`hide_inactive` ocultan carpetas `-Deleted`/`-Inactive` solo en el árbol; `folder_suffix_kind`, `path_is_hidden`). `_refresh_catalog_tree` conserva carpetas expandidas y scroll (`_open_catalog_folders`). Casillas (desmarcadas por defecto) en `panel.py` (`_on_catalog_suffix_toggle`), ajustes `ui.catalog_show_deleted`/`ui.catalog_show_inactive`.
 
 ## Estado que lee / escribe (en App)
 Lee: `connection`, `catalog_entries`, `catalog_view_mode`, `catalog_colors`, `accounts`
@@ -25,3 +25,26 @@ Lanzar `run_continue` ni mutar `self.accounts` (salvo pintar tag in_batch).
 
 ## Tests
 `tests/gui/test_catalog.py`, `tests/gui/test_catalog_tree.py`
+
+## Catálogo avanzado (v3.12)
+
+El árbol usa `selectmode="extended"`. `gui/library/catalog_advanced.py` (mixin) aporta ficha de cuenta, mover varias cuentas (`FsOperationService.plan_move_accounts`), arrastrar y soltar (`_drop_on_catalog_tree`), abrir carpeta/copiar ruta y la papelera (`library/trash.py`).
+
+## Colores y ventanas (v3.14)
+
+`colors.load_catalog_colors` fuerza que *Eliminada* use el color de *Disabled*. Todas las ventanas se centran con `gui/shared/window_position.py` (`install_auto_centering`).
+
+## v3.16
+
+Menú de carpeta: *Eliminar carpeta vacía…* (`fsops_actions._catalog_delete_empty_folder`). Papelera con caducidad y «quitar del catálogo» (`catalog_advanced._open_trash_dialog`). Barra de estado: `StagingPanelMixin._refresh_staging_hint`.
+  Si el texto es un Owner ID (solo dígitos, ≥5; `parse_owner_id`), el filtro busca por
+  id en **todo** el catálogo (`find_entries_by_owner_id`, incluye ARCHIVED/DELETED) y
+  sustituye la lista filtrada por las coincidencias (feat-uc2-20).
+
+## Tests
+`tests/gui/test_catalog_owner_search.py`
+
+## v3.25 (feat-uc2-25)
+- Menú contextual de cuenta en seis grupos con separadores; `_set_catalog_account_private`. Marca privada: `AccountCatalogEntry.is_private`, `AccountCatalogService.set_private` / `list_container_paths`; color de texto `private_fg` (`colors.py`, tag `private` en el árbol).
+- Barras de desplazamiento permanentes (`catalog_list_scroll`, `catalog_tree_scroll`).
+- Clic derecho en carpeta: Copiar ruta (`gui/library/fsops_actions.py::_catalog_copy_folder_path`).

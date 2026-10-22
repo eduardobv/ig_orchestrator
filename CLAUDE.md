@@ -1,5 +1,22 @@
 # CLAUDE.md — ig_orchestrator
 
+## Cómo trabajar en una sesión nueva (LEER PRIMERO)
+
+Esta sesión puede no tener contexto previo. **Antes de responder una pregunta o de pedir/hacer un cambio, consulta la documentación del proyecto** en este orden y no te fíes de la memoria:
+
+1. `docs/arquitectura-v3.md` — guía técnica: estado, módulos, modelo de datos, ajustes, invariantes, recetas, pruebas, limitaciones y mapa de «dónde mirar cada cosa».
+2. `docs/manual-usuario.md` — qué hace cada menú, menú contextual y modal de la GUI, y qué abre.
+3. `docs/tutorial-v3.md` — cada feat de v3 con campos, ejemplos y cómo probarlo.
+4. `CHANGELOG.md` — qué cambió, cuándo, qué se probó.
+5. `tasks/done/v3/feat-*.md` (sección «Resultado de la implementación») y `docs/v3-status.md` — decisiones, qué no se hizo y por qué.
+6. `MODULE.md` del paquete afectado y el código.
+
+Reglas de sesión:
+- Para preguntas de «¿cómo funciona / dónde está / por qué?», responde desde esos documentos y verifica en el código/base de datos si hay duda; si el documento está desactualizado, corrígelo.
+- Para cambios, sigue el proceso de «Changelog y Commits» (más abajo): código + tests + CHANGELOG + manual + (tutorial) + MODULE.md + `docs/arquitectura-v3.md` si cambia la arquitectura, el modelo de datos, los ajustes o las limitaciones.
+- Responde en español y, cuando el usuario pregunte «dónde/cómo», con pasos cortos y no técnicos.
+- No ejecutes acciones destructivas sobre `G:` real; prueba en copias. Informa de lo que no se pudo probar.
+
 ## Propósito del Proyecto
 
 **ig_orchestrator** es un orquestador para preparar, trazar y procesar descargas manuales de Instagram mediante un bot de Telegram.
@@ -8,9 +25,10 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v2.1.0)
+### Estado Actual (v3.26.0, serie v3 cerrada)
 
-- Rama activa: `v2/gui-ux-stories`
+- Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
+- v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
 - El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o `--run`
 - La GUI de escritorio funciona con `python -m ig_orchestrator gui`
 - SQLite v2 (`data/orchestrator_gui.sqlite`) es la fuente de verdad en la GUI
@@ -25,6 +43,8 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 - Última: v1.31.0
 - Rollback disponible si GUI v2 falla
 
+**Serie v3.x** — integración de sc1/sc2 y gestión de la biblioteca (rama `v3/integration`): ver `docs/arquitectura-v3.md`, `docs/tutorial-v3.md` y `docs/manual-usuario.md`.
+
 **Serie v2.x** — GUI mejorada con modularización, SQLite v2:
 - Rama: `v2/orchestrator` (merged a `master`, tag `v2.0.0`)
 - Rama activa: `v2/gui-ux-stories` (en desarrollo, v2.1.0)
@@ -32,26 +52,6 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 - Cierre esperado: PR a `master` + tag `v2.0.0` (ya hecho, ahora en mejoras GUI)
 
 ## Arquitectura y Módulos
-
-### Estructura de Carpetas
-
-```
-config/          → batch.example.json, batch.json (entrada)
-data/            → orchestrator.db (v1), orchestrator_gui.sqlite (v2)
-logs/            → app.log global + YYYYMMDD_HHMMSS/username.log
-reports/         → run_YYYYMMDD_HHMMSS.md
-src/ig_orchestrator/
-  main.py        → Punto de entrada CLI
-  cli/main.py    → Entry CLI (main.py es shim)
-  settings.py    → Lectura de .env
-  input/         → Parser, importador, clasificador de URLs
-  db/            → SQLite, schema, repositorios, adaptadores
-  gui/           → Shell (app.py shim), editor, catálogo, batches, settings, draft
-  orchestration/ → Orquestadores, política de reintentos
-  telegram/      → Telethon, parser de respuestas del bot
-  filesystem/    → Carpetas, watcher, clasificación, movimiento
-  reports/       → Reporte Markdown
-```
 
 ### Reglas de Arquitectura (de AGENTS.md)
 
@@ -163,7 +163,7 @@ Características:
 ### Para Tareas GUI, Persistencia v2 o Tests
 
 Leer primero:
-1. `PLAN.md`
+1. `tasks/done/PLAN.md` (plan inicial, histórico)
 2. `AGENTS.md`
 3. `tasks/TareaX.md`
 4. El código existente relacionado
@@ -179,6 +179,15 @@ Leer primero:
 - Usar SQLite temporal en tests de repositorios
 - No depender de Telegram real en tests automatizados
 - Suite mínima obligatoria: settings, batch_json_parser, batch_importer, url_classifier, retry_policy, bot_response_parser, file_watcher, file_classifier, folder_service, file_mover, repositorios SQLite, markdown_report_builder, orquestadores
+
+### Cada petición del usuario = documentación completa + versión incremental
+
+**Regla permanente (no hace falta que el usuario la repita):**
+
+1. **Toda petición que cambie algo** (nueva función, mejora, ajuste de interfaz, corrección) debe cerrar con **toda la documentación actualizada en el mismo commit**: `CHANGELOG.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md` (sección del feat), `docs/arquitectura-v3.md` (si cambia arquitectura, modelo de datos, ajustes o limitaciones), `MODULE.md` del paquete, `README.md` si cambia lo visible, `AGENTS.md`/`Agents.md` y este `CLAUDE.md` si cambian reglas, y el `tasks/done/v3/feat-*.md` correspondiente con su «Resultado de la implementación». Si algún documento no requiere cambios, se revisa igualmente.
+2. **Versionado incremental dentro de la serie activa** (hoy v3.x en `v3/integration`): una mejora o función nueva pedida se trata como un **feat incremental** de la serie, **sin abrir serie nueva**: sube el **minor** (`v3.13.0`, `v3.14.0`…) y se nombra `feat-<área>-<n>` con el siguiente número (áreas: `uc1` renombrado, `uc2` catálogo/carpetas, `uc3` sincronización, `uc4` instancias, `uc5` sin G:, `uc6` almacén; `problemN` para problemas puntuales). Una corrección de algo ya entregado sube el **patch** (`v3.13.1`). Se hace commit y tag `vX.Y.Z`.
+3. Cada feat nuevo lleva su especificación breve en `tasks/done/v3/feat-<área>-<n>.md` (objetivo, qué se hizo, qué no) y una fila en `docs/plan-v3-features.md`.
+4. Una serie nueva (v4) solo se abre si el usuario lo pide explícitamente.
 
 ### Changelog y Commits
 
@@ -196,6 +205,11 @@ Leer primero:
    - `MODULE.md` correspondiente: si cambian interfaces o responsabilidades de módulo
    - `tasks/Tarea_X.md` o directorio `tasks/done/`: registrar estado de las tareas
    - `README.md`: si cambia comportamiento visible al usuario o flujos operativos
+   - `docs/manual-usuario.md`: **siempre** que se añada, cambie o elimine un menú, menú contextual, modal, botón o ajuste de la GUI (qué hace y qué abre); el manual debe estar siempre al día
+   - `docs/tutorial-v3.md`: sección del feat si la serie v3 sigue en curso
+   - `AGENTS.md` (`Agents.md`): si cambian las instrucciones base para IA o este proceso
+
+   `CHANGELOG.md`, `docs/manual-usuario.md` y `AGENTS.md` se revisan en **cada** cambio, aunque solo sea para confirmar que no requieren edición.
 
 3. Las tareas completadas se mueven de `tasks/` a `tasks/done/`
 
@@ -212,36 +226,6 @@ Para arreglos:
 ```bash
 git commit -m "fix: adjust tarea X ..."
 git tag v1.X.1
-```
-
-## Configuración de Entorno
-
-### `.env` Obligatorio
-
-```env
-TELEGRAM_API_ID=
-TELEGRAM_API_HASH=
-TELETHON_SESSION_NAME=telegram_user_session
-TELEGRAM_DOWNLOAD_BOT_USERNAME=@example_bot
-
-TELEGRAM_DESKTOP_DOWNLOAD_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
-WORKING_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
-REPORTS_FOLDER=reports
-SQLITE_DB_PATH=data\orchestrator.db
-
-MAX_RETRIES=5
-RETRY_BASE_SECONDS=90
-RETRY_MAX_SECONDS=900
-DOWNLOAD_WAIT_TIMEOUT_SECONDS=300
-DOWNLOAD_STABLE_SECONDS=10
-```
-
-### `.env` Opcional
-
-```env
-POST_PROCESS_ENABLED=false
-POST_PROCESS_COMMAND=D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat
-SQLITE_GUI_DB_PATH=data\orchestrator_gui.sqlite
 ```
 
 ## Errores Definitivos (No Reintentar)
@@ -318,6 +302,10 @@ WORKING_FOLDER\username\             # Raíz cuenta
 - Si destino existe: sufijo numérico `archivo_1.jpg`, `archivo_2.jpg`, etc.
 - Al finalizar lote real: limpiar `telegram_media*` en raíz y `*_1.mp4` duplicados en `reels\`
 
+### Almacén (v3.11)
+
+Opcional: `app_settings['staging.root']`. Las carpetas renombradas pueden dejarse en `STAGING\<categoria>\<grupo>\<carpeta>` (`staged_accounts`) y volcarse a la biblioteca con `Lote > Pendiente de volcar a G:` (`staging/service.py`).
+
 ### Reportes
 
 ```
@@ -341,15 +329,6 @@ Tarea v2.1 GUI UX ⟹ v2.1.0 (rama: v2/gui-ux-stories)
 
 Arreglos incrementan patch: `v1.X.1`, `v1.X.2`, etc.
 
-## No Implementar en v1.0.1
-
-- Integración con el script de renombrado
-- Limpieza de duplicados generados por el renombrador
-- Movimiento final a `G:\4K Stogram`
-- UI web o standalone
-
-Estos siguen perteneciendo al script externo Manual Rename Files.
-
 ## Seguridad
 
 **No commitear**:
@@ -358,29 +337,17 @@ Estos siguen perteneciendo al script externo Manual Rename Files.
 - Bases SQLite reales en `data/`
 - `api_hash`, códigos de login ni secretos en logs
 
-## Ejecutar Tests
-
-```bash
-python -m pytest                  # Todos
-python -m pytest -q              # Silencioso
-python -m pytest tests/test_gui_services.py  # Específico
-```
-
-Desde VS Code: configuración `Tests: pytest`
-
-## Inicializar SQLite
-
-```bash
-python -m ig_orchestrator init-db
-python -m ig_orchestrator init-db --db-path data\orchestrator.db
-```
-
 ## Referencias
 
+- **docs/arquitectura-v3.md**: Guía técnica de la arquitectura v3 (empezar por aquí)
+- **docs/README.md**: Índice de la documentación
 - **AGENTS.md**: Instrucciones base para cualquier IA
-- **PLAN.md**: Plan general del proyecto
+- **tasks/done/PLAN.md**: Plan general inicial del proyecto (histórico, archivado)
 - **CHANGELOG.md**: Historial de versiones y cambios
 - **README.md**: Guía operativa completa
 - **tasks/TareaX.md**: Descripción de cada tarea
 - **docs/modularizacion_v2.md**: Arquitectura de modularización v2
+- **docs/v3-status.md**, **docs/plan-v3-features.md**, **docs/feat-*.md**: Análisis, plan y propuestas de la serie v3 (integración de `sc1`/`sc2`, catálogo = disco, renombrado sin G:)
+- **docs/tutorial-v3.md**: Tutorial de uso feat a feat (opciones, campos, ejemplos y cómo probar); se amplía en cada feat de v3
+- **docs/manual-usuario.md**: Manual de uso por menú, menú contextual y modal (qué hace cada opción y qué abre); actualizar al añadir o cambiar opciones de GUI
 - **MODULE.md** en cada paquete: Documentación interna del módulo

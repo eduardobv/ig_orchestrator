@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlite3 import IntegrityError
 import tkinter as tk
 from tkinter import font as tkfont
-from tkinter import colorchooser, filedialog, messagebox, ttk
+from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 from ig_orchestrator import __version__
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
@@ -57,6 +57,20 @@ from ig_orchestrator.gui.batch_resume_service import (
     mark_batch_interrupted,
     resolve_account_download_folder,
 )
+from ig_orchestrator.gui.batches.manage import (
+    BatchManageError,
+    create_empty_draft_batch,
+    delete_unstarted_batch,
+    list_batch_accounts,
+    list_draft_targets,
+    rename_batch,
+    restore_batch_to_draft,
+)
+from ig_orchestrator.gui.batches.pause import (
+    PauseAccountsError,
+    move_accounts_to_batch,
+    suggest_split_name,
+)
 from ig_orchestrator.gui.batch_transfer_service import (
     BatchTransferError,
     export_batch_to_path,
@@ -101,6 +115,7 @@ from ig_orchestrator.gui.shared.helpers import (
     catalog_focus_username,
     center_modal_on_parent,
     filter_batch_accounts,
+    priority_cell_text,
     stories_cell_text,
 )
 from ig_orchestrator.gui.text_edit import (
@@ -119,21 +134,21 @@ from ig_orchestrator.orchestration.processing_policy import (
 
 
 class BatchesDialogMixin:
-    """Mixin: saved/executed batches dialog (includes queue panel)."""
+    """Mixin: saved/executed batches dialog (list, accounts detail, batch management)."""
 
     def _open_pending_batches(self) -> None:
         dialog = tk.Toplevel(self.root)
         dialog.title("Lotes guardados y ejecuciones")
-        dialog.geometry("1100x620")
+        dialog.geometry("1100x720")
         dialog.transient(self.root)
         dialog.columnconfigure(0, weight=1)
-        dialog.rowconfigure(1, weight=1)
+        dialog.rowconfigure(1, weight=3)
+        dialog.rowconfigure(2, weight=2)
         self._batches_dialog = dialog
 
         def _clear_dialog_ref(_event=None) -> None:
             if self._batches_dialog is dialog:
                 self._batches_dialog = None
-                self._refresh_queue_panel = None
 
         dialog.bind("<Destroy>", _clear_dialog_ref)
         bind_escape_close(dialog, on_close=_clear_dialog_ref)
@@ -141,10 +156,10 @@ class BatchesDialogMixin:
         ttk.Label(
             dialog,
             text=(
-                "Activos: GUARDADO, ejecuciones y POR RENOMBRAR. "
-                "Históricos: lotes COMPLETED (solo lectura). "
-                "Selecciona 2 o más lotes para armar una cola y ejecutarlos "
-                "en secuencia. Importar crea un lote nuevo en esta instancia."
+                "Activos: GUARDADO, ejecuciones y POR RENOMBRAR; selecciona un lote "
+                "para ver sus cuentas, moverlas a otro lote, renombrarlo o borrarlo. "
+                "Históricos: lotes COMPLETED (solo lectura; los no iniciados se "
+                "pueden recuperar). Importar crea un lote nuevo en esta instancia."
             ),
             padding=(10, 10, 10, 4),
         ).grid(row=0, column=0, sticky="w")
@@ -274,17 +289,6 @@ class BatchesDialogMixin:
                 return None
             return int(selection[0])
 
-        def selected_active_batch_ids() -> list[int]:
-            selection = active_tree.selection()
-            if not selection:
-                messagebox.showwarning(
-                    "Cola",
-                    "Selecciona uno o más lotes activos.",
-                    parent=dialog,
-                )
-                return []
-            return [int(item_id) for item_id in selection]
-
         def selected_active_summary():
             batch_id = selected_batch_id_from(active_tree)
             if batch_id is None:
@@ -317,16 +321,16 @@ class BatchesDialogMixin:
                 return
             if not summary.is_draft:
                 messagebox.showwarning(
-                    "Recuperar lote",
+                    "Editar lote",
                     "Una ejecucion ya iniciada no se puede editar. "
-                    "Usa Reanudar / Ejecutar o Renombrar segun el estado.",
+                    "Usa Ejecutar o Renombrar segun el estado.",
                     parent=dialog,
                 )
                 return
             try:
                 draft = load_batch_draft(self.connection, summary.batch_id)
             except ValueError as exc:
-                messagebox.showerror("Recuperar lote", str(exc), parent=dialog)
+                messagebox.showerror("Editar lote", str(exc), parent=dialog)
                 return
             dialog.destroy()
             self._load_persisted_draft(summary.batch_id, draft)
@@ -340,7 +344,7 @@ class BatchesDialogMixin:
                 return
             if summary.is_awaiting_rename:
                 messagebox.showwarning(
-                    "Reanudar lote",
+                    "Ejecutar lote",
                     "Este lote esta POR RENOMBRAR. Usa Renombrar o "
                     "Finalizar sin renombrar.",
                     parent=dialog,
@@ -350,44 +354,206 @@ class BatchesDialogMixin:
             try:
                 draft = load_batch_draft(self.connection, batch_id)
             except ValueError as exc:
-                messagebox.showerror("Reanudar lote", str(exc), parent=dialog)
+                messagebox.showerror("Ejecutar lote", str(exc), parent=dialog)
                 return
             dialog.destroy()
             self._load_persisted_draft(batch_id, draft)
             self._start_batch(batch_id)
 
+        def selected_active_batch_id_quiet() -> int | None:
+            selection = active_tree.selection()
+            return int(selection[0]) if len(selection) == 1 else None
+
+        def select_batch(batch_id: int | None) -> None:
+            if batch_id is not None and active_tree.exists(str(batch_id)):
+                active_tree.selection_set(str(batch_id))
+                active_tree.see(str(batch_id))
+            refresh_detail()
+
+        def after_change(*, changed=(), deleted=()) -> None:
+            """Refresh lists and keep the main window consistent with SQLite."""
+            reload_active()
+            if history_loaded["done"]:
+                reload_history()
+            self._sync_editor_with_batches(set(changed), set(deleted))
+            self._update_pending_button_label()
+
+        def new_batch() -> None:
+            name = simpledialog.askstring(
+                t("batches.new.title"),
+                t("batches.new.prompt"),
+                initialvalue=_suggest_batch_name(),
+                parent=dialog,
+            )
+            if name is None:
+                return
+            try:
+                batch_id = create_empty_draft_batch(self.connection, name)
+            except BatchManageError as exc:
+                messagebox.showerror(t("batches.new.title"), str(exc), parent=dialog)
+                return
+            self._write_console(f"Lote GUARDADO vacío creado: id={batch_id}.\n")
+            after_change()
+            select_batch(batch_id)
+
+        def rename_batch_action() -> None:
+            summary = selected_active_summary()
+            if summary is None:
+                return
+            if self.process_runner.is_running() and self.active_batch_id == summary.batch_id:
+                messagebox.showwarning(
+                    t("batches.btn.rename"),
+                    t("batches.rename.running"),
+                    parent=dialog,
+                )
+                return
+            name = simpledialog.askstring(
+                t("batches.btn.rename"),
+                t("batches.rename.prompt"),
+                initialvalue=summary.batch_name,
+                parent=dialog,
+            )
+            if name is None or name.strip() == summary.batch_name:
+                return
+            try:
+                rename_batch(self.connection, summary.batch_id, name)
+            except BatchManageError as exc:
+                messagebox.showerror(t("batches.btn.rename"), str(exc), parent=dialog)
+                return
+            after_change(changed={summary.batch_id})
+            select_batch(summary.batch_id)
+
         def delete_selected() -> None:
             summary = selected_active_summary()
             if summary is None:
                 return
-            if not summary.is_draft:
-                messagebox.showwarning(
-                    "Borrar lote",
-                    "Solo se pueden borrar lotes GUARDADOS que nunca se hayan ejecutado.",
-                    parent=dialog,
-                )
-                return
             if not messagebox.askyesno(
-                "Borrar lote guardado",
-                f"Borrar definitivamente el lote guardado {summary.batch_name} "
-                f"(id={summary.batch_id})?",
+                t("batches.btn.delete"),
+                t(
+                    "batches.delete.confirm",
+                    name=summary.batch_name,
+                    id=summary.batch_id,
+                    accounts=summary.total_accounts,
+                ),
                 parent=dialog,
             ):
                 return
             try:
-                delete_draft_batch(self.connection, summary.batch_id)
-            except ValueError as exc:
-                messagebox.showerror("Borrar lote", str(exc), parent=dialog)
+                delete_unstarted_batch(self.connection, summary.batch_id)
+            except (BatchManageError, ValueError) as exc:
+                messagebox.showerror(t("batches.btn.delete"), str(exc), parent=dialog)
                 return
-            if self.saved_batch_id == summary.batch_id:
-                self._start_new_batch()
-            if self.active_queue_id is not None:
-                open_queue = get_open_queue(self.connection)
-                if open_queue is None:
-                    self.active_queue_id = None
-            reload_active()
-            refresh_queue_panel()
-            self._update_pending_button_label()
+            self._write_console(f"Lote {summary.batch_id} borrado.\n")
+            after_change(deleted={summary.batch_id})
+            select_batch(None)
+
+        def choose_move_target(source_id: int, count: int):
+            """Small modal: pick a saved batch or a new name. Returns (kind, value) or None."""
+            result: dict[str, object] = {}
+            top = tk.Toplevel(dialog)
+            top.title(t("batches.move.title"))
+            top.transient(dialog)
+            top.columnconfigure(0, weight=1)
+            targets = list_draft_targets(self.connection, source_id)
+            new_label = t("batches.move.new_option")
+            labels = [new_label] + [f"{name} (id={bid})" for bid, name in targets]
+            ttk.Label(top, text=t("batches.move.prompt", count=count), padding=10).grid(
+                row=0, column=0, sticky="w"
+            )
+            combo = ttk.Combobox(top, values=labels, state="readonly", width=48)
+            combo.current(1 if targets else 0)
+            combo.grid(row=1, column=0, sticky="ew", padx=10)
+            name_var = tk.StringVar(value=suggest_split_name(self.connection, source_id))
+            name_entry = ttk.Entry(top, textvariable=name_var, width=50)
+            name_entry.grid(row=2, column=0, sticky="ew", padx=10, pady=(8, 0))
+
+            def sync_entry(_event=None) -> None:
+                name_entry.configure(
+                    state="normal" if combo.current() == 0 else "disabled"
+                )
+
+            combo.bind("<<ComboboxSelected>>", sync_entry)
+            sync_entry()
+
+            def accept() -> None:
+                if combo.current() == 0:
+                    result["value"] = ("new", name_var.get())
+                else:
+                    result["value"] = ("existing", targets[combo.current() - 1][0])
+                top.destroy()
+
+            buttons = ttk.Frame(top, padding=10)
+            buttons.grid(row=3, column=0, sticky="e")
+            ttk.Button(buttons, text=t("batches.move.ok"), command=accept).pack(side=tk.RIGHT)
+            ttk.Button(buttons, text=t("batches.close"), command=top.destroy).pack(
+                side=tk.RIGHT, padx=(0, 8)
+            )
+            top.bind("<Escape>", lambda _e: top.destroy())
+            top.grab_set()
+            center_modal_on_parent(top, dialog, False)
+            top.wait_window()
+            return result.get("value")
+
+        def move_accounts_action() -> None:
+            source_id = selected_active_batch_id_quiet()
+            if source_id is None:
+                messagebox.showwarning(
+                    t("batches.move.title"), t("batches.select_one"), parent=dialog
+                )
+                return
+            usernames = [
+                str(detail_tree.item(item, "values")[0])
+                for item in detail_tree.selection()
+            ]
+            if not usernames:
+                messagebox.showwarning(
+                    t("batches.move.title"), t("batches.move.select_accounts"), parent=dialog
+                )
+                return
+            choice = choose_move_target(source_id, len(usernames))
+            if choice is None:
+                return
+            kind, value = choice
+            created_id = None
+            try:
+                if kind == "new":
+                    created_id = create_empty_draft_batch(self.connection, str(value))
+                    target_id = created_id
+                else:
+                    target_id = int(value)
+                result = move_accounts_to_batch(
+                    self.connection,
+                    source_batch_id=source_id,
+                    target_batch_id=target_id,
+                    usernames=usernames,
+                )
+            except (BatchManageError, PauseAccountsError) as exc:
+                if created_id is not None:
+                    delete_unstarted_batch(self.connection, created_id)
+                messagebox.showerror(t("batches.move.title"), str(exc), parent=dialog)
+                return
+            self._write_console(
+                f"{len(result.usernames)} cuenta(s) movidas → «{result.target_batch_name}» "
+                f"(id={result.target_batch_id}).\n"
+            )
+            after_change(changed={source_id, result.target_batch_id})
+            select_batch(source_id)
+
+        def restore_selected() -> None:
+            summary = selected_history_summary()
+            if summary is None:
+                return
+            try:
+                restore_batch_to_draft(self.connection, summary.batch_id)
+            except BatchManageError as exc:
+                messagebox.showwarning(t("batches.btn.restore"), str(exc), parent=dialog)
+                return
+            self._write_console(
+                f"Lote {summary.batch_id} recuperado del histórico como GUARDADO.\n"
+            )
+            after_change(changed={summary.batch_id})
+            notebook.select(0)
+            select_batch(summary.batch_id)
 
         def finish_selected() -> None:
             summary = selected_active_summary()
@@ -419,15 +585,11 @@ class BatchesDialogMixin:
             if self.active_batch_id == batch_id:
                 self.batch_ready_for_rename = False
                 self.rename_button.configure(state="disabled")
-            if self.active_queue_id is not None:
-                open_queue = get_open_queue(self.connection)
-                if open_queue is None:
-                    self.active_queue_id = None
             self._write_console(
                 f"Batch {batch_id} marcado como COMPLETED (sin renombrar).\n"
             )
             reload_active()
-            refresh_queue_panel()
+            refresh_detail()
             if history_loaded["done"]:
                 reload_history()
             self._update_pending_button_label()
@@ -448,7 +610,8 @@ class BatchesDialogMixin:
                 f"Marcar el lote {summary.batch_name} (id={summary.batch_id}) "
                 "como ejecutado en otra instancia?\n\n"
                 "Dejara de ser pendiente de descarga y pasara a POR RENOMBRAR "
-                "(puedes renombrar o finalizar sin renombrar).",
+                "(puedes renombrar o finalizar sin renombrar).\n\n"
+                + t("batches.elsewhere_warning"),
                 parent=dialog,
             ):
                 return
@@ -465,12 +628,8 @@ class BatchesDialogMixin:
                 f"Batch {summary.batch_id} marcado como AWAITING_RENAME "
                 "(ejecutado en otra instancia).\n"
             )
-            if self.active_queue_id is not None:
-                open_queue = get_open_queue(self.connection)
-                if open_queue is None:
-                    self.active_queue_id = None
             reload_active()
-            refresh_queue_panel()
+            refresh_detail()
             self._update_pending_button_label()
 
         def rename_selected() -> None:
@@ -497,7 +656,6 @@ class BatchesDialogMixin:
             self.saved_batch_id = None
             self.saved_draft_signature = None
             self.active_batch_id = batch_id
-            self.active_queue_id = None
             self.batch_ready_for_rename = True
             self._update_batch_context()
             self.rename_button.configure(state="normal")
@@ -583,214 +741,83 @@ class BatchesDialogMixin:
             dialog.destroy()
             self._load_historical_batch(summary.batch_id, draft)
 
-        queue_frame = ttk.LabelFrame(dialog, text="Cola de ejecución", padding=8)
-        queue_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 4))
-        queue_frame.columnconfigure(0, weight=1)
-        queue_tree = ttk.Treeview(
-            queue_frame,
-            columns=("order", "name", "id", "item_status", "batch_status"),
-            show="headings",
-            height=4,
-            selectmode="browse",
+        # --- detail of the selected batch: its accounts ---------------------------------
+        manage_row = ttk.Frame(active_tab)
+        manage_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Button(manage_row, text=t("batches.btn.new"), command=new_batch).pack(side=tk.LEFT)
+        ttk.Button(manage_row, text=t("batches.btn.rename"), command=rename_batch_action).pack(
+            side=tk.LEFT, padx=(6, 0)
         )
-        for column, title, width, anchor in (
-            ("order", "#", 40, "e"),
-            ("name", "Lote", 280, "w"),
-            ("id", "ID", 60, "e"),
-            ("item_status", "En cola", 110, "w"),
-            ("batch_status", "Lote", 130, "w"),
+        ttk.Button(manage_row, text=t("batches.btn.delete"), command=delete_selected).pack(
+            side=tk.LEFT, padx=(6, 0)
+        )
+
+        detail_frame = ttk.LabelFrame(dialog, text=t("batches.detail"), padding=8)
+        detail_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 4))
+        detail_frame.columnconfigure(0, weight=1)
+        detail_frame.rowconfigure(0, weight=1)
+        detail_tree = ttk.Treeview(
+            detail_frame,
+            columns=("username", "prio", "urls", "stories", "start"),
+            show="headings",
+            height=6,
+            selectmode="extended",
+        )
+        for column, title_key, width, anchor in (
+            ("username", "batches.col.username", 260, "w"),
+            ("prio", "batches.col.prio", 60, "center"),
+            ("urls", "batches.col.urls", 70, "e"),
+            ("stories", "batches.col.stories", 80, "center"),
+            ("start", "batches.col.start", 120, "w"),
         ):
-            queue_tree.heading(column, text=title)
-            queue_tree.column(column, width=width, anchor=anchor)
-        queue_tree.grid(row=0, column=0, sticky="nsew")
-        queue_scroll = ttk.Scrollbar(
-            queue_frame,
+            detail_tree.heading(column, text=t(title_key))
+            detail_tree.column(column, width=width, anchor=anchor)
+        bind_treeview_sort(
+            detail_tree,
+            ("username", "prio", "urls", "stories", "start"),
+            title_for=lambda column: t(f"batches.col.{column}"),
+        )
+        detail_tree.grid(row=0, column=0, sticky="nsew")
+        detail_scroll = ttk.Scrollbar(
+            detail_frame,
             orient=tk.VERTICAL,
-            command=queue_tree.yview,
+            command=detail_tree.yview,
             style="Visible.Vertical.TScrollbar",
         )
-        queue_scroll.grid(row=0, column=1, sticky="ns")
-        queue_tree.configure(yscrollcommand=queue_scroll.set)
-        queue_buttons = ttk.Frame(queue_frame)
-        queue_buttons.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        detail_scroll.grid(row=0, column=1, sticky="ns")
+        detail_tree.configure(yscrollcommand=detail_scroll.set)
+        detail_buttons = ttk.Frame(detail_frame)
+        detail_buttons.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        detail_hint = ttk.Label(detail_buttons, text="")
+        detail_hint.pack(side=tk.LEFT)
+        ttk.Button(
+            detail_buttons, text=t("batches.btn.move"), command=move_accounts_action
+        ).pack(side=tk.RIGHT)
 
-        def selected_queue_item_id() -> int | None:
-            selection = queue_tree.selection()
-            if not selection:
-                messagebox.showwarning(
-                    "Cola",
-                    "Selecciona un lote de la cola.",
-                    parent=dialog,
-                )
-                return None
-            return int(selection[0])
-
-        def refresh_queue_panel() -> None:
-            for item in queue_tree.get_children():
-                queue_tree.delete(item)
-            queue = get_open_queue(self.connection)
-            if queue is None:
-                self.active_queue_id = None
+        def refresh_detail() -> None:
+            for item in detail_tree.get_children():
+                detail_tree.delete(item)
+            batch_id = selected_active_batch_id_quiet()
+            if batch_id is None:
+                detail_hint.configure(text=t("batches.select_one"))
                 return
-            self.active_queue_id = queue.id
-            visible_index = 0
-            for item in queue.items:
-                if item.is_removed:
-                    continue
-                visible_index += 1
-                queue_tree.insert(
+            rows = list_batch_accounts(self.connection, batch_id)
+            for index, row in enumerate(rows):
+                detail_tree.insert(
                     "",
                     tk.END,
-                    iid=str(item.id),
+                    iid=str(index),
                     values=(
-                        visible_index,
-                        item.batch_name,
-                        item.batch_id,
-                        item.status,
-                        item.batch_status,
+                        row.username,
+                        priority_cell_text(row.priority),
+                        row.url_count,
+                        stories_cell_text(row.download_stories),
+                        row.start_date,
                     ),
                 )
+            detail_hint.configure(text=t("batches.detail_count", count=len(rows)))
 
-        self._refresh_queue_panel = refresh_queue_panel
-
-        def add_selected_to_queue() -> None:
-            batch_ids = selected_active_batch_ids()
-            if not batch_ids:
-                return
-            try:
-                queue = add_batches_to_open_queue(self.connection, batch_ids)
-            except BatchQueueError as exc:
-                messagebox.showerror("Cola", str(exc), parent=dialog)
-                return
-            self.active_queue_id = queue.id
-            refresh_queue_panel()
-            self._write_console(
-                f"Cola {queue.id}: {len(queue.items)} lote(s) en secuencia.\n"
-            )
-
-        def remove_selected_from_queue() -> None:
-            item_id = selected_queue_item_id()
-            if item_id is None:
-                return
-            try:
-                queue = remove_queue_item(self.connection, item_id)
-            except BatchQueueError as exc:
-                messagebox.showerror("Cola", str(exc), parent=dialog)
-                return
-            refresh_queue_panel()
-            if queue.status == QueueStatus.CANCELLED.value:
-                self.active_queue_id = None
-                self._write_console(
-                    "Lote quitado de la cola; la secuencia quedó vacía y se cerró.\n"
-                )
-            elif self.process_runner.is_running() and self.active_queue_id is not None:
-                self._write_console(
-                    "Lote quitado de la cola; la secuencia "
-                    "continuará con los que queden.\n"
-                )
-
-        def move_selected_queue_item(direction: int) -> None:
-            item_id = selected_queue_item_id()
-            if item_id is None:
-                return
-            try:
-                move_queue_item(self.connection, item_id, direction=direction)
-            except BatchQueueError as exc:
-                messagebox.showerror("Cola", str(exc), parent=dialog)
-                return
-            refresh_queue_panel()
-            queue_tree.selection_set(str(item_id))
-
-        def run_queue_selected() -> None:
-            queue = get_open_queue(self.connection)
-            if queue is None or not queue.pending_items and queue.running_item is None:
-                messagebox.showwarning(
-                    "Ejecutar secuencia",
-                    "Añade al menos un lote ejecutable a la cola.",
-                    parent=dialog,
-                )
-                return
-            try:
-                self._start_queue_sequence(queue.id)
-            except BatchQueueError as exc:
-                messagebox.showerror("Ejecutar secuencia", str(exc), parent=dialog)
-
-        def rename_queue_selected() -> None:
-            queue = get_open_queue(self.connection)
-            batch_ids: list[int] = []
-            if queue is not None and queue.rename_batch_ids:
-                batch_ids = list(queue.rename_batch_ids)
-                self.active_queue_id = queue.id
-            else:
-                selected = selected_active_batch_ids()
-                if len(selected) < 2:
-                    messagebox.showwarning(
-                        "Renombrar cola",
-                        "Selecciona una cola o al menos dos lotes POR RENOMBRAR.",
-                        parent=dialog,
-                    )
-                    return
-                try:
-                    queue = add_batches_to_open_queue(self.connection, selected)
-                except BatchQueueError as exc:
-                    messagebox.showerror("Renombrar cola", str(exc), parent=dialog)
-                    return
-                batch_ids = list(queue.rename_batch_ids)
-                self.active_queue_id = queue.id
-            if not batch_ids:
-                messagebox.showwarning(
-                    "Renombrar cola",
-                    "No hay lotes en la cola listos para renombrar.",
-                    parent=dialog,
-                )
-                return
-            for batch_id in batch_ids:
-                if not is_batch_ready_for_rename(self.connection, batch_id):
-                    messagebox.showwarning(
-                        "Renombrar cola",
-                        f"El lote {batch_id} aún no está listo para renombrar.",
-                        parent=dialog,
-                    )
-                    return
-            try:
-                draft = load_batch_draft(self.connection, batch_ids[0])
-            except ValueError as exc:
-                messagebox.showerror("Renombrar cola", str(exc), parent=dialog)
-                return
-            self._load_persisted_draft(batch_ids[0], draft)
-            self.saved_batch_id = None
-            self.saved_draft_signature = None
-            self.active_batch_id = batch_ids[0]
-            self.batch_ready_for_rename = True
-            self._update_batch_context()
-            self.rename_button.configure(state="normal")
-            refresh_queue_panel()
-            self._write_console(
-                f"Cola {self.active_queue_id}: renombrado combinado de "
-                f"{len(batch_ids)} lote(s). Pulsa Renombrar o espera el arranque.\n"
-            )
-            self._rename_manual_files()
-
-        ttk.Button(
-            queue_buttons, text="Añadir a cola", command=add_selected_to_queue
-        ).pack(side=tk.LEFT)
-        ttk.Button(
-            queue_buttons, text="Quitar de cola", command=remove_selected_from_queue
-        ).pack(side=tk.LEFT, padx=(6, 0))
-        ttk.Button(
-            queue_buttons, text="Subir", command=lambda: move_selected_queue_item(-1)
-        ).pack(side=tk.LEFT, padx=(6, 0))
-        ttk.Button(
-            queue_buttons, text="Bajar", command=lambda: move_selected_queue_item(1)
-        ).pack(side=tk.LEFT, padx=(6, 0))
-        ttk.Button(
-            queue_buttons, text="Ejecutar secuencia", command=run_queue_selected
-        ).pack(side=tk.RIGHT)
-        ttk.Button(
-            queue_buttons,
-            text="Renombrar cola / selección",
-            command=rename_queue_selected,
-        ).pack(side=tk.RIGHT, padx=(0, 8))
+        active_tree.bind("<<TreeviewSelect>>", lambda _event: refresh_detail())
 
         active_actions = ttk.Frame(dialog, padding=10)
         history_actions = ttk.Frame(dialog, padding=10)
@@ -799,11 +826,11 @@ class BatchesDialogMixin:
         def show_active_actions() -> None:
             history_actions.grid_remove()
             active_actions.grid(row=3, column=0, sticky="ew")
-            queue_frame.grid()
+            detail_frame.grid()
 
         def show_history_actions() -> None:
             active_actions.grid_remove()
-            queue_frame.grid_remove()
+            detail_frame.grid_remove()
             history_actions.grid(row=3, column=0, sticky="ew")
             if not history_loaded["done"]:
                 reload_history()
@@ -814,12 +841,12 @@ class BatchesDialogMixin:
             else:
                 show_active_actions()
 
-        ttk.Button(active_actions, text="Reanudar / Ejecutar", command=resume_selected).pack(
+        ttk.Button(active_actions, text=t("batches.btn.run"), command=resume_selected).pack(
             side=tk.RIGHT
         )
-        ttk.Button(
-            active_actions, text="Recuperar / Modificar", command=recover_selected
-        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(active_actions, text=t("batches.btn.edit"), command=recover_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
         ttk.Button(active_actions, text="Renombrar", command=rename_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
@@ -839,9 +866,6 @@ class BatchesDialogMixin:
         ttk.Button(active_actions, text="Importar", command=import_batch).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
-        ttk.Button(active_actions, text="Borrar lote", command=delete_selected).pack(
-            side=tk.RIGHT, padx=(0, 8)
-        )
         ttk.Button(active_actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
 
         ttk.Button(
@@ -849,6 +873,11 @@ class BatchesDialogMixin:
             text="Abrir (solo lectura)",
             command=open_history_selected,
         ).pack(side=tk.RIGHT)
+        ttk.Button(
+            history_actions,
+            text=t("batches.btn.restore"),
+            command=restore_selected,
+        ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(
             history_actions,
             text="Exportar",
@@ -865,8 +894,31 @@ class BatchesDialogMixin:
         managed = reload_active()
         notebook.tab(1, text="Históricos")
         show_active_actions()
-        refresh_queue_panel()
+        refresh_detail()
         if not managed:
             active_empty.place(relx=0.48, rely=0.48, anchor="center")
         center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
 
+
+    def _sync_editor_with_batches(self, changed: set[int], deleted: set[int]) -> None:
+        """Keep the main window consistent after the batches dialog changed SQLite."""
+        if self.saved_batch_id in deleted:
+            if not self.process_runner.is_running():
+                self._start_new_batch()
+            return
+        for batch_id in (self.saved_batch_id, self.active_batch_id):
+            if batch_id is None or batch_id not in changed:
+                continue
+            try:
+                draft = load_batch_draft(self.connection, batch_id)
+            except ValueError:
+                return
+            if self.saved_batch_id == batch_id:
+                self._load_persisted_draft(batch_id, draft)
+            else:
+                self.accounts = list(draft.accounts)
+                self.saved_draft_signature = _draft_signature(draft)
+                self.selected_index = None
+                self._refresh_table()
+                self._refresh_runtime_progress()
+            return

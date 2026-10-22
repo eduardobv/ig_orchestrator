@@ -8,6 +8,7 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.renaming.settings import INTEGRATED, read_engine
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
@@ -134,43 +135,6 @@ class RenameMixin:
         """Return start date, new-account args and optional warning notes."""
 
         notes: list[str] = []
-        if self.active_queue_id is not None:
-            try:
-                queue = get_queue(self.connection, self.active_queue_id)
-            except BatchQueueError as exc:
-                notes.append(f"No se pudo leer la cola {self.active_queue_id}: {exc}")
-                self.active_queue_id = None
-            else:
-                if not queue.rename_batch_ids:
-                    notes.append(
-                        f"La cola {self.active_queue_id} no tiene lotes activos; "
-                        "se usará el lote seleccionado."
-                    )
-                    self.active_queue_id = None
-        if self.active_queue_id is not None:
-            try:
-                params = collect_queue_rename_parameters(
-                    self.connection, self.active_queue_id
-                )
-            except (BatchQueueError, ValueError) as exc:
-                notes.append(f"No se pudo leer la cola {self.active_queue_id}: {exc}")
-                self.active_queue_id = None
-            else:
-                notes.append(
-                    f"Parámetros unidos de la cola id={self.active_queue_id} "
-                    f"({len(params.batch_ids)} lote(s))."
-                )
-                if params.has_mixed_dates:
-                    notes.append(
-                        "Los lotes tenían startNowDate distintos; "
-                        f"se usa {params.start_now_date}."
-                    )
-                if not MANUAL_RENAME_SCRIPT.is_file():
-                    notes.append(
-                        f"Aviso: no se encontró el script en {MANUAL_RENAME_SCRIPT}."
-                    )
-                return params.start_now_date, params.new_accounts, notes
-
         start_now_date = self.default_date_var.get().strip()
         accounts = self.accounts
         batch_id = self.active_batch_id or self.saved_batch_id
@@ -279,50 +243,26 @@ class RenameMixin:
             return
         if self.process_runner.is_running() or not self.batch_ready_for_rename:
             return
+        if self._offer_pull_before_rename():
+            return
 
-        if self.active_queue_id is None and self.active_batch_id is None:
+        if self.active_batch_id is None:
             messagebox.showerror("Renombrar", "No hay un batch activo para renombrar.")
             self._set_status_tone(STATUS_TONE_ERROR)
             return
-        if self.active_queue_id is not None:
-            try:
-                queue = get_queue(self.connection, self.active_queue_id)
-            except BatchQueueError as exc:
-                messagebox.showerror("Renombrar", str(exc))
-                self._set_status_tone(STATUS_TONE_ERROR)
-                return
-            if not queue.rename_batch_ids:
-                self.active_queue_id = None
-        if self.active_queue_id is not None:
-            try:
-                params = collect_queue_rename_parameters(
-                    self.connection, self.active_queue_id
-                )
-            except (BatchQueueError, ValueError) as exc:
-                messagebox.showerror("Renombrar", str(exc))
-                self._set_status_tone(STATUS_TONE_ERROR)
-                return
-            self.default_date_var.set(params.start_now_date)
-            self.rename_new_accounts = params.new_accounts
-            if params.has_mixed_dates:
-                self._write_console(
-                    "Aviso: startNowDate combinado = "
-                    f"{params.start_now_date} (la más reciente de la cola).\n"
-                )
-        else:
-            try:
-                persisted_draft = load_batch_draft(
-                    self.connection,
-                    self.active_batch_id,
-                )
-            except ValueError as exc:
-                messagebox.showerror("Renombrar", str(exc))
-                self._set_status_tone(STATUS_TONE_ERROR)
-                return
-            self.default_date_var.set(persisted_draft.default_start_now_date)
-            self.rename_new_accounts = _new_account_rename_parameters(
-                persisted_draft.accounts
+        try:
+            persisted_draft = load_batch_draft(
+                self.connection,
+                self.active_batch_id,
             )
+        except ValueError as exc:
+            messagebox.showerror("Renombrar", str(exc))
+            self._set_status_tone(STATUS_TONE_ERROR)
+            return
+        self.default_date_var.set(persisted_draft.default_start_now_date)
+        self.rename_new_accounts = _new_account_rename_parameters(
+            persisted_draft.accounts
+        )
 
         start_now_date = self.default_date_var.get().strip()
         try:
@@ -335,6 +275,9 @@ class RenameMixin:
                 "Start date debe tener formato YYYY-MM-DD antes de renombrar.",
             )
             self._set_status_tone(STATUS_TONE_ERROR)
+            return
+        if read_engine(self.connection) == INTEGRATED:
+            self._start_integrated_rename(start_now_date, self.rename_new_accounts)
             return
         if not MANUAL_RENAME_SCRIPT.is_file():
             error = f"No se encontro el script de renombrado: {MANUAL_RENAME_SCRIPT}"
@@ -380,27 +323,12 @@ class RenameMixin:
         )
         self.active_process_kind = None
         if decision.mark_completed:
-            if self.active_queue_id is not None:
-                try:
-                    finish_queue_after_rename(self.connection, self.active_queue_id)
-                    self._write_console(
-                        f"Cola {self.active_queue_id} y sus lotes marcados "
-                        "COMPLETED tras renombrar.\n"
-                    )
-                    self.active_queue_id = None
-                except (BatchQueueError, ValueError) as exc:
-                    self._write_console(
-                        f"No se pudo marcar COMPLETED la cola: {exc}\n"
-                    )
-            elif self.active_batch_id is not None:
                 try:
                     finish_batch(self.connection, self.active_batch_id)
                     self._write_console(
                         f"Batch {self.active_batch_id} marcado COMPLETED "
                         "tras renombrar.\n"
                     )
-                    if self._refresh_queue_panel is not None:
-                        self._refresh_queue_panel()
                 except ValueError as exc:
                     self._write_console(
                         f"No se pudo marcar COMPLETED tras renombrar: {exc}\n"

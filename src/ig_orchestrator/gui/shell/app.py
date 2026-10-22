@@ -147,8 +147,21 @@ from ig_orchestrator.gui.chrome.statusbar import StatusBarMixin
 from ig_orchestrator.gui.chrome.toolbar import ToolbarMixin
 from ig_orchestrator.gui.editor.panel import EditorPanelMixin
 from ig_orchestrator.gui.run.controller import RunControllerMixin
+from ig_orchestrator.gui.library.catalog_advanced import CatalogAdvancedMixin
+from ig_orchestrator.gui.library.index_actions import IndexActionsMixin
+from ig_orchestrator.gui.shared.window_position import install_auto_centering
+from ig_orchestrator.gui.library.staging_panel import StagingPanelMixin
+from ig_orchestrator.gui.run.integrated_rename import IntegratedRenameMixin
 from ig_orchestrator.gui.run.rename import RenameMixin
 from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
+from ig_orchestrator.gui.exchange.publish_dialog import PublishDialogMixin
+from ig_orchestrator.gui.exchange.pull_dialog import PullDialogMixin
+from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
+from ig_orchestrator.gui.library.fsops_actions import FsOpsActionsMixin
+from ig_orchestrator.gui.library.lifecycle_actions import AccountLifecycleActionsMixin
+from ig_orchestrator.gui.library.rename_actions import AccountRenameActionsMixin
+from ig_orchestrator.gui.library.scan_actions import LibraryScanActionsMixin
+from ig_orchestrator.gui.library.import_dialog import LibraryImportMixin
 from ig_orchestrator.gui.stories.dialog import StoriesInboxMixin
 
 def launch_gui(
@@ -189,7 +202,19 @@ class InstagramOrchestratorApp(
     BatchesDialogMixin,
     RunControllerMixin,
     RenameMixin,
+    IntegratedRenameMixin,
+    IndexActionsMixin,
+    CatalogAdvancedMixin,
+    StagingPanelMixin,
     StoriesInboxMixin,
+    LibraryAuditMixin,
+    LibraryImportMixin,
+    FsOpsActionsMixin,
+    AccountLifecycleActionsMixin,
+    AccountRenameActionsMixin,
+    LibraryScanActionsMixin,
+    PullDialogMixin,
+    PublishDialogMixin,
 ):
     def __init__(
         self,
@@ -200,6 +225,7 @@ class InstagramOrchestratorApp(
         batch_json_path: Path,
     ) -> None:
         self.root = root
+        install_auto_centering()  # every window opens centred on the monitor of the main window
         self.connection = connection
         self.settings = settings
         self.catalog_service = AccountCatalogService(
@@ -221,11 +247,10 @@ class InstagramOrchestratorApp(
         self.last_run_was_dry_run = False
         self.dry_run_var = tk.BooleanVar(value=False)
         self.active_batch_id: int | None = None
-        self.active_queue_id: int | None = None
+        self.paused_batch_id: int | None = None
         self.cancel_requested = False
         self.active_process_kind: str | None = None
         self._batches_dialog: tk.Toplevel | None = None
-        self._refresh_queue_panel = None
         self.runtime_progress: dict[str, AccountRuntimeProgress] = {}
         self.progress_poll_id: str | None = None
         self._username_sort_ascending: bool | None = None
@@ -240,6 +265,9 @@ class InstagramOrchestratorApp(
             if row is not None and str(row["value"]) in {"list", "tree"}:
                 self.catalog_view_mode = str(row["value"])
             self.catalog_colors = load_catalog_colors(connection)
+        if self.catalog_view_mode == "tree":
+            self.catalog_service.include_deleted = True
+            self.catalog_entries = self.catalog_service.list_entries()
 
         today = date.today().isoformat()
         self.batch_name_var = tk.StringVar(
@@ -247,6 +275,12 @@ class InstagramOrchestratorApp(
         )
         self.default_date_var = tk.StringVar(value=today)
         self.catalog_filter_var = tk.StringVar()
+        self.catalog_show_deleted_var = tk.BooleanVar(
+            value=_gui_setting(connection, "ui.catalog_show_deleted", "0") == "1"
+        )
+        self.catalog_show_inactive_var = tk.BooleanVar(
+            value=_gui_setting(connection, "ui.catalog_show_inactive", "0") == "1"
+        )
         self.batch_filter_var = tk.StringVar()
         self.batch_count_var = tk.StringVar(value=t("label.batch_count", count=0))
         self.username_var = tk.StringVar()
@@ -284,32 +318,7 @@ class InstagramOrchestratorApp(
         self._refresh_table()
         self._update_pending_button_label()
         self._update_batch_context()
-        self._restore_open_queue()
-
-
-    def _restore_open_queue(self) -> None:
-        """Pick up a sequence persisted by this or another instance."""
-        queue = get_open_queue(self.connection)
-        if queue is None:
-            self.active_queue_id = None
-            return
-        self.active_queue_id = queue.id
-        if queue.status == QueueStatus.PAUSED.value:
-            self.pause_button.configure(
-                image=self.icons.get("play"),
-                tooltip=t("tooltip.resume"),
-                state="normal"
-            )
-        elif queue.status == QueueStatus.AWAITING_RENAME.value and queue.rename_batch_ids:
-            self.batch_ready_for_rename = True
-            self.rename_button.configure(state="normal")
-            try:
-                params = collect_queue_rename_parameters(self.connection, queue.id)
-            except (BatchQueueError, ValueError):
-                self.active_queue_id = None
-                return
-            self.default_date_var.set(params.start_now_date)
-            self.rename_new_accounts = params.new_accounts
+        self.root.after(600, self._fsops_startup)
 
 
     def _build_widgets(self) -> None:
@@ -390,7 +399,7 @@ class InstagramOrchestratorApp(
         self.stories_button.grid(row=0, column=8, padx=(0, 12))
         ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=9, sticky="w")
         self.batch_name_entry = ttk.Entry(
-            top, textvariable=self.batch_name_var, width=28
+            top, textvariable=self.batch_name_var, width=48
         )
         self.batch_name_entry.grid(row=0, column=10, sticky="ew", padx=(6, 12))
         bind_edit_context_menu(self.batch_name_entry)

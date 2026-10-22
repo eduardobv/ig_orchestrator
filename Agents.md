@@ -1,12 +1,16 @@
 # Agents.md
 
+## Antes de empezar (sesion nueva)
+
+Leer `CLAUDE.md` y, para cualquier pregunta o cambio, consultar primero `docs/arquitectura-v3.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md` y `CHANGELOG.md` (indice en `docs/README.md`). No depender de la memoria de la conversacion.
+
 ## Proposito
 
 Este archivo sirve como instrucciones base para cualquier IA que implemente tareas de este proyecto.
 
 Cuando se pida implementar una tarea, leer primero:
 
-1. `PLAN.md`
+1. `tasks/done/PLAN.md` (plan inicial, histórico)
 2. `Agents.md`
 3. `tasks/TareaX.md`
 4. El codigo existente relacionado
@@ -175,6 +179,19 @@ Cada tarea debe actualizar `CHANGELOG.md` con:
 * pruebas ejecutadas.
 
 Si `CHANGELOG.md` no existe, crearlo.
+
+## Regla permanente: cada peticion cierra con documentacion completa y version incremental
+
+* Toda peticion que cambie algo se entrega con **toda** la documentacion actualizada en el mismo commit (CHANGELOG, manual de usuario, tutorial, arquitectura, MODULE.md, README, Agents/CLAUDE, nota del feat). El usuario no tiene que repetirlo.
+* Dentro de la serie activa (v3.x) una mejora pedida es un **feat incremental**: sube el **minor** (`v3.13.0`…), se llama `feat-<area>-<n>` (siguiente numero) y su spec va en `tasks/done/v3/`. Una correccion sube el **patch**. No abrir serie nueva sin peticion expresa.
+
+## Documentacion que se actualiza siempre
+
+En cada cambio, ademas de `CHANGELOG.md`:
+
+* `docs/manual-usuario.md`: obligatorio cuando se anade, cambia o elimina un menu, menu contextual, modal, boton o ajuste de la GUI. Debe describir que hace y a que invoca/abre.
+* `Agents.md`: actualizarlo si cambian estas instrucciones o el proceso de trabajo.
+* `CLAUDE.md`, `README.md`, `MODULE.md` del paquete y `docs/tutorial-v3.md` segun corresponda.
 
 ## Respuesta final de cada implementacion
 

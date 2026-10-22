@@ -39,6 +39,9 @@ class GuiCatalogRepository(AccountHistoryRepository):
         normalized = user_name.strip()
         existing = self.get_by_user_name(normalized)
         if existing is not None:
+            if existing.status is AccountHistoryStatus.ARCHIVED:
+                # Using an archived account (editor, batch) makes it managed.
+                return self.update_status(normalized, AccountHistoryStatus.ENABLED)
             return existing
         now = datetime.now(timezone.utc).isoformat()
         enabled_id = self._lookups.id_for("catalog_account_statuses", "ENABLED")
@@ -71,16 +74,23 @@ class GuiCatalogRepository(AccountHistoryRepository):
         ).fetchone()
         return _row_to_history(row)
 
-    def list_all(self) -> list[AccountHistory]:
+    def list_all(
+        self, include_archived: bool = False, include_deleted: bool = False
+    ) -> list[AccountHistory]:
+        hidden = [] if include_archived else ["'ARCHIVED'"]
+        if not (include_archived or include_deleted):
+            hidden.append("'DELETED'")
+        where = f" WHERE cas.code NOT IN ({', '.join(hidden)})" if hidden else ""
         rows = self.connection.execute(
-            _CATALOG_SELECT + " ORDER BY ca.id"
+            _CATALOG_SELECT + where + " ORDER BY ca.id"
         ).fetchall()
         return [_row_to_history(row) for row in rows]
 
     def list_enabled(self) -> list[AccountHistory]:
         disabled_id = self._lookups.id_for("catalog_account_statuses", "DISABLED")
         rows = self.connection.execute(
-            _CATALOG_SELECT + " WHERE ca.status_id <> ? ORDER BY ca.id",
+            _CATALOG_SELECT
+            + " WHERE ca.status_id <> ? AND cas.code NOT IN ('ARCHIVED', 'DELETED') ORDER BY ca.id",
             (disabled_id,),
         ).fetchall()
         return [_row_to_history(row) for row in rows]
@@ -99,7 +109,8 @@ class GuiCatalogRepository(AccountHistoryRepository):
             SELECT DISTINCT TRIM(cf.full_path) AS destination_path
             FROM catalog_accounts ca
             JOIN catalog_folders cf ON cf.id = ca.folder_id
-            WHERE TRIM(cf.full_path) <> ''
+            JOIN catalog_account_statuses cas ON cas.id = ca.status_id
+            WHERE TRIM(cf.full_path) <> '' AND cas.code NOT IN ('ARCHIVED', 'DELETED')
             ORDER BY destination_path COLLATE NOCASE
             """
         ).fetchall()

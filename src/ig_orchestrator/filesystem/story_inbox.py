@@ -26,6 +26,8 @@ class StoryInboxError(ValueError):
 
 class StoryInboxStatus(StrEnum):
     MOVED = "MOVED"
+    MOVED_VIA_ALIAS = "MOVED_VIA_ALIAS"  # the username in the file name is an old name of the account
+    OVERWRITTEN = "OVERWRITTEN"  # forced move: replaced the file that already existed
     NO_USERNAME_IN_NAME = "NO_USERNAME_IN_NAME"
     USERNAME_NOT_IN_DB = "USERNAME_NOT_IN_DB"
     EMPTY_PATH = "EMPTY_PATH"
@@ -100,46 +102,142 @@ def _lookup_account_path(connection: sqlite3.Connection, username: str) -> str |
     return str(row["path"] if "path" in row.keys() else row[0] or "")
 
 
+def _lookup_bdapp_path(app: sqlite3.Connection, username: str) -> str | None:
+    """Absolute account folder from bdapp (``LIBRARY`` root + ``rel_path``)."""
+
+    try:
+        row = app.execute(
+            """
+            SELECT a.rel_path,
+                   (SELECT path FROM path_roots WHERE code = 'LIBRARY') AS root,
+                   f.full_path, a.username
+            FROM catalog_accounts a
+            LEFT JOIN catalog_folders f ON f.id = a.folder_id
+            WHERE a.username = ? COLLATE NOCASE
+            LIMIT 1
+            """,
+            (username,),
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None:
+        return None
+    if row[0] and str(row[1] or "").strip():
+        root = str(row[1]).rstrip("\\/")
+        return "\\".join((root, str(row[0])))
+    if row[2]:  # account without rel_path: its catalog folder + username
+        return "\\".join((str(row[2]).rstrip("\\/"), str(row[3])))
+    return None
+
+
+def _lookup_alias(app: sqlite3.Connection, username: str) -> tuple[str, str] | None:
+    """``(account folder, current username)`` when *username* is a unique old name of an account."""
+
+    try:
+        rows = app.execute(
+            """
+            SELECT DISTINCT a.username FROM account_usernames u
+            JOIN catalog_accounts a ON a.id = u.catalog_account_id
+            WHERE u.username = ? COLLATE NOCASE AND a.username <> ? COLLATE NOCASE
+            """,
+            (username, username),
+        ).fetchall()
+    except sqlite3.Error:
+        return None
+    if len(rows) != 1:  # an old name reused by several accounts is ambiguous: never guess
+        return None
+    current = str(rows[0][0])
+    path = _lookup_bdapp_path(app, current)
+    return (path, current) if path else None
+
+
 def organize_story_inbox(
     *,
     inbox: Path | str,
-    accounts_db: Path | str,
+    accounts_db: Path | str | None = None,
+    app_connection: sqlite3.Connection | None = None,
 ) -> list[StoryInboxResult]:
-    """Move each media file in *inbox* to ``{accounts_dir.path}/story``."""
+    """Move each media file in *inbox* to ``<account folder>/story``.
+
+    The account folder comes from bdapp (``app_connection``) first; the legacy
+    ``accounts_dir`` table in *accounts_db* is only a fallback.
+    """
 
     inbox_path = Path(inbox)
-    db_path = Path(accounts_db)
     if not inbox_path.is_dir():
         raise StoryInboxError(f"Stories folder does not exist: {inbox_path}")
-    if not db_path.is_file():
-        raise StoryInboxError(f"Accounts database does not exist: {db_path}")
+    db_path = Path(accounts_db) if accounts_db else None
+    if db_path is None and app_connection is None:
+        raise StoryInboxError("No account source: configure bdapp or an accounts database.")
+    if db_path is not None and not db_path.is_file():
+        if app_connection is None:
+            raise StoryInboxError(f"Accounts database does not exist: {db_path}")
+        db_path = None
 
-    try:
-        connection = _connect_accounts_db(db_path)
-    except sqlite3.Error as exc:
-        raise StoryInboxError(f"Cannot open accounts database: {exc}") from exc
+    connection: sqlite3.Connection | None = None
+    if db_path is not None:
+        try:
+            connection = _connect_accounts_db(db_path)
+        except sqlite3.Error as exc:
+            if app_connection is None:
+                raise StoryInboxError(f"Cannot open accounts database: {exc}") from exc
 
     results: list[StoryInboxResult] = []
     try:
-        tables = {
-            str(row[0])
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table'"
-            ).fetchall()
-        }
-        if "accounts_dir" not in tables:
-            raise StoryInboxError(
-                "The database has no accounts_dir table. "
-                f"File: {db_path}"
-            )
+        if connection is not None:
+            tables = {
+                str(row[0])
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+            }
+            if "accounts_dir" not in tables:
+                if app_connection is None:
+                    raise StoryInboxError(
+                        f"The database has no accounts_dir table. File: {db_path}"
+                    )
+                connection.close()
+                connection = None
         for source in list_inbox_media(inbox_path):
-            results.append(_move_one(connection, source))
+            results.append(_move_one(connection, source, app_connection))
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
     return results
 
 
-def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
+def force_move_conflicts(
+    results: list[StoryInboxResult],
+    *,
+    app_connection: sqlite3.Connection | None = None,
+    accounts_db: Path | str | None = None,
+) -> list[StoryInboxResult]:
+    """Retry the ``DESTINATION_EXISTS`` results overwriting the existing file."""
+
+    connection: sqlite3.Connection | None = None
+    if accounts_db and Path(accounts_db).is_file():
+        try:
+            connection = _connect_accounts_db(Path(accounts_db))
+        except sqlite3.Error:
+            connection = None
+    forced: list[StoryInboxResult] = []
+    try:
+        for item in results:
+            if item.status is not StoryInboxStatus.DESTINATION_EXISTS or not item.source.is_file():
+                continue
+            forced.append(_move_one(connection, item.source, app_connection, overwrite=True))
+    finally:
+        if connection is not None:
+            connection.close()
+    return forced
+
+
+def _move_one(
+    connection: sqlite3.Connection | None,
+    source: Path,
+    app_connection: sqlite3.Connection | None = None,
+    overwrite: bool = False,
+) -> StoryInboxResult:
     username = username_from_story_filename(source.name)
     if not username:
         return StoryInboxResult(
@@ -150,7 +248,11 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
             detail="filename has no username prefix before '-'",
         )
     try:
-        account_path = _lookup_account_path(connection, username)
+        account_path = (
+            _lookup_bdapp_path(app_connection, username) if app_connection is not None else None
+        )
+        if account_path is None and connection is not None:
+            account_path = _lookup_account_path(connection, username)
     except sqlite3.Error as exc:
         return StoryInboxResult(
             source=source,
@@ -159,13 +261,19 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
             status=StoryInboxStatus.USERNAME_NOT_IN_DB,
             detail=str(exc),
         )
+    alias_note = ""
+    if account_path is None and app_connection is not None:
+        alias = _lookup_alias(app_connection, username)
+        if alias is not None:
+            account_path, current_name = alias
+            alias_note = f"@{username} ahora es @{current_name}"
     if account_path is None:
         return StoryInboxResult(
             source=source,
             username=username,
             destination=None,
             status=StoryInboxStatus.USERNAME_NOT_IN_DB,
-            detail=f"@{username} not found in accounts_dir",
+            detail=f"@{username} not found in bdapp or accounts_dir",
         )
     stripped = account_path.strip()
     if not stripped:
@@ -187,7 +295,7 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
         )
     destination_dir = account_root / STORY_SUBFOLDER
     destination = destination_dir / source.name
-    if destination.exists():
+    if destination.exists() and not overwrite:
         return StoryInboxResult(
             source=source,
             username=username,
@@ -197,6 +305,9 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
         )
     try:
         destination_dir.mkdir(parents=False, exist_ok=True)
+        existed = destination.exists()
+        if existed:
+            destination.unlink()
         shutil.move(str(source), str(destination))
     except OSError as exc:
         return StoryInboxResult(
@@ -210,22 +321,66 @@ def _move_one(connection: sqlite3.Connection, source: Path) -> StoryInboxResult:
         source=source,
         username=username,
         destination=destination,
-        status=StoryInboxStatus.MOVED,
+        status=(
+            StoryInboxStatus.OVERWRITTEN
+            if existed
+            else StoryInboxStatus.MOVED_VIA_ALIAS
+            if alias_note
+            else StoryInboxStatus.MOVED
+        ),
+        detail=alias_note,
     )
 
 
+_MOVED_STATUSES = (
+    StoryInboxStatus.MOVED,
+    StoryInboxStatus.MOVED_VIA_ALIAS,
+    StoryInboxStatus.OVERWRITTEN,
+)
+
+
 def summarize_results(results: list[StoryInboxResult]) -> tuple[int, int]:
-    moved = sum(1 for item in results if item.status is StoryInboxStatus.MOVED)
+    moved = sum(1 for item in results if item.status in _MOVED_STATUSES)
     errors = len(results) - moved
     return moved, errors
+
+
+@dataclass(frozen=True, slots=True)
+class StoryInboxReport:
+    """What matters after a run: total moved, the problems and what is still in the inbox."""
+
+    moved: int
+    problems: tuple[StoryInboxResult, ...]
+    leftovers: tuple[Path, ...]
+
+    @property
+    def conflicts(self) -> tuple[StoryInboxResult, ...]:
+        return tuple(p for p in self.problems if p.status is StoryInboxStatus.DESTINATION_EXISTS)
+
+    @property
+    def is_clean(self) -> bool:
+        return not self.problems and not self.leftovers
+
+
+def build_report(inbox: Path | str, results: list[StoryInboxResult]) -> StoryInboxReport:
+    """Summarise *results* and re-scan *inbox* for files that stayed there."""
+
+    return StoryInboxReport(
+        moved=sum(1 for item in results if item.status in _MOVED_STATUSES),
+        problems=tuple(item for item in results if item.status not in _MOVED_STATUSES),
+        leftovers=tuple(list_inbox_media(Path(inbox))),
+    )
 
 
 __all__ = [
     "STORY_MEDIA_EXTENSIONS",
     "STORY_SUBFOLDER",
     "StoryInboxError",
+    "StoryInboxReport",
     "StoryInboxResult",
     "StoryInboxStatus",
+    "build_report",
+    "force_move_conflicts",
     "list_inbox_media",
     "organize_story_inbox",
     "summarize_results",

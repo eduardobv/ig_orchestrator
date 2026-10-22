@@ -13,6 +13,7 @@ from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
     AccountCatalogService,
     filter_catalog_entries,
+    parse_owner_id,
     list_usernames_active_on_date,
 )
 from ig_orchestrator.gui.batch_draft import AccountDraft, BatchDraft
@@ -121,8 +122,9 @@ class CatalogPanelMixin:
     """Mixin: catalog list/tree, filter, contextual menu."""
 
     def _build_catalog(self, parent: ttk.Frame, *, width_chars: int) -> None:
-        parent.rowconfigure(2, weight=1)
+        parent.rowconfigure(3, weight=1)
         parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=0)
         header = ttk.Frame(parent)
         header.grid(row=0, column=0, sticky="ew")
         ttk.Label(header, text=t("label.catalog")).pack(side=tk.LEFT)
@@ -133,8 +135,22 @@ class CatalogPanelMixin:
             tooltip=t("tooltip.catalog_view"),
         )
         self.catalog_view_button.pack(side=tk.RIGHT)
+        self.catalog_suffix_row = ttk.Frame(parent)
+        self.catalog_suffix_row.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        ttk.Checkbutton(
+            self.catalog_suffix_row,
+            text=t("catalog.show_deleted"),
+            variable=self.catalog_show_deleted_var,
+            command=self._on_catalog_suffix_toggle,
+        ).pack(side=tk.LEFT)
+        ttk.Checkbutton(
+            self.catalog_suffix_row,
+            text=t("catalog.show_inactive"),
+            variable=self.catalog_show_inactive_var,
+            command=self._on_catalog_suffix_toggle,
+        ).pack(side=tk.LEFT, padx=(8, 0))
         filter_row = ttk.Frame(parent)
-        filter_row.grid(row=1, column=0, sticky="ew", pady=(6, 6))
+        filter_row.grid(row=2, column=0, sticky="ew", pady=(6, 6))
         filter_row.columnconfigure(0, weight=1)
         self.catalog_filter_entry = ttk.Entry(
             filter_row, textvariable=self.catalog_filter_var
@@ -167,7 +183,16 @@ class CatalogPanelMixin:
             exportselection=False,
             width=width_chars,
         )
-        self.catalog_list.grid(row=2, column=0, sticky="nsew")
+        self.catalog_list.grid(row=3, column=0, sticky="nsew")
+        # Permanent scrollbars (one per view) to jump around without the mouse wheel.
+        self.catalog_list_scroll = ttk.Scrollbar(
+            parent,
+            orient=tk.VERTICAL,
+            command=self.catalog_list.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        self.catalog_list_scroll.grid(row=3, column=1, sticky="ns")
+        self.catalog_list.configure(yscrollcommand=self.catalog_list_scroll.set)
         self.catalog_list.bind(
             "<ButtonRelease-1>", lambda _event: self._load_catalog()
         )
@@ -176,9 +201,17 @@ class CatalogPanelMixin:
         )
         self.catalog_list.bind("<Button-3>", self._show_catalog_menu)
         self.catalog_tree = ttk.Treeview(
-            parent, show="tree", selectmode="browse"
+            parent, show="tree", selectmode="extended"
         )
-        self.catalog_tree.grid(row=2, column=0, sticky="nsew")
+        self.catalog_tree.grid(row=3, column=0, sticky="nsew")
+        self.catalog_tree_scroll = ttk.Scrollbar(
+            parent,
+            orient=tk.VERTICAL,
+            command=self.catalog_tree.yview,
+            style="Visible.Vertical.TScrollbar",
+        )
+        self.catalog_tree_scroll.grid(row=3, column=1, sticky="ns")
+        self.catalog_tree.configure(yscrollcommand=self.catalog_tree_scroll.set)
         self.catalog_tree.bind(
             "<<TreeviewSelect>>", lambda _event: self._load_catalog()
         )
@@ -186,25 +219,48 @@ class CatalogPanelMixin:
             "<Double-Button-1>", lambda _event: self._open_and_load_catalog_account()
         )
         self.catalog_tree.bind("<Button-3>", self._show_catalog_menu)
+        self._setup_catalog_drag_and_drop()
         self._apply_catalog_view_visibility()
         self.catalog_menu = tk.Menu(self.root, tearoff=False)
-        self.catalog_menu.add_command(label="Abrir", command=self._open_catalog_account)
-        self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(
-            label="Inactivo", command=self._set_catalog_account_inactive
-        )
-        self.catalog_menu.add_command(
+        menu = self.catalog_menu
+        # 1. Look at the account
+        menu.add_command(label="Abrir", command=self._open_catalog_account)
+        menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
+        menu.add_separator()
+        # 2. Marks (do not change the state)
+        menu.add_command(
             label="Favorito", command=lambda: self._set_catalog_account_favorite(True)
         )
-        self.catalog_menu.add_command(
+        menu.add_command(
             label="Quitar favorito",
             command=lambda: self._set_catalog_account_favorite(False),
         )
-        self.catalog_menu.add_separator()
-        self.catalog_menu.add_command(label="Delete", command=self._disable_catalog_account)
-        self.catalog_menu.add_command(
-            label="Activar", command=self._enable_catalog_account
+        menu.add_command(
+            label=t("private.mark"), command=lambda: self._set_catalog_account_private(True)
         )
+        menu.add_command(
+            label=t("private.unmark"), command=lambda: self._set_catalog_account_private(False)
+        )
+        menu.add_separator()
+        # 3. State of the account
+        menu.add_command(label="Activar", command=self._enable_catalog_account)
+        menu.add_command(label="Inactivo", command=self._set_catalog_account_inactive)
+        menu.add_command(label=t("menu.catalog.delete"), command=self._disable_catalog_account)
+        menu.add_command(label=t("life.mark_deleted"), command=self._catalog_mark_deleted)
+        menu.add_command(label=t("life.restore"), command=self._catalog_restore_deleted)
+        menu.add_separator()
+        # 4. Its folder on disk
+        menu.add_command(label=t("card.open_folder"), command=self._catalog_open_folder)
+        menu.add_command(label=t("card.copy_path"), command=self._catalog_copy_path)
+        menu.add_command(label=t("fsops.move_account"), command=self._catalog_move_selected)
+        self._catalog_move_menu_index = menu.index("end")
+        menu.add_separator()
+        # 5. Maintenance
+        menu.add_command(label=t("scan.account"), command=self._sync_account)
+        menu.add_command(label=t("rename.menu"), command=self._catalog_username_changed)
+        menu.add_separator()
+        # 6. Destructive, on its own
+        menu.add_command(label=t("trash.delete"), command=self._catalog_delete_to_trash)
 
 
     def _clear_catalog_filter(self) -> None:
@@ -213,6 +269,16 @@ class CatalogPanelMixin:
 
     def _apply_catalog_pasted_text(self, raw: str) -> None:
         pasted = normalize_username(first_clipboard_line(raw))
+        owner_id = parse_owner_id(pasted)
+        if owner_id is not None:
+            # An Instagram owner id: search by id; if it is a known account, bind the
+            # editor to that account instead of to the digits.
+            self.catalog_filter_var.set(owner_id)
+            found = self.catalog_service.find_entries_by_owner_id(owner_id)
+            if len(found) == 1:
+                self.username_var.set(found[0].username)
+                self._apply_username_identity(found[0].username)
+            return
         self.catalog_filter_var.set(pasted)
         self.username_var.set(pasted)
         self._apply_username_identity(pasted)
@@ -250,6 +316,9 @@ class CatalogPanelMixin:
             return
         self.catalog_view_mode = next_mode
         self._persist_catalog_view()
+        # Deleted accounts live in their -Deleted folders: show them in the tree only.
+        self.catalog_service.include_deleted = next_mode == "tree"
+        self._reload_catalog()
 
 
     def _persist_catalog_view(self) -> None:
@@ -275,10 +344,44 @@ class CatalogPanelMixin:
     def _apply_catalog_view_visibility(self) -> None:
         if self.catalog_view_mode == "tree":
             self.catalog_list.grid_remove()
+            self.catalog_list_scroll.grid_remove()
             self.catalog_tree.grid()
+            self.catalog_tree_scroll.grid()
+            self.catalog_suffix_row.grid()
         else:
             self.catalog_tree.grid_remove()
+            self.catalog_tree_scroll.grid_remove()
             self.catalog_list.grid()
+            self.catalog_list_scroll.grid()
+            self.catalog_suffix_row.grid_remove()
+
+
+    def _on_catalog_suffix_toggle(self) -> None:
+        """Persist the "show -Deleted / -Inactive folders" checkboxes and redraw the tree."""
+
+        if is_gui_schema(self.connection):
+            for key, var in (
+                ("ui.catalog_show_deleted", self.catalog_show_deleted_var),
+                ("ui.catalog_show_inactive", self.catalog_show_inactive_var),
+            ):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES (?, ?, 'BOOLEAN', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value,
+                        updated_at = excluded.updated_at
+                    """,
+                    (key, "1" if var.get() else "0"),
+                )
+            self.connection.commit()
+        self._refresh_catalog()
+
+
+    def _toggle_full_library(self) -> None:
+        """Show/hide ARCHIVED accounts (on disk only, never downloaded by the app)."""
+        self.catalog_service.include_archived = bool(self.show_library_var.get())
+        self._reload_catalog()
 
 
     def _batch_usernames(self) -> set[str]:
@@ -298,6 +401,17 @@ class CatalogPanelMixin:
         visible: list[str] = []
         filtered = filter_catalog_entries(self.catalog_entries, query)
         focus_username = catalog_focus_username(query, filtered, selected_username)
+        owner_id = parse_owner_id(query)
+        if owner_id is not None:
+            # Owner-id search covers the whole catalog (also archived/deleted).
+            by_owner = self.catalog_service.find_entries_by_owner_id(owner_id)
+            if by_owner:
+                filtered = by_owner
+                focus_username = by_owner[0].username
+                self._set_status(
+                    f"Owner ID {owner_id}: "
+                    + ", ".join(f"@{e.username} ({e.status.value})" for e in by_owner)
+                )
         self.catalog_list.delete(0, tk.END)
         palette = getattr(self, "catalog_colors", _CATALOG_COLORS)
         for entry in filtered:
@@ -348,11 +462,22 @@ class CatalogPanelMixin:
         tree = getattr(self, "catalog_tree", None)
         if tree is None:
             return
+        # Rebuilding collapses everything: remember what was open and where the view was.
+        open_folders = self._open_catalog_folders(tree)
+        tree_yview = tree.yview()[0]
         tree.delete(*tree.get_children())
         for key, color in self.catalog_colors.items():
-            if color:
+            if color and key != "private_fg":
                 tree.tag_configure(key, background=color)
-        roots = build_catalog_tree(list(entries), unrouted_label=t("label.unrouted"))
+        tree.tag_configure("private", foreground=self.catalog_colors.get("private_fg") or "#7b1fa2")
+        roots = build_catalog_tree(
+            list(entries),
+            unrouted_label=t("label.unrouted"),
+            extra_folder_paths=None if query.strip() else self.catalog_service.list_empty_folder_paths(),
+            # A search always looks everywhere; the checkboxes only declutter the browsing tree.
+            hide_deleted=not query.strip() and not self.catalog_show_deleted_var.get(),
+            hide_inactive=not query.strip() and not self.catalog_show_inactive_var.get(),
+        )
         match = query.strip().casefold()
 
         def insert_nodes(parent: str, nodes) -> None:
@@ -367,7 +492,9 @@ class CatalogPanelMixin:
                             today=entry.username.casefold() in today,
                             palette=self.catalog_colors,
                         )
-                        if colors.get("background") == self.catalog_colors.get("disabled"):
+                        if entry.status is AccountHistoryStatus.DELETED:
+                            tags.append("deleted")
+                        elif colors.get("background") == self.catalog_colors.get("disabled"):
                             tags.append("disabled")
                         elif colors.get("background") == self.catalog_colors.get("in_batch"):
                             tags.append("in_batch")
@@ -377,6 +504,8 @@ class CatalogPanelMixin:
                             tags.append("inactive")
                         elif colors.get("background") == self.catalog_colors.get("favorite"):
                             tags.append("favorite")
+                    if entry is not None and entry.is_private:
+                        tags.append("private")
                     tree.insert(
                         parent,
                         tk.END,
@@ -392,7 +521,25 @@ class CatalogPanelMixin:
                     tree.item(folder_id, open=True)
 
         insert_nodes("", roots)
+        for folder_id in open_folders:
+            if tree.exists(folder_id):
+                tree.item(folder_id, open=True)
         self._select_catalog_tree_leaf(focus_username)
+        if not focus_username or not tree.exists(f"user:{focus_username}"):
+            tree.yview_moveto(tree_yview)
+
+    @staticmethod
+    def _open_catalog_folders(tree) -> list[str]:
+        """Ids of the expanded folder nodes currently shown in *tree*."""
+
+        found: list[str] = []
+        stack = list(tree.get_children())
+        while stack:
+            iid = str(stack.pop())
+            if iid.startswith("folder:") and tree.item(iid, "open"):
+                found.append(iid)
+            stack.extend(tree.get_children(iid))
+        return found
 
 
     def _select_catalog_tree_leaf(self, username: str | None) -> None:
@@ -423,9 +570,14 @@ class CatalogPanelMixin:
     def _show_catalog_menu(self, event: tk.Event) -> None:
         if self.catalog_view_mode == "tree":
             row = self.catalog_tree.identify_row(event.y)
+            if row.startswith("folder:"):
+                self._popup_folder_menu(event, row)
+                return
             if not row.startswith("user:"):
                 return
-            self.catalog_tree.selection_set(row)
+            if row not in self.catalog_tree.selection():
+                self.catalog_tree.selection_set(row)  # keep a multi-selection when right-clicking inside it
+            self._update_catalog_menu_labels()
             self.catalog_menu.tk_popup(event.x_root, event.y_root)
             return
         index = self.catalog_list.nearest(event.y)
@@ -436,6 +588,13 @@ class CatalogPanelMixin:
         self.catalog_list.activate(index)
         self.catalog_menu.tk_popup(event.x_root, event.y_root)
 
+
+    def _update_catalog_menu_labels(self) -> None:
+        """The move entry says "all" when several accounts are selected."""
+
+        count = len(self._selected_catalog_usernames())
+        label = t("fsops.move_all", count=count) if count > 1 else t("fsops.move_account")
+        self.catalog_menu.entryconfigure(self._catalog_move_menu_index, label=label)
 
     def _selected_catalog_username(self) -> str | None:
         if getattr(self, "catalog_view_mode", "list") == "tree":
@@ -510,6 +669,15 @@ class CatalogPanelMixin:
         self._reload_catalog()
 
 
+    def _set_catalog_account_private(self, private: bool) -> None:
+        usernames = self._selected_catalog_usernames()
+        if not usernames:
+            return
+        for username in usernames:
+            self.catalog_service.set_private(username, private=private)
+        self._reload_catalog()
+
+
     def _set_catalog_account_favorite(self, favorite: bool) -> None:
         username = self._selected_catalog_username()
         if username is None:
@@ -560,6 +728,8 @@ class CatalogPanelMixin:
             ),
             None,
         )
+        if entry is None:
+            entry = self.catalog_service.find_entry(self.username_var.get().strip())
         if entry is None:
             return
         if entry.owner_id:

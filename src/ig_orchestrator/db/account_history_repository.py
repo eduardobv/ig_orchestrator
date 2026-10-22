@@ -73,7 +73,7 @@ class AccountHistoryRepository:
         ).fetchone()
         return _row_to_history(row)
 
-    def list_all(self) -> list[AccountHistory]:
+    def list_all(self, include_archived: bool = False, include_deleted: bool = False) -> list[AccountHistory]:
         rows = self.connection.execute(
             "SELECT * FROM account_history ORDER BY id"
         ).fetchall()

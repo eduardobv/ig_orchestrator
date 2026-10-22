@@ -9,6 +9,16 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.library.trash import configured_retention_days
+from ig_orchestrator.renaming.settings import (
+    lite_mirror_enabled,
+    preview_required,
+    read_engine,
+    staging_after_rename,
+    staging_root_setting,
+    write_setting,
+)
+from ig_orchestrator.gui.settings.instances_tab import InstancesTab
 from ig_orchestrator.db.downloaded_files_cleanup import purge_downloaded_files
 from ig_orchestrator.db.schema_mode import is_gui_schema
 from ig_orchestrator.gui.account_catalog_service import (
@@ -143,6 +153,7 @@ class SettingsDialogWithTabs:
         self._build_ui_tab()
         self._build_processing_tab()
         self._build_catalog_tab()
+        self._build_instances_tab()
         self._build_notify_tab()
 
         # Buttons
@@ -217,11 +228,23 @@ class SettingsDialogWithTabs:
         ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=500).grid(
             row=1, column=0, sticky="w", pady=(2, 12)
         )
+        self.rename_engine_var = tk.StringVar(value=read_engine(self.connection))
+        ttk.Label(frame, text=t("settings.rename_engine")).grid(row=3, column=0, sticky="w", pady=(14, 0))
+        engines = ttk.Frame(frame)
+        engines.grid(row=4, column=0, sticky="w")
+        ttk.Radiobutton(engines, text=t("settings.rename_engine_integrated"), value="integrated",
+                        variable=self.rename_engine_var).pack(anchor="w")
+        ttk.Radiobutton(engines, text=t("settings.rename_engine_legacy"), value="legacy_sc2",
+                        variable=self.rename_engine_var).pack(anchor="w")
+        self.rename_preview_var = tk.BooleanVar(value=preview_required(self.connection))
+        ttk.Checkbutton(frame, text=t("settings.rename_preview"), variable=self.rename_preview_var).grid(
+            row=5, column=0, sticky="w", pady=(6, 0)
+        )
         ttk.Button(
             frame,
             text=t("settings.purge_files"),
             command=lambda: self._purge_downloaded_files(),
-        ).grid(row=2, column=0, sticky="w")
+        ).grid(row=6, column=0, sticky="w", pady=(14, 0))
 
     def _build_catalog_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)
@@ -247,6 +270,47 @@ class SettingsDialogWithTabs:
             )
             btn.grid(row=0, column=index, padx=(0, 4))
             self.color_buttons[key] = btn
+
+        ttk.Label(frame, text=t("settings.deleted_folder")).grid(row=2, column=0, sticky="w")
+        self.deleted_folder_var = tk.StringVar(
+            value=_gui_setting(self.connection, "library.deleted_folder_rel", "09.DELETED")
+        )
+        ttk.Entry(frame, textvariable=self.deleted_folder_var, width=32).grid(
+            row=3, column=0, sticky="w", pady=(0, 6)
+        )
+        self.deleted_keep_group_var = tk.BooleanVar(
+            value=_gui_setting(self.connection, "library.deleted_keep_group", "0") in {"1", "true"}
+        )
+        ttk.Checkbutton(
+            frame, text=t("settings.deleted_keep_group"), variable=self.deleted_keep_group_var
+        ).grid(row=4, column=0, sticky="w")
+        self.lite_mirror_var = tk.BooleanVar(value=lite_mirror_enabled(self.connection))
+        ttk.Checkbutton(frame, text=t("settings.lite_mirror"), variable=self.lite_mirror_var).grid(
+            row=5, column=0, sticky="w", pady=(14, 0)
+        )
+        ttk.Label(frame, text=t("settings.lite_mirror_help"), wraplength=520, justify="left").grid(
+            row=6, column=0, sticky="w"
+        )
+        ttk.Label(frame, text=t("settings.trash_retention")).grid(row=11, column=0, sticky="w", pady=(14, 0))
+        self.trash_retention_var = tk.StringVar(value=str(configured_retention_days(self.connection) or 0))
+        ttk.Entry(frame, textvariable=self.trash_retention_var, width=8).grid(row=12, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.staging_root")).grid(row=7, column=0, sticky="w", pady=(14, 0))
+        self.staging_root_var = tk.StringVar(value=staging_root_setting(self.connection))
+        ttk.Entry(frame, textvariable=self.staging_root_var, width=48).grid(row=8, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.staging_after")).grid(row=9, column=0, sticky="w", pady=(6, 0))
+        self.staging_after_var = tk.StringVar(value=staging_after_rename(self.connection))
+        after = ttk.Frame(frame)
+        after.grid(row=10, column=0, sticky="w")
+        for value, key in (("ASK", "settings.staging_ask"), ("STAGING", "settings.staging_staging"), ("LIBRARY", "settings.staging_library")):
+            ttk.Radiobutton(after, text=t(key), value=value, variable=self.staging_after_var).pack(anchor="w")
+
+    def _build_instances_tab(self) -> None:
+        if not is_gui_schema(self.connection):
+            return
+        self.notebook.add(
+            InstancesTab(self.notebook, self.connection),
+            text=t("settings.tabs.instances"),
+        )
 
     def _build_notify_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)
@@ -344,6 +408,34 @@ class SettingsDialogWithTabs:
 
             # Stories first
             write_stories_first_enabled(self.connection, self.stories_first.get())
+
+            # Renamer and accounts_lite mirror
+            write_setting(self.connection, "renaming.engine", self.rename_engine_var.get())
+            write_setting(self.connection, "renaming.preview", "1" if self.rename_preview_var.get() else "0", "BOOLEAN")
+            retention = self.trash_retention_var.get().strip()
+            write_setting(self.connection, "trash.retention_days", retention if retention.isdigit() else "0")
+            write_setting(self.connection, "staging.root", self.staging_root_var.get().strip().rstrip("\\/"), "PATH")
+            write_setting(self.connection, "staging.after_rename", self.staging_after_var.get())
+            write_setting(self.connection, "compat.lite.enabled", "1" if self.lite_mirror_var.get() else "0", "BOOLEAN")
+
+            # Deleted accounts folder
+            for key, value, kind in (
+                (
+                    "library.deleted_folder_rel",
+                    self.deleted_folder_var.get().strip().strip("\\/") or "09.DELETED",
+                    "TEXT",
+                ),
+                ("library.deleted_keep_group", "1" if self.deleted_keep_group_var.get() else "0", "BOOLEAN"),
+            ):
+                self.connection.execute(
+                    """
+                    INSERT INTO app_settings (key, value, value_type, updated_at)
+                    VALUES (?, ?, ?, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        value = excluded.value, updated_at = excluded.updated_at
+                    """,
+                    (key, value, kind),
+                )
 
             # Notify settings
             self.connection.execute(

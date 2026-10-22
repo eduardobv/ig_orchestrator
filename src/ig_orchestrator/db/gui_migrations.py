@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime
 from pathlib import Path
 from sqlite3 import Connection
 
@@ -84,6 +86,8 @@ def apply_gui_migrations(connection: Connection) -> None:
 def _patch_gui_schema(connection: Connection) -> None:
     """Idempotent lookup/column patches for databases already at v100."""
 
+    backup_before_library_migration(connection)
+
     connection.execute(
         """
         INSERT OR IGNORE INTO batch_url_statuses
@@ -116,6 +120,307 @@ def _patch_gui_schema(connection: Connection) -> None:
     )
     _add_column_if_missing(connection, "downloaded_files", "sha256", "TEXT")
     _add_column_if_missing(connection, "downloaded_files", "updated_at", "TEXT")
+    _patch_library_schema(connection)
+    _add_column_if_missing(connection, "fs_operations", "payload", "TEXT")
+    for column, kind in (("manual_path", "TEXT"), ("destination", "TEXT"), ("account_id", "INTEGER"),
+                         ("spec", "TEXT"), ("resolved", "INTEGER DEFAULT 0")):
+        _add_column_if_missing(connection, "rename_run_accounts", column, kind)
+    for column in ("dir_mtime_root", "dir_mtime_story", "dir_mtime_reels", "dir_mtime_highlights"):
+        _add_column_if_missing(connection, "catalog_accounts", column, "REAL")
+    _add_column_if_missing(connection, "catalog_accounts", "scan_state", "TEXT NOT NULL DEFAULT 'UNKNOWN'")
+    _add_column_if_missing(connection, "account_lifecycle", "payload", "TEXT")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS instances (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL CHECK (role IN ('MAIN', 'WORKER')),
+            is_local INTEGER NOT NULL DEFAULT 0,
+            working_path TEXT,
+            exchange_path TEXT,
+            exchange_local_path TEXT,
+            app_version TEXT,
+            last_seen_at TEXT,
+            notes TEXT
+        )
+        """
+    )
+
+
+def _patch_library_schema(connection: Connection) -> None:
+    """v3 feat 3: whole-library catalog (paths, counters) + per-account media index."""
+
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO catalog_account_statuses
+            (id, code, name, description, color_hex, sort_order, is_active)
+        VALUES (5, 'ARCHIVED', 'Archived',
+                'On disk only; never downloaded by the app.', '#e8eaed', 5, 1)
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO catalog_account_statuses
+            (id, code, name, description, color_hex, sort_order, is_active)
+        VALUES (6, 'DELETED', 'Deleted on Instagram',
+                'Account no longer exists; folder archived.', '#d9d2e9', 6, 1)
+        """
+    )
+    for column, definition in (
+        ("deleted_at", "TEXT"),
+        ("previous_rel_path", "TEXT"),
+        ("rel_path", "TEXT"),
+        ("posts_count", "INTEGER"),
+        ("reels_count", "INTEGER"),
+        ("story_count", "INTEGER"),
+        ("highlights_count", "INTEGER"),
+        ("last_media_at", "TEXT"),
+        ("last_scan_at", "TEXT"),
+        ("disk_state", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+        ("legacy_lite_id", "INTEGER"),
+    ):
+        _add_column_if_missing(connection, "catalog_accounts", column, definition)
+    _add_column_if_missing(connection, "catalog_folders", "rel_path", "TEXT")
+    _add_column_if_missing(
+        connection, "catalog_folders", "kind", "TEXT NOT NULL DEFAULT 'GROUP'"
+    )
+    connection.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_catalog_accounts_rel_path "
+        "ON catalog_accounts(rel_path) WHERE rel_path IS NOT NULL"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_catalog_accounts_owner "
+        "ON catalog_accounts(instagram_user_id)"
+    )
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS library_import_issues (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,
+            username TEXT,
+            owner_id TEXT,
+            rel_path TEXT,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        );
+        -- Only what the renamer needs: keyed by the account primary key (not username).
+        CREATE TABLE IF NOT EXISTS media_index (
+            id INTEGER PRIMARY KEY,
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind INTEGER NOT NULL,       -- 0 post/root, 1 reels, 2 story, 3 highlights
+            media_id INTEGER NOT NULL,
+            taken_at INTEGER NOT NULL,   -- naive local time of the file name, as epoch seconds
+            owner_id INTEGER NOT NULL,
+            ext INTEGER NOT NULL,        -- 0 jpg, 1 jpeg, 2 mp4
+            suffix TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_media_index_lookup
+            ON media_index(account_id, kind, media_id);
+        CREATE TABLE IF NOT EXISTS fs_operations (
+            id INTEGER PRIMARY KEY,
+            op_group TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            op_type TEXT NOT NULL,       -- MKDIR | MOVE_DIR | RENAME_DIR | RMDIR
+            src_rel TEXT,
+            dst_rel TEXT,
+            account_id INTEGER REFERENCES catalog_accounts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL,        -- PLANNED | DISK_DONE | COMMITTED | FAILED | UNDONE
+            error TEXT,
+            undo_of INTEGER REFERENCES fs_operations(id),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fs_operations_group ON fs_operations(op_group, seq);
+        CREATE TABLE IF NOT EXISTS exchange_publications (
+            id INTEGER PRIMARY KEY,
+            package_id TEXT NOT NULL UNIQUE,
+            batch_ids TEXT NOT NULL,      -- JSON list of batch ids
+            status TEXT NOT NULL,         -- PENDING | PUBLISHED | FAILED
+            path TEXT,
+            files INTEGER,
+            bytes INTEGER,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS exchange_imports (
+            id INTEGER PRIMARY KEY,
+            package_id TEXT NOT NULL UNIQUE,
+            source_instance TEXT,
+            batch_id INTEGER REFERENCES batches(id),
+            imported_at TEXT NOT NULL,
+            files INTEGER,
+            bytes INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS staged_accounts (
+            id INTEGER PRIMARY KEY,
+            catalog_account_id INTEGER NOT NULL REFERENCES catalog_accounts(id),
+            staging_rel TEXT NOT NULL,
+            target_rel TEXT NOT NULL,
+            rename_run_id INTEGER REFERENCES rename_runs(id),
+            files INTEGER,
+            bytes INTEGER,
+            status TEXT NOT NULL,         -- STAGED | DUMPING | DUMPED | CONFLICT | FAILED
+            staged_at TEXT NOT NULL,
+            dumped_at TEXT,
+            error TEXT,
+            UNIQUE (catalog_account_id, staging_rel)
+        );
+        CREATE TABLE IF NOT EXISTS dump_runs (
+            id INTEGER PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            status TEXT NOT NULL,
+            accounts INTEGER DEFAULT 0,
+            files INTEGER DEFAULT 0,
+            bytes INTEGER DEFAULT 0,
+            summary TEXT
+        );
+        CREATE TABLE IF NOT EXISTS rename_runs (
+            id INTEGER PRIMARY KEY,
+            batch_id INTEGER REFERENCES batches(id),
+            queue_id INTEGER,
+            engine TEXT NOT NULL,
+            source_folder TEXT NOT NULL,
+            start_now_date TEXT NOT NULL,
+            options TEXT,
+            status TEXT NOT NULL,         -- RUNNING | OK | WITH_PROBLEMS | CANCELLED
+            started_at TEXT NOT NULL,
+            finished_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS rename_run_accounts (
+            id INTEGER PRIMARY KEY,
+            rename_run_id INTEGER NOT NULL REFERENCES rename_runs(id) ON DELETE CASCADE,
+            username TEXT NOT NULL,
+            status TEXT NOT NULL,         -- RENAMED | NEW | SKIPPED | MOVE_CONFLICT | NO_FILES | ERROR
+            renamed INTEGER DEFAULT 0,
+            duplicated INTEGER DEFAULT 0,
+            moved INTEGER DEFAULT 0,
+            detail TEXT
+        );
+        CREATE TABLE IF NOT EXISTS scan_runs (
+            id INTEGER PRIMARY KEY,
+            scope TEXT NOT NULL,          -- ALL | CATEGORY | ACCOUNT | DEEP
+            rel_scope TEXT,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            dirs_stat INTEGER DEFAULT 0,
+            dirs_listed INTEGER DEFAULT 0,
+            files_seen INTEGER DEFAULT 0,
+            accounts_changed INTEGER DEFAULT 0,
+            accounts_new INTEGER DEFAULT 0,
+            accounts_missing INTEGER DEFAULT 0,
+            errors INTEGER DEFAULT 0,
+            seconds REAL
+        );
+        CREATE TABLE IF NOT EXISTS scan_findings (
+            id INTEGER PRIMARY KEY,
+            scan_run_id INTEGER NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,           -- NEW_FOLDER | MOVED_FOLDER | MISSING_FOLDER | OWNER_CHANGED | USERNAME_DUP
+            account_id INTEGER REFERENCES catalog_accounts(id) ON DELETE SET NULL,
+            rel_path TEXT,
+            detail TEXT,
+            resolved INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS account_usernames (
+            id INTEGER PRIMARY KEY,
+            catalog_account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            username TEXT NOT NULL COLLATE NOCASE,
+            valid_from TEXT,
+            valid_to TEXT,               -- NULL = current name
+            reason TEXT NOT NULL,        -- INITIAL | RENAMED | MANUAL
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_usernames_name ON account_usernames(username);
+        CREATE TABLE IF NOT EXISTS owner_dup_ignored (
+            owner_id TEXT PRIMARY KEY,
+            note TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS account_lifecycle (
+            id INTEGER PRIMARY KEY,
+            op_group TEXT,
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,           -- DELETE | LABEL | RESTORE
+            prev_status_id INTEGER,
+            prev_favorite INTEGER,
+            prev_rel_path TEXT,
+            created_at TEXT NOT NULL,
+            undone INTEGER NOT NULL DEFAULT 0,
+            payload TEXT                 -- JSON snapshot for RENAME / MERGE undo
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_lifecycle_group ON account_lifecycle(op_group);
+        CREATE TABLE IF NOT EXISTS media_index_state (
+            account_id INTEGER NOT NULL REFERENCES catalog_accounts(id) ON DELETE CASCADE,
+            kind INTEGER NOT NULL,
+            items INTEGER NOT NULL,
+            max_media_id INTEGER,
+            indexed_at TEXT NOT NULL,
+            source TEXT NOT NULL,
+            PRIMARY KEY (account_id, kind)
+        );
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_account_usernames_account ON account_usernames(catalog_account_id)"
+    )
+    connection.execute(
+        """
+        INSERT INTO account_usernames (catalog_account_id, username, valid_from, valid_to, reason, created_at)
+        SELECT a.id, a.username, NULL, NULL, 'INITIAL', datetime('now') FROM catalog_accounts a
+        WHERE NOT EXISTS (SELECT 1 FROM account_usernames u WHERE u.catalog_account_id = a.id)
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO path_roots (code, path, updated_at)
+        SELECT 'LIBRARY', COALESCE(
+            (SELECT NULLIF(TRIM(path), '') FROM path_roots WHERE code = 'FINAL_BASE'),
+            (SELECT full_path FROM catalog_folders WHERE parent_id IS NULL ORDER BY id LIMIT 1),
+            ''
+        ), datetime('now')
+        """
+    )
+
+
+def backup_before_library_migration(connection: Connection) -> Path | None:
+    """Copy the database to ``<db dir>/bkp`` before the v3 library migration.
+
+    Runs only when the migration is still pending and the catalog has data.
+    """
+
+    columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(catalog_accounts)").fetchall()
+    }
+    if not columns or "rel_path" in columns:
+        return None
+    if connection.execute("SELECT COUNT(*) FROM catalog_accounts").fetchone()[0] == 0:
+        return None
+    return backup_database(connection, "pre_v3")
+
+
+def backup_database(connection: Connection, label: str) -> Path | None:
+    """Copy the main database to ``<db dir>/bkp/<name>_<label>_<timestamp>``."""
+
+    file_name = next(
+        (str(row[2]) for row in connection.execute("PRAGMA database_list") if row[1] == "main"),
+        "",
+    )
+    if not file_name:
+        return None
+    source = Path(file_name)
+    target_dir = source.parent / "bkp"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    target = target_dir / f"{source.stem}_{label}_{stamp}{source.suffix}"
+    connection.commit()
+    backup = sqlite3.connect(target)
+    try:
+        connection.backup(backup)
+    finally:
+        backup.close()
+    return target
 
 
 def _add_column_if_missing(

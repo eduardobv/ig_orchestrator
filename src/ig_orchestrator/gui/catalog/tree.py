@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from ig_orchestrator.db.catalog_importer import split_destination_path
@@ -7,6 +8,29 @@ from ig_orchestrator.gui.account_catalog_service import AccountCatalogEntry
 
 
 UNROUTED_PATH = ""
+
+_DELETED_SUFFIX = re.compile(r"-delete[d]?$", re.IGNORECASE)
+_INACTIVE_SUFFIX = re.compile(r"-inactiv(?:e|a|o)$", re.IGNORECASE)
+
+
+def folder_suffix_kind(name: str) -> str | None:
+    """``'deleted'`` / ``'inactive'`` when the folder *name* ends in ``-Deleted`` / ``-Inactive``."""
+
+    if _DELETED_SUFFIX.search(name):
+        return "deleted"
+    if _INACTIVE_SUFFIX.search(name):
+        return "inactive"
+    return None
+
+
+def path_is_hidden(path: str, *, hide_deleted: bool, hide_inactive: bool) -> bool:
+    """True when any folder of *path* has a hidden ``-Deleted`` / ``-Inactive`` suffix."""
+
+    for name in split_destination_path(path):
+        kind = folder_suffix_kind(name)
+        if (kind == "deleted" and hide_deleted) or (kind == "inactive" and hide_inactive):
+            return True
+    return False
 
 
 @dataclass
@@ -26,8 +50,21 @@ def build_catalog_tree(
     entries: list[AccountCatalogEntry],
     *,
     unrouted_label: str = "Sin ruta",
+    extra_folder_paths: list[str] | None = None,
+    hide_deleted: bool = False,
+    hide_inactive: bool = False,
 ) -> list[CatalogTreeNode]:
-    """Group catalog entries into a folder tree; usernames are leaves."""
+    """Group catalog entries into a folder tree; usernames are leaves.
+
+    ``extra_folder_paths`` adds folders that hold no account yet (e.g. just created).
+    ``hide_deleted`` / ``hide_inactive`` drop folders suffixed ``-Deleted`` / ``-Inactive`` (and what they
+    hold) from the tree only; the data and the folder pickers are untouched.
+    """
+
+    def hidden(path: str) -> bool:
+        return (hide_deleted or hide_inactive) and path_is_hidden(
+            path, hide_deleted=hide_deleted, hide_inactive=hide_inactive
+        )
 
     folders: dict[str, CatalogTreeNode] = {}
     roots: list[CatalogTreeNode] = []
@@ -46,6 +83,8 @@ def build_catalog_tree(
         return node
 
     for entry in entries:
+        if hidden(entry.destination_path):
+            continue
         segments = split_destination_path(entry.destination_path)
         if not segments:
             unrouted.children.append(
@@ -72,6 +111,15 @@ def build_catalog_tree(
             )
         )
 
+    for extra in extra_folder_paths or []:
+        if hidden(extra):
+            continue
+        parent = None
+        current_path = ""
+        for index, name in enumerate(split_destination_path(extra)):
+            current_path = name if index == 0 else _join_windows(current_path, name)
+            parent = folder_node(current_path, name, parent)
+
     if unrouted.children:
         unrouted.children.sort(key=lambda node: node.name.casefold())
         roots.append(unrouted)
@@ -91,4 +139,10 @@ def _sort_nodes(nodes: list[CatalogTreeNode]) -> None:
         _sort_nodes(node.children)
 
 
-__all__ = ["CatalogTreeNode", "UNROUTED_PATH", "build_catalog_tree"]
+__all__ = [
+    "CatalogTreeNode",
+    "UNROUTED_PATH",
+    "build_catalog_tree",
+    "folder_suffix_kind",
+    "path_is_hidden",
+]

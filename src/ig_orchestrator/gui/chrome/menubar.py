@@ -153,6 +153,13 @@ class MenubarMixin:
             label=t("menu.view.catalog_tree"),
             command=lambda: self._set_catalog_view("tree"),
         )
+        view_menu.add_separator()
+        self.show_library_var = tk.BooleanVar(value=False)
+        view_menu.add_checkbutton(
+            label=t("menu.view.full_library"),
+            variable=self.show_library_var,
+            command=self._toggle_full_library,
+        )
         menubar.add_cascade(label=t("menu.view"), menu=view_menu)
 
         batch_menu = tk.Menu(menubar, tearoff=False)
@@ -162,7 +169,11 @@ class MenubarMixin:
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.stories"), command=self._open_stories_inbox)
         batch_menu.add_separator()
+        batch_menu.add_command(label=t("menu.batch.pull"), command=self._open_pull_dialog)
+        batch_menu.add_command(label=t("menu.batch.publish"), command=self._open_publish_dialog)
         batch_menu.add_command(label=t("menu.batch.rename"), command=self._rename_manual_files)
+        batch_menu.add_command(label=t("pending.menu"), command=self._move_pending_renamed)
+        batch_menu.add_command(label=t("staging.menu"), command=self._open_staging_panel)
         batch_menu.add_command(
             label=t("menu.batch.rename_manual"), command=self._show_manual_rename_command
         )
@@ -187,6 +198,31 @@ class MenubarMixin:
         catalog_menu.add_command(
             label=t("menu.catalog.enable"), command=self._enable_catalog_account
         )
+        catalog_menu.add_separator()
+        sync_menu = tk.Menu(catalog_menu, tearoff=False)
+        sync_menu.add_command(label=t("scan.quick"), command=self._sync_quick)
+        sync_menu.add_command(label=t("scan.category"), command=self._sync_category)
+        sync_menu.add_command(label=t("scan.account"), command=self._sync_account)
+        sync_menu.add_command(label=t("scan.deep"), command=self._sync_deep)
+        sync_menu.add_separator()
+        sync_menu.add_command(label=t("scan.findings_menu"), command=self._open_scan_findings)
+        catalog_menu.add_cascade(label=t("scan.menu"), menu=sync_menu)
+        catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
+        catalog_menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
+        catalog_menu.add_command(label=t("trash.open"), command=self._open_trash_dialog)
+        catalog_menu.add_command(label=t("index.menu"), command=self._verify_account_index)
+        catalog_menu.add_separator()
+        catalog_menu.add_command(label=t("rename.menu"), command=self._catalog_username_changed)
+        catalog_menu.add_command(label=t("owners.menu"), command=self._open_owner_groups)
+        catalog_menu.add_separator()
+        catalog_menu.add_command(label=t("life.mark_deleted"), command=self._catalog_mark_deleted)
+        catalog_menu.add_command(label=t("life.mark_many"), command=self._catalog_mark_many_deleted)
+        catalog_menu.add_command(label=t("life.restore"), command=self._catalog_restore_deleted)
+        catalog_menu.add_command(label=t("life.suggest"), command=self._catalog_suggest_deleted)
+        catalog_menu.add_command(label=t("life.label"), command=self._catalog_label_deleted)
+        catalog_menu.add_separator()
+        catalog_menu.add_command(label=t("menu.catalog.import"), command=self._open_library_import)
+        catalog_menu.add_command(label=t("menu.catalog.ops"), command=self._open_fsops_history)
         menubar.add_cascade(label=t("menu.catalog"), menu=catalog_menu)
 
         settings_menu = tk.Menu(menubar, tearoff=False)

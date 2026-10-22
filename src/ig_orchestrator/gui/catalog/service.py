@@ -1,14 +1,27 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from sqlite3 import Connection
 from typing import Iterable
 
+from dataclasses import replace
+
 from ig_orchestrator.db import AccountHistoryRepository
+from ig_orchestrator.library.account_card import list_private_usernames, set_account_private
 from ig_orchestrator.models import AccountHistoryStatus
+
+
+_OWNER_ID_RE = re.compile(r'''^["']?(\d{5,})["']?$''')
+
+
+def parse_owner_id(query: str) -> str | None:
+    """Instagram owner id typed/pasted in the search box (digits only), else ``None``."""
+    match = _OWNER_ID_RE.match(query.strip())
+    return match.group(1) if match else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +34,7 @@ class AccountCatalogEntry:
     start_init_date: str | None = None
     status: AccountHistoryStatus = AccountHistoryStatus.ENABLED
     is_favorite: bool = False
+    is_private: bool = False
 
 
 class AccountCatalogService:
@@ -32,17 +46,122 @@ class AccountCatalogService:
         backup_dir: Path = Path("config/bkp"),
     ) -> None:
         self.connection = connection
+        self.include_archived = False  # "show the full library" toggle
+        self.include_deleted = False  # deleted accounts are shown in the tree view only
         self.batch_json_path = batch_json_path
         self.backup_dir = backup_dir
+
+    def _catalog_has_accounts(self) -> bool:
+        try:
+            return bool(self.connection.execute("SELECT 1 FROM catalog_accounts LIMIT 1").fetchone())
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_accounts
+            return False
 
     def list_entries(self) -> list[AccountCatalogEntry]:
         entries: list[AccountCatalogEntry] = []
         entries.extend(self._from_account_history())
-        entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
-        if not entries:
+        # The database is the source of truth once it has accounts: batch.json is only a
+        # bootstrap for an empty catalog (otherwise it resurrects ghost "no path" rows).
+        if not self._catalog_has_accounts():
+            entries.extend(self._from_batch_json(self.batch_json_path, source="batch.json"))
+        if not entries and not self._catalog_has_accounts():
             for backup_path in sorted(self.backup_dir.glob("*.json")):
                 entries.extend(self._from_batch_json(backup_path, source="backup"))
-        return sorted(_deduplicate(entries), key=_catalog_sort_key)
+        private = list_private_usernames(self.connection)
+        deduplicated = _deduplicate(entries)
+        if private:
+            deduplicated = [
+                replace(entry, is_private=True) if entry.username.casefold() in private else entry
+                for entry in deduplicated
+            ]
+        return sorted(deduplicated, key=_catalog_sort_key)
+
+    def find_entry(self, username: str) -> AccountCatalogEntry | None:
+        """Catalog entry for *username* whatever its status (also archived/deleted)."""
+
+        record = AccountHistoryRepository(self.connection).get_by_user_name(username)
+        if record is None:
+            return None
+        return AccountCatalogEntry(
+            username=record.user_name,
+            source="account_history",
+            owner_id=record.user_ig_id,
+            destination_path=record.field1,
+            start_init_date=record.field2,
+            status=record.status,
+            is_favorite=record.is_favorite,
+            is_private=record.user_name.casefold() in list_private_usernames(self.connection),
+        )
+
+    def set_private(self, username: str, *, private: bool) -> bool:
+        """Mark/unmark the catalog account as private (the bot cannot download its posts)."""
+
+        return set_account_private(self.connection, username, private)
+
+    def list_container_paths(self) -> list[str]:
+        """Top-level folders of the library (``G:\4K Stogram\00.MODELS-A``...), alphabetical."""
+
+        try:
+            rows = self.connection.execute(
+                "SELECT c.full_path FROM catalog_folders c JOIN catalog_folders p ON p.id = c.parent_id"
+                " WHERE p.parent_id IS NULL ORDER BY c.full_path COLLATE NOCASE"
+            ).fetchall()
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_folders
+            return []
+        return [str(row[0]) for row in rows]
+
+    def find_entries_by_owner_id(self, owner_id: str) -> list[AccountCatalogEntry]:
+        """Accounts whose owner id equals *owner_id*, whatever their status.
+
+        Searches the whole catalog (also ARCHIVED and DELETED), independently of
+        what the catalog view currently shows.
+        """
+        wanted = parse_owner_id(owner_id) or owner_id.strip()
+        if not wanted:
+            return []
+        records = AccountHistoryRepository(self.connection).list_all(
+            include_archived=True, include_deleted=True
+        )
+        return sorted(
+            (
+                AccountCatalogEntry(
+                    username=record.user_name,
+                    source="account_history",
+                    owner_id=record.user_ig_id,
+                    destination_path=record.field1,
+                    start_init_date=record.field2,
+                    status=record.status,
+                    is_favorite=record.is_favorite,
+                )
+                for record in records
+                if (record.user_ig_id or "").strip() == wanted
+            ),
+            key=_catalog_sort_key,
+        )
+
+    def list_empty_folder_paths(self) -> list[str]:
+        """Catalog folders (excluding the root) with no account anywhere below them."""
+
+        try:
+            folders = self.connection.execute(
+                "SELECT id, parent_id, full_path FROM catalog_folders"
+            ).fetchall()
+            occupied: set[int] = set()
+            parents = {int(r["id"]): r["parent_id"] for r in folders}
+            for row in self.connection.execute(
+                "SELECT DISTINCT folder_id FROM catalog_accounts WHERE folder_id IS NOT NULL"
+            ):
+                current = int(row[0])
+                while current is not None and current not in occupied:
+                    occupied.add(current)
+                    current = parents.get(current)
+            return [
+                str(r["full_path"])
+                for r in folders
+                if int(r["id"]) not in occupied and r["parent_id"] is not None
+            ]
+        except Exception:  # noqa: BLE001 - v1 schema has no catalog_folders
+            return []
 
     def disable(self, username: str) -> None:
         repository = AccountHistoryRepository(self.connection)
@@ -89,7 +208,9 @@ class AccountCatalogService:
         return list_usernames_active_on_date(self.connection, day)
 
     def _from_account_history(self) -> Iterable[AccountCatalogEntry]:
-        for record in AccountHistoryRepository(self.connection).list_all():
+        for record in AccountHistoryRepository(self.connection).list_all(
+            include_archived=self.include_archived, include_deleted=self.include_deleted
+        ):
             yield AccountCatalogEntry(
                 username=record.user_name,
                 source="account_history",
@@ -157,6 +278,8 @@ def _deduplicate(entries: Iterable[AccountCatalogEntry]) -> list[AccountCatalogE
 def _catalog_sort_key(entry: AccountCatalogEntry) -> tuple[object, ...]:
     username = entry.username.casefold()
     destination_path = (entry.destination_path or "").strip().casefold()
+    if entry.status in (AccountHistoryStatus.ARCHIVED, AccountHistoryStatus.DELETED):
+        return (5, username)
     if entry.status is AccountHistoryStatus.DISABLED:
         return (4, username)
     if entry.status is AccountHistoryStatus.INACTIVE:
@@ -276,5 +399,6 @@ __all__ = [
     "AccountCatalogEntry",
     "AccountCatalogService",
     "filter_catalog_entries",
+    "parse_owner_id",
     "list_usernames_active_on_date",
 ]

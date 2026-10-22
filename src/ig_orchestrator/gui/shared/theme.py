@@ -134,7 +134,7 @@ def icon_button(
     tooltip: str,
 ) -> ttk.Button:
     button = ttk.Button(parent, image=image, command=command)
-    Tooltip(button, tooltip)
+    button.tooltip = Tooltip(button, tooltip)  # type: ignore[attr-defined]
     return button
 
 

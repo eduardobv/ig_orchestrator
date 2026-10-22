@@ -30,6 +30,32 @@ def classify_instagram_url(url: str) -> PublicationType:
     return PublicationType.UNKNOWN
 
 
+# Public post/reel shortcodes have 11 characters; the links of private accounts carry a
+# much longer id (~39 characters) that the download bot cannot resolve.
+PUBLIC_SHORTCODE_MAX_LENGTH = 14
+
+
+def is_private_post_url(url: str) -> bool:
+    """True for an Instagram post/reel URL with the long id of a private account."""
+
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    if hostname != "instagram.com" and not hostname.endswith(".instagram.com"):
+        return False
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if len(segments) < 2 or segments[0].lower() not in {"p", "reel", "reels", "tv"}:
+        return False
+    return len(segments[1]) > PUBLIC_SHORTCODE_MAX_LENGTH
+
+
+def find_private_post_urls(lines: list[str]) -> list[str]:
+    """The lines of *lines* that are private-account post URLs (see ``is_private_post_url``)."""
+
+    return [line.strip() for line in lines if line.strip() and is_private_post_url(line)]
+
+
 def _validate_instagram_url(scheme: str, hostname: str | None, url: str) -> None:
     if scheme not in {"http", "https"}:
         raise UrlClassifierError(f"URL must use http or https: {url}")
@@ -58,4 +84,9 @@ def _is_post_url(segments: list[str]) -> bool:
     return len(segments) >= 2 and segments[0] == "p"
 
 
-__all__ = ["UrlClassifierError", "classify_instagram_url"]
+__all__ = [
+    "UrlClassifierError",
+    "classify_instagram_url",
+    "find_private_post_urls",
+    "is_private_post_url",
+]
