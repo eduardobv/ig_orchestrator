@@ -1123,3 +1123,11 @@ Probar: `python -m pytest tests/gui/test_feat_uc2_25.py`; después abrir la GUI 
 4. **Volver a los iconos anteriores:** copia los PNG de `src/ig_orchestrator/gui/shared/static/icons/_old/` sobre la carpeta `icons/`. Para regenerar o retocar los nuevos: `python tools/gen_icons.py src/ig_orchestrator/gui/shared/static/icons`.
 
 Probar: `python -m pytest tests/gui/test_feat_gui_26.py`.
+
+## Feat 27 · Ajustes de tamaño y textos de la GUI (v4.1.0)
+
+* Casillas del catálogo: **Deleted** / **Inactive** (antes «Ver -Deleted» / «Ver -Inactive»); mismo comportamiento.
+* Editor: sin etiqueta «URLs» junto al cuadro de URLs.
+* Cuadro del nombre del lote más corto (38) y cuadro de OwnerId junto al username algo más estrecho (16).
+
+Probar: abrir la GUI y comprobar los cuatro puntos; `python -m pytest`.

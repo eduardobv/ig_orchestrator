@@ -1,5 +1,22 @@
 # Changelog
 
+## v4.1.0 - feat-gui-27: ajustes de tamaño y textos de la GUI
+
+Fecha: 2026-10-22 · Rama: `v4/main`
+
+### Creado
+* `tasks/done/v4/feat-gui-27.md`.
+
+### Modificado
+* **Casillas del catálogo:** «Ver -Deleted» / «Ver -Inactive» pasan a **Deleted** / **Inactive** (`catalog.show_deleted`, `catalog.show_inactive`, es/en).
+* **Editor:** se elimina la etiqueta «URLs» entre los botones verticales (Pegar/Agregar, Pegar, Limpiar editor) y el cuadro de URLs (`gui/editor/panel.py`); el cuadro de URLs se mantiene. Se retira la clave `label.urls` (sin uso).
+* **Nombre del lote:** ancho 48 → 38 caracteres (`gui/shell/app.py`).
+* **OwnerId (solo lectura, junto al username):** ancho 20 → 16 caracteres.
+* Versión 4.1.0.
+
+### Pruebas
+* `python -m pytest`: 615 passed. Sin cambios de lógica.
+
 ## v4.0.0 - feat-gui-26: iconos nuevos, botón único Ejecutar/Pausar, botón Pull y botones Copiar
 
 Fecha: 2026-10-22 · Rama: `v4/main` (primer feat de la serie v4)

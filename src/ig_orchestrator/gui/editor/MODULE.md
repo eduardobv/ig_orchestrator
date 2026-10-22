@@ -33,3 +33,4 @@ cualquier otra con el mismo rank pasa a 0.
 
 ## v4.0 (feat-gui-26)
 - `panel.py`: `_copy_icon_button` (botón Copiar junto a Pegar en username, Owner Id, fecha y ruta).
+- v4.1 (feat-gui-27): sin etiqueta «URLs»; OwnerId de solo lectura a 16 caracteres.

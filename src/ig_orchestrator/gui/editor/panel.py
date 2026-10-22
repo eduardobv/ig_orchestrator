@@ -199,7 +199,7 @@ class EditorPanelMixin:
         self.owner_display_entry = ttk.Entry(
             username_row,
             textvariable=self.owner_display_var,
-            width=20,
+            width=16,
             state="readonly",
         )
         self.owner_display_entry.grid(row=0, column=5, sticky="w")
@@ -367,9 +367,6 @@ class EditorPanelMixin:
             tooltip=t("tooltip.clear_editor"),
         ).pack(side=tk.TOP, pady=1)
 
-        ttk.Label(parent, text=t("label.urls")).grid(
-            row=4, column=1, sticky="nw", pady=(8, 0)
-        )
         self.urls_text = tk.Text(parent, height=9, wrap="none", undo=True)
         self.urls_text.grid(
             row=4, column=2, sticky="nsew", pady=(8, 0)
