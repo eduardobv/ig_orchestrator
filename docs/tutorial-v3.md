@@ -1114,3 +1114,12 @@ Probar: expande varias carpetas, marca/desmarca **Ver -Deleted**: el árbol sigu
 8. Nombre de lote más ancho (48). 9. Barra de scroll del catálogo. 10. Clic derecho en una carpeta → **Copiar ruta**. 11. **Normalizar** oculto (la función sigue en el código).
 
 Probar: `python -m pytest tests/gui/test_feat_uc2_25.py`; después abrir la GUI y repasar los puntos 1–11.
+
+## Feat 26 · Iconos nuevos, botón único Ejecutar/Pausar, Pull y Copiar (v4.0.0, primer feat de v4)
+
+1. **Ejecutar/Pausar:** el botón ▶ de la barra pasa a ⏸ al ejecutar un lote; al pausar vuelve a ▶ (reanudar). Prueba: carga un lote, ▶, observa el cambio; ⏸ y de nuevo ▶.
+2. **Renombrar** (campo con cursor), **Stories** (anillo degradado) y **Pull** (flecha a bandeja, abre *Traer carpetas*). *Renombrar manual* solo en el menú *Lote*.
+3. **Copiar:** junto a cada *Pegar* del editor (username, Owner Id, fecha, ruta).
+4. **Volver a los iconos anteriores:** copia los PNG de `src/ig_orchestrator/gui/shared/static/icons/_old/` sobre la carpeta `icons/`. Para regenerar o retocar los nuevos: `python tools/gen_icons.py src/ig_orchestrator/gui/shared/static/icons`.
+
+Probar: `python -m pytest tests/gui/test_feat_gui_26.py`.

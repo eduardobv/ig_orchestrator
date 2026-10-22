@@ -20,3 +20,6 @@ Servicios GUI (sin Tk). SQLite. ProcessRunner → CLI.
 
 ## Cómo cambiar esto
 Solo añadir un atributo de estado nuevo aquí. La lógica de un panel va en su mixin.
+
+## v4.0 (feat-gui-26)
+- `app.py`: botonera con Ejecutar/Pausar en la misma celda, botón Pull y Renombrar manual oculto.

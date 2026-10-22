@@ -638,5 +638,10 @@
   "fsops.copy_path": "Copiar ruta",
   "fsops.path_copied": "Ruta copiada: {path}",
   "rename.offline_confirm": "La unidad de la biblioteca (G:) no está conectada.\n\nSe renombrarán las carpetas en su sitio, pero NO se moverán a la unidad G: (quedarán pendientes de mover).\n\n¿Continuar con el renombrado?",
-  "rename.offline_cancelled": "Renombrado cancelado: la unidad G: no está conectada"
+  "rename.offline_cancelled": "Renombrado cancelado: la unidad G: no está conectada",
+  "tooltip.pull": "Traer carpetas de otra instancia",
+  "tooltip.copy_username": "Copiar username",
+  "tooltip.copy_owner_id": "Copiar Owner Id",
+  "tooltip.copy_first_post_date": "Copiar fecha del primer post",
+  "tooltip.copy_path": "Copiar ruta"
 }

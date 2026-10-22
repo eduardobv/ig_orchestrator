@@ -359,13 +359,16 @@ class InstagramOrchestratorApp(
             tooltip=t("tooltip.execute"),
         )
         self.execute_button.grid(row=0, column=3, padx=(0, 2))
+        # Pause/resume shares the Run cell: only one of the two is visible
+        # (see RunControllerMixin._sync_run_pause_buttons).
         self.pause_button = icon_button(
             top,
             image=self.icons.get("pause"),
             command=self._toggle_pause_resume,
             tooltip=t("tooltip.pause"),
         )
-        self.pause_button.grid(row=0, column=4, padx=(0, 2))
+        self.pause_button.grid(row=0, column=3, padx=(0, 2))
+        self.pause_button.grid_remove()
         self.pause_button.state(["disabled"])
         self.cancel_button = icon_button(
             top,
@@ -373,7 +376,7 @@ class InstagramOrchestratorApp(
             command=self._cancel_process,
             tooltip=t("tooltip.stop"),
         )
-        self.cancel_button.grid(row=0, column=5, padx=(0, 8))
+        self.cancel_button.grid(row=0, column=4, padx=(0, 8))
         self.cancel_button.state(["disabled"])
         self.rename_button = icon_button(
             top,
@@ -381,22 +384,32 @@ class InstagramOrchestratorApp(
             command=self._rename_manual_files,
             tooltip=t("tooltip.rename"),
         )
-        self.rename_button.grid(row=0, column=6, padx=(0, 2))
+        self.rename_button.grid(row=0, column=5, padx=(0, 2))
         self.rename_button.state(["disabled"])
+        # Kept (state logic still configures it) but hidden: the manual
+        # rename command lives in the Lote menu only.
         self.rename_manual_button = icon_button(
             top,
             image=self.icons.get("terminal"),
             command=self._show_manual_rename_command,
             tooltip=t("tooltip.rename_manual"),
         )
-        self.rename_manual_button.grid(row=0, column=7, padx=(0, 2))
+        self.rename_manual_button.grid(row=0, column=8, padx=(0, 2))
+        self.rename_manual_button.grid_remove()
         self.stories_button = icon_button(
             top,
             image=self.icons.get("stories"),
             command=self._open_stories_inbox,
             tooltip=t("tooltip.stories"),
         )
-        self.stories_button.grid(row=0, column=8, padx=(0, 12))
+        self.stories_button.grid(row=0, column=6, padx=(0, 2))
+        self.pull_button = icon_button(
+            top,
+            image=self.icons.get("pull"),
+            command=self._open_pull_dialog,
+            tooltip=t("tooltip.pull"),
+        )
+        self.pull_button.grid(row=0, column=7, padx=(0, 12))
         ttk.Label(top, text=t("label.batch_name")).grid(row=0, column=9, sticky="w")
         self.batch_name_entry = ttk.Entry(
             top, textvariable=self.batch_name_var, width=48

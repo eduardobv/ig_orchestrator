@@ -224,6 +224,9 @@ class StatusBarMixin:
         self.cancel_button.configure(state=button_states.get("stop", "disabled"))
         self.rename_button.configure(state=button_states.get("rename", "disabled"))
         self.rename_manual_button.configure(state=button_states.get("rename_manual", "disabled"))
+        sync = getattr(self, "_sync_run_pause_buttons", None)
+        if sync is not None:
+            sync()
 
         # The lots dialog stays reachable during a batch/sequence so pending
         # queue items can be removed before they start.

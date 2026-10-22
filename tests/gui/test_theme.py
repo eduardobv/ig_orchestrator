@@ -99,7 +99,8 @@ def test_editor_layout_places_add_update_on_username_row() -> None:
         assert str(app.url_actions.grid_info()["rowspan"]) == "2"
         assert str(app.username_combo.grid_info()["column"]) == "0"
         assert str(app.paste_username_button.grid_info()["column"]) == "1"
-        assert str(app.clear_username_button.grid_info()["column"]) == "2"
+        assert str(app.copy_username_button.grid_info()["column"]) == "2"
+        assert str(app.clear_username_button.grid_info()["column"]) == "3"
         assert str(app.clear_username_button.cget("width")) == "3"
         assert str(app.clear_username_button.cget("text")) == "❌"
         url_buttons = list(app.url_actions.pack_slaves())

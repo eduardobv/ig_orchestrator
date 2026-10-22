@@ -14,3 +14,6 @@ CLI `run_continue` vía ProcessRunner. SQLite vía draft/resume/queue.
 
 ## Tests
 `tests/gui/test_run.py`, `tests/gui/test_rename.py`
+
+## v4.0 (feat-gui-26)
+- `controller.py`: `_sync_run_pause_buttons` muestra Ejecutar o Pausar/Reanudar en la misma celda.

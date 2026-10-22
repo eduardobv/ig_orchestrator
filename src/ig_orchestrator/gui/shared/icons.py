@@ -32,6 +32,9 @@ _ICON_FILES = {
     "eraser": "eraser.png",
     "list": "list.png",
     "tree": "tree.png",
+    "pull": "pull.png",
+    "copy-black": "copy_black.png",
+    "play-pause": "play_pause.png",
 }
 
 

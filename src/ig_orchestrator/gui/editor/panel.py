@@ -185,10 +185,14 @@ class EditorPanelMixin:
             width=3,
             command=self._clear_username,
         )
-        self.clear_username_button.grid(row=0, column=2, sticky="e", padx=(4, 0))
+        self.copy_username_button = self._copy_icon_button(
+            username_row, self.username_var, t("tooltip.copy_username")
+        )
+        self.copy_username_button.grid(row=0, column=2, sticky="e", padx=(4, 0))
+        self.clear_username_button.grid(row=0, column=3, sticky="e", padx=(4, 0))
         Tooltip(self.clear_username_button, t("tooltip.clear_username"))
         ttk.Label(username_row, text=t("label.owner_id_short")).grid(
-            row=0, column=3, sticky="e", padx=(12, 4)
+            row=0, column=4, sticky="e", padx=(12, 4)
         )
         self.owner_display_var = tk.StringVar(value="")
         # Read-only entry (not a label) so the id can be selected and copied.
@@ -198,7 +202,7 @@ class EditorPanelMixin:
             width=20,
             state="readonly",
         )
-        self.owner_display_entry.grid(row=0, column=4, sticky="w")
+        self.owner_display_entry.grid(row=0, column=5, sticky="w")
         bind_edit_context_menu(self.owner_display_entry)
         self.username_var.trace_add("write", lambda *_: self._refresh_owner_display())
         self.owner_id_var.trace_add("write", lambda *_: self._refresh_owner_display())
@@ -258,7 +262,10 @@ class EditorPanelMixin:
             width=3,
             command=self._clear_owner_id,
         )
-        clear_owner_id_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        self._copy_icon_button(
+            owner_id_row, self.owner_id_var, t("tooltip.copy_owner_id")
+        ).grid(row=0, column=2, sticky="w", padx=(4, 0))
+        clear_owner_id_btn.grid(row=0, column=3, sticky="w", padx=(4, 0))
         Tooltip(clear_owner_id_btn, t("tooltip.clear_owner_id"))
 
         # Start Init Date row with paste/clear buttons
@@ -286,7 +293,10 @@ class EditorPanelMixin:
             width=3,
             command=self._clear_start_init_date,
         )
-        self.clear_start_date_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        self._copy_icon_button(
+            start_date_row, self.start_init_date_var, t("tooltip.copy_first_post_date")
+        ).grid(row=0, column=2, sticky="w", padx=(4, 0))
+        self.clear_start_date_btn.grid(row=0, column=3, sticky="w", padx=(4, 0))
         Tooltip(self.clear_start_date_btn, t("tooltip.clear_first_post_date"))
 
         # Path row with paste/clear buttons
@@ -317,7 +327,10 @@ class EditorPanelMixin:
             width=3,
             command=self._clear_destination_path,
         )
-        clear_path_btn.grid(row=0, column=2, sticky="w", padx=(4, 0))
+        self._copy_icon_button(
+            self.path_row, self.destination_path_combo.variable, t("tooltip.copy_path")
+        ).grid(row=0, column=2, sticky="w", padx=(4, 0))
+        clear_path_btn.grid(row=0, column=3, sticky="w", padx=(4, 0))
         Tooltip(clear_path_btn, t("tooltip.clear_path"))
         self.new_account_frame.grid(
             row=3, column=1, columnspan=3, sticky="ew", pady=(8, 0)
@@ -654,6 +667,23 @@ class EditorPanelMixin:
 
     def _clear_owner_id(self) -> None:
         self.owner_id_var.set("")
+
+    def _copy_icon_button(self, parent, variable, tooltip: str):
+        """Compact copy button next to a paste button: copies the field value."""
+
+        def copy() -> None:
+            value = str(variable.get()).strip()
+            if not value:
+                return
+            self.root.clipboard_clear()
+            self.root.clipboard_append(value)
+
+        return compact_icon_button(
+            parent,
+            image=self.icons.get_compact("copy-black"),
+            command=copy,
+            tooltip=tooltip,
+        )
 
     def _paste_owner_id(self) -> bool:
         text = read_clipboard(self.root)

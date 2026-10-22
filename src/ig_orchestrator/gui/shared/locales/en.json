@@ -638,5 +638,10 @@
   "fsops.copy_path": "Copy path",
   "fsops.path_copied": "Path copied: {path}",
   "rename.offline_confirm": "The library drive (G:) is not connected.\n\nFolders will be renamed in place but NOT moved to the G: drive (they stay pending to move).\n\nContinue with the rename?",
-  "rename.offline_cancelled": "Rename cancelled: the G: drive is not connected"
+  "rename.offline_cancelled": "Rename cancelled: the G: drive is not connected",
+  "tooltip.pull": "Pull folders from another instance",
+  "tooltip.copy_username": "Copy username",
+  "tooltip.copy_owner_id": "Copy Owner Id",
+  "tooltip.copy_first_post_date": "Copy first post date",
+  "tooltip.copy_path": "Copy path"
 }

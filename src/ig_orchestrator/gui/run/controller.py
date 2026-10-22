@@ -469,6 +469,25 @@ class RunControllerMixin:
         tip = getattr(self.pause_button, "tooltip", None)
         if tip is not None:
             tip.text = t("tooltip.resume" if resume else "tooltip.pause")
+        self._sync_run_pause_buttons()
+
+    def _sync_run_pause_buttons(self) -> None:
+        """Show one button in the Run cell: Run when idle, Pause/Resume otherwise."""
+        runner = getattr(self, "process_runner", None)
+        running_batch = bool(
+            runner is not None
+            and runner.is_running()
+            and getattr(self, "active_process_kind", None) == "batch"
+        )
+        show_pause = running_batch or getattr(self, "paused_batch_id", None) is not None
+        if not hasattr(self.pause_button, "grid_remove"):  # fakes in unit tests
+            return
+        if show_pause:
+            self.execute_button.grid_remove()
+            self.pause_button.grid()
+        else:
+            self.pause_button.grid_remove()
+            self.execute_button.grid()
 
     def _pause_single_batch(self) -> None:
         """Pause a batch run: stop the process, keep it resumable."""

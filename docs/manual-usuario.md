@@ -26,7 +26,7 @@ Estados de una cuenta: **Activa**, **Inactiva**, **Oculta (Disabled)**, **Cambia
 
 | Zona | Contenido |
 |---|---|
-| Barra de botones (iconos) | Nuevo lote, Registrar/actualizar, Lotes/ejecuciones, Ejecutar, Detener, Pausar/Reanudar, Renombrar, Renombrar manual, Organizar stories (mismos atajos que los menús; cada icono tiene tooltip). |
+| Barra de botones (iconos) | Nuevo lote, Registrar/actualizar, Lotes/ejecuciones, Ejecutar/Pausar/Reanudar (**un solo botón**: ▶ en reposo, ⏸ mientras corre el lote, ▶ al reanudar), Detener, Renombrar, Organizar stories y Traer carpetas de otra instancia (*pull*). *Renombrar manual* ya no está en la botonera: solo en *Lote → Renombrar manual*. Mismos atajos que los menús; cada icono tiene tooltip. |
 | **Catálogo** (izquierda) | En vista árbol, casillas **Ver -Deleted** / **Ver -Inactive** (desmarcadas por defecto; ocultan esas carpetas solo en el árbol; la búsqueda las ignora y los selectores de carpeta siguen mostrándolas; también en el clic derecho de una carpeta). Filtro de búsqueda, botón pegar, cambio lista/árbol. Al refrescarse, el árbol conserva las carpetas expandidas y el scroll. Clic derecho: ver §5. El filtro busca por **username** (parte del nombre) o por **Owner ID**: pega el número (≥5 dígitos) de la página de Instagram y se muestra la cuenta cuyo Owner ID coincide exactamente, **entre todas las cuentas, también archivadas y eliminadas** aunque la vista no las muestre; el árbol abre su carpeta y la selecciona, y la barra de estado indica usuario y estado. Si no hay coincidencia, no pasa nada (los números no se toman como username). |
 | **Editor** (derecha) | Datos de la cuenta que vas a añadir al lote (§4). |
 | **Cuentas del lote actual** | Tabla de cuentas del lote con estado por colores; clic derecho (§6). |
@@ -57,6 +57,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 | **Pegar/Agregar** | Pega del portapapeles un username (y URLs) y lo añade/actualiza en el lote de una vez. |
 | **Agregar/Actualizar** | Añade el contenido del editor al lote, o actualiza la cuenta si ya está. |
 | **Pegar** | Pega URLs del portapapeles en el cuadro de URLs. |
+| **Copiar** (icono junto a *Pegar*) | En username, Owner Id, fecha del primer post y ruta: copia el valor del campo al portapapeles (vacío = no hace nada). |
 | ~~Normalizar~~ | Oculto desde v3.25 (se usaba poco); la función sigue en el código. |
 | **Limpiar editor** | Vacía los campos del editor. |
 | **Eliminar selección / Eliminar todo** | Quita cuentas del lote actual (no toca el catálogo ni el disco). |
@@ -75,7 +76,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 |---|---|
 | **Ejecutar** | Lanza el lote actual: envía URLs al bot de Telegram, espera descargas y las mueve a la carpeta de trabajo. Progreso en consola y tabla. |
 | **Detener** | Detiene el proceso en curso (descarga o renombrado integrado; este último para antes de la siguiente cuenta). |
-| **Pausar / Reanudar** | **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
+| **Pausar / Reanudar** (mismo botón que Ejecutar) | **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
 | **Ejecutar tras Detener/Pausar** | Con un lote ya iniciado, Ejecutar lo **reanuda** (no intenta registrarlo de nuevo, así que no aparece «Batch name … already exists»). |
 | **Lotes guardados y ejecuciones…** | Modal para organizar los lotes (ver «Modal» más abajo). |
 | **Organizar stories…** | Modal *Stories Inbox*: elige la carpeta de entrada, *Guardar rutas* y *Ejecutar* para mover stories sueltas a la carpeta `story` de cada cuenta; al terminar muestra un **informe**: total movido, solo los ficheros con problema (duplicado, carpeta inexistente, cuenta no encontrada…), los ficheros que siguen en la carpeta (con nombre) o «carpeta vacía». **Forzar mover (sobrescribir)** reintenta los duplicados reemplazando el existente (pide confirmación). |

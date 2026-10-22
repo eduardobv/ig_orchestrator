@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.0.0 - feat-gui-26: iconos nuevos, botón único Ejecutar/Pausar, botón Pull y botones Copiar
+
+Fecha: 2026-10-22 · Rama: `v4/main` (primer feat de la serie v4)
+
+### Creado
+* `tools/gen_icons.py` (genera los iconos con Pillow, sin librerías nativas); iconos `pull.png`, `copy.png`, `copy_black.png`, `play_pause.png`; carpeta `gui/shared/static/icons/_old/` con los iconos sustituidos (play, pause, rename, stories) para poder restaurarlos.
+* `tests/gui/test_feat_gui_26.py` (6 pruebas); `tasks/done/v4/feat-gui-26.md`.
+
+### Modificado
+* **Iconos nuevos:** `rename` (campo de texto con cursor), `stories` (anillo degradado con silueta, ahora con transparencia: el anterior era un PNG 24×24 con fondo negro), `play` y `pause` (esquinas suaves; pausa en ámbar).
+* **Ejecutar/Pausar en el mismo sitio:** `gui/shell/app.py` coloca ambos botones en la misma celda y `RunControllerMixin._sync_run_pause_buttons` muestra solo uno: *Ejecutar* en reposo, *Pausar* mientras corre un lote y *Reanudar* (icono play) con el lote en pausa. Se llama desde `_set_pause_button_mode` y `_set_process_running`. Los dos botones siguen existiendo, así que la lógica de estados no cambia.
+* **Renombrar manual** oculto de la botonera (`grid_remove`); sigue en el menú *Lote*.
+* **Botón Pull** (`pull_button`) en la botonera: abre el diálogo de traer carpetas de otra instancia (ya existía en el menú).
+* **Copiar** junto a *Pegar* en username, Owner Id, fecha del primer post y ruta (`EditorPanelMixin._copy_icon_button`); el borrar (❌) pasa a la columna siguiente.
+* Locales es/en: `tooltip.pull`, `tooltip.copy_*`. Versión 4.0.0.
+* `tests/gui/test_theme.py`: el borrar del username pasa a la columna 3.
+
+### Pruebas
+* `python -m pytest`: 615 passed. Captura de la GUI real (copia de la BD) revisada; **no probado** el cambio Ejecutar→Pausar con un lote real ni con Telegram.
+
 ## v3.26.0 - cierre de la serie v3
 
 Fecha: 2026-10-22 · Rama: `v3/integration` → `master`

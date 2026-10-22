@@ -14,3 +14,6 @@ Infra GUI reutilizable.
 ## Tests
 `tests/gui/test_i18n.py`, `tests/gui/test_theme.py`, `tests/gui/test_log_window.py`,
 `tests/gui/test_helpers.py`
+
+## v4.0 (feat-gui-26)
+- `icons.py`: registra `pull`, `copy-black`, `play-pause`. Iconos nuevos generados con `tools/gen_icons.py`; los sustituidos están en `static/icons/_old/`.
