@@ -25,9 +25,9 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v3.24.0)
+### Estado Actual (v3.26.0, serie v3 cerrada)
 
-- Rama activa: `v3/integration` (tags `v3.2.0`…`v3.24.0`; PR a `master` pendiente). Detalle y limitaciones: `docs/arquitectura-v3.md`.
+- Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
 - El flujo real se ejecuta con `python -m ig_orchestrator --input config\batch.json` o `--run`
 - La GUI de escritorio funciona con `python -m ig_orchestrator gui`
@@ -52,31 +52,6 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 - Cierre esperado: PR a `master` + tag `v2.0.0` (ya hecho, ahora en mejoras GUI)
 
 ## Arquitectura y Módulos
-
-### Estructura de Carpetas
-
-```
-config/          → batch.example.json, batch.json (entrada)
-data/            → orchestrator.db (v1), orchestrator_gui.sqlite (v2)
-logs/            → app.log global + YYYYMMDD_HHMMSS/username.log
-reports/         → run_YYYYMMDD_HHMMSS.md
-src/ig_orchestrator/
-  main.py        → Punto de entrada CLI
-  cli/main.py    → Entry CLI (main.py es shim)
-  settings.py    → Lectura de .env
-  input/         → Parser, importador, clasificador de URLs
-  db/            → SQLite, schema, repositorios, adaptadores
-  gui/           → Shell (app.py shim), editor, catálogo, batches, settings, draft
-  orchestration/ → Orquestadores, política de reintentos
-  telegram/      → Telethon, parser de respuestas del bot
-  filesystem/    → Carpetas, watcher, clasificación, movimiento
-  reports/       → Reporte Markdown
-  library/       → Catálogo=disco: operaciones de disco con diario, escáner, papelera, ficha, auditoría, importación
-  renaming/      → Renombrado integrado (port de sc2), índice como referencia
-  staging/       → Almacén de procesadas y volcado a la biblioteca
-  exchange/      → Intercambio entre instancias (publicar/traer/importar resultados)
-```
-(Detalle módulo a módulo en `docs/arquitectura-v3.md`.)
 
 ### Reglas de Arquitectura (de AGENTS.md)
 
@@ -253,36 +228,6 @@ git commit -m "fix: adjust tarea X ..."
 git tag v1.X.1
 ```
 
-## Configuración de Entorno
-
-### `.env` Obligatorio
-
-```env
-TELEGRAM_API_ID=
-TELEGRAM_API_HASH=
-TELETHON_SESSION_NAME=telegram_user_session
-TELEGRAM_DOWNLOAD_BOT_USERNAME=@example_bot
-
-TELEGRAM_DESKTOP_DOWNLOAD_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
-WORKING_FOLDER=C:\Users\eduba\Downloads\DW\Telegram_Desktop
-REPORTS_FOLDER=reports
-SQLITE_DB_PATH=data\orchestrator.db
-
-MAX_RETRIES=5
-RETRY_BASE_SECONDS=90
-RETRY_MAX_SECONDS=900
-DOWNLOAD_WAIT_TIMEOUT_SECONDS=300
-DOWNLOAD_STABLE_SECONDS=10
-```
-
-### `.env` Opcional
-
-```env
-POST_PROCESS_ENABLED=false
-POST_PROCESS_COMMAND=D:\Archivos\Scripts\IG\ManualRenameFiles\MRF_auto.bat
-SQLITE_GUI_DB_PATH=data\orchestrator_gui.sqlite
-```
-
 ## Errores Definitivos (No Reintentar)
 
 ```
@@ -384,15 +329,6 @@ Tarea v2.1 GUI UX ⟹ v2.1.0 (rama: v2/gui-ux-stories)
 
 Arreglos incrementan patch: `v1.X.1`, `v1.X.2`, etc.
 
-## No Implementar en v1.0.1
-
-- Integración con el script de renombrado
-- Limpieza de duplicados generados por el renombrador
-- Movimiento final a `G:\4K Stogram`
-- UI web o standalone
-
-Estos siguen perteneciendo al script externo Manual Rename Files.
-
 ## Seguridad
 
 **No commitear**:
@@ -400,23 +336,6 @@ Estos siguen perteneciendo al script externo Manual Rename Files.
 - `*.session`, `*.session-journal`
 - Bases SQLite reales en `data/`
 - `api_hash`, códigos de login ni secretos en logs
-
-## Ejecutar Tests
-
-```bash
-python -m pytest                  # Todos
-python -m pytest -q              # Silencioso
-python -m pytest tests/test_gui_services.py  # Específico
-```
-
-Desde VS Code: configuración `Tests: pytest`
-
-## Inicializar SQLite
-
-```bash
-python -m ig_orchestrator init-db
-python -m ig_orchestrator init-db --db-path data\orchestrator.db
-```
 
 ## Referencias
 

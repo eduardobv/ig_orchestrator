@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.26.0 - cierre de la serie v3
+
+Fecha: 2026-10-22 · Rama: `v3/integration` → `master`
+
+### Modificado
+* Versión 3.26.0 (`pyproject.toml`, `__init__.py`, `tests/test_package_smoke.py`); `docs/arquitectura-v3.md` y `CLAUDE.md` marcan v3 como cerrada y apuntan a la rama `v4/main`.
+* `CLAUDE.md`: se incluyen los cambios del usuario (sección «Estructura de Carpetas» y «Configuración de Entorno» retiradas; el detalle vive en `docs/arquitectura-v3.md`).
+* Sin cambios de código funcional. Pendientes aceptados: lo relacionado con `G:` real solo se probó con copias (ver `docs/arquitectura-v3.md` §8); `compareProcess` aparcado.
+
+### Pruebas
+* `python -m pytest`: 609 passed. **No probado con Telegram real ni con `G:` real.**
+
 ## v3.25.0 - feat-uc2-25: cuentas privadas, OwnerId en el editor, aviso sin G:, ficha copiable, menú reorganizado y mejoras pequeñas de la GUI
 
 Fecha: 2026-10-22 · Rama: `v3/integration` (feat incremental de v3)

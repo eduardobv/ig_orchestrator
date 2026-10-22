@@ -9,8 +9,8 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v3.25.0** (tags `v3.2.0` … `v3.18.0`; los feats nuevos pedidos se añaden como feats incrementales de v3, ver `CLAUDE.md`) |
-| Rama de trabajo | `v3/integration` (PR a `master` pendiente: se hace al terminar la serie v3) |
+| Versión | **v3.26.0** — cierre de la serie v3 (tags `v3.2.0` … `v3.26.0`). Los cambios nuevos van en la serie v4 (rama `v4/main`) |
+| Rama de trabajo | `v3/integration` (serie cerrada en v3.26.0; PR a `master` abierto) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
 | Base v1 | `data/orchestrator.sqlite`: solo CLI y rollback. No escribir en ella desde la GUI. |
@@ -186,7 +186,7 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 
 | Tema | Estado |
 |---|---|
-| PR `v3/integration` → `master` | Pendiente (tras validar). |
+| PR `v3/integration` → `master` | Abierto al cerrar la serie (v3.26.0). |
 | «Eliminar carpeta vacía» | Hecho en v3.16 (`plan_delete_empty_folder`). |
 | Probar con `G:` real | Renombrado sin `G:`, almacén/volcado, publicar/importar con inst1 y papelera **solo probados con copias/datos sintéticos**. |
 | Fusión genérica carpeta↔carpeta | **Descartada** por riesgo (reasignar cuentas de grupos fusionados); solo existe la fusión de cuentas (feat 7). |
