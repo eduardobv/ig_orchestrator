@@ -120,6 +120,22 @@ def _patch_gui_schema(connection: Connection) -> None:
     )
     connection.execute(
         """
+        INSERT OR IGNORE INTO bot_errors
+            (id, code, match_pattern, match_kind, is_retryable, max_retries_override,
+             notify_on_match, notify_template, description, is_active, sort_order)
+        VALUES
+            (8, 'FILE_TOO_LARGE_LINK', 'error_file_too_large_link', 'CONTAINS',
+             1, NULL, 0, NULL,
+             'File over the bot limit; the bot sends a download link that the app downloads directly.',
+             1, 8),
+            (9, 'FILE_TOO_LARGE_DOWNLOAD_FAILED', 'Large file download failed',
+             'CONTAINS', 1, NULL, 0, NULL,
+             'Direct download of the bot link failed (expired link, cut, size mismatch); retried asking the bot for a new link.',
+             1, 9)
+        """
+    )
+    connection.execute(
+        """
         INSERT OR IGNORE INTO app_settings (key, value, value_type, updated_at)
         VALUES ('processing.stories_first', '1', 'BOOLEAN', datetime('now'))
         """

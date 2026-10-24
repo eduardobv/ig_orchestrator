@@ -5,16 +5,24 @@ from enum import StrEnum
 import re
 from re import Pattern
 
+from ig_orchestrator.telegram.large_file import (
+    FILE_TOO_LARGE_LINK_MARKER,
+    extract_download_url,
+)
+
 
 class BotResponseStatus(StrEnum):
     OK = "OK"
     RETRYABLE_ERROR = "RETRYABLE_ERROR"
     NON_RETRYABLE_ERROR = "NON_RETRYABLE_ERROR"
     UNKNOWN = "UNKNOWN"
+    # The file is over the bot's Telegram limit; the bot sends a download link.
+    LARGE_FILE_LINK = "LARGE_FILE_LINK"
 
 
 class BotErrorType(StrEnum):
     SERVICE_OVERLOADED = "SERVICE_OVERLOADED"
+    FILE_TOO_LARGE_LINK = "FILE_TOO_LARGE_LINK"
     GEOBLOCK_REQUIRED = "GEOBLOCK_REQUIRED"
     MEDIA_NOT_FOUND_OR_UNAVAILABLE = "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
     NOT_FOUND = "NOT_FOUND"
@@ -28,6 +36,7 @@ class BotResponse:
     original_message: str | None
     last_error: str | None = None
     last_error_type: BotErrorType | None = None
+    download_url: str | None = None
 
 
 _RETRYABLE_ERRORS: tuple[tuple[str, BotErrorType], ...] = (
@@ -67,6 +76,14 @@ def parse_bot_response(message: str | None) -> BotResponse:
         )
 
     normalized_message = message.casefold()
+
+    if FILE_TOO_LARGE_LINK_MARKER in normalized_message:
+        return BotResponse(
+            status=BotResponseStatus.LARGE_FILE_LINK,
+            original_message=message,
+            last_error_type=BotErrorType.FILE_TOO_LARGE_LINK,
+            download_url=extract_download_url(message),
+        )
 
     retryable_error_type = _find_error_type(normalized_message, _RETRYABLE_ERRORS)
     if retryable_error_type is not None:

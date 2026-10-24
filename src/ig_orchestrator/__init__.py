@@ -1,3 +1,3 @@
 """Instagram manual download orchestrator package."""
 
-__version__ = "4.4.1"
+__version__ = "4.5.0"

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import re
 import shutil
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,8 +21,16 @@ from ig_orchestrator.models import (
     UrlJobStatus,
 )
 from ig_orchestrator.telegram.bot_response_parser import (
+    BotResponse,
     BotResponseStatus,
     parse_bot_response,
+)
+from ig_orchestrator.telegram.large_file import (
+    FILE_TOO_LARGE_DOWNLOAD_FAILED,
+    LargeFileConfig,
+    LargeFileDownloadError,
+    download_large_file,
+    media_id_from_url,
 )
 
 
@@ -46,6 +54,7 @@ class TelegramBotClient(Protocol):
 
 
 Watcher = Callable[[Path, datetime, float, float], list[Path]]
+LargeFileDownloader = Callable[[str, Path, LargeFileConfig], Awaitable[Path]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +68,7 @@ class BotConversationConfig:
     response_fallback_poll_seconds: float = 1.5
     parallel_downloads: int = 4
     watcher_fallback_enabled: bool = True
+    large_file: LargeFileConfig = LargeFileConfig()
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -112,12 +122,14 @@ class BotConversationService:
         download_repository: DownloadRepository,
         config: BotConversationConfig,
         watcher: Watcher = watch_downloaded_files,
+        large_file_downloader: LargeFileDownloader = download_large_file,
     ) -> None:
         self._telegram_client = telegram_client
         self._url_job_repository = url_job_repository
         self._download_repository = download_repository
         self._config = config
         self._watcher = watcher
+        self._large_file_downloader = large_file_downloader
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
         self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
@@ -222,6 +234,9 @@ class BotConversationService:
             return BotConversationResult(job=retry_job)
 
         response = parse_bot_response(bot_message)
+
+        if response.status is BotResponseStatus.LARGE_FILE_LINK and not direct_paths:
+            return await self._download_large_file_result(job, response, bot_message)
 
         if (
             response.status is BotResponseStatus.NON_RETRYABLE_ERROR
@@ -412,6 +427,57 @@ class BotConversationService:
                 await asyncio.sleep(
                     min(self._config.response_poll_interval_seconds, deadline - now)
                 )
+
+    async def _download_large_file_result(
+        self,
+        job: UrlJob,
+        response: BotResponse,
+        bot_message: str | None,
+    ) -> BotConversationResult:
+        """Download a file the bot only offered as a link (> 50 MB)."""
+
+        job_id = _require_job_id(job)
+        media_id = media_id_from_url(job.url)
+        try:
+            if not self._config.large_file.enabled:
+                raise LargeFileDownloadError("Large file download is disabled.")
+            if not response.download_url:
+                raise LargeFileDownloadError("Bot message has no download link.")
+            if media_id is None:
+                raise LargeFileDownloadError(
+                    "Large file links are only supported for posts and reels."
+                )
+            target = _unique_path(self._config.download_folder, f"{media_id}.mp4")
+            logger.info(
+                "Downloading large file from bot link: job_id={} media_id={}",
+                job_id,
+                media_id,
+            )
+            downloaded = await self._large_file_downloader(
+                response.download_url, target, self._config.large_file
+            )
+        except LargeFileDownloadError as exc:
+            logger.warning(
+                "Large file download failed: job_id={} error={}", job_id, exc
+            )
+            failed_job = self._url_job_repository.update_error(
+                job_id,
+                status=UrlJobStatus.RETRY_PENDING,
+                last_error=f"Large file download failed: {exc}",
+                last_error_type=FILE_TOO_LARGE_DOWNLOAD_FAILED,
+                non_retryable=False,
+            )
+            return BotConversationResult(job=failed_job, bot_message=bot_message)
+
+        stored = self._store_detected_file(job_id, downloaded)
+        downloaded_job = self._url_job_repository.update_status(
+            job_id,
+            UrlJobStatus.DOWNLOADED,
+            finished_at=_utc_now(),
+        )
+        return BotConversationResult(
+            job=downloaded_job, files=(stored,), bot_message=bot_message
+        )
 
     async def _download_with_limit(
         self,

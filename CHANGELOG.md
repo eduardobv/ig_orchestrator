@@ -1,5 +1,22 @@
 # Changelog
 
+## v4.5.0 - feat-run-31: reels grandes por enlace directo
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `telegram/large_file.py`: `shortcode_to_media_id` / `media_id_from_url` (shortcode → `media_id`, verificado con 3 ids reales), `extract_download_url` (URL completa, sin truncar), `download_large_file` (streaming a `.part`, comprobación de `Content-Length`, tope de tamaño, renombrado atómico, `User-Agent: curl/8.4.0`) y `LargeFileConfig`.
+* `tests/telegram/test_large_file.py` (decodificación, URL de 1 000+ caracteres, servidor local con 200 / 403 / corte / tamaño excedido).
+
+### Modificado
+* `telegram/bot_response_parser.py`: nuevo estado `LARGE_FILE_LINK` (texto `error_file_too_large_link`) con `download_url`.
+* `telegram/bot_conversation_service.py`: ante ese estado descarga el enlace como `<media_id>.mp4` en la carpeta de descarga y sigue el flujo normal (`REEL` → `reels\`). Si falla (403/410 por enlace caducado, corte, tamaño distinto, URL no de post/reel, función desactivada) → `RETRY_PENDING` con tipo `FILE_TOO_LARGE_DOWNLOAD_FAILED`; el reintento pide un enlace nuevo al bot. Ya no se esperan 300 s + 300 s.
+* BD: filas `FILE_TOO_LARGE_LINK` y `FILE_TOO_LARGE_DOWNLOAD_FAILED` en `bot_errors` (esquemas y parche de `gui_migrations`).
+* Documentación: `CLAUDE.md`, `README.md`, `docs/arquitectura-v3.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`, `tasks/feat-run-30.md`. `AGENTS.md` y `docs/manual-usuario.md` revisados sin cambios. Versión 4.5.0.
+
+### Pruebas
+* `python -m pytest`: todo en verde. **No probado** con el bot real en la app (la descarga por enlace sí se midió en el spike: 54,6 MB en 2,7 s). Límites fijos por ahora (timeouts 10/120 s, máx. 500 MB) hasta el feat de ajustes `run.*`.
+
 ## v4.4.1 - feat-run-30 (parte 2): descargas únicas, en paralelo y en carpeta propia
 
 Fecha: 2026-10-24 · Rama: `v4/main`

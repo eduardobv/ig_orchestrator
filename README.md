@@ -125,6 +125,8 @@ DOWNLOAD_STABLE_SECONDS=10
 
 Variables opcionales de descarga de Telegram (v4.4.1): `TELEGRAM_DOWNLOAD_TEMP_FOLDER` (carpeta propia de descarga; vacío = la de Telegram Desktop), `TELEGRAM_PARALLEL_DOWNLOADS` (4) y `TELEGRAM_WATCHER_FALLBACK` (`false`: no busca ficheros en la carpeta de Telegram Desktop si la descarga directa falla).
 
+Los reels de más de ~50 MB (para los que el bot solo da un enlace) se descargan directamente desde ese enlace (v4.5.0).
+
 Variables opcionales de post-proceso:
 
 ```env

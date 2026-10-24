@@ -409,7 +409,9 @@ INSERT OR IGNORE INTO bot_errors (
     (4, 'NOT_FOUND', 'We''re sorry, we couldn''t find that.', 'CONTAINS', 0, NULL, 0, NULL, 'Publication not found; do not retry.', 1, 4),
     (5, 'PRIVATE_ACCOUNT_STORIES', 'We can''t get stories from a private account (instagram limit)', 'CONTAINS', 0, NULL, 0, NULL, 'Stories of a private account cannot be fetched.', 1, 5),
     (6, 'STORIES_NOT_FOUND', '\bstories\s+for\s+[^\r\n]+?\s+not\s+found\b', 'REGEX', 0, NULL, 0, NULL, 'No stories for that username; the username in the message varies.', 1, 6),
-    (7, 'MEDIA_REMOVED', 'Instagram page of the post is unavailable', 'CONTAINS', 0, NULL, 0, NULL, 'Bot said media not found and the anonymous Instagram page confirms the post is gone; not retried.', 1, 7);
+    (7, 'MEDIA_REMOVED', 'Instagram page of the post is unavailable', 'CONTAINS', 0, NULL, 0, NULL, 'Bot said media not found and the anonymous Instagram page confirms the post is gone; not retried.', 1, 7),
+    (8, 'FILE_TOO_LARGE_LINK', 'error_file_too_large_link', 'CONTAINS', 1, NULL, 0, NULL, 'File over the bot limit; the bot sends a download link that the app downloads directly.', 1, 8),
+    (9, 'FILE_TOO_LARGE_DOWNLOAD_FAILED', 'Large file download failed', 'CONTAINS', 1, NULL, 0, NULL, 'Direct download of the bot link failed (expired link, cut, size mismatch); retried asking the bot for a new link.', 1, 9);
 
 INSERT OR IGNORE INTO path_roots (id, code, path, updated_at) VALUES
     (1, 'TELEGRAM_DESKTOP', '', datetime('now')),

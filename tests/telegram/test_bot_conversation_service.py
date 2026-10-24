@@ -692,3 +692,78 @@ def test_watcher_fallback_disabled_does_not_scan_telegram_folder(
     result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
 
     assert result.job.last_error_type == "NO_FILES_DETECTED"
+
+
+def _large_file_service(tmp_path: Path, downloader, *, enabled: bool = True):
+    from ig_orchestrator.telegram.large_file import LargeFileConfig
+
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    folder = tmp_path / "downloads"
+    folder.mkdir(exist_ok=True)
+    service = BotConversationService(
+        telegram_client=FakeTelegramClient(
+            [_incoming("error_file_too_large_link\nhttps://cdn.example.com/big.mp4?sig=1")]
+        ),
+        url_job_repository=job_repo,
+        download_repository=download_repo,
+        config=BotConversationConfig(
+            download_folder=folder,
+            download_wait_timeout_seconds=0,
+            download_stable_seconds=0,
+            response_wait_timeout_seconds=0,
+            large_file=LargeFileConfig(enabled=enabled),
+        ),
+        watcher=lambda *_args: [],
+        large_file_downloader=downloader,
+    )
+    return service, job_repo
+
+
+def test_large_file_link_is_downloaded_named_by_media_id(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    async def downloader(url, destination, _config):
+        calls.append(url)
+        destination.write_bytes(b"big video")
+        return destination
+
+    service, job_repo = _large_file_service(tmp_path, downloader)
+    job = _stored_job(job_repo)
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.DOWNLOADED
+    assert calls == ["https://cdn.example.com/big.mp4?sig=1"]
+    assert len(result.files) == 1
+    assert result.files[0].original_path.suffix == ".mp4"
+    assert result.files[0].original_path.stem.isdigit()
+    assert result.files[0].media_type == MediaType.VIDEO
+
+
+def test_large_file_failure_goes_to_retry_with_its_own_error_type(
+    tmp_path: Path,
+) -> None:
+    from ig_orchestrator.telegram.large_file import LargeFileDownloadError
+
+    async def downloader(*_args):
+        raise LargeFileDownloadError("HTTP Error 403: Forbidden")
+
+    service, job_repo = _large_file_service(tmp_path, downloader)
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert result.job.status == UrlJobStatus.RETRY_PENDING
+    assert result.job.last_error_type == "FILE_TOO_LARGE_DOWNLOAD_FAILED"
+
+
+def test_large_file_download_can_be_disabled(tmp_path: Path) -> None:
+    async def downloader(*_args):
+        raise AssertionError("must not download")
+
+    service, job_repo = _large_file_service(tmp_path, downloader, enabled=False)
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert result.job.last_error_type == "FILE_TOO_LARGE_DOWNLOAD_FAILED"

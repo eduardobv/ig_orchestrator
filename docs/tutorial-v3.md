@@ -1143,6 +1143,14 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 31 · Reels grandes por enlace (v4.5.0)
+
+Cuando un reel pesa más de ~50 MB el bot no lo envía: responde `error_file_too_large_link` y un enlace. La app lo detecta y descarga ese enlace directamente (unos 3 s), con nombre `<media_id>.mp4` (el `media_id` se calcula del shortcode de la URL), y sigue el flujo normal (`reels\`).
+
+* Si el enlace falla (caducado, cortado), la URL queda `RETRY_PENDING` con error `FILE_TOO_LARGE_DOWNLOAD_FAILED` y se reintenta pidiendo un enlace nuevo.
+* Solo posts y reels. Límites actuales fijos: 10 s de conexión, 120 s de lectura, 500 MB.
+* **Probar:** `python -m pytest tests/telegram/test_large_file.py`; en un lote real con un reel grande, busca en `logs/app.log` «Downloading large file from bot link».
+
 ## Feat 29 · Posts eliminados: no reintentar (v4.3.0)
 
 Cuando el bot responde «Media not found or unavailable» para un post o reel, el orquestador pide la página pública del post a Instagram (sin login):
