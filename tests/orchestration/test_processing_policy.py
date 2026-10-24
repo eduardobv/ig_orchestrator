@@ -13,6 +13,7 @@ from ig_orchestrator.models import (
     UrlSource,
 )
 from ig_orchestrator.orchestration.processing_policy import (
+    AccountOrderInfo,
     STORIES_FIRST_SETTING_KEY,
     AccountJobScope,
     non_story_sweep_accounts,
@@ -37,7 +38,7 @@ def test_ordered_main_pass_jobs_puts_all_story_types_first() -> None:
     assert [job.id for job in ordered] == [generated.id, input_story.id, reel.id, highlight.id]
 
 
-def test_stories_and_non_story_sweeps_preserve_group_priority() -> None:
+def test_stories_sweep_keeps_batch_order_and_non_story_sweep_is_lightest_first() -> None:
     story_only = _account(1, "story_only")
     mixed = _account(2, "mixed")
     reels_only = _account(3, "reels_only")
@@ -54,7 +55,83 @@ def test_stories_and_non_story_sweeps_preserve_group_priority() -> None:
     rest = non_story_sweep_accounts([story_only, mixed, reels_only], jobs)
 
     assert [account.username for account in stories] == ["story_only", "mixed"]
+    # Equal workload (1 reel each): ties fall back to batch order.
     assert [account.username for account in rest] == ["mixed", "reels_only"]
+
+
+def test_stories_sweep_puts_priority_first_then_batch_order() -> None:
+    accounts = [_account(i, f"a{i}") for i in (1, 2, 3)]
+    jobs = {
+        i: [_job(i * 10, PublicationType.STORY, UrlSource.GENERATED_STORY, account_id=i)]
+        for i in (1, 2, 3)
+    }
+
+    plain = stories_sweep_accounts(accounts, jobs)
+    ranked = stories_sweep_accounts(
+        accounts, jobs, {3: AccountOrderInfo(priority=1), 2: AccountOrderInfo(priority=2)}
+    )
+
+    assert [a.username for a in plain] == ["a1", "a2", "a3"]
+    assert [a.username for a in ranked] == ["a3", "a2", "a1"]
+
+
+def test_non_story_sweep_orders_by_workload_reels_posts_new_then_batch() -> None:
+    def many(account_id: int, reels: int, posts: int, base: int) -> list[UrlJob]:
+        out = [
+            _job(base + n, PublicationType.REEL, UrlSource.INPUT_URL, account_id=account_id)
+            for n in range(reels)
+        ]
+        out += [
+            _job(base + 50 + n, PublicationType.POST, UrlSource.INPUT_URL, account_id=account_id)
+            for n in range(posts)
+        ]
+        return out
+
+    names = ["big", "light_posts", "light_reels", "tie_old", "tie_new", "tie_first"]
+    accounts = [_account(i, n) for i, n in enumerate(names, start=1)]
+    jobs = {
+        1: many(1, 60, 40, 1000),  # 100 URLs: last
+        2: many(2, 0, 3, 2000),  # 3 URLs, 0 reels
+        3: many(3, 3, 0, 3000),  # 3 URLs, 3 reels: before light_posts
+        4: many(4, 2, 1, 4000),  # 3 URLs, 2 reels, 1 post
+        5: many(5, 2, 1, 5000),  # same as 4 but a new account
+        6: many(6, 2, 1, 6000),  # same as 4, listed later than 4
+    }
+    jobs[7] = []
+    info = {5: AccountOrderInfo(is_new_account=True)}
+
+    rest = non_story_sweep_accounts(accounts, jobs, info)
+
+    assert [a.username for a in rest] == [
+        "light_reels",
+        "tie_old",
+        "tie_first",
+        "tie_new",
+        "light_posts",
+        "big",
+    ]
+
+
+def test_non_story_sweep_ignores_stories_when_counting() -> None:
+    heavy_stories = _account(1, "stories_many")
+    other = _account(2, "other")
+    jobs = {
+        1: [
+            *[
+                _job(10 + n, PublicationType.STORY, UrlSource.GENERATED_STORY, account_id=1)
+                for n in range(5)
+            ],
+            _job(30, PublicationType.REEL, UrlSource.INPUT_URL, account_id=1),
+        ],
+        2: [
+            _job(40, PublicationType.REEL, UrlSource.INPUT_URL, account_id=2),
+            _job(41, PublicationType.REEL, UrlSource.INPUT_URL, account_id=2),
+        ],
+    }
+
+    rest = non_story_sweep_accounts([other, heavy_stories], jobs)
+
+    assert [a.username for a in rest] == ["stories_many", "other"]
 
 
 def test_stories_first_setting_defaults_true_and_can_be_disabled(

@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v4.1.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
+| Versión | **v4.2.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
 | Rama de trabajo | `v3/integration` (serie cerrada en v3.26.0; PR a `master` abierto) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -113,7 +113,7 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 | Clave | Para qué |
 |---|---|
 | `ui.*` | Idioma, tema, vista del catálogo, colores, posición de ventana, paneles visibles |
-| `processing.stories_first` | Barridas de stories |
+| `processing.stories_first` | Barridas de stories. Orden (v4.2.0): stories por prioridad y luego orden del lote (máx. 2 reintentos por story, `STORY_MAX_RETRIES`); resto de menor a mayor número de URLs pendientes (empate: más reels, menos posts, cuenta no nueva, orden del lote). Lógica en `processing_policy.stories_sweep_accounts` / `non_story_sweep_accounts`; prioridad y «cuenta nueva» se leen de `batch_accounts` (`load_account_order_info`) |
 | `notify.*` | Aviso por Telegram al terminar lote |
 | `stories.inbox_path`, `stories.accounts_db_path` | Stories Inbox y ruta de `accounts_lite` (usada por el espejo) |
 | `retention.downloaded_files` | Retención de la tabla de ficheros |

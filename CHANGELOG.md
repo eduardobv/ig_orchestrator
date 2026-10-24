@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.2.0 - feat-run-28: nuevo orden de ejecución del lote y 2 reintentos para stories
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `tasks/done/v4/feat-run-28.md`.
+
+### Modificado
+* `orchestration/processing_policy.py`: `stories_sweep_accounts` ordena por prioridad (rango 1, 2…) y después por orden del lote (se acaba la separación «solo-stories primero, mixtas después»); `non_story_sweep_accounts` ordena de menos a más URLs pendientes (posts+reels+highlights), luego más reels, menos posts, cuenta no nueva antes que nueva y orden del lote (se acaba «las que tuvieron stories primero»). Nuevos `AccountOrderInfo` y `load_account_order_info` (leen `priority` e `is_new_account` de `batch_accounts`; vacío en esquema v1).
+* `orchestration/batch_orchestrator.py`: pasa esa información al plan de barridas.
+* `orchestration/retry_policy.py` y `account_orchestrator.py`: las stories (`STORY`) tienen como máximo 2 reintentos (`STORY_MAX_RETRIES`); si el máximo configurado es menor, se respeta el menor. Antes usaban el máximo global (5 por defecto).
+* Documentación: `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/arquitectura-v3.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`. Versión 4.2.0. No hay `MODULE.md` en `orchestration/`.
+
+### Pruebas
+* `python -m pytest`: 622 passed, 1 skipped (nuevas: prioridad y orden de barridas, desempates, 2 reintentos para stories). **No probado** con Telegram ni con un lote real.
+
 ## v4.1.0 - feat-gui-27: ajustes de tamaño y textos de la GUI
 
 Fecha: 2026-10-22 · Rama: `v4/main`

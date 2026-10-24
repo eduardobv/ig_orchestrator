@@ -1,6 +1,6 @@
 import pytest
 
-from ig_orchestrator.models import UrlJobStatus
+from ig_orchestrator.models import PublicationType, UrlJobStatus
 from ig_orchestrator.orchestration import (
     MEDIA_NOT_FOUND_ERROR_TYPE,
     MEDIA_NOT_FOUND_MAX_RETRIES,
@@ -173,3 +173,42 @@ def test_retry_queue_preserves_fifo_order_and_requeues_at_the_end() -> None:
 def test_retry_policy_rejects_invalid_numbers(kwargs: dict[str, object]) -> None:
     with pytest.raises(ValueError):
         calculate_retry_decision(**kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("max_retries", "retries", "expected"),
+    [
+        (5, 1, RetryDecisionAction.RETRY),
+        (5, 2, RetryDecisionAction.FAILED_FINAL),
+        (1, 1, RetryDecisionAction.FAILED_FINAL),
+        (0, 0, RetryDecisionAction.FAILED_FINAL),
+    ],
+)
+def test_story_jobs_get_at_most_two_retries(
+    max_retries: int,
+    retries: int,
+    expected: RetryDecisionAction,
+) -> None:
+    decision = calculate_retry_decision(
+        retries=retries,
+        max_retries=max_retries,
+        base_seconds=90,
+        max_seconds=900,
+        non_retryable=False,
+        publication_type=PublicationType.STORY,
+    )
+
+    assert decision.action == expected
+
+
+def test_non_story_jobs_keep_the_full_retry_budget() -> None:
+    decision = calculate_retry_decision(
+        retries=4,
+        max_retries=5,
+        base_seconds=90,
+        max_seconds=900,
+        non_retryable=False,
+        publication_type=PublicationType.REEL,
+    )
+
+    assert decision.action == RetryDecisionAction.RETRY

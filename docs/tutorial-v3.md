@@ -1131,3 +1131,14 @@ Probar: `python -m pytest tests/gui/test_feat_gui_26.py`.
 * Cuadro del nombre del lote más corto (38) y cuadro de OwnerId junto al username algo más estrecho (16).
 
 Probar: abrir la GUI y comprobar los cuatro puntos; `python -m pytest`.
+
+## Feat 28 · Orden de ejecución del lote (v4.2.0)
+
+Con *Priorizar stories (dos barridas)* activo (por defecto):
+
+1. **Primero las stories** de todas las cuentas con el check de stories: las que tienen *prioridad* (1, 2…) y después las demás por orden de alta en el lote. Cada story admite como máximo **2 reintentos** (antes usaba el máximo global, 5).
+2. **Después posts, reels y highlights**, de la cuenta con menos URLs pendientes a la que más. Desempates: más reels → menos posts → cuenta ya existente (no nueva) → orden del lote.
+
+Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cuentas pequeñas.
+
+Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».

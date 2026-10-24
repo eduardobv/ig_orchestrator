@@ -301,7 +301,7 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 |---|---|
 | **General** | Idioma (reinicia la app). |
 | **Interfaz** | Colores del catálogo, posición de la ventana principal (izquierda/centro/derecha) y *Guardar posición*. |
-| **Procesamiento** | *Priorizar stories (dos barridas)*; **Motor de renombrado** (integrado o script externo) y **vista previa siempre**; *Vaciar tabla de ficheros descargados*. |
+| **Procesamiento** | *Priorizar stories (dos barridas)*: primero las stories (cuentas con prioridad, luego por orden de alta; 2 reintentos máx.) y después posts/reels/highlights de la cuenta con menos URLs a la que más; **Motor de renombrado** (integrado o script externo) y **vista previa siempre**; *Vaciar tabla de ficheros descargados*. |
 | **Catálogo** | Carpeta de cuentas eliminadas y *Conservar la carpeta de grupo*; **Mantener actualizado accounts_lite**; **Almacén** (carpeta local) y **Tras renombrar** (preguntar / almacén / biblioteca); **Papelera: días de retención** (0 = sin límite). |
 | **Notificaciones** | Aviso por Telegram al terminar un lote: activar, destino, plantilla, errores del bot que avisan, *Enviar prueba*. |
 | **Instancias** | Registro de equipos: nombre, rol, es-local, carpeta de descargas, carpeta compartida (ruta desde este PC y en la propia), notas; *Añadir / Editar / Eliminar / Probar*. |

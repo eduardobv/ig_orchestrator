@@ -33,6 +33,7 @@ from ig_orchestrator.orchestration.processing_policy import (
     PROCESSABLE_ACCOUNT_STATUSES,
     account_status_from_jobs,
     is_open_job,
+    load_account_order_info,
     non_story_sweep_accounts,
     read_stories_first_enabled,
     stories_sweep_accounts,
@@ -354,8 +355,14 @@ class BatchOrchestrator:
         accounts: list[Account],
     ) -> list[AccountOrchestratorResult]:
         jobs_by_account = self._jobs_by_account(accounts)
-        stories_pass = stories_sweep_accounts(accounts, jobs_by_account)
-        non_story_pass = non_story_sweep_accounts(accounts, jobs_by_account)
+        order_info = load_account_order_info(
+            self._batch_repository.connection,
+            [account.id for account in accounts if account.id is not None],
+        )
+        stories_pass = stories_sweep_accounts(accounts, jobs_by_account, order_info)
+        non_story_pass = non_story_sweep_accounts(
+            accounts, jobs_by_account, order_info
+        )
         planned: list[tuple[Account, AccountJobScope]] = [
             *[(account, AccountJobScope.STORIES) for account in stories_pass],
             *[(account, AccountJobScope.NON_STORIES) for account in non_story_pass],

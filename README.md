@@ -28,7 +28,9 @@ El proceso manual original tiene muchas piezas dificiles de auditar: listas de U
 6. Si una cuenta tiene `download_stories = true`, se genera automaticamente la URL de stories.
 7. Las stories (generadas o de entrada) se procesan antes que reels/posts/highlights.
    Con `processing.stories_first` (default, Configuración) el lote hace dos
-   barridas: todas las stories de todas las cuentas, y después el resto.
+   barridas: todas las stories de todas las cuentas (primero las de prioridad,
+   luego por orden de alta en el lote) y después el resto, de la cuenta con menos
+   URLs a la que más (empate: más reels, menos posts, cuenta no nueva, orden del lote).
 8. Los errores temporales se reintentan por rondas, al final de cada barrida.
 9. Los errores definitivos quedan guardados sin reintento.
 10. Los archivos descargados se asocian a la URL que los produjo.
@@ -1009,6 +1011,7 @@ Politica:
   `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
   `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.
 - Backoff por defecto: 90, 180, 360, 720, 900 segundos.
+- Las stories tienen como máximo **2 reintentos** (v4.2.0), porque caducan.
 
 `Stories for {username} not found` se reconoce como patron dinamico. Por
 ejemplo, `Stories for superlisha not found` termina directamente como

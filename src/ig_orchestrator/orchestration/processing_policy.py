@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from sqlite3 import Connection
 
@@ -122,50 +123,93 @@ def jobs_by_account_id(jobs_by_account: dict[int, list[UrlJob]], account_id: int
     return jobs_by_account.get(account_id, [])
 
 
+@dataclass(frozen=True, slots=True)
+class AccountOrderInfo:
+    """Batch-account flags that influence sweep order (not part of ``Account``)."""
+
+    priority: int = 0
+    is_new_account: bool = False
+
+
+def load_account_order_info(
+    connection: Connection,
+    account_ids: list[int],
+) -> dict[int, AccountOrderInfo]:
+    """Read priority / new-account flags; empty on the legacy (v1) schema."""
+
+    if not account_ids:
+        return {}
+    placeholders = ",".join("?" for _ in account_ids)
+    try:
+        rows = connection.execute(
+            f"SELECT id, priority, is_new_account FROM batch_accounts "
+            f"WHERE id IN ({placeholders})",
+            account_ids,
+        ).fetchall()
+    except Exception:
+        return {}
+    return {
+        int(row["id"]): AccountOrderInfo(
+            priority=int(row["priority"] or 0),
+            is_new_account=bool(row["is_new_account"]),
+        )
+        for row in rows
+    }
+
+
 def stories_sweep_accounts(
     accounts: list[Account],
     jobs_by_account: dict[int, list[UrlJob]],
+    order_info: dict[int, AccountOrderInfo] | None = None,
 ) -> list[Account]:
-    """Story-only accounts first, then mixed accounts that still have open stories."""
+    """Accounts with open stories: ranked priority first, then batch order."""
 
-    story_only: list[Account] = []
-    mixed: list[Account] = []
-    for account in accounts:
+    info = order_info or {}
+    candidates: list[tuple[int, Account]] = []
+    for index, account in enumerate(accounts):
         if account.id is None:
             continue
         jobs = jobs_by_account_id(jobs_by_account, account.id)
-        stories = [job for job in jobs if is_story_job(job)]
-        others = [job for job in jobs if not is_story_job(job)]
-        if not any(is_open_job(job) for job in stories):
-            continue
-        if not others:
-            story_only.append(account)
-        else:
-            mixed.append(account)
-    return [*story_only, *mixed]
+        if any(is_open_job(job) for job in jobs if is_story_job(job)):
+            candidates.append((index, account))
+
+    def key(item: tuple[int, Account]) -> tuple[int, int, int]:
+        index, account = item
+        priority = info.get(account.id, AccountOrderInfo()).priority
+        return (0, priority, index) if priority > 0 else (1, 0, index)
+
+    return [account for _index, account in sorted(candidates, key=key)]
 
 
 def non_story_sweep_accounts(
     accounts: list[Account],
     jobs_by_account: dict[int, list[UrlJob]],
+    order_info: dict[int, AccountOrderInfo] | None = None,
 ) -> list[Account]:
-    """Accounts that already had stories first, then accounts that never had stories."""
+    """Accounts with open posts/reels/highlights, lightest workload first.
 
-    had_stories: list[Account] = []
-    never_stories: list[Account] = []
-    for account in accounts:
+    Order: fewest open non-story URLs; then more reels; then fewer posts; then
+    existing accounts before new ones; then batch order.
+    """
+
+    info = order_info or {}
+    candidates: list[tuple[tuple[int, int, int, bool, int], Account]] = []
+    for index, account in enumerate(accounts):
         if account.id is None:
             continue
-        jobs = jobs_by_account_id(jobs_by_account, account.id)
-        stories = [job for job in jobs if is_story_job(job)]
-        others = [job for job in jobs if not is_story_job(job)]
-        if not any(is_open_job(job) for job in others):
+        open_others = [
+            job
+            for job in jobs_by_account_id(jobs_by_account, account.id)
+            if not is_story_job(job) and is_open_job(job)
+        ]
+        if not open_others:
             continue
-        if stories:
-            had_stories.append(account)
-        else:
-            never_stories.append(account)
-    return [*had_stories, *never_stories]
+        reels = sum(1 for job in open_others if job.publication_type is PublicationType.REEL)
+        posts = sum(1 for job in open_others if job.publication_type is PublicationType.POST)
+        is_new = info.get(account.id, AccountOrderInfo()).is_new_account
+        candidates.append(((len(open_others), -reels, posts, is_new, index), account))
+    candidates.sort(key=lambda item: item[0])
+    return [account for _key, account in candidates]
 
 
 def account_status_from_jobs(jobs: list[UrlJob]) -> AccountStatus:
@@ -255,6 +299,7 @@ def write_stories_first_enabled(connection: Connection, enabled: bool) -> None:
 
 __all__ = [
     "AccountJobScope",
+    "AccountOrderInfo",
     "OPEN_URL_STATUSES",
     "PROCESSABLE_ACCOUNT_STATUSES",
     "PROCESSABLE_ACCOUNT_STATUS_VALUES",
@@ -269,6 +314,7 @@ __all__ = [
     "is_open_job",
     "is_story_job",
     "job_in_scope",
+    "load_account_order_info",
     "non_story_sweep_accounts",
     "ordered_main_pass_jobs",
     "parse_bool_setting",

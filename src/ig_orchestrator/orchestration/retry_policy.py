@@ -5,11 +5,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Deque, Generic, Iterable, TypeVar
 
-from ig_orchestrator.models import UrlJobStatus
+from ig_orchestrator.models import PublicationType, UrlJobStatus
 
 # Bot message "Media not found or unavailable" is retryable once only.
 MEDIA_NOT_FOUND_ERROR_TYPE = "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
 MEDIA_NOT_FOUND_MAX_RETRIES = 1
+# Stories expire, so they get at most 2 retries (a lower configured budget wins).
+STORY_MAX_RETRIES = 2
 
 
 class RetryDecisionAction(StrEnum):
@@ -67,9 +69,12 @@ class RetryQueue(Generic[T]):
 def resolve_max_retries_for_error(
     max_retries: int,
     last_error_type: str | None,
+    publication_type: PublicationType | None = None,
 ) -> int:
     """Cap max_retries for known error types that should not use the global budget."""
 
+    if publication_type is PublicationType.STORY:
+        max_retries = min(max_retries, STORY_MAX_RETRIES)
     if last_error_type == MEDIA_NOT_FOUND_ERROR_TYPE:
         return min(max_retries, MEDIA_NOT_FOUND_MAX_RETRIES)
     return max_retries
@@ -83,6 +88,7 @@ def calculate_retry_decision(
     max_seconds: int,
     non_retryable: bool,
     last_error_type: str | None = None,
+    publication_type: PublicationType | None = None,
 ) -> RetryDecision:
     """Calculate retry backoff and final-failure decisions without sleeping."""
 
@@ -94,6 +100,7 @@ def calculate_retry_decision(
     effective_max_retries = resolve_max_retries_for_error(
         max_retries,
         last_error_type,
+        publication_type,
     )
 
     if non_retryable:
@@ -133,6 +140,7 @@ __all__ = [
     "MEDIA_NOT_FOUND_ERROR_TYPE",
     "MEDIA_NOT_FOUND_MAX_RETRIES",
     "RetryDecision",
+    "STORY_MAX_RETRIES",
     "RetryDecisionAction",
     "RetryQueue",
     "calculate_retry_decision",
