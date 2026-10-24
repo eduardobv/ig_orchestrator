@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.3.0 - feat-run-29: no reintentar posts eliminados
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `orchestration/post_availability.py` (`classify_post_html`, `InstagramPostAvailabilityChecker`, `MEDIA_REMOVED_ERROR_TYPE`); `tests/orchestration/test_post_availability.py`; `tasks/done/v4/feat-run-29.md`.
+
+### Modificado
+* `UrlJobProcessor`: tras `Media not found or unavailable` en posts/reels consulta la página pública de Instagram (sin login, User-Agent `curl/8.4.0`: con un User-Agent de navegador Instagram devuelve la página de error también para posts vivos). Página de error (`PolarisErrorRoot` + `httpErrorPage`) → `FAILED_FINAL`, `non_retryable`, tipo `MEDIA_REMOVED`; con `og:title` o resultado no concluyente se reintenta. Conectado en `cli/main.py`.
+* `MEDIA_NOT_FOUND_MAX_RETRIES` 1 → 3 (`retry_policy.py`).
+* BD: nuevo error `MEDIA_REMOVED` en `bot_errors` (esquemas y parche `gui_migrations`).
+* Documentación: `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/arquitectura-v3.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`. Versión 4.3.0.
+
+### Pruebas
+* `python -m pytest`: todo en verde. Comprobado en vivo con los 4 posts de ejemplo: 2 vivos → existe; «no disponible» y +18 → eliminado. **Limitación:** un post +18 se detecta como eliminado (la página anónima es idéntica), así que si el bot responde «Media not found» para uno, no se reintenta. No probado con Telegram real ni con muchas peticiones seguidas (posible limitación de tasa de Instagram → se trata como no concluyente solo si la respuesta no es la página de error).
+
 ## v4.2.0 - feat-run-28: nuevo orden de ejecución del lote y 2 reintentos para stories
 
 Fecha: 2026-10-24 · Rama: `v4/main`

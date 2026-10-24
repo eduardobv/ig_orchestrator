@@ -43,6 +43,9 @@ from ig_orchestrator.orchestration import (
     UrlJobProcessorConfig,
     UrlJobProcessorResult,
 )
+from ig_orchestrator.orchestration.post_availability import (
+    InstagramPostAvailabilityChecker,
+)
 from ig_orchestrator.reports import MarkdownReportBuilder
 from ig_orchestrator.settings import Settings, SettingsError, load_settings
 from ig_orchestrator.telegram import (
@@ -372,6 +375,7 @@ def _run_batch(
             config=UrlJobProcessorConfig(
                 default_working_folder=settings.working_folder,
                 error_notifier=_make_error_notifier(connection, telegram_client),
+                availability_checker=InstagramPostAvailabilityChecker(),
             ),
         )
         account_orchestrator = AccountOrchestrator(
@@ -529,6 +533,7 @@ def _run_continue(
                 config=UrlJobProcessorConfig(
                     default_working_folder=settings.working_folder,
                     error_notifier=_make_error_notifier(connection, telegram_client),
+                    availability_checker=InstagramPostAvailabilityChecker(),
                 ),
             )
         account_orchestrator = AccountOrchestrator(

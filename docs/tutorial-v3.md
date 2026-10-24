@@ -1142,3 +1142,14 @@ Con *Priorizar stories (dos barridas)* activo (por defecto):
 Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cuentas pequeñas.
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
+
+## Feat 29 · Posts eliminados: no reintentar (v4.3.0)
+
+Cuando el bot responde «Media not found or unavailable» para un post o reel, el orquestador pide la página pública del post a Instagram (sin login):
+
+* **Página de error** (`PolarisErrorRoot` + `httpErrorPage`): el post ya no existe → la URL queda `FAILED_FINAL` con error `MEDIA_REMOVED`, sin reintentos.
+* **Página normal** o **no concluyente** (muro de login, 429, sin red): se reintenta, ahora **3 veces como máximo** (antes 1).
+
+Solo aplica a posts y reels; las stories y highlights no se comprueban. Una petición por URL fallida, con 2 s mínimo entre peticiones.
+
+Probar: `python -m pytest tests/orchestration/test_post_availability.py tests/orchestration/test_url_job_processor.py`. En un lote real, busca en `logs/app.log` «Post availability: … result=».

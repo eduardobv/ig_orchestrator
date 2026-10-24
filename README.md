@@ -976,7 +976,7 @@ Errores reintentables del bot:
 ```text
 The service is overloaded, please try again later.
 geoblock_required
-Media not found or unavailable   # solo 1 reintento (tope propio)
+Media not found or unavailable   # máx. 3 reintentos (tope propio)
 ```
 
 Errores definitivos, sin reintento:
@@ -1005,8 +1005,8 @@ Politica:
 - Despues se procesan URLs manuales.
 - Al final se procesa la cola FIFO de reintentos.
 - Tras `MAX_RETRIES`, se marca `FAILED_FINAL`.
-- `Media not found or unavailable` solo se reintenta **1 vez**, aunque
-  `MAX_RETRIES` sea mayor; luego `FAILED_FINAL`.
+- `Media not found or unavailable` se reintenta como máximo **3 veces**, aunque
+  `MAX_RETRIES` sea mayor; luego `FAILED_FINAL`. Antes de reintentar se consulta la página pública del post en Instagram (sin login): si es la página de error (`PolarisErrorRoot` + `httpErrorPage`) el post ya no existe → `FAILED_FINAL` con tipo `MEDIA_REMOVED`, sin reintentos; si la página es normal (`og:title`) o no se puede saber (muro de login, 429, red caída), se reintenta.
 - Si el bot no devuelve ningún mensaje ni archivo antes del timeout, se registra
   `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
   `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.

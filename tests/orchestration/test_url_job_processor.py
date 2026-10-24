@@ -27,7 +27,8 @@ from ig_orchestrator.models import (
     UrlJobStatus,
     UrlSource,
 )
-from ig_orchestrator.orchestration import UrlJobProcessor
+from ig_orchestrator.orchestration import UrlJobProcessor, UrlJobProcessorConfig
+from ig_orchestrator.orchestration.post_availability import PostAvailability
 from ig_orchestrator.telegram import BotConversationResult
 
 
@@ -105,6 +106,83 @@ def test_processor_keeps_retry_pending_result_without_moving_files(
     assert result.job.status is UrlJobStatus.RETRY_PENDING
     assert result.job.last_error_type == "SERVICE_OVERLOADED"
     assert result.files == ()
+
+
+def _media_not_found_processor(stored: StoredEntities, availability, calls: list[str]):
+    retry_job = stored.job_repo.update_error(
+        stored.job.id,
+        status=UrlJobStatus.RETRY_PENDING,
+        last_error="Media not found or unavailable",
+        last_error_type="MEDIA_NOT_FOUND_OR_UNAVAILABLE",
+        non_retryable=False,
+    )
+
+    async def checker(url: str) -> PostAvailability:
+        calls.append(url)
+        return availability
+
+    return UrlJobProcessor(
+        url_job_repository=stored.job_repo,
+        account_repository=stored.account_repo,
+        download_repository=stored.download_repo,
+        conversation_service=FakeConversationService(BotConversationResult(job=retry_job)),
+        config=UrlJobProcessorConfig(availability_checker=checker),
+    )
+
+
+def test_processor_marks_removed_post_failed_final_without_retry(tmp_path: Path) -> None:
+    stored = _stored_entities(tmp_path)
+    calls: list[str] = []
+    processor = _media_not_found_processor(stored, PostAvailability.REMOVED, calls)
+
+    result = asyncio.run(processor.process(stored.job.id))
+
+    assert calls == [stored.job.url]
+    assert result.job.status is UrlJobStatus.FAILED_FINAL
+    assert result.job.non_retryable is True
+    assert result.job.last_error_type == "MEDIA_REMOVED"
+
+
+def test_processor_keeps_retry_when_post_exists_or_check_is_unknown(
+    tmp_path: Path,
+) -> None:
+    for availability in (PostAvailability.EXISTS, PostAvailability.UNKNOWN):
+        stored = _stored_entities(tmp_path / availability.value)
+        processor = _media_not_found_processor(stored, availability, [])
+
+        result = asyncio.run(processor.process(stored.job.id))
+
+        assert result.job.status is UrlJobStatus.RETRY_PENDING
+        assert result.job.last_error_type == "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
+
+
+def test_processor_does_not_check_other_errors(tmp_path: Path) -> None:
+    stored = _stored_entities(tmp_path)
+    calls: list[str] = []
+    retry_job = stored.job_repo.update_error(
+        stored.job.id,
+        status=UrlJobStatus.RETRY_PENDING,
+        last_error="The service is overloaded, please try again later.",
+        last_error_type="SERVICE_OVERLOADED",
+        non_retryable=False,
+    )
+
+    async def checker(url: str) -> PostAvailability:
+        calls.append(url)
+        return PostAvailability.REMOVED
+
+    processor = UrlJobProcessor(
+        url_job_repository=stored.job_repo,
+        account_repository=stored.account_repo,
+        download_repository=stored.download_repo,
+        conversation_service=FakeConversationService(BotConversationResult(job=retry_job)),
+        config=UrlJobProcessorConfig(availability_checker=checker),
+    )
+
+    result = asyncio.run(processor.process(stored.job.id))
+
+    assert calls == []
+    assert result.job.status is UrlJobStatus.RETRY_PENDING
 
 
 def test_processor_reclassifies_reel_with_only_images_as_post(

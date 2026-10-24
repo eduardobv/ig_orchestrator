@@ -7,9 +7,10 @@ from typing import Deque, Generic, Iterable, TypeVar
 
 from ig_orchestrator.models import PublicationType, UrlJobStatus
 
-# Bot message "Media not found or unavailable" is retryable once only.
+# Bot message "Media not found or unavailable": the post may be gone, so the
+# retry budget is small (and skipped when Instagram confirms it was removed).
 MEDIA_NOT_FOUND_ERROR_TYPE = "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
-MEDIA_NOT_FOUND_MAX_RETRIES = 1
+MEDIA_NOT_FOUND_MAX_RETRIES = 3
 # Stories expire, so they get at most 2 retries (a lower configured budget wins).
 STORY_MAX_RETRIES = 2
 

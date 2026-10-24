@@ -12,6 +12,12 @@ from ig_orchestrator.filesystem import (
 )
 from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.models import DownloadFile, PublicationType, UrlJob, UrlJobStatus
+from ig_orchestrator.orchestration.post_availability import (
+    MEDIA_REMOVED_ERROR_TYPE,
+    AvailabilityChecker,
+    PostAvailability,
+)
+from ig_orchestrator.orchestration.retry_policy import MEDIA_NOT_FOUND_ERROR_TYPE
 from ig_orchestrator.telegram import BotConversationResult
 
 
@@ -36,6 +42,7 @@ ErrorNotifier = Callable[[UrlJob, str], Awaitable[None]]
 class UrlJobProcessorConfig:
     default_working_folder: Path | None = None
     error_notifier: ErrorNotifier | None = None
+    availability_checker: AvailabilityChecker | None = None
 
     def __post_init__(self) -> None:
         if self.default_working_folder is not None and not isinstance(
@@ -95,6 +102,7 @@ class UrlJobProcessor:
         detected_files = list(conversation_result.files)
 
         if processed_job.status is not UrlJobStatus.DOWNLOADED:
+            processed_job = await self._finalize_if_removed(processed_job)
             logger.info(
                 "URL job processor finished without download: job_id={} status={} error_type={}",
                 url_job_id,
@@ -180,6 +188,40 @@ class UrlJobProcessor:
             completed_job.status.value,
         )
         return UrlJobProcessorResult(job=completed_job, files=stored_files)
+
+    async def _finalize_if_removed(self, job: UrlJob) -> UrlJob:
+        """Stop retrying a ``Media not found`` job when Instagram shows it is gone."""
+
+        checker = self._config.availability_checker
+        if (
+            checker is None
+            or job.last_error_type != MEDIA_NOT_FOUND_ERROR_TYPE
+            or job.status is UrlJobStatus.FAILED_FINAL
+        ):
+            return job
+        try:
+            availability = await checker(job.url)
+        except Exception:
+            logger.warning("Post availability check failed", exc_info=True)
+            return job
+        if availability is not PostAvailability.REMOVED:
+            return job
+        logger.warning(
+            "Post no longer exists on Instagram; not retrying: job_id={} url={}",
+            job.id,
+            job.url,
+        )
+        return self._url_job_repository.update_error(
+            _require_job_id(job),
+            status=UrlJobStatus.FAILED_FINAL,
+            last_error=(
+                f"{job.last_error or 'Media not found or unavailable'} "
+                "[Instagram: post unavailable, not retried]"
+            ),
+            last_error_type=MEDIA_REMOVED_ERROR_TYPE,
+            non_retryable=True,
+            retries=job.retries,
+        )
 
     async def _notify_error(self, job: UrlJob, username: str) -> None:
         notifier = self._config.error_notifier

@@ -93,7 +93,7 @@ def test_media_not_found_is_capped_to_one_retry() -> None:
     assert resolve_max_retries_for_error(5, "SERVICE_OVERLOADED") == 5
 
     first = calculate_retry_decision(
-        retries=0,
+        retries=2,
         max_retries=5,
         base_seconds=90,
         max_seconds=900,
@@ -101,7 +101,7 @@ def test_media_not_found_is_capped_to_one_retry() -> None:
         last_error_type=MEDIA_NOT_FOUND_ERROR_TYPE,
     )
     second = calculate_retry_decision(
-        retries=1,
+        retries=3,
         max_retries=5,
         base_seconds=90,
         max_seconds=900,

@@ -25,7 +25,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v4.2.0; serie v3 cerrada en v3.26.0)
+### Estado Actual (v4.3.0; serie v3 cerrada en v3.26.0)
 
 - Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
@@ -243,7 +243,7 @@ El error de stories se detecta por patrón porque `{username}` cambia. En respue
 ```
 The service is overloaded, please try again later.
 geoblock_required
-Media not found or unavailable   # solo 1 reintento (tope propio)
+Media not found or unavailable   # máx. 3 reintentos (tope propio) y solo si el post sigue existiendo
 NO_BOT_RESPONSE                   # sin mensaje ni archivo antes del timeout
 ```
 
@@ -252,14 +252,14 @@ Política:
 - Stories generadas se procesan primero
 - URLs manuales se procesan después
 - Cola FIFO de reintentos al final
-- `Media not found or unavailable` solo 1 reintento, aunque `MAX_RETRIES > 1`
+- `Media not found or unavailable`: máx. 3 reintentos aunque `MAX_RETRIES > 1`. Antes de reintentar se consulta la página pública del post en Instagram (sin login): si es la página de error (`PolarisErrorRoot` + `httpErrorPage`) el post ya no existe → `FAILED_FINAL` con tipo `MEDIA_REMOVED`, sin reintentos; si la página es normal (`og:title`) o no se puede saber (muro de login, 429, red caída), se reintenta. Solo posts/reels (no stories/highlights). Código: `orchestration/post_availability.py`, usado por `UrlJobProcessor`
 - Tras `MAX_RETRIES`, se marca `FAILED_FINAL`
 - Backoff por defecto: 90, 180, 360, 720, 900 segundos
 - Las stories (`STORY`) tienen como máximo **2 reintentos** (si `MAX_RETRIES` es menor, manda el menor)
 
-### Orden de procesamiento del lote (v4.2.0, `processing.stories_first`)
+### Orden de procesamiento del lote (v4.3.0, `processing.stories_first`)
 
-Orden con `processing.stories_first` (v4.2.0):
+Orden con `processing.stories_first` (v4.3.0):
 1. **Barrida de stories:** todas las cuentas con stories pendientes; primero las que tienen *prioridad* (rango 1, 2…), después el orden en que se añadieron al lote. Las stories tienen como máximo **2 reintentos**.
 2. **Barrida de posts/reels/highlights:** de la cuenta con menos URLs pendientes a la que más; empate → más reels; empate → menos posts; empate → cuenta ya existente antes que nueva; empate → orden del lote.
 

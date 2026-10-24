@@ -123,6 +123,7 @@ termina cada cuenta antes de pasar a la siguiente. Primero se procesan
 todos los jobs `STORY` del lote (cuentas con prioridad primero, después por orden de alta en el lote; máx. 2 reintentos por story),
 las cuentas mixtas quedan `INCOMPLETE`, y una segunda barrida procesa
 reels/posts/highlights, de la cuenta con menos URLs a la que más (empate: más reels, menos posts, cuenta no nueva, orden del lote). El check en Configuración restaura el modo legado.
+10. Si el bot responde `Media not found or unavailable` (post/reel), el orquestador consulta la página pública de Instagram sin login: si es la página de error (`PolarisErrorRoot` + `httpErrorPage`) se marca `FAILED_FINAL` (`MEDIA_REMOVED`) sin reintentos; si no, máx. 3 reintentos.
 10. Si una URL falla temporalmente, pasar a la siguiente y reintentar al final.
 11. Si una URL falla con error definitivo, guardar error y no reintentar.
 12. Mover archivos a carpeta correcta.

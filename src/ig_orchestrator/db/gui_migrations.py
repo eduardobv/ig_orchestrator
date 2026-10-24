@@ -108,6 +108,18 @@ def _patch_gui_schema(connection: Connection) -> None:
     )
     connection.execute(
         """
+        INSERT OR IGNORE INTO bot_errors
+            (id, code, match_pattern, match_kind, is_retryable, max_retries_override,
+             notify_on_match, notify_template, description, is_active, sort_order)
+        VALUES
+            (7, 'MEDIA_REMOVED', 'Instagram page of the post is unavailable', 'CONTAINS',
+             0, NULL, 0, NULL,
+             'Bot said media not found and the anonymous Instagram page confirms the post is gone; not retried.',
+             1, 7)
+        """
+    )
+    connection.execute(
+        """
         INSERT OR IGNORE INTO app_settings (key, value, value_type, updated_at)
         VALUES ('processing.stories_first', '1', 'BOOLEAN', datetime('now'))
         """

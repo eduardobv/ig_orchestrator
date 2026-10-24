@@ -405,10 +405,11 @@ INSERT OR IGNORE INTO bot_errors (
 ) VALUES
     (1, 'SERVICE_OVERLOADED', 'The service is overloaded, please try again later.', 'CONTAINS', 1, NULL, 0, NULL, 'Bot or Instagram service is temporarily overloaded.', 1, 1),
     (2, 'GEOBLOCK_REQUIRED', 'geoblock_required', 'CONTAINS', 1, NULL, 0, NULL, 'Temporary geoblock from the bot.', 1, 2),
-    (3, 'MEDIA_NOT_FOUND_OR_UNAVAILABLE', 'Media not found or unavailable', 'CONTAINS', 1, 1, 0, NULL, 'Media missing; retried at most once even if MAX_RETRIES is higher.', 1, 3),
+    (3, 'MEDIA_NOT_FOUND_OR_UNAVAILABLE', 'Media not found or unavailable', 'CONTAINS', 1, 1, 0, NULL, 'Media missing; retried at most 3 times even if MAX_RETRIES is higher.', 1, 3),
     (4, 'NOT_FOUND', 'We''re sorry, we couldn''t find that.', 'CONTAINS', 0, NULL, 0, NULL, 'Publication not found; do not retry.', 1, 4),
     (5, 'PRIVATE_ACCOUNT_STORIES', 'We can''t get stories from a private account (instagram limit)', 'CONTAINS', 0, NULL, 0, NULL, 'Stories of a private account cannot be fetched.', 1, 5),
-    (6, 'STORIES_NOT_FOUND', '\bstories\s+for\s+[^\r\n]+?\s+not\s+found\b', 'REGEX', 0, NULL, 0, NULL, 'No stories for that username; the username in the message varies.', 1, 6);
+    (6, 'STORIES_NOT_FOUND', '\bstories\s+for\s+[^\r\n]+?\s+not\s+found\b', 'REGEX', 0, NULL, 0, NULL, 'No stories for that username; the username in the message varies.', 1, 6),
+    (7, 'MEDIA_REMOVED', 'Instagram page of the post is unavailable', 'CONTAINS', 0, NULL, 0, NULL, 'Bot said media not found and the anonymous Instagram page confirms the post is gone; not retried.', 1, 7);
 
 INSERT OR IGNORE INTO path_roots (id, code, path, updated_at) VALUES
     (1, 'TELEGRAM_DESKTOP', '', datetime('now')),
