@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v4.4.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
+| Versión | **v4.4.1** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
 | Rama de trabajo | `v3/integration` (serie cerrada en v3.26.0; PR a `master` abierto) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -43,7 +43,7 @@ Objetivo de v3 (todo hecho, falta validar en uso real): la app, con su única ba
 | `input/` | Parser/importador de lotes JSON y clasificador de URLs. | |
 | `db/` | Conexión, esquema v2, **migraciones aditivas** (`gui_migrations.py`), repositorios (`instances_repository.py`…), adaptadores v2. | `_patch_gui_schema`, `_patch_library_schema`, `_add_column_if_missing` |
 | `orchestration/` | Orquestadores de descarga, reintentos, política (`processing_policy`), comprobación anónima de existencia de posts (`post_availability`, v4.3.0: `Media not found` + página de error de Instagram → `MEDIA_REMOVED` sin reintentos; si no, máx. 3). | |
-| `telegram/` | Telethon y parser de respuestas del bot. Desde v4.4.0 las respuestas llegan por eventos `NewMessage` (con sondeo de respaldo cada 1,5 s) y Telethon usa `cryptg`. | |
+| `telegram/` | Telethon y parser de respuestas del bot. Desde v4.4.0 las respuestas llegan por eventos `NewMessage` (con sondeo de respaldo cada 1,5 s) y Telethon usa `cryptg`. Desde v4.4.1: un fichero por `(nombre, tamaño)`, miniaturas sin nombre solo como respaldo, descargas en paralelo, carpeta propia (`TELEGRAM_DOWNLOAD_TEMP_FOLDER`) y vigilante opcional (`TELEGRAM_WATCHER_FALLBACK`, off). | |
 | `filesystem/` | Watcher, clasificación y movimiento de descargas, `story_inbox`. | |
 | `reports/` | Reporte Markdown. | |
 | `library/` | **Catálogo = disco**: rutas, escáner, operaciones de disco con diario, ciclo de vida, renombre de usernames, fusión, papelera, ficha, auditoría, importación bdsc1, espejo lite. | ver §3 |

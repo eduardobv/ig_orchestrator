@@ -1160,3 +1160,11 @@ Probar: `python -m pytest tests/orchestration/test_post_availability.py tests/or
 * **Instalar:** `pip install -r requirements.txt` (en cada instancia, Windows 10 y 11).
 * **Probar:** lanza un lote pequeño y abre `logs/app.log`: debe aparecer «Telegram download acceleration (cryptg): yes» y no «cryptg module not installed». Compara la duración de un reel con la de antes (~38 s de mediana).
 * **Tests:** `python -m pytest tests/telegram`.
+
+### v4.4.1 · Descargas únicas, en paralelo y carpeta propia
+
+* **Una descarga por fichero:** el adjunto repetido de un reel se baja una vez, y las miniaturas sin nombre no se bajan si ya llegan los originales con nombre. Los nombres (`media_id`) no cambian.
+* **En paralelo:** hasta `TELEGRAM_PARALLEL_DOWNLOADS` (4) a la vez; útil en carruseles y highlights.
+* **Carpeta propia (opcional):** pon `TELEGRAM_DOWNLOAD_TEMP_FOLDER=<carpeta>` en `.env` para no mezclar con la de Telegram Desktop (vacío = la de siempre). Reinicia la app tras cambiarlo.
+* **Vigilante off:** con `TELEGRAM_WATCHER_FALLBACK=false` (por defecto) no se mira la carpeta de Telegram Desktop; si la descarga directa falla, la URL se reintenta.
+* **Probar:** lote pequeño con un reel, un carrusel y un highlight; en `logs/app.log` busca «Duplicate bot attachment skipped» y «previews not downloaded»; comprueba tiempos y que los nombres de fichero no cambian.

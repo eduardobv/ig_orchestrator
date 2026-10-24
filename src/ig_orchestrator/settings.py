@@ -37,6 +37,15 @@ class Settings:
         default_factory=lambda: Path(r"data\orchestrator_gui.sqlite")
     )
     window_position: str = "left"
+    telegram_download_temp_folder: Path | None = None
+    telegram_parallel_downloads: int = 4
+    telegram_watcher_fallback: bool = False
+
+    @property
+    def telegram_download_target_folder(self) -> Path:
+        """Folder where bot media is downloaded (own folder if configured)."""
+
+        return self.telegram_download_temp_folder or self.telegram_desktop_download_folder
 
 
 _ENV_TO_FIELD = {
@@ -60,6 +69,9 @@ _ENV_TO_FIELD = {
     "MANUAL_RENAME_BAT_PATH": "manual_rename_bat_path",
     "MANUAL_RENAME_CONFIG_PATH": "manual_rename_config_path",
     "WINDOW_POSITION": "window_position",
+    "TELEGRAM_DOWNLOAD_TEMP_FOLDER": "telegram_download_temp_folder",
+    "TELEGRAM_PARALLEL_DOWNLOADS": "telegram_parallel_downloads",
+    "TELEGRAM_WATCHER_FALLBACK": "telegram_watcher_fallback",
 }
 
 _REQUIRED_ENV_VARS = tuple(
@@ -74,6 +86,9 @@ _REQUIRED_ENV_VARS = tuple(
         "MANUAL_RENAME_CONFIG_PATH",
         "SQLITE_GUI_DB_PATH",
         "WINDOW_POSITION",
+        "TELEGRAM_DOWNLOAD_TEMP_FOLDER",
+        "TELEGRAM_PARALLEL_DOWNLOADS",
+        "TELEGRAM_WATCHER_FALLBACK",
     }
 )
 
@@ -143,6 +158,15 @@ def load_settings(env_file: str | Path = ".env") -> Settings:
             window_position=_parse_optional_window_position(
                 raw_values, "WINDOW_POSITION", default="left"
             ),
+            telegram_download_temp_folder=_parse_optional_path(
+                raw_values, "TELEGRAM_DOWNLOAD_TEMP_FOLDER"
+            ),
+            telegram_parallel_downloads=_parse_optional_positive_int(
+                raw_values, "TELEGRAM_PARALLEL_DOWNLOADS", default=4
+            ),
+            telegram_watcher_fallback=_parse_optional_bool(
+                raw_values, "TELEGRAM_WATCHER_FALLBACK", default=False
+            ),
         )
     except ValueError as exc:
         raise SettingsError(f"Invalid environment settings: {exc}") from exc
@@ -189,6 +213,24 @@ def _parse_optional_bool(
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
     raise ValueError(f"{env_name} must be a boolean")
+
+
+def _parse_optional_positive_int(
+    raw_values: dict[str, str],
+    env_name: str,
+    *,
+    default: int,
+) -> int:
+    value = raw_values.get(env_name)
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = int(value.strip())
+    except ValueError as exc:
+        raise ValueError(f"{env_name} must be an integer") from exc
+    if parsed < 1:
+        raise ValueError(f"{env_name} must be at least 1")
+    return parsed
 
 
 def _parse_optional_window_position(

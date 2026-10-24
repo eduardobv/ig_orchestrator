@@ -172,3 +172,49 @@ def test_invalid_post_process_enabled_raises_clear_error(
         load_settings(env_file)
 
     assert "POST_PROCESS_ENABLED must be a boolean" in str(exc_info.value)
+
+
+def test_telegram_download_settings_defaults_and_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_settings_environment(monkeypatch)
+    env_file = tmp_path / ".env"
+    write_env_file(env_file)
+
+    defaults = load_settings(env_file)
+
+    assert defaults.telegram_download_temp_folder is None
+    assert defaults.telegram_download_target_folder == (
+        defaults.telegram_desktop_download_folder
+    )
+    assert defaults.telegram_parallel_downloads == 4
+    assert defaults.telegram_watcher_fallback is False
+
+    own_folder = tmp_path / "tg_tmp"
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8")
+        + f"\nTELEGRAM_DOWNLOAD_TEMP_FOLDER={own_folder}"
+        + "\nTELEGRAM_PARALLEL_DOWNLOADS=2\nTELEGRAM_WATCHER_FALLBACK=true\n",
+        encoding="utf-8",
+    )
+
+    custom = load_settings(env_file)
+
+    assert custom.telegram_download_target_folder == own_folder
+    assert custom.telegram_parallel_downloads == 2
+    assert custom.telegram_watcher_fallback is True
+
+
+def test_invalid_parallel_downloads_raises_clear_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_settings_environment(monkeypatch)
+    env_file = tmp_path / ".env"
+    write_env_file(env_file)
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8") + "\nTELEGRAM_PARALLEL_DOWNLOADS=0\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="TELEGRAM_PARALLEL_DOWNLOADS"):
+        load_settings(env_file)

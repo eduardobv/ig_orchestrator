@@ -123,6 +123,8 @@ DOWNLOAD_WAIT_TIMEOUT_SECONDS=300
 DOWNLOAD_STABLE_SECONDS=10
 ```
 
+Variables opcionales de descarga de Telegram (v4.4.1): `TELEGRAM_DOWNLOAD_TEMP_FOLDER` (carpeta propia de descarga; vacío = la de Telegram Desktop), `TELEGRAM_PARALLEL_DOWNLOADS` (4) y `TELEGRAM_WATCHER_FALLBACK` (`false`: no busca ficheros en la carpeta de Telegram Desktop si la descarga directa falla).
+
 Variables opcionales de post-proceso:
 
 ```env

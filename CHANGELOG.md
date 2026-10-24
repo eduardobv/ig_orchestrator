@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.4.1 - feat-run-30 (parte 2): descargas únicas, en paralelo y en carpeta propia
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Modificado
+* `telegram/bot_conversation_service.py`: (1) cada adjunto con nombre se descarga **una sola vez** por `(nombre, tamaño)` (el reel que llegaba duplicado, M1 = M2, ya no se baja dos veces); (2) las **miniaturas sin nombre no se descargan** si los originales con nombre son todas imágenes (se mantienen como respaldo cuando no hay originales o hay vídeos, igual que antes); (3) las descargas con nombre corren **en paralelo** (`parallel_downloads`, 4) en tareas aparte mientras se siguen recibiendo mensajes; (4) el **vigilante** de la carpeta de Telegram Desktop pasa a ser opcional (`watcher_fallback_enabled`, desactivado desde `.env`). Los nombres de fichero (`media_id`) no cambian.
+* `settings.py` / `.env`: `TELEGRAM_DOWNLOAD_TEMP_FOLDER` (carpeta propia de descarga, opcional; vacío = la de Telegram Desktop como hasta ahora), `TELEGRAM_PARALLEL_DOWNLOADS` (4) y `TELEGRAM_WATCHER_FALLBACK` (false). `Settings.telegram_download_target_folder` es la carpeta efectiva (también la usa la limpieza `telegram_media*` de fin de lote). `cli/main.py` los conecta.
+* `.gitignore`: se ignoran `docs/response-*.html` (respuestas de ejemplo locales).
+* Documentación: `CLAUDE.md`, `README.md`, `.env.example`, `docs/arquitectura-v3.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`, `tasks/feat-run-30.md`. `AGENTS.md` y `docs/manual-usuario.md` revisados sin cambios (sin menús ni ajustes de GUI). Versión 4.4.1.
+
+### Pruebas
+* `python -m pytest`: todo en verde (nuevas: adjunto duplicado una vez, miniaturas sin descargar y nombres `media_id` intactos, paralelismo con tope, vigilante desactivado, ajustes nuevos). **No probado** con Telegram real.
+* Si `TELEGRAM_WATCHER_FALLBACK=false` y una descarga directa falla, la URL pasa a `RETRY_PENDING` (`NO_FILES_DETECTED`) en lugar de buscar en la carpeta de Telegram Desktop.
+
 ## v4.4.0 - feat-run-30 (parte 1): `cryptg` y eventos en vez de sondeo
 
 Fecha: 2026-10-24 · Rama: `v4/main`

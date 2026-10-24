@@ -300,4 +300,6 @@ Pruebas previstas: cliente de Telegram y reloj falsos con las **secuencias reale
 
 ### v4.4.0 (parte 1) · 2026-10-24
 Hecho: `cryptg` en dependencias + aviso en el log; conversación por eventos `NewMessage` (suscripción antes de enviar) con sondeo de respaldo cada 1,5 s. Decisiones del usuario: orden aprobado; feat 1 dividido en dos commits; carpeta temporal de descarga propia y configurable (v4.4.1); telemetría con retención de 90 días e informe en el modal de lotes y el menú Lote; sin más pruebas reales (se mide con telemetría); tamaño por URL queda como idea futura. `media_id`: los nombres de fichero no se tocan.
-Pendiente: v4.4.1 y feats 2-7.
+### v4.4.1 (parte 2) · 2026-10-24
+Hecho: descarga única por `(nombre, tamaño)`; miniaturas sin nombre solo como respaldo (si los originales son todo imágenes, no se bajan); descargas en paralelo (`TELEGRAM_PARALLEL_DOWNLOADS`=4); carpeta propia opcional (`TELEGRAM_DOWNLOAD_TEMP_FOLDER`, vacío = la de Telegram Desktop); vigilante off por defecto (`TELEGRAM_WATCHER_FALLBACK`). Estos ajustes están en `.env` con valores fijos hasta el feat 4 (`RunSettings`). No se hizo: fin por conteo/descripción (feat 5), plazos por tipo (feat 5).
+Pendiente: feats 2-7.

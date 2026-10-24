@@ -583,3 +583,112 @@ def test_event_mode_runs_backup_poll_when_no_event_arrives(tmp_path: Path) -> No
     assert result.job.last_error_type == "NO_BOT_RESPONSE"
     assert 1 <= client.polls <= 4
     assert client.closed is True
+
+
+class CountingClient(FakeTelegramClient):
+    """Direct-download client that records calls and peak concurrency."""
+
+    def __init__(self, messages: list[FakeMessage]) -> None:
+        super().__init__(messages, enable_direct_download=True)
+        self.downloaded_ids: list[int] = []
+        self.active = 0
+        self.peak = 0
+
+    async def download_message_media(self, message, destination):
+        self.active += 1
+        self.peak = max(self.peak, self.active)
+        await asyncio.sleep(0.02)
+        self.downloaded_ids.append(message.id)
+        self.active -= 1
+        return await super().download_message_media(message, destination)
+
+
+def _counting_service(
+    tmp_path: Path,
+    client: CountingClient,
+    *,
+    watcher_fallback_enabled: bool = True,
+    parallel_downloads: int = 4,
+) -> tuple[BotConversationService, UrlJobRepository, DownloadRepository]:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    folder = tmp_path / "downloads"
+    folder.mkdir(exist_ok=True)
+    service = BotConversationService(
+        telegram_client=client,
+        url_job_repository=job_repo,
+        download_repository=download_repo,
+        config=BotConversationConfig(
+            download_folder=folder,
+            download_wait_timeout_seconds=0,
+            download_stable_seconds=0,
+            response_wait_timeout_seconds=0,
+            parallel_downloads=parallel_downloads,
+            watcher_fallback_enabled=watcher_fallback_enabled,
+        ),
+        watcher=lambda *_args: [],
+    )
+    return service, job_repo, download_repo
+
+
+def test_reel_with_same_attachment_twice_downloads_it_once(tmp_path: Path) -> None:
+    video = _document("4014272112143137696.mp4", "video/mp4")
+    messages = [
+        _incoming_media(101, document=video),
+        _incoming_media(102, document=video),
+        _incoming("description"),
+    ]
+    client = CountingClient(messages)
+    service, job_repo, _ = _counting_service(tmp_path, client)
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert client.downloaded_ids == [101]
+    assert [f.original_path.name for f in result.files] == ["4014272112143137696.mp4"]
+
+
+def test_carousel_skips_preview_downloads_and_keeps_media_id_names(
+    tmp_path: Path,
+) -> None:
+    messages = [_incoming_media(100 + i, photo=object()) for i in range(1, 4)]
+    names = [f"39000000000000000{i}.jpg" for i in range(1, 4)]
+    messages += [
+        _incoming_media(200 + i, document=_document(name, "image/jpeg"))
+        for i, name in enumerate(names)
+    ]
+    client = CountingClient(messages)
+    service, job_repo, _ = _counting_service(tmp_path, client)
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert sorted(client.downloaded_ids) == [200, 201, 202]
+    assert sorted(f.original_path.name for f in result.files) == sorted(names)
+
+
+def test_downloads_run_in_parallel_up_to_the_configured_limit(tmp_path: Path) -> None:
+    messages = [
+        _incoming_media(200 + i, document=_document(f"39{i:02d}.jpg", "image/jpeg"))
+        for i in range(8)
+    ]
+    client = CountingClient(messages)
+    service, job_repo, _ = _counting_service(tmp_path, client, parallel_downloads=3)
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert len(result.files) == 8
+    assert 2 <= client.peak <= 3
+
+
+def test_watcher_fallback_disabled_does_not_scan_telegram_folder(
+    tmp_path: Path,
+) -> None:
+    client = CountingClient([_incoming("Download completed successfully")])
+    service, job_repo, _ = _counting_service(
+        tmp_path, client, watcher_fallback_enabled=False
+    )
+    service._watcher = lambda *_a: (_ for _ in ()).throw(AssertionError("watcher used"))
+
+    result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert result.job.last_error_type == "NO_FILES_DETECTED"

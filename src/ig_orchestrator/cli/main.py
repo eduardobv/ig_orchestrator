@@ -362,9 +362,11 @@ def _run_batch(
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             config=BotConversationConfig(
-                download_folder=settings.telegram_desktop_download_folder,
+                download_folder=settings.telegram_download_target_folder,
                 download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
                 download_stable_seconds=settings.download_stable_seconds,
+                parallel_downloads=settings.telegram_parallel_downloads,
+                watcher_fallback_enabled=settings.telegram_watcher_fallback,
             ),
         )
         url_job_processor = UrlJobProcessor(
@@ -408,7 +410,7 @@ def _run_batch(
             account_orchestrator=account_orchestrator,
             config=BatchOrchestratorConfig(
                 progress_callback=_print_account_progress,
-                telegram_download_folder=settings.telegram_desktop_download_folder,
+                telegram_download_folder=settings.telegram_download_target_folder,
                 default_working_folder=settings.working_folder,
                 telegram_client=telegram_client,
             ),
@@ -520,9 +522,11 @@ def _run_continue(
                 url_job_repository=url_job_repository,
                 download_repository=download_repository,
                 config=BotConversationConfig(
-                    download_folder=settings.telegram_desktop_download_folder,
+                    download_folder=settings.telegram_download_target_folder,
                     download_wait_timeout_seconds=settings.download_wait_timeout_seconds,
                     download_stable_seconds=settings.download_stable_seconds,
+                    parallel_downloads=settings.telegram_parallel_downloads,
+                    watcher_fallback_enabled=settings.telegram_watcher_fallback,
                 ),
             )
             url_job_processor = UrlJobProcessor(
@@ -568,7 +572,7 @@ def _run_continue(
             config=BatchOrchestratorConfig(
                 dry_run=dry_run,
                 progress_callback=_print_account_progress,
-                telegram_download_folder=settings.telegram_desktop_download_folder,
+                telegram_download_folder=settings.telegram_download_target_folder,
                 default_working_folder=settings.working_folder,
                 telegram_client=telegram_client,
             ),

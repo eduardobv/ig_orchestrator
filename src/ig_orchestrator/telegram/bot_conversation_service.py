@@ -57,6 +57,8 @@ class BotConversationConfig:
     response_poll_interval_seconds: float = 0.5
     response_message_limit: int = 50
     response_fallback_poll_seconds: float = 1.5
+    parallel_downloads: int = 4
+    watcher_fallback_enabled: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -70,6 +72,8 @@ class BotConversationConfig:
         )
         if self.response_poll_interval_seconds <= 0:
             raise ValueError("response_poll_interval_seconds must be positive")
+        if self.parallel_downloads <= 0:
+            raise ValueError("parallel_downloads must be positive")
         if self.response_fallback_poll_seconds <= 0:
             raise ValueError("response_fallback_poll_seconds must be positive")
         if self.response_message_limit <= 0:
@@ -116,6 +120,7 @@ class BotConversationService:
         self._watcher = watcher
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
+        self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
 
     async def process_url_job(self, job: UrlJob) -> BotConversationResult:
         if job.id is None:
@@ -130,6 +135,9 @@ class BotConversationService:
                 if self._subscription is not None:
                     self._subscription.close()
                 self._subscription = None
+                for task in self._download_tasks:
+                    task.cancel()
+                self._download_tasks = []
 
     def _open_subscription(self) -> Any | None:
         subscribe = getattr(self._telegram_client, "subscribe_bot_messages", None)
@@ -251,7 +259,7 @@ class BotConversationService:
             return BotConversationResult(job=retry_job, bot_message=bot_message)
 
         detected_paths = direct_paths
-        if not detected_paths:
+        if not detected_paths and self._config.watcher_fallback_enabled:
             detected_paths = self._watcher(
                 self._config.download_folder,
                 started_at,
@@ -308,7 +316,10 @@ class BotConversationService:
         )
         seen_message_ids: set[int] = set()
         bot_texts: list[str] = []
-        downloads: list[_MediaDownload] = []
+        seen_files: set[tuple[str, int | None]] = set()
+        previews: list[Any] = []
+        semaphore = asyncio.Semaphore(self._config.parallel_downloads)
+        self._download_tasks = []
         last_media_at: float | None = None
         bot_responded = False
 
@@ -348,10 +359,8 @@ class BotConversationService:
                     if parse_bot_response(text).status is not BotResponseStatus.OK:
                         return (
                             _join_bot_texts(bot_texts),
-                            _finalize_media_downloads(
-                                self._config.download_folder,
-                                downloads,
-                                media_filename_prefix,
+                            await self._finish_downloads(
+                                job_id, previews, media_filename_prefix
                             ),
                             bot_responded,
                         )
@@ -359,21 +368,35 @@ class BotConversationService:
                 if _message_has_media(message) and _can_download_media(
                     self._telegram_client
                 ):
-                    download = await self._download_bot_message_media(job_id, message)
-                    downloads.append(download)
-                    if download.path or download.provisional_path:
-                        last_media_at = asyncio.get_running_loop().time()
+                    last_media_at = asyncio.get_running_loop().time()
+                    file_name = _original_file_name(message)
+                    if file_name is None:
+                        # Unnamed media are previews; downloaded only if needed.
+                        previews.append(message)
+                        continue
+                    file_key = (file_name.casefold(), _document_size(message))
+                    if file_key in seen_files:
+                        logger.info(
+                            "Duplicate bot attachment skipped: job_id={} file={}",
+                            job_id,
+                            file_name,
+                        )
+                        continue
+                    seen_files.add(file_key)
+                    self._download_tasks.append(
+                        asyncio.create_task(
+                            self._download_with_limit(semaphore, job_id, message)
+                        )
+                    )
 
             now = asyncio.get_running_loop().time()
-            if downloads and last_media_at is not None:
+            if last_media_at is not None:
                 quiet_seconds = now - last_media_at
                 if quiet_seconds >= self._config.download_stable_seconds:
                     return (
                         _join_bot_texts(bot_texts),
-                        _finalize_media_downloads(
-                            self._config.download_folder,
-                            downloads,
-                            media_filename_prefix,
+                        await self._finish_downloads(
+                            job_id, previews, media_filename_prefix
                         ),
                         bot_responded,
                     )
@@ -381,11 +404,7 @@ class BotConversationService:
             if now >= deadline:
                 return (
                     _join_bot_texts(bot_texts),
-                    _finalize_media_downloads(
-                        self._config.download_folder,
-                        downloads,
-                        media_filename_prefix,
-                    ),
+                    await self._finish_downloads(job_id, previews, media_filename_prefix),
                     bot_responded,
                 )
 
@@ -393,6 +412,54 @@ class BotConversationService:
                 await asyncio.sleep(
                     min(self._config.response_poll_interval_seconds, deadline - now)
                 )
+
+    async def _download_with_limit(
+        self,
+        semaphore: asyncio.Semaphore,
+        job_id: int,
+        message: Any,
+    ) -> _MediaDownload:
+        async with semaphore:
+            return await self._download_bot_message_media(job_id, message)
+
+    async def _finish_downloads(
+        self,
+        job_id: int,
+        previews: list[Any],
+        media_filename_prefix: str,
+    ) -> list[Path]:
+        """Await named downloads; fetch unnamed previews only when needed."""
+
+        downloads = list(await asyncio.gather(*self._download_tasks))
+        self._download_tasks = []
+        named_paths = [
+            download.path
+            for download in downloads
+            if download.path is not None and download.path.exists()
+        ]
+        only_images = bool(named_paths) and all(_is_image_path(p) for p in named_paths)
+        if previews and only_images:
+            logger.info(
+                "Telegram image previews not downloaded: job_id={} originals={} previews={}",
+                job_id,
+                len(named_paths),
+                len(previews),
+            )
+        elif previews:
+            semaphore = asyncio.Semaphore(self._config.parallel_downloads)
+            downloads.extend(
+                await asyncio.gather(
+                    *(
+                        self._download_with_limit(semaphore, job_id, message)
+                        for message in previews
+                    )
+                )
+            )
+        return _finalize_media_downloads(
+            self._config.download_folder,
+            downloads,
+            media_filename_prefix,
+        )
 
     async def _next_event_messages(
         self,
@@ -562,6 +629,11 @@ def _original_file_name(message: Any) -> str | None:
         if isinstance(file_name, str) and file_name.strip():
             return _sanitize_windows_filename(file_name)
     return None
+
+
+def _document_size(message: Any) -> int | None:
+    size = getattr(getattr(message, "document", None), "size", None)
+    return size if isinstance(size, int) else None
 
 
 def _message_file_extension(message: Any, original_file_name: str | None) -> str:
