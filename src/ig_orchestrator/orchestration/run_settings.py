@@ -102,8 +102,20 @@ RUN_SETTING_SPECS: tuple[RunSettingSpec, ...] = (
                    lambda s: s.retry_base_seconds, 1, 3600),
     RunSettingSpec("run.retry.max_seconds", "retry_max_seconds", KIND_INT, GROUP_RETRY,
                    lambda s: s.retry_max_seconds, 1, 7200),
+    RunSettingSpec("run.bot.first_response_timeout_seconds", "first_response_seconds", KIND_INT,
+                   GROUP_BOT, lambda s: 30, 5, 600),
+    RunSettingSpec("run.bot.first_response_timeout_seconds_story", "first_response_story_seconds",
+                   KIND_INT, GROUP_BOT, lambda s: 30, 5, 600),
+    RunSettingSpec("run.bot.first_response_timeout_seconds_carousel",
+                   "first_response_carousel_seconds", KIND_INT, GROUP_BOT, lambda s: 75, 5, 600),
+    RunSettingSpec("run.bot.first_response_timeout_seconds_highlights",
+                   "first_response_highlights_seconds", KIND_INT, GROUP_BOT, lambda s: 75, 5, 600),
     RunSettingSpec("run.bot.total_timeout_seconds", "total_timeout_seconds", KIND_INT, GROUP_BOT,
-                   lambda s: s.download_wait_timeout_seconds, 10, 3600),
+                   lambda s: 120, 10, 3600),
+    RunSettingSpec("run.bot.completion_mode", "completion_mode", KIND_CHOICE, GROUP_BOT,
+                   lambda s: "EXPECTED_COUNT", choices=("EXPECTED_COUNT", "STABLE")),
+    RunSettingSpec("run.bot.grace_ms", "grace_ms", KIND_INT, GROUP_BOT,
+                   lambda s: 2500, 200, 30000),
     RunSettingSpec("run.bot.stable_seconds", "stable_seconds", KIND_INT, GROUP_BOT,
                    lambda s: s.download_stable_seconds, 0, 120),
     RunSettingSpec("run.bot.use_events", "use_events", KIND_BOOL, GROUP_BOT, lambda s: True),
@@ -150,7 +162,13 @@ class RunSettings:
     media_not_found_max_retries: int
     retry_base_seconds: int
     retry_max_seconds: int
+    first_response_seconds: int
+    first_response_story_seconds: int
+    first_response_carousel_seconds: int
+    first_response_highlights_seconds: int
     total_timeout_seconds: int
+    completion_mode: str
+    grace_ms: int
     stable_seconds: int
     use_events: bool
     fallback_poll_ms: int

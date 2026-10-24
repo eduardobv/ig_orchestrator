@@ -19,6 +19,7 @@ from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.models import (
     DownloadFile,
     DownloadFileStatus,
+    PublicationType,
     UrlJob,
     UrlJobStatus,
 )
@@ -29,6 +30,9 @@ from ig_orchestrator.telegram.bot_response_parser import (
 )
 from ig_orchestrator.telemetry.observer import NullObserver, RunObserver
 from ig_orchestrator.telemetry.trace import (
+    EXIT_COUNT_REACHED,
+    EXIT_DESCRIPTION,
+    EXIT_GRACE,
     EXIT_DEADLINE_FIRST,
     EXIT_DEADLINE_TOTAL,
     EXIT_ERROR_TEXT,
@@ -73,6 +77,20 @@ Watcher = Callable[[Path, datetime, float, float], list[Path]]
 LargeFileDownloader = Callable[[str, Path, LargeFileConfig], Awaitable[Path]]
 
 
+COMPLETION_EXPECTED_COUNT = "EXPECTED_COUNT"
+COMPLETION_STABLE = "STABLE"
+
+
+@dataclass(frozen=True, slots=True)
+class FirstResponseTimeouts:
+    """Seconds to wait for the bot's first message, by kind of URL."""
+
+    default: float = 30.0
+    story: float = 30.0
+    carousel: float = 75.0
+    highlights: float = 75.0
+
+
 @dataclass(frozen=True, slots=True)
 class BotConversationConfig:
     download_folder: Path
@@ -86,6 +104,12 @@ class BotConversationConfig:
     watcher_fallback_enabled: bool = True
     large_file: LargeFileConfig = LargeFileConfig()
     use_events: bool = True
+    # STABLE keeps the legacy rule (quiet for download_stable_seconds after the
+    # last file); EXPECTED_COUNT ends on item count / description / short grace.
+    completion_mode: str = COMPLETION_STABLE
+    grace_seconds: float = 2.5
+    album_settle_seconds: float = 1.5
+    first_response_timeouts: FirstResponseTimeouts = FirstResponseTimeouts()
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -99,6 +123,10 @@ class BotConversationConfig:
         )
         if self.response_poll_interval_seconds <= 0:
             raise ValueError("response_poll_interval_seconds must be positive")
+        if self.completion_mode not in (COMPLETION_EXPECTED_COUNT, COMPLETION_STABLE):
+            raise ValueError("completion_mode must be EXPECTED_COUNT or STABLE")
+        if self.grace_seconds <= 0 or self.album_settle_seconds < 0:
+            raise ValueError("grace_seconds must be positive")
         if self.parallel_downloads <= 0:
             raise ValueError("parallel_downloads must be positive")
         if self.response_fallback_poll_seconds <= 0:
@@ -153,6 +181,7 @@ class BotConversationService:
         self._clock = clock
         self._observer: RunObserver = observer or NullObserver()
         self._trace: AttemptTrace | None = None
+        self._story_like = False
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
         self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
@@ -180,6 +209,7 @@ class BotConversationService:
                 "fallback_poll_s": self._config.response_fallback_poll_seconds,
             }
             self._trace = trace
+            self._story_like = _is_story_like(job)
             self._observer.begin_attempt(trace)
             try:
                 result = await self._process_url_job_locked(job)
@@ -262,6 +292,7 @@ class BotConversationService:
                 media_filename_prefix=_media_filename_prefix(job),
                 since=started_at,
                 sent_message_id=sent_message_id,
+                first_response_timeout=self._first_response_timeout(job),
             )
         )
         logger.info(
@@ -371,11 +402,25 @@ class BotConversationService:
         media_filename_prefix: str,
         since: datetime,
         sent_message_id: int | None,
+        first_response_timeout: float,
     ) -> tuple[str | None, list[Path], bool]:
-        deadline = asyncio.get_running_loop().time() + max(
-            self._config.response_wait_timeout_seconds,
-            self._config.download_wait_timeout_seconds,
-        )
+        loop = asyncio.get_running_loop()
+        legacy = self._config.completion_mode == COMPLETION_STABLE
+        if legacy:
+            deadline = loop.time() + max(
+                self._config.response_wait_timeout_seconds,
+                self._config.download_wait_timeout_seconds,
+            )
+        else:
+            deadline = loop.time() + first_response_timeout
+        # Expected items = album members + the first standalone media message
+        # (M1); later standalone documents are attachments, not new items.
+        expected_items = 0
+        standalone_counted = False
+        named_files: set[str] = set()
+        last_album_at: float | None = None
+        last_message_at: float | None = None
+        description_seen = False
         seen_message_ids: set[int] = set()
         bot_texts: list[str] = []
         seen_files: set[tuple[str, int | None]] = set()
@@ -412,8 +457,21 @@ class BotConversationService:
                     continue
                 if sent_message_id is not None and message_id == sent_message_id:
                     continue
+                if (
+                    sent_message_id is not None
+                    and message_id is not None
+                    and message_id < sent_message_id
+                ):
+                    # Late message of the previous URL (now that we stop early
+                    # it can still be in flight): Telegram ids only grow, so a
+                    # reply to this URL always has a higher id than our message.
+                    continue
 
                 bot_responded = True
+                last_message_at = loop.time()
+                if not legacy:
+                    # Any bot message renews the plazo (it becomes the total one).
+                    deadline = last_message_at + self._config.download_wait_timeout_seconds
 
                 text = _message_text(message)
                 has_text = text is not None and bool(text.strip())
@@ -421,6 +479,8 @@ class BotConversationService:
                 self._record_message(message, text if has_text else None, parsed)
                 if has_text and parsed is not None:
                     bot_texts.append(text.strip())
+                    if parsed.status is BotResponseStatus.OK and named_files:
+                        description_seen = True
                     if parsed.status is not BotResponseStatus.OK:
                         self._end_wait(
                             EXIT_LARGE_FILE_LINK
@@ -440,6 +500,14 @@ class BotConversationService:
                 ):
                     last_media_at = asyncio.get_running_loop().time()
                     file_name = _original_file_name(message)
+                    if _int_or_none(getattr(message, "grouped_id", None)) is not None:
+                        expected_items += 1
+                        last_album_at = last_media_at
+                    elif not standalone_counted and expected_items == 0:
+                        expected_items += 1
+                        standalone_counted = True
+                    if file_name is not None:
+                        named_files.add(file_name.casefold())
                     if file_name is None:
                         # Unnamed media are previews; downloaded only if needed.
                         previews.append(message)
@@ -462,7 +530,33 @@ class BotConversationService:
                     )
 
             now = asyncio.get_running_loop().time()
-            if last_media_at is not None:
+            if self._trace is not None:
+                self._trace.expected_items = expected_items or None
+            if not legacy and last_media_at is not None:
+                settled = (
+                    last_album_at is None
+                    or now - last_album_at >= self._config.album_settle_seconds
+                )
+                exit_reason: str | None = None
+                if expected_items and len(named_files) >= expected_items and settled:
+                    exit_reason = EXIT_COUNT_REACHED
+                elif description_seen and settled:
+                    exit_reason = EXIT_DESCRIPTION
+                elif (
+                    last_message_at is not None
+                    and now - last_message_at >= self._config.grace_seconds
+                ):
+                    exit_reason = EXIT_GRACE
+                if exit_reason is not None:
+                    self._end_wait(exit_reason)
+                    return (
+                        _join_bot_texts(bot_texts),
+                        await self._finish_downloads(
+                            job_id, previews, media_filename_prefix
+                        ),
+                        bot_responded,
+                    )
+            if legacy and last_media_at is not None:
                 quiet_seconds = now - last_media_at
                 if quiet_seconds >= self._config.download_stable_seconds:
                     self._end_wait(EXIT_STABLE)
@@ -488,6 +582,18 @@ class BotConversationService:
                 await asyncio.sleep(
                     min(self._config.response_poll_interval_seconds, deadline - now)
                 )
+
+    def _first_response_timeout(self, job: UrlJob) -> float:
+        timeouts = self._config.first_response_timeouts
+        if job.publication_type is PublicationType.HIGHLIGHTS:
+            return timeouts.highlights
+        if job.publication_type is PublicationType.STORY:
+            return timeouts.story
+        url = job.url.lower()
+        # A /p/ link may be a carousel even without img_index; /reel/ never is.
+        if "/p/" in url or "/tv/" in url:
+            return timeouts.carousel
+        return timeouts.default
 
     async def _download_large_file_result(
         self,
@@ -625,8 +731,16 @@ class BotConversationService:
             for download in downloads
             if download.path is not None and download.path.exists()
         ]
-        only_images = bool(named_paths) and all(_is_image_path(p) for p in named_paths)
-        if previews and only_images:
+        if self._story_like:
+            # Stories/highlights have no attachments: unnamed photos of the
+            # album are real content unless every named file is an image.
+            skip_previews = bool(named_paths) and all(
+                _is_image_path(p) for p in named_paths
+            )
+        else:
+            # Posts/reels: unnamed media are thumbnails of the named originals.
+            skip_previews = bool(named_paths)
+        if previews and skip_previews:
             logger.info(
                 "Telegram image previews not downloaded: job_id={} originals={} previews={}",
                 job_id,
@@ -661,7 +775,7 @@ class BotConversationService:
 
         loop = asyncio.get_running_loop()
         fallback_due = last_fallback_poll + self._config.response_fallback_poll_seconds
-        wait = min(max(min(fallback_due, deadline) - loop.time(), 0.0), 0.5)
+        wait = min(max(min(fallback_due, deadline) - loop.time(), 0.0), 0.25)
         first = await subscription.get(wait)
         if first is not None:
             messages = [first]
@@ -824,6 +938,13 @@ def _original_file_name(message: Any) -> str | None:
         if isinstance(file_name, str) and file_name.strip():
             return _sanitize_windows_filename(file_name)
     return None
+
+
+def _is_story_like(job: UrlJob) -> bool:
+    return (
+        job.publication_type in (PublicationType.STORY, PublicationType.HIGHLIGHTS)
+        or "/stories/" in job.url.lower()
+    )
 
 
 def _int_or_none(value: Any) -> int | None:

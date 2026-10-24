@@ -16,6 +16,9 @@ TEXT_CLASS_UNKNOWN = "UNKNOWN"
 EXIT_ERROR_TEXT = "ERROR_TEXT"
 EXIT_LARGE_FILE_LINK = "LARGE_FILE_LINK"
 EXIT_STABLE = "STABLE"
+EXIT_COUNT_REACHED = "COUNT_REACHED"
+EXIT_DESCRIPTION = "DESCRIPTION"
+EXIT_GRACE = "GRACE"
 EXIT_DEADLINE_FIRST = "DEADLINE_FIRST"
 EXIT_DEADLINE_TOTAL = "DEADLINE_TOTAL"
 EXIT_SEND_FAILED = "SEND_FAILED"
@@ -58,6 +61,7 @@ class AttemptTrace:
     batch_run_id: int | None = None
     attempt_no: int = 1
     publication_type: str | None = None
+    expected_items: int | None = None
     started_at: str = ""
     clock: Clock = field(default=time.monotonic, repr=False)
 

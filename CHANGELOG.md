@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.8.0 - feat-run-34: fin de la espera por conteo/descripción y plazos de primera respuesta por tipo
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `tests/telegram/test_completion.py`: las secuencias reales de mensajes del bot medidas en el spike (reel con adjunto duplicado, foto suelta, carrusel de 12 con dos álbumes, carrusel de 20 con vídeos repetidos, highlights de 16, story de fotos sin nombre, descripción sin todos los adjuntos, plazos por tipo, renovación del plazo, mensajes rezagados).
+
+### Modificado
+* `telegram/bot_conversation_service.py`: nuevo modo de fin `EXPECTED_COUNT` (por defecto desde `cli/main.py`; `STABLE` conserva la regla antigua). Se da por terminada una URL cuando: (1) los **nombres únicos descargados ≥ items anunciados** (miembros de álbum + el primer mensaje suelto; con álbumes, 1,5 s de calma tras el último para los álbumes extra de > 10 items) → `COUNT_REACHED`; (2) llega la **descripción** tras ≥ 1 adjunto → `DESCRIPTION`; (3) no llega nada más durante `grace` (2,5 s) → `GRACE`. Ya no se esperan 10 s de silencio.
+* **Plazos de primera respuesta por tipo** (`FirstResponseTimeouts`): reel/post suelto/error 30 s, story 30 s, carrusel y `/p/` 75 s, highlights 75 s. Cualquier mensaje del bot pasa el plazo al total (`run.bot.total_timeout_seconds`, ahora 120 s) y lo **renueva** con cada mensaje nuevo. Sin respuesta → `NO_BOT_RESPONSE` (`DEADLINE_FIRST`).
+* **Mensajes rezagados:** al terminar antes, el adjunto repetido o la descripción de una URL pueden llegar durante la siguiente; se ignora todo mensaje del bot con id menor que el mensaje enviado (los ids de Telegram solo crecen).
+* **Miniaturas:** en posts/reels solo se descargan si no hay ningún original con nombre (antes también si había algún vídeo, lo que duplicaba las fotos de carruseles con vídeos); en stories/highlights las fotos sin nombre del álbum siguen siendo contenido.
+* Telemetría: `url_job_attempts.expected_items` se rellena y aparecen los motivos `COUNT_REACHED`, `DESCRIPTION` y `GRACE`.
+* Ajustes `run.*` nuevos (pestaña *Ejecución*): `first_response_timeout_seconds` (+`_story`, `_carousel`, `_highlights`), `completion_mode`, `grace_ms`; el plazo total pasa a 120 s por defecto (ya no sale de `DOWNLOAD_WAIT_TIMEOUT_SECONDS`, que queda para la base v1 y el vigilante).
+* Documentación: `CLAUDE.md`, `README.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md`, `docs/arquitectura-v3.md`, `docs/plan-v3-features.md`, `telemetry/MODULE.md`, `tasks/feat-run-30.md`. `AGENTS.md` revisado sin cambios. Versión 4.8.0.
+
+### Pruebas
+* `python -m pytest`: 698 passed. Durante las pruebas se detectaron y corrigieron dos fallos: el primer adjunto suelto de un carrusel se contaba como un item más (el conteo no se alcanzaba) y las miniaturas de un carrusel con vídeos se bajaban y duplicaban las fotos.
+* **No probado** con el bot real. Riesgo a vigilar en el primer lote: un `GRACE` demasiado corto cortaría un álbum que el bot entregue con pausas > 2,5 s (se puede subir en *Ejecución > Silencio breve* o volver a `STABLE`); la telemetría (`exit_reason`, `expected_items`) permite comprobarlo.
+
 ## v4.7.0 - feat-run-33: ajustes de ejecución (`run.*`) y pestaña «Ejecución»
 
 Fecha: 2026-10-24 · Rama: `v4/main`

@@ -86,13 +86,14 @@ class SqliteObserver:
                 """
                 INSERT INTO url_job_attempts (
                     url_job_id, batch_id, batch_run_id, account_id, attempt_no,
-                    publication_type, album_size_bucket, started_at, finished_at,
+                    publication_type, expected_items, album_size_bucket, started_at,
+                    finished_at,
                     t_send_ms, t_first_response_ms, t_first_media_ms,
                     t_last_media_ms, t_description_ms, t_end_wait_ms, t_download_ms,
                     t_move_ms, t_total_ms, flood_wait_ms, exit_reason, outcome,
                     error_code, messages_count, media_count, files_count,
                     bytes_downloaded, duplicates_skipped, aes_backend, settings_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     trace.url_job_id,
@@ -101,6 +102,7 @@ class SqliteObserver:
                     trace.account_id,
                     trace.attempt_no,
                     trace.publication_type,
+                    trace.expected_items,
                     album_size_bucket(trace.media_count),
                     trace.started_at,
                     finished_at,

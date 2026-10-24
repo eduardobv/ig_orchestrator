@@ -50,6 +50,7 @@ from ig_orchestrator.reports import MarkdownReportBuilder
 from ig_orchestrator.settings import Settings, SettingsError, load_settings
 from ig_orchestrator.telemetry import build_observer
 from ig_orchestrator.telegram.large_file import LargeFileConfig
+from ig_orchestrator.telegram.bot_conversation_service import FirstResponseTimeouts
 from ig_orchestrator.orchestration.run_settings import load_run_settings
 from ig_orchestrator.telegram import (
     BotConversationConfig,
@@ -377,6 +378,9 @@ def _run_batch(
                 response_poll_interval_seconds=run_settings.fallback_poll_ms / 1000,
                 response_fallback_poll_seconds=run_settings.fallback_poll_ms / 1000,
                 use_events=run_settings.use_events,
+                completion_mode=run_settings.completion_mode,
+                grace_seconds=run_settings.grace_ms / 1000,
+                first_response_timeouts=_first_response_timeouts(run_settings),
                 large_file=_large_file_config(run_settings),
             ),
         )
@@ -483,6 +487,15 @@ def _run_batch(
     return 0
 
 
+def _first_response_timeouts(run_settings):
+    return FirstResponseTimeouts(
+        default=run_settings.first_response_seconds,
+        story=run_settings.first_response_story_seconds,
+        carousel=run_settings.first_response_carousel_seconds,
+        highlights=run_settings.first_response_highlights_seconds,
+    )
+
+
 def _large_file_config(run_settings):
     return LargeFileConfig(
         enabled=run_settings.large_enabled,
@@ -574,6 +587,9 @@ def _run_continue(
                     response_poll_interval_seconds=run_settings.fallback_poll_ms / 1000,
                     response_fallback_poll_seconds=run_settings.fallback_poll_ms / 1000,
                     use_events=run_settings.use_events,
+                    completion_mode=run_settings.completion_mode,
+                    grace_seconds=run_settings.grace_ms / 1000,
+                    first_response_timeouts=_first_response_timeouts(run_settings),
                     large_file=_large_file_config(run_settings),
                 ),
             )

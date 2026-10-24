@@ -1143,6 +1143,18 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 34 · Fin de la espera por conteo y plazos por tipo (v4.8.0)
+
+Antes la app esperaba 10 s de silencio tras el último fichero de cada URL. Ahora cierra la URL en cuanto sabe que ya está todo:
+
+* **Conteo:** el primer mensaje del bot anuncia cuántos items hay (álbum de N o un único mensaje). Cuando se han bajado N ficheros distintos, termina (`COUNT_REACHED`).
+* **Descripción:** si llega la descripción del post tras algún fichero, termina (`DESCRIPTION`).
+* **Silencio breve:** si no llega nada más durante 2,5 s, termina (`GRACE`); por ejemplo, stories con fotos sin nombre.
+* **Primera respuesta por tipo:** reel/post/error 30 s, story 30 s, carrusel o enlace `/p/` 75 s, highlights 75 s. Si el bot no contesta en ese tiempo, la URL va a reintento (`NO_BOT_RESPONSE`). Una vez que contesta, cada mensaje nuevo renueva un plazo de 120 s.
+* **Ajustes:** *Configuración > Ejecución > Bot y descargas*: los cuatro plazos, *Cómo dar por terminada una URL* (`EXPECTED_COUNT` o `STABLE`, el modo antiguo) y *Silencio breve (ms)*.
+* **Probar:** lanza un lote con un reel, un carrusel, una story y un highlight. En la telemetría: `SELECT publication_type, exit_reason, expected_items, files_count, t_end_wait_ms, t_total_ms FROM url_job_attempts ORDER BY id DESC LIMIT 20;`. Debe verse `files_count = expected_items` y `t_end_wait_ms` de pocos cientos de ms. Si falta algún fichero de un álbum, sube *Silencio breve* o pasa a `STABLE`.
+* **Tests:** `python -m pytest tests/telegram/test_completion.py`.
+
 ## Feat 33 · Pestaña «Ejecución» y ajustes `run.*` (v4.7.0)
 
 *Configuración > Ejecución* reúne todos los ajustes de la descarga. Antes estaban en `.env` (hay que reiniciar y editar un fichero) o fijos en el código.

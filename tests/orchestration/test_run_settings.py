@@ -47,7 +47,7 @@ def test_defaults_come_from_env_and_builtin_values(tmp_path: Path) -> None:
     run = load_run_settings(_gui(tmp_path), _env(tmp_path))
 
     assert run.max_retries == 5 and run.retry_base_seconds == 90
-    assert run.total_timeout_seconds == 300 and run.stable_seconds == 10
+    assert run.total_timeout_seconds == 120 and run.stable_seconds == 10
     assert run.story_max_retries == 2 and run.media_not_found_max_retries == 3
     assert run.use_events is True and run.fallback_poll_ms == 1500
     assert run.parallel_downloads == 4 and run.watcher_fallback is False
