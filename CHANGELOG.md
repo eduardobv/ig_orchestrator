@@ -1,5 +1,23 @@
 # Changelog
 
+## v4.9.0 - feat-run-35: cola global de reintentos y tope propio para NO_BOT_RESPONSE
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `tests/orchestration/test_global_retry_queue.py`: tope de `NO_BOT_RESPONSE`, cuenta en modo diferido, reintentos al final del lote sin bloquear a las demás cuentas, orden por `next_retry_at` hasta fallo final y modo antiguo intacto.
+
+### Modificado
+* `orchestration/batch_orchestrator.py`: con `global_retry_queue`, cuando todas las cuentas terminan su pasada principal se ejecuta una **ronda de reintentos** de todo el lote, ordenada por `next_retry_at` (después id). Solo espera lo que falta hasta el primer reintento pendiente (nada si ya venció) y respeta el retroceso 90/180/360… Cada intento completa la URL, la da por fallida o la reprograma, así que el bucle termina.
+* `orchestration/account_orchestrator.py`: `defer_retries` deja las URLs fallidas en `RETRY_PENDING` con `next_retry_at` en lugar de esperar y reintentar dentro de la cuenta; `process_account(..., only_job_id=)` reintenta una sola URL. Las URLs `SENT_TO_BOT`/`WAITING_DOWNLOAD` de una ejecución interrumpida vencen de inmediato.
+* `orchestration/retry_policy.py`: `NO_BOT_RESPONSE` tiene tope propio (`no_response_max_retries`, 3 por defecto, nunca por encima de `MAX_RETRIES`).
+* Ajustes `run.retry.global_queue` (activo por defecto) y `run.retry.no_response_max` en la pestaña *Ejecución > Reintentos*. Con la cola desactivada se conserva el comportamiento anterior (reintento dentro de la cuenta).
+* Documentación: `CLAUDE.md`, `README.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md`, `docs/arquitectura-v3.md`, `docs/plan-v3-features.md`, `tasks/feat-run-30.md`. `AGENTS.md` revisado sin cambios. Versión 4.9.0.
+
+### Pruebas
+* `python -m pytest`: 703 passed (el test del vigilante, inestable en Windows por mtime, puede fallar de forma intermitente y pasa solo).
+* **No probado** con Telegram real. Efecto visible: una cuenta con un fallo ya no retiene el lote; sus reintentos salen al final. Las cuentas con URLs pendientes de reintento quedan `PARTIAL` hasta la ronda.
+
 ## v4.8.0 - feat-run-34: fin de la espera por conteo/descripción y plazos de primera respuesta por tipo
 
 Fecha: 2026-10-24 · Rama: `v4/main`

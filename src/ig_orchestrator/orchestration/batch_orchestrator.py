@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Protocol
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from ig_orchestrator.models import (
     InputBatchStatus,
     RunStatus,
     RunSummary,
+    UrlJob,
     UrlJobStatus,
 )
 from ig_orchestrator.logging_config import configure_app_logging, get_logger
@@ -31,6 +32,7 @@ from ig_orchestrator.orchestration.account_orchestrator import (
 from ig_orchestrator.orchestration.processing_policy import (
     AccountJobScope,
     PROCESSABLE_ACCOUNT_STATUSES,
+    RETRYABLE_URL_STATUSES,
     account_status_from_jobs,
     is_open_job,
     load_account_order_info,
@@ -49,8 +51,9 @@ class BatchAccountOrchestrator(Protocol):
         account_id: int,
         *,
         scope: AccountJobScope = AccountJobScope.ALL,
+        only_job_id: int | None = None,
     ) -> AccountOrchestratorResult:
-        """Process one account by id, optionally limited to a job scope."""
+        """Process one account by id, optionally limited to a job scope or one retry."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +73,11 @@ class BatchOrchestratorConfig:
     default_working_folder: Path | None = None
     telegram_client: object | None = None
     stories_first: bool | None = None
+    # Global retry queue: after every account finished its main pass, retry the
+    # failed URLs of the whole batch ordered by next_retry_at.
+    global_retry_queue: bool = False
+    wait_between_retries: bool = False
+    retry_delay_handler: Callable[[float], Awaitable[None]] | None = None
 
 
 class BatchOrchestrator:
@@ -160,6 +168,10 @@ class BatchOrchestrator:
                     accounts=processable_accounts,
                 )
             )
+            if self._config.global_retry_queue:
+                account_results.extend(
+                    await self._process_retry_round(batch_id=batch_id)
+                )
 
             summary = self._build_batch_summary(batch_id)
             batch = self._batch_repository.update_status(
@@ -317,6 +329,85 @@ class BatchOrchestrator:
             summary=summary,
             account_results=tuple(account_results),
         )
+
+    async def _process_retry_round(
+        self,
+        *,
+        batch_id: int,
+    ) -> list[AccountOrchestratorResult]:
+        """Retry the failed URLs of the whole batch, earliest ``next_retry_at`` first.
+
+        Sleeps only what is missing until the earliest retry is due (nothing if it
+        already is). Every attempt either completes the URL, fails it for good
+        or reschedules it, so the loop always ends.
+        """
+
+        results: list[AccountOrchestratorResult] = []
+        skipped: set[int] = set()
+        rounds = 0
+        while True:
+            candidates = self._retry_candidates(batch_id, skipped)
+            if not candidates:
+                break
+            next_retry_at, job, account = candidates[0]
+            now = datetime.now(timezone.utc)
+            wait_seconds = (_aware(next_retry_at) - now).total_seconds()
+            if wait_seconds > 0 and self._config.wait_between_retries:
+                logger.info(
+                    "Retry round waiting for the earliest retry: job_id={} wait_seconds={:.0f} pending={}",
+                    job.id,
+                    wait_seconds,
+                    len(candidates),
+                )
+                await self._wait_retry_delay(wait_seconds)
+            rounds += 1
+            logger.info(
+                "Retry round: job_id={} account={} retries={} pending={}",
+                job.id,
+                account.username,
+                job.retries,
+                len(candidates),
+            )
+            if self._config.progress_callback is not None:
+                self._config.progress_callback(rounds, rounds + len(candidates) - 1, account)
+            result = await self._account_orchestrator.process_account(
+                account.id,
+                scope=AccountJobScope.ALL,
+                only_job_id=job.id,
+            )
+            results.append(result)
+            if result.error is not None:
+                skipped.add(job.id)  # infrastructure failure: do not loop on it
+        return results
+
+    def _retry_candidates(
+        self,
+        batch_id: int,
+        skipped: set[int],
+    ) -> list[tuple[datetime | None, UrlJob, Account]]:
+        candidates: list[tuple[datetime | None, UrlJob, Account]] = []
+        for account in self._account_repository.list_by_batch(batch_id):
+            if account.id is None or account.status not in PROCESSABLE_ACCOUNT_STATUSES:
+                continue
+            for job in self._url_job_repository.list_by_account(account.id):
+                if (
+                    job.id is None
+                    or job.id in skipped
+                    or job.status not in RETRYABLE_URL_STATUSES
+                    or job.non_retryable
+                ):
+                    continue
+                candidates.append((job.next_retry_at, job, account))
+        candidates.sort(key=lambda item: (_aware(item[0]), item[1].id or 0))
+        return candidates
+
+    async def _wait_retry_delay(self, seconds: float) -> None:
+        if self._config.retry_delay_handler is not None:
+            await self._config.retry_delay_handler(seconds)
+            return
+        import asyncio
+
+        await asyncio.sleep(seconds)
 
     def _stories_first_enabled(self) -> bool:
         if self._config.stories_first is not None:
@@ -535,6 +626,12 @@ def _run_status_from_counts(*, total: int, completed: int, failed: int) -> RunSt
     if failed == total:
         return RunStatus.FAILED
     return RunStatus.PARTIAL
+
+
+def _aware(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 __all__ = [

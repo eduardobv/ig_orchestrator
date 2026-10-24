@@ -11,6 +11,9 @@ from ig_orchestrator.models import PublicationType, UrlJobStatus
 # retry budget is small (and skipped when Instagram confirms it was removed).
 MEDIA_NOT_FOUND_ERROR_TYPE = "MEDIA_NOT_FOUND_OR_UNAVAILABLE"
 MEDIA_NOT_FOUND_MAX_RETRIES = 3
+# The bot did not answer in time: usually a temporary glitch, but not forever.
+NO_BOT_RESPONSE_ERROR_TYPE = "NO_BOT_RESPONSE"
+NO_BOT_RESPONSE_MAX_RETRIES = 3
 # Stories expire, so they get at most 2 retries (a lower configured budget wins).
 STORY_MAX_RETRIES = 2
 
@@ -74,6 +77,7 @@ def resolve_max_retries_for_error(
     *,
     story_max_retries: int = STORY_MAX_RETRIES,
     media_not_found_max_retries: int = MEDIA_NOT_FOUND_MAX_RETRIES,
+    no_response_max_retries: int | None = None,
 ) -> int:
     """Cap max_retries for known error types that should not use the global budget."""
 
@@ -81,6 +85,11 @@ def resolve_max_retries_for_error(
         max_retries = min(max_retries, story_max_retries)
     if last_error_type == MEDIA_NOT_FOUND_ERROR_TYPE:
         return min(max_retries, media_not_found_max_retries)
+    if (
+        last_error_type == NO_BOT_RESPONSE_ERROR_TYPE
+        and no_response_max_retries is not None
+    ):
+        return min(max_retries, no_response_max_retries)
     return max_retries
 
 
@@ -95,6 +104,7 @@ def calculate_retry_decision(
     publication_type: PublicationType | None = None,
     story_max_retries: int = STORY_MAX_RETRIES,
     media_not_found_max_retries: int = MEDIA_NOT_FOUND_MAX_RETRIES,
+    no_response_max_retries: int | None = None,
 ) -> RetryDecision:
     """Calculate retry backoff and final-failure decisions without sleeping."""
 
@@ -109,6 +119,7 @@ def calculate_retry_decision(
         publication_type,
         story_max_retries=story_max_retries,
         media_not_found_max_retries=media_not_found_max_retries,
+        no_response_max_retries=no_response_max_retries,
     )
 
     if non_retryable:

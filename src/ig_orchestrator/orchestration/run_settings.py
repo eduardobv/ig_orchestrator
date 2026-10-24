@@ -98,6 +98,10 @@ RUN_SETTING_SPECS: tuple[RunSettingSpec, ...] = (
                    lambda s: 2, 0, 20),
     RunSettingSpec("run.retry.media_not_found_max", "media_not_found_max_retries", KIND_INT,
                    GROUP_RETRY, lambda s: 3, 0, 20),
+    RunSettingSpec("run.retry.no_response_max", "no_response_max_retries", KIND_INT, GROUP_RETRY,
+                   lambda s: 3, 0, 20),
+    RunSettingSpec("run.retry.global_queue", "global_retry_queue", KIND_BOOL, GROUP_RETRY,
+                   lambda s: True),
     RunSettingSpec("run.retry.base_seconds", "retry_base_seconds", KIND_INT, GROUP_RETRY,
                    lambda s: s.retry_base_seconds, 1, 3600),
     RunSettingSpec("run.retry.max_seconds", "retry_max_seconds", KIND_INT, GROUP_RETRY,
@@ -160,6 +164,8 @@ class RunSettings:
     max_retries: int
     story_max_retries: int
     media_not_found_max_retries: int
+    no_response_max_retries: int
+    global_retry_queue: bool
     retry_base_seconds: int
     retry_max_seconds: int
     first_response_seconds: int

@@ -1143,6 +1143,16 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 35 · Cola global de reintentos (v4.9.0)
+
+Antes, una URL con error temporal se reintentaba dentro de su cuenta, con esperas de 90 a 900 s que bloqueaban al resto del lote. Ahora:
+
+* **Cola global:** cada cuenta procesa sus URLs una vez; las que fallan quedan en `RETRY_PENDING` con su hora de reintento (`next_retry_at`). Al terminar todas las cuentas, se reintentan juntas, la más antigua primero. Solo se espera lo que falte hasta que venza el primer reintento.
+* **Sin respuesta del bot:** `NO_BOT_RESPONSE` se reintenta como máximo 3 veces (ajustable), y nunca más que el máximo general.
+* **Ajustes:** *Configuración > Ejecución > Reintentos*: *Cola global de reintentos* (desmarcar vuelve al modo anterior) y *Máximo sin respuesta del bot*.
+* **Probar:** lanza un lote con un par de cuentas y alguna URL que falle (por ejemplo, un reel eliminado o con el bot parado un momento). En el log verás `URL job scheduled for retry` durante el lote y `Retry round:` al final. En la base: `SELECT id, status, retries, next_retry_at, last_error_type FROM url_jobs WHERE status IN ('RETRY_PENDING','FAILED_FINAL');`.
+* **Tests:** `python -m pytest tests/orchestration/test_global_retry_queue.py`.
+
 ## Feat 34 · Fin de la espera por conteo y plazos por tipo (v4.8.0)
 
 Antes la app esperaba 10 s de silencio tras el último fichero de cada URL. Ahora cierra la URL en cuanto sabe que ya está todo:

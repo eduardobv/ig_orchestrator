@@ -125,6 +125,8 @@ DOWNLOAD_STABLE_SECONDS=10
 
 Variables opcionales de descarga de Telegram (v4.4.1): `TELEGRAM_DOWNLOAD_TEMP_FOLDER` (carpeta propia de descarga; vacío = la de Telegram Desktop), `TELEGRAM_PARALLEL_DOWNLOADS` (4) y `TELEGRAM_WATCHER_FALLBACK` (`false`: no busca ficheros en la carpeta de Telegram Desktop si la descarga directa falla).
 
+Cola global de reintentos (v4.9.0): las URLs con error temporal se reintentan todas juntas al final del lote, sin bloquear a las demás cuentas.
+
 Fin de la espera por conteo de items (v4.8.0): cada URL se da por terminada al llegar todos sus ficheros, en vez de esperar 10 s de silencio.
 
 Ajustes de ejecución (v4.7.0): *Configuración > Ejecución* reúne reintentos, descargas, enlace grande, Instagram, Telethon y telemetría; prioridad GUI > `.env` > defecto.

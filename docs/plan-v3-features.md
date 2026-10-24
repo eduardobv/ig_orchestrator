@@ -46,6 +46,7 @@ y renombra o mueve al workplace principal las carpetas descargadas por otras; re
 | 22 ✅ | [`feat-uc2-22`](../tasks/done/v3/feat-uc2-22.md) · Stories Inbox: informe de problemas, sobrantes y forzar mover (incremental) | UC2 | Saber qué falló al mover stories sin leer un log | ⬤○○○ | 21 | 0,5 d |
 | 23 ✅ | [`feat-uc2-23`](../tasks/done/v3/feat-uc2-23.md) · Ocultar carpetas -Deleted/-Inactive en el árbol del catálogo (incremental) | UC2 | Árbol menos saturado sin perder acceso | ⬤○○○ | 22 | 0,25 d |
 | 24 ✅ | [`feat-uc2-24`](../tasks/done/v3/feat-uc2-24.md) · El árbol del catálogo conserva lo expandido al refrescar; -Deleted/-Inactive ocultas por defecto (incremental) | UC2 | Navegar sin reabrir nodos | ⬤○○○ | 23 | 0,25 d |
+| 35 ✅ | [`feat-run-35`](../tasks/feat-run-30.md) · Cola global de reintentos y tope de `NO_BOT_RESPONSE` (v4.9.0) | Orquestación | lotes sin bloqueos por reintentos | ⬤⬤⬤⬤ | 34 | 1 d |
 | 34 ✅ | [`feat-run-34`](../tasks/feat-run-30.md) · Fin por conteo/descripción/silencio breve y plazos de primera respuesta por tipo (v4.8.0) | Orquestación | ~8-10 s menos por URL | ⬤⬤⬤⬤ | 33 | 1 d |
 | 33 ✅ | [`feat-run-33`](../tasks/feat-run-30.md) · Pestaña «Ejecución»: ajustes `run.*` (GUI > `.env` > defecto) (v4.7.0) | GUI / Orquestación | Configurar la descarga sin tocar `.env` | ⬤⬤⬤○ | 32 | 1 d |
 | 32 ✅ | [`feat-run-32`](../tasks/feat-run-30.md) · Telemetría: tablas de intentos/mensajes/esperas, `AttemptTrace` y observador (v4.6.0) | Orquestación | Medir dónde se va el tiempo | ⬤⬤⬤○ | 30 | 1 d |

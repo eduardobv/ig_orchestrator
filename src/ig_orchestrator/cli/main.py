@@ -410,6 +410,8 @@ def _run_batch(
                 retry_max_seconds=settings.retry_max_seconds,
                 story_max_retries=run_settings.story_max_retries,
                 media_not_found_max_retries=run_settings.media_not_found_max_retries,
+                no_response_max_retries=run_settings.no_response_max_retries,
+                defer_retries=run_settings.global_retry_queue,
                 wait_between_retries=True,
                 item_progress_callback=(
                     _print_item_progress
@@ -431,6 +433,8 @@ def _run_batch(
                 telegram_download_folder=settings.telegram_download_target_folder,
                 default_working_folder=settings.working_folder,
                 telegram_client=telegram_client,
+                global_retry_queue=run_settings.global_retry_queue,
+                wait_between_retries=True,
             ),
         )
         if imported.batch.id is None:
@@ -619,6 +623,8 @@ def _run_continue(
                 retry_max_seconds=settings.retry_max_seconds,
                 story_max_retries=run_settings.story_max_retries,
                 media_not_found_max_retries=run_settings.media_not_found_max_retries,
+                no_response_max_retries=run_settings.no_response_max_retries,
+                defer_retries=run_settings.global_retry_queue,
                 wait_between_retries=not dry_run,
                 dry_run=dry_run,
                 item_progress_callback=(
@@ -642,6 +648,8 @@ def _run_continue(
                 telegram_download_folder=settings.telegram_download_target_folder,
                 default_working_folder=settings.working_folder,
                 telegram_client=telegram_client,
+                global_retry_queue=run_settings.global_retry_queue,
+                wait_between_retries=True,
             ),
         )
 

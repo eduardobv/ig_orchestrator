@@ -67,6 +67,10 @@ class AccountOrchestratorConfig:
     retry_max_seconds: int = 900
     story_max_retries: int = 2
     media_not_found_max_retries: int = 3
+    no_response_max_retries: int | None = None
+    # Global retry queue: leave failed URLs RETRY_PENDING (with next_retry_at)
+    # for the batch's final retry round instead of retrying them in place.
+    defer_retries: bool = False
     wait_between_retries: bool = False
     retry_delay_handler: RetryDelayHandler | None = None
     item_progress_callback: ItemProgressCallback | None = None
@@ -126,7 +130,10 @@ class AccountOrchestrator:
         account_id: int,
         *,
         scope: AccountJobScope = AccountJobScope.ALL,
+        only_job_id: int | None = None,
     ) -> AccountOrchestratorResult:
+        """Process one account; with ``only_job_id`` run just that retry."""
+
         if account_id <= 0:
             raise ValueError("account_id must be positive")
         if not isinstance(scope, AccountJobScope):
@@ -194,6 +201,7 @@ class AccountOrchestrator:
                     processed_job_ids=processed_job_ids,
                     working_base=working_base,
                     scope=scope,
+                    only_job_id=only_job_id,
                 )
         except Exception as exc:
             logger.exception(
@@ -311,7 +319,10 @@ class AccountOrchestrator:
         processed_job_ids: list[int],
         working_base: Path,
         scope: AccountJobScope,
+        only_job_id: int | None = None,
     ) -> AccountOrchestratorResult:
+        single_retry = only_job_id is not None
+        deferred = self._config.defer_retries
         try:
             if self._account_was_failed_externally(account_id):
                 summary = self._build_account_summary(account_id)
@@ -355,7 +366,8 @@ class AccountOrchestrator:
                         is_retry,
                     )
 
-            for job in ordered_main_pass_jobs(jobs, scope):
+            main_pass_jobs = [] if single_retry else ordered_main_pass_jobs(jobs, scope)
+            for job in main_pass_jobs:
                 if self._account_was_failed_externally(account_id):
                     break
                 current_job = self._url_job_repository.get_by_id(_require_job_id(job))
@@ -376,11 +388,15 @@ class AccountOrchestrator:
                     break
                 self._enqueue_or_finalize_retry(result.job, retry_queue)
 
-            if not self._account_was_failed_externally(account_id):
+            if single_retry:
+                retry_queue.enqueue(only_job_id)
+            elif not self._account_was_failed_externally(account_id):
                 for job in existing_retry_jobs(jobs, scope):
                     self._enqueue_or_finalize_retry(job, retry_queue)
 
-            while retry_queue:
+            # Deferred mode: the batch runs the retry round once every account
+            # finished its main pass; here the queue is only scheduled.
+            while retry_queue and (single_retry or not deferred):
                 if self._account_was_failed_externally(account_id):
                     break
                 job_id = retry_queue.pop_next()
@@ -403,7 +419,11 @@ class AccountOrchestrator:
                     self._mark_failed_final(job, reason=decision.reason)
                     continue
 
-                if self._config.wait_between_retries and decision.delay_seconds:
+                if (
+                    self._config.wait_between_retries
+                    and decision.delay_seconds
+                    and not deferred
+                ):
                     logger.info(
                         "Waiting before retry: job_id={} delay_seconds={}",
                         job_id,
@@ -438,6 +458,8 @@ class AccountOrchestrator:
                             failed_retry,
                             reason=retry_decision.reason,
                         )
+                    elif deferred:
+                        self._schedule_next_retry(failed_retry, retry_decision.delay_seconds)
                     else:
                         logger.info(
                             "URL job requeued for retry: job_id={} retries={} next_delay_seconds={}",
@@ -519,6 +541,11 @@ class AccountOrchestrator:
             next_retry_at = datetime.now(timezone.utc) + timedelta(
                 seconds=decision.delay_seconds
             )
+        if self._config.defer_retries:
+            if job.status is UrlJobStatus.RETRY_PENDING and job.next_retry_at:
+                next_retry_at = job.next_retry_at  # count from the failure, keep it
+            elif job.status in (UrlJobStatus.SENT_TO_BOT, UrlJobStatus.WAITING_DOWNLOAD):
+                next_retry_at = datetime.now(timezone.utc)  # interrupted, not failed
         updated = self._url_job_repository.update_error(
             _require_job_id(job),
             status=UrlJobStatus.RETRY_PENDING,
@@ -546,9 +573,28 @@ class AccountOrchestrator:
             max_seconds=self._config.retry_max_seconds,
             story_max_retries=self._config.story_max_retries,
             media_not_found_max_retries=self._config.media_not_found_max_retries,
+            no_response_max_retries=self._config.no_response_max_retries,
             non_retryable=job.non_retryable,
             last_error_type=job.last_error_type,
             publication_type=job.publication_type,
+        )
+
+    def _schedule_next_retry(self, job: UrlJob, delay_seconds: int | None) -> UrlJob:
+        next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds or 0)
+        logger.info(
+            "URL job scheduled for the retry round: job_id={} retries={} next_retry_at={}",
+            _require_job_id(job),
+            job.retries,
+            next_retry_at,
+        )
+        return self._url_job_repository.update_error(
+            _require_job_id(job),
+            status=UrlJobStatus.RETRY_PENDING,
+            last_error=job.last_error or "Retry pending",
+            last_error_type=job.last_error_type or "RETRY_PENDING",
+            non_retryable=job.non_retryable,
+            retries=job.retries,
+            next_retry_at=next_retry_at,
         )
 
     def _increment_retry_failure(self, job: UrlJob) -> UrlJob:
