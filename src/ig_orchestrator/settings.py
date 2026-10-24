@@ -40,6 +40,8 @@ class Settings:
     telegram_download_temp_folder: Path | None = None
     telegram_parallel_downloads: int = 4
     telegram_watcher_fallback: bool = False
+    telemetry_level: str = "FULL"
+    telemetry_retention_days: int = 90
 
     @property
     def telegram_download_target_folder(self) -> Path:
@@ -72,6 +74,8 @@ _ENV_TO_FIELD = {
     "TELEGRAM_DOWNLOAD_TEMP_FOLDER": "telegram_download_temp_folder",
     "TELEGRAM_PARALLEL_DOWNLOADS": "telegram_parallel_downloads",
     "TELEGRAM_WATCHER_FALLBACK": "telegram_watcher_fallback",
+    "TELEMETRY_LEVEL": "telemetry_level",
+    "TELEMETRY_RETENTION_DAYS": "telemetry_retention_days",
 }
 
 _REQUIRED_ENV_VARS = tuple(
@@ -89,6 +93,8 @@ _REQUIRED_ENV_VARS = tuple(
         "TELEGRAM_DOWNLOAD_TEMP_FOLDER",
         "TELEGRAM_PARALLEL_DOWNLOADS",
         "TELEGRAM_WATCHER_FALLBACK",
+        "TELEMETRY_LEVEL",
+        "TELEMETRY_RETENTION_DAYS",
     }
 )
 
@@ -167,6 +173,10 @@ def load_settings(env_file: str | Path = ".env") -> Settings:
             telegram_watcher_fallback=_parse_optional_bool(
                 raw_values, "TELEGRAM_WATCHER_FALLBACK", default=False
             ),
+            telemetry_level=_parse_telemetry_level(raw_values),
+            telemetry_retention_days=_parse_optional_positive_int(
+                raw_values, "TELEMETRY_RETENTION_DAYS", default=90
+            ),
         )
     except ValueError as exc:
         raise SettingsError(f"Invalid environment settings: {exc}") from exc
@@ -213,6 +223,16 @@ def _parse_optional_bool(
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
     raise ValueError(f"{env_name} must be a boolean")
+
+
+def _parse_telemetry_level(raw_values: dict[str, str]) -> str:
+    value = raw_values.get("TELEMETRY_LEVEL")
+    if value is None or not value.strip():
+        return "FULL"
+    normalized = value.strip().upper()
+    if normalized not in {"OFF", "ATTEMPTS", "FULL"}:
+        raise ValueError("TELEMETRY_LEVEL must be OFF, ATTEMPTS or FULL")
+    return normalized
 
 
 def _parse_optional_positive_int(

@@ -61,17 +61,17 @@ class AccountLogHandle:
 
 
 class ProjectLogger:
-    def debug(self, message: str, *args: Any) -> None:
-        _logger.debug(_format_message(message, args))
+    def debug(self, message: str, *args: Any, exc_info: bool = False) -> None:
+        _logger.debug(_format_message(message, args), exc_info=exc_info)
 
-    def info(self, message: str, *args: Any) -> None:
-        _logger.info(_format_message(message, args))
+    def info(self, message: str, *args: Any, exc_info: bool = False) -> None:
+        _logger.info(_format_message(message, args), exc_info=exc_info)
 
-    def warning(self, message: str, *args: Any) -> None:
-        _logger.warning(_format_message(message, args))
+    def warning(self, message: str, *args: Any, exc_info: bool = False) -> None:
+        _logger.warning(_format_message(message, args), exc_info=exc_info)
 
-    def error(self, message: str, *args: Any) -> None:
-        _logger.error(_format_message(message, args))
+    def error(self, message: str, *args: Any, exc_info: bool = False) -> None:
+        _logger.error(_format_message(message, args), exc_info=exc_info)
 
     def exception(self, message: str, *args: Any) -> None:
         _logger.exception(_format_message(message, args))

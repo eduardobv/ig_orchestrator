@@ -1143,6 +1143,17 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 32 · Telemetría de ejecución (v4.6.0)
+
+Cada intento de descarga deja una fila en `url_job_attempts` (base `data/orchestrator_gui.sqlite`) con cuánto tardó cada fase, y un registro por mensaje del bot en `bot_message_events`. No cambia ninguna regla de descarga.
+
+* **Ajustes (`.env`):** `TELEMETRY_LEVEL=FULL|ATTEMPTS|OFF` y `TELEMETRY_RETENTION_DAYS=90`.
+* **Privacidad:** de las descripciones solo se guarda su clase y longitud.
+* **Probar:** lanza un lote pequeño y consulta, por ejemplo:
+  * `SELECT publication_type, COUNT(*), AVG(t_total_ms) FROM url_job_attempts GROUP BY 1;`
+  * `SELECT url_job_id, t_total_ms, t_first_response_ms, t_end_wait_ms, t_download_ms, flood_wait_ms, exit_reason, aes_backend FROM url_job_attempts ORDER BY t_total_ms DESC LIMIT 20;`
+* Con esta tabla se puede pedir a la IA que analice dónde están los cuellos de botella (el informe en la GUI llega en un feat posterior).
+
 ## Feat 31 · Reels grandes por enlace (v4.5.0)
 
 Cuando un reel pesa más de ~50 MB el bot no lo envía: responde `error_file_too_large_link` y un enlace. La app lo detecta y descarga ese enlace directamente (unos 3 s), con nombre `<media_id>.mp4` (el `media_id` se calcula del shortcode de la URL), y sigue el flujo normal (`reels\`).

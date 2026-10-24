@@ -17,5 +17,8 @@ SQLite es la fuente de verdad. v1 (`orchestrator.sqlite`) y v2 GUI
 API pública: `ig_orchestrator.db` (`__init__.py`). Las rutas antiguas
 (`gui_adapters`, `catalog_importer`, `gui_migrations`) son shims.
 
+## Telemetría
+`gui_migrations._patch_gui_schema` llama a `telemetry.schema.ensure_telemetry_schema` (tablas `url_job_attempts`, `bot_message_events`, `run_wait_events`; ver `telemetry/MODULE.md`).
+
 ## Tests
 `tests/db/`

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import hashlib
 import re
 import shutil
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -25,6 +27,19 @@ from ig_orchestrator.telegram.bot_response_parser import (
     BotResponseStatus,
     parse_bot_response,
 )
+from ig_orchestrator.telemetry.observer import NullObserver, RunObserver
+from ig_orchestrator.telemetry.trace import (
+    EXIT_DEADLINE_FIRST,
+    EXIT_DEADLINE_TOTAL,
+    EXIT_ERROR_TEXT,
+    EXIT_LARGE_FILE_LINK,
+    EXIT_SEND_FAILED,
+    EXIT_STABLE,
+    TEXT_CLASS_DESCRIPTION,
+    TEXT_CLASS_ERROR,
+    TEXT_CLASS_LARGE_FILE_LINK,
+    AttemptTrace,
+)
 from ig_orchestrator.telegram.large_file import (
     FILE_TOO_LARGE_DOWNLOAD_FAILED,
     LargeFileConfig,
@@ -32,6 +47,7 @@ from ig_orchestrator.telegram.large_file import (
     download_large_file,
     media_id_from_url,
 )
+from ig_orchestrator.telegram.telegram_client import cryptg_available
 
 
 logger = get_logger()
@@ -95,6 +111,7 @@ class BotConversationResult:
     job: UrlJob
     files: tuple[DownloadFile, ...] = ()
     bot_message: str | None = None
+    trace: AttemptTrace | None = None
 
 
 @dataclass(slots=True)
@@ -123,6 +140,8 @@ class BotConversationService:
         config: BotConversationConfig,
         watcher: Watcher = watch_downloaded_files,
         large_file_downloader: LargeFileDownloader = download_large_file,
+        clock: Callable[[], float] = time.monotonic,
+        observer: RunObserver | None = None,
     ) -> None:
         self._telegram_client = telegram_client
         self._url_job_repository = url_job_repository
@@ -130,6 +149,9 @@ class BotConversationService:
         self._config = config
         self._watcher = watcher
         self._large_file_downloader = large_file_downloader
+        self._clock = clock
+        self._observer: RunObserver = observer or NullObserver()
+        self._trace: AttemptTrace | None = None
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
         self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
@@ -141,9 +163,29 @@ class BotConversationService:
         async with self._lock:
             # Subscribe before sending so no bot reply can be missed.
             self._subscription = self._open_subscription()
+            trace = AttemptTrace.start(
+                url_job_id=job.id,
+                account_id=job.account_id,
+                batch_run_id=job.run_id,
+                attempt_no=job.retries + 1,
+                publication_type=job.publication_type.value,
+                clock=self._clock,
+            )
+            trace.aes_backend = "cryptg" if cryptg_available() else "pyaes"
+            trace.settings = {
+                "events": self._subscription is not None,
+                "parallel_downloads": self._config.parallel_downloads,
+                "watcher_fallback": self._config.watcher_fallback_enabled,
+                "fallback_poll_s": self._config.response_fallback_poll_seconds,
+            }
+            self._trace = trace
+            self._observer.begin_attempt(trace)
             try:
-                return await self._process_url_job_locked(job)
+                result = await self._process_url_job_locked(job)
+                trace.files_count = len(result.files)
+                return dataclasses.replace(result, trace=trace)
             finally:
+                self._trace = None
                 if self._subscription is not None:
                     self._subscription.close()
                 self._subscription = None
@@ -190,8 +232,12 @@ class BotConversationService:
                 last_error_type="SEND_MESSAGE_FAILED",
                 non_retryable=False,
             )
+            if self._trace is not None:
+                self._trace.end_wait(EXIT_SEND_FAILED)
             return BotConversationResult(job=failed_job)
 
+        if self._trace is not None:
+            self._trace.mark_sent()
         sent_message_id = _message_id(sent_message)
         if sent_message_id is not None:
             current_job = self._url_job_repository.update_sent_message_id(
@@ -369,9 +415,17 @@ class BotConversationService:
                 bot_responded = True
 
                 text = _message_text(message)
-                if text is not None and text.strip():
+                has_text = text is not None and bool(text.strip())
+                parsed = parse_bot_response(text) if has_text else None
+                self._record_message(message, text if has_text else None, parsed)
+                if has_text and parsed is not None:
                     bot_texts.append(text.strip())
-                    if parse_bot_response(text).status is not BotResponseStatus.OK:
+                    if parsed.status is not BotResponseStatus.OK:
+                        self._end_wait(
+                            EXIT_LARGE_FILE_LINK
+                            if parsed.status is BotResponseStatus.LARGE_FILE_LINK
+                            else EXIT_ERROR_TEXT
+                        )
                         return (
                             _join_bot_texts(bot_texts),
                             await self._finish_downloads(
@@ -391,6 +445,8 @@ class BotConversationService:
                         continue
                     file_key = (file_name.casefold(), _document_size(message))
                     if file_key in seen_files:
+                        if self._trace is not None:
+                            self._trace.duplicates_skipped += 1
                         logger.info(
                             "Duplicate bot attachment skipped: job_id={} file={}",
                             job_id,
@@ -408,6 +464,7 @@ class BotConversationService:
             if last_media_at is not None:
                 quiet_seconds = now - last_media_at
                 if quiet_seconds >= self._config.download_stable_seconds:
+                    self._end_wait(EXIT_STABLE)
                     return (
                         _join_bot_texts(bot_texts),
                         await self._finish_downloads(
@@ -417,6 +474,9 @@ class BotConversationService:
                     )
 
             if now >= deadline:
+                self._end_wait(
+                    EXIT_DEADLINE_TOTAL if bot_responded else EXIT_DEADLINE_FIRST
+                )
                 return (
                     _join_bot_texts(bot_texts),
                     await self._finish_downloads(job_id, previews, media_filename_prefix),
@@ -453,9 +513,15 @@ class BotConversationService:
                 job_id,
                 media_id,
             )
+            large_started = self._clock()
             downloaded = await self._large_file_downloader(
                 response.download_url, target, self._config.large_file
             )
+            if self._trace is not None:
+                self._trace.t_download_ms = int((self._clock() - large_started) * 1000)
+                self._trace.bytes_downloaded += (
+                    downloaded.stat().st_size if downloaded.exists() else 0
+                )
         except LargeFileDownloadError as exc:
             logger.warning(
                 "Large file download failed: job_id={} error={}", job_id, exc
@@ -488,6 +554,46 @@ class BotConversationService:
         async with semaphore:
             return await self._download_bot_message_media(job_id, message)
 
+    def _end_wait(self, exit_reason: str) -> None:
+        if self._trace is not None:
+            self._trace.end_wait(exit_reason)
+
+    def _record_message(
+        self,
+        message: Any,
+        text: str | None,
+        parsed: BotResponse | None,
+    ) -> None:
+        trace = self._trace
+        if trace is None:
+            return
+        document = getattr(message, "document", None)
+        has_name = _original_file_name(message) is not None
+        if document is not None:
+            kind = "DOCUMENT_FILE" if has_name else "VIDEO_NONAME"
+        elif getattr(message, "photo", None):
+            kind = "PHOTO"
+        else:
+            kind = "TEXT"
+        text_class: str | None = None
+        if parsed is not None:
+            if parsed.status is BotResponseStatus.OK:
+                text_class = TEXT_CLASS_DESCRIPTION
+            elif parsed.status is BotResponseStatus.LARGE_FILE_LINK:
+                text_class = TEXT_CLASS_LARGE_FILE_LINK
+            else:
+                text_class = TEXT_CLASS_ERROR
+        trace.on_message(
+            message_id=_message_id(message),
+            grouped_id=_int_or_none(getattr(message, "grouped_id", None)),
+            kind=kind,
+            mime=getattr(document, "mime_type", None),
+            has_filename=has_name,
+            size_bytes=_document_size(message),
+            text_class=text_class,
+            text_len=len(text) if text else None,
+        )
+
     async def _finish_downloads(
         self,
         job_id: int,
@@ -496,6 +602,21 @@ class BotConversationService:
     ) -> list[Path]:
         """Await named downloads; fetch unnamed previews only when needed."""
 
+        started = self._clock()
+        try:
+            return await self._finish_downloads_inner(
+                job_id, previews, media_filename_prefix
+            )
+        finally:
+            if self._trace is not None:
+                self._trace.t_download_ms = int((self._clock() - started) * 1000)
+
+    async def _finish_downloads_inner(
+        self,
+        job_id: int,
+        previews: list[Any],
+        media_filename_prefix: str,
+    ) -> list[Path]:
         downloads = list(await asyncio.gather(*self._download_tasks))
         self._download_tasks = []
         named_paths = [
@@ -573,6 +694,7 @@ class BotConversationService:
         temp_path = target_folder / f"job_{job_id}_msg_{message_id}{extension}"
         temp_path.unlink(missing_ok=True)
 
+        download_started = self._clock()
         try:
             downloaded_path_text = await self._telegram_client.download_message_media(
                 message,
@@ -583,6 +705,12 @@ class BotConversationService:
             downloaded_path = Path(downloaded_path_text)
             if not downloaded_path.exists():
                 raise RuntimeError(f"Downloaded file does not exist: {downloaded_path}")
+            if self._trace is not None:
+                self._trace.on_download(
+                    message_id,
+                    int((self._clock() - download_started) * 1000),
+                    downloaded_path.stat().st_size,
+                )
 
             if not original_file_name:
                 return _MediaDownload(
@@ -695,6 +823,10 @@ def _original_file_name(message: Any) -> str | None:
         if isinstance(file_name, str) and file_name.strip():
             return _sanitize_windows_filename(file_name)
     return None
+
+
+def _int_or_none(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _document_size(message: Any) -> int | None:

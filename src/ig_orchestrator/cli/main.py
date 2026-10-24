@@ -48,6 +48,7 @@ from ig_orchestrator.orchestration.post_availability import (
 )
 from ig_orchestrator.reports import MarkdownReportBuilder
 from ig_orchestrator.settings import Settings, SettingsError, load_settings
+from ig_orchestrator.telemetry import build_observer
 from ig_orchestrator.telegram import (
     BotConversationConfig,
     BotConversationService,
@@ -357,7 +358,9 @@ def _run_batch(
         download_repository = DownloadRepository(connection)
         run_repository = RunRepository(connection)
 
+        observer = _build_observer(connection, settings)
         conversation_service = BotConversationService(
+            observer=observer,
             telegram_client=telegram_client,
             url_job_repository=url_job_repository,
             download_repository=download_repository,
@@ -370,6 +373,7 @@ def _run_batch(
             ),
         )
         url_job_processor = UrlJobProcessor(
+            observer=observer,
             url_job_repository=url_job_repository,
             account_repository=account_repository,
             download_repository=download_repository,
@@ -469,6 +473,14 @@ def _run_batch(
     return 0
 
 
+def _build_observer(connection, settings):
+    return build_observer(
+        connection,
+        level=settings.telemetry_level,
+        retention_days=settings.telemetry_retention_days,
+    )
+
+
 def _run_continue(
     *,
     batch_id: int | None = None,
@@ -517,7 +529,9 @@ def _run_continue(
         else:
             if telegram_client is None:
                 raise RuntimeError("Telegram client is required for a real run")
+            observer = _build_observer(connection, settings)
             conversation_service = BotConversationService(
+                observer=observer,
                 telegram_client=telegram_client,
                 url_job_repository=url_job_repository,
                 download_repository=download_repository,
@@ -530,6 +544,7 @@ def _run_continue(
                 ),
             )
             url_job_processor = UrlJobProcessor(
+                observer=observer,
                 url_job_repository=url_job_repository,
                 account_repository=account_repository,
                 download_repository=download_repository,

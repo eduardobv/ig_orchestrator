@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.6.0 - feat-run-32: telemetría de ejecución
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* Paquete `telemetry/` (`trace.py`, `observer.py`, `schema.py`, `housekeeping.py`, `MODULE.md`) y `tests/telemetry/test_telemetry.py`.
+* Tablas aditivas en la base de la GUI (`db/gui_migrations.py` → `ensure_telemetry_schema`): `url_job_attempts` (una fila por intento: fases en ms, motivo de salida, resultado, bytes, duplicados evitados, `FloodWait`, motor de cifrado `cryptg`/`pyaes`), `bot_message_events` (un registro por mensaje del bot: tipo, offset, tamaño, descarga) y `run_wait_events` (`FLOOD_WAIT`).
+
+### Modificado
+* `BotConversationService` mide el intento y devuelve `BotConversationResult.trace`; `UrlJobProcessor` añade movimiento y resultado y lo vuelca a través de `RunObserver`; `cli/main.py` lo conecta (base v1 → `NullObserver`).
+* `.env`: `TELEMETRY_LEVEL` (`OFF`/`ATTEMPTS`/`FULL`, defecto `FULL`) y `TELEMETRY_RETENTION_DAYS` (90; se purga al arrancar la ejecución).
+* Los `FloodWait` de Telethon se capturan desde su log (`telethon.client.users`, nivel INFO) y se suman al intento en curso.
+* Corrección: `ProjectLogger` aceptaba `exc_info` solo de nombre; `logger.warning(..., exc_info=True)` lanzaba `TypeError` (afectaba a 4 sitios, entre ellos la comprobación de posts eliminados y las notificaciones). Ahora se admite.
+* Privacidad: no se guarda el texto de las descripciones, solo clase y longitud.
+* Documentación: `CLAUDE.md`, `README.md`, `.env.example`, `docs/arquitectura-v3.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`, `tasks/feat-run-30.md`. `AGENTS.md` y `docs/manual-usuario.md` revisados sin cambios (el informe en la GUI llega en el feat 7). Versión 4.6.0.
+
+### Pruebas
+* `python -m pytest`: 669 passed (traza con reloj falso, volcado FULL/ATTEMPTS, fallo del observador sin romper, purga, captura de `FloodWait`, servicio y procesador). **No probado** con Telegram real. El informe y las recomendaciones no existen aún: por ahora se consulta la base con SQL (ver tutorial). La prueba `tests/filesystem/test_file_watcher.py::test_watch_downloaded_files_returns_new_stable_files` es intermitente (resolución de `mtime` en Windows), anterior a este cambio.
+
 ## v4.5.0 - feat-run-31: reels grandes por enlace directo
 
 Fecha: 2026-10-24 · Rama: `v4/main`

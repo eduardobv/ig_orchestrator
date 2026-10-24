@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlite3 import Connection
 
 from ig_orchestrator.db.connection import connect
+from ig_orchestrator.telemetry.schema import ensure_telemetry_schema
 
 
 SCHEMA_V2_PATH = Path(__file__).resolve().parent / "v2" / "schema.sql"
@@ -87,6 +88,7 @@ def _patch_gui_schema(connection: Connection) -> None:
     """Idempotent lookup/column patches for databases already at v100."""
 
     backup_before_library_migration(connection)
+    ensure_telemetry_schema(connection)
 
     connection.execute(
         """

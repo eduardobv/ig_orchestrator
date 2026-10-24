@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ from ig_orchestrator.orchestration.post_availability import (
 )
 from ig_orchestrator.orchestration.retry_policy import MEDIA_NOT_FOUND_ERROR_TYPE
 from ig_orchestrator.telegram import BotConversationResult
+from ig_orchestrator.telemetry.observer import NullObserver, RunObserver
+from ig_orchestrator.telemetry.trace import AttemptTrace
 
 
 logger = get_logger()
@@ -69,6 +72,7 @@ class UrlJobProcessor:
         conversation_service: UrlJobConversationService,
         config: UrlJobProcessorConfig | None = None,
         file_mover: FileMover = move_downloaded_files,
+        observer: RunObserver | None = None,
     ) -> None:
         self._url_job_repository = url_job_repository
         self._account_repository = account_repository
@@ -76,8 +80,34 @@ class UrlJobProcessor:
         self._conversation_service = conversation_service
         self._config = config or UrlJobProcessorConfig()
         self._file_mover = file_mover
+        self._observer: RunObserver = observer or NullObserver()
+        self._trace: AttemptTrace | None = None
 
     async def process(self, url_job_id: int) -> UrlJobProcessorResult:
+        self._trace = None
+        try:
+            result = await self._process(url_job_id)
+        except BaseException:
+            self._finish_trace(None)
+            raise
+        self._finish_trace(result)
+        return result
+
+    def _finish_trace(self, result: UrlJobProcessorResult | None) -> None:
+        trace, self._trace = self._trace, None
+        if trace is None:
+            return
+        if result is None:
+            trace.finish(outcome="EXCEPTION", error_code=None)
+        else:
+            trace.files_count = len(result.files)
+            trace.finish(
+                outcome=result.job.status.value,
+                error_code=result.job.last_error_type,
+            )
+        self._observer.finish_attempt(trace)
+
+    async def _process(self, url_job_id: int) -> UrlJobProcessorResult:
         if url_job_id <= 0:
             raise ValueError("url_job_id must be positive")
 
@@ -98,6 +128,9 @@ class UrlJobProcessor:
             job.url,
         )
         conversation_result = await self._conversation_service.process_url_job(job)
+        self._trace = conversation_result.trace
+        if self._trace is not None:
+            self._trace.batch_id = account.batch_id
         processed_job = conversation_result.job
         detected_files = list(conversation_result.files)
 
@@ -145,6 +178,7 @@ class UrlJobProcessor:
                 final_publication_type,
             )
 
+        move_started = time.monotonic()
         try:
             moved_files = self._file_mover(
                 account.username,
@@ -152,6 +186,8 @@ class UrlJobProcessor:
                 final_publication_type,
                 detected_files,
             )
+            if self._trace is not None:
+                self._trace.t_move_ms = int((time.monotonic() - move_started) * 1000)
         except Exception as exc:
             logger.exception(
                 "Moving downloaded files failed: job_id={} error={}",

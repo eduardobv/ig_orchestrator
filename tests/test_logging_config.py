@@ -107,3 +107,12 @@ def test_multiple_account_logs_share_execution_folder_and_append(
     content = second.path.read_text(encoding="utf-8")
     assert "first account pass" in content
     assert "second account pass" in content
+
+
+def test_project_logger_accepts_exc_info() -> None:
+    from ig_orchestrator.logging_config import get_logger
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        get_logger().warning("with traceback", exc_info=True)

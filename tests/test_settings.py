@@ -218,3 +218,26 @@ def test_invalid_parallel_downloads_raises_clear_error(
 
     with pytest.raises(SettingsError, match="TELEGRAM_PARALLEL_DOWNLOADS"):
         load_settings(env_file)
+
+
+def test_telemetry_settings_defaults_and_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clear_settings_environment(monkeypatch)
+    env_file = tmp_path / ".env"
+    write_env_file(env_file)
+
+    defaults = load_settings(env_file)
+    assert (defaults.telemetry_level, defaults.telemetry_retention_days) == ("FULL", 90)
+
+    original = env_file.read_text(encoding="utf-8")
+    env_file.write_text(
+        original + "\nTELEMETRY_LEVEL=attempts\nTELEMETRY_RETENTION_DAYS=30\n",
+        encoding="utf-8",
+    )
+    custom = load_settings(env_file)
+    assert (custom.telemetry_level, custom.telemetry_retention_days) == ("ATTEMPTS", 30)
+
+    env_file.write_text(original + "\nTELEMETRY_LEVEL=LOUD\n", encoding="utf-8")
+    with pytest.raises(SettingsError, match="TELEMETRY_LEVEL"):
+        load_settings(env_file)
