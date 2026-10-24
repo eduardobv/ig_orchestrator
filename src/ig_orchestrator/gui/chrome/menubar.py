@@ -168,6 +168,9 @@ class MenubarMixin:
         batch_menu.add_command(label=t("menu.batch.pause"), command=self._toggle_pause_resume)
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.stories"), command=self._open_stories_inbox)
+        batch_menu.add_command(
+            label=t("menu.batch.report"), command=self._open_current_execution_report
+        )
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.pull"), command=self._open_pull_dialog)
         batch_menu.add_command(label=t("menu.batch.publish"), command=self._open_publish_dialog)

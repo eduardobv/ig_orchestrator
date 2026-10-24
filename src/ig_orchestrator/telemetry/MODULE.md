@@ -6,6 +6,7 @@ Mide cada intento de descarga para poder ver dónde se va el tiempo. Solo observ
 * `trace.py` · `AttemptTrace` (en memoria, reloj monotónico inyectable): tiempos por fase desde el envío al bot, mensajes recibidos (`MessageEvent`), esperas (`WaitEvent`), motivo de salida y resultado. Se vuelca una sola vez al terminar el intento.
 * `observer.py` · `RunObserver` (protocolo), `NullObserver` (base v1 o `TELEMETRY_LEVEL=OFF`), `SqliteObserver` (escribe en la base de la GUI), `build_observer` (elige uno y purga lo antiguo) y `install_flood_wait_capture` (convierte el log «Sleeping for Ns … flood wait» de Telethon en una espera `FLOOD_WAIT`).
 * `schema.py` · tablas aditivas `url_job_attempts`, `bot_message_events`, `run_wait_events` (sin claves foráneas); `ensure_telemetry_schema` se llama desde `db/gui_migrations.py`.
+* `report.py` · informe de un lote (`build_batch_report`, `report_to_markdown`, `attempts_to_csv`) con recomendaciones por reglas fijas; solo lee.
 * `housekeeping.py` · `purge_telemetry(older_than_days=…, batch_id=…)`.
 
 ## Dónde se engancha

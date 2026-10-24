@@ -57,6 +57,8 @@ from ig_orchestrator.gui.batch_resume_service import (
     mark_batch_interrupted,
     resolve_account_download_folder,
 )
+from ig_orchestrator.gui.batches.execution_report import open_execution_report
+from ig_orchestrator.telemetry.report import has_report_data
 from ig_orchestrator.gui.batches.manage import (
     BatchManageError,
     create_empty_draft_batch,
@@ -135,6 +137,14 @@ from ig_orchestrator.orchestration.processing_policy import (
 
 class BatchesDialogMixin:
     """Mixin: saved/executed batches dialog (list, accounts detail, batch management)."""
+
+    def _open_current_execution_report(self) -> None:
+        """Lote > Informe de ejecución: current batch, else the latest measured one."""
+
+        batch_id = self.active_batch_id or self.saved_batch_id
+        if batch_id is not None and not has_report_data(self.connection, batch_id):
+            batch_id = None
+        open_execution_report(self.root, self.connection, batch_id)
 
     def _open_pending_batches(self) -> None:
         dialog = tk.Toplevel(self.root)
@@ -887,6 +897,23 @@ class BatchesDialogMixin:
             side=tk.LEFT
         )
 
+        def show_report_menu(tree: ttk.Treeview, event) -> None:
+            row = tree.identify_row(event.y)
+            if not row:
+                return
+            tree.selection_set(row)
+            menu = tk.Menu(dialog, tearoff=False)
+            menu.add_command(
+                label=t("report.menu"),
+                command=lambda: open_execution_report(dialog, self.connection, int(row)),
+            )
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        for tree in (active_tree, history_tree):
+            tree.bind("<Button-3>", lambda event, tr=tree: show_report_menu(tr, event))
         active_tree.bind("<Double-Button-1>", lambda _event: resume_selected())
         history_tree.bind("<Double-Button-1>", lambda _event: open_history_selected())
         notebook.bind("<<NotebookTabChanged>>", on_tab_changed)

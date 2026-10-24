@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.10.0 - feat-run-36: informe de ejecución, recomendaciones y purga de telemetría
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `telemetry/report.py`: `build_batch_report` (resumen y % por fase, 20 más lentos con «por qué», p50/p90/máx por tipo y tamaño, errores, éxito por nº de intento, recomendaciones deterministas), `report_to_markdown`, `attempts_to_csv`.
+* `gui/batches/execution_report.py`: modal *Informe de ejecución* con pestañas y exportación a Markdown/CSV.
+* `tests/telemetry/test_report.py`.
+
+### Modificado
+* `gui/batches/dialog.py`: clic derecho en un lote de *Lotes guardados y ejecuciones* → **Informe de ejecución…**; nuevo método `_open_current_execution_report`.
+* `gui/chrome/menubar.py`: **Lote > Informe de ejecución…** (lote actual; si no tiene telemetría, el último medido).
+* `gui/settings/run_tab.py`: botón **Purgar telemetría…** (borra intentos, mensajes y esperas; no toca lotes ni descargas).
+* Locales `es.json`/`en.json`. Documentación: `CLAUDE.md`, `README.md`, manual, tutorial (Feat 36), arquitectura, `plan-v3-features.md`, `telemetry/MODULE.md`, `gui/batches/MODULE.md`, `tasks/feat-run-30.md`. `AGENTS.md` revisado sin cambios. Versión 4.10.0.
+
+### Pruebas
+* `python -m pytest`: 707 passed. Informe comprobado con la base real de la GUI (22 URLs: el 64 % del tiempo era fin de espera del modo antiguo) y el modal abierto con Tk real.
+* No hecho: sección del informe en `run_*.md` (el informe se exporta desde el modal).
+
 ## v4.9.0 - feat-run-35: cola global de reintentos y tope propio para NO_BOT_RESPONSE
 
 Fecha: 2026-10-24 · Rama: `v4/main`

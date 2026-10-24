@@ -26,6 +26,7 @@ from ig_orchestrator.orchestration.run_settings import (
     save_run_settings,
 )
 from ig_orchestrator.settings import Settings
+from ig_orchestrator.telemetry.housekeeping import purge_telemetry
 
 
 class RunSettingsTab(ttk.Frame):
@@ -52,6 +53,9 @@ class RunSettingsTab(ttk.Frame):
         ttk.Button(
             footer, text=t("run.reset"), command=self._on_reset
         ).pack(side=tk.LEFT)
+        ttk.Button(
+            footer, text=t("run.purge_telemetry"), command=self._on_purge_telemetry
+        ).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Label(footer, text=t("run.apply_note"), wraplength=420).pack(
             side=tk.LEFT, padx=8
         )
@@ -157,6 +161,22 @@ class RunSettingsTab(ttk.Frame):
             return False
         save_run_settings(self.connection, self.collect(), self.env_settings)
         return True
+
+    def _on_purge_telemetry(self) -> None:
+        if not messagebox.askyesno(
+            t("run.purge_telemetry"), t("run.purge_telemetry_confirm"), parent=self
+        ):
+            return
+        try:
+            removed = purge_telemetry(self.connection, older_than_days=0)
+        except Exception as exc:  # telemetry tables may not exist (v1 database)
+            messagebox.showerror(t("run.purge_telemetry"), str(exc), parent=self)
+            return
+        messagebox.showinfo(
+            t("run.purge_telemetry"),
+            t("run.purge_telemetry_done").format(count=removed),
+            parent=self,
+        )
 
     def _on_reset(self) -> None:
         if not messagebox.askyesno(

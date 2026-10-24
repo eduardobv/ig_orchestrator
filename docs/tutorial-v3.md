@@ -1143,6 +1143,16 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 36 · Informe de ejecución (v4.10.0)
+
+Convierte la telemetría en un informe legible del lote.
+
+* **Abrirlo:** *Lote > Informe de ejecución…* (lote actual, o el último medido), o *Lotes / ejecuciones…* → clic derecho en un lote → *Informe de ejecución…*.
+* **Pestañas:** *Resumen* (duración, URLs/h, % por fase: bot, descarga, fin de espera, FloodWait, espera de reintento, movimiento, otros); *Más lentos* (top 20 con el motivo: fase dominante + motivo de salida); *Por tipo y tamaño* (p50/p90/máx de primera respuesta y total, para calibrar plazos); *Errores*; *Reintentos* (éxito por nº de intento); *Recomendaciones* (reglas fijas: instalar `cryptg`, subir un plazo si la primera respuesta llega al 80 % del límite, FloodWait > 5 %, fin de espera > 15 %, esperas de reintento > 15 %, bot sin responder > 10 %, silencio breve que corta álbumes).
+* **Exportar:** botones *Exportar Markdown* y *Exportar CSV* (un intento por fila).
+* **Purgar:** *Configuración > Ejecución > Purgar telemetría…*. Además se purga sola a los 90 días.
+* **Tests:** `python -m pytest tests/telemetry/test_report.py`.
+
 ## Feat 35 · Cola global de reintentos (v4.9.0)
 
 Antes, una URL con error temporal se reintentaba dentro de su cuenta, con esperas de 90 a 900 s que bloqueaban al resto del lote. Ahora:
