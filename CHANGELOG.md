@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.7.0 - feat-run-33: ajustes de ejecución (`run.*`) y pestaña «Ejecución»
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Creado
+* `orchestration/run_settings.py`: `RUN_SETTING_SPECS` (23 claves con tipo, rango y valor por defecto), `RunSettings`, `load_run_settings`, `save_run_settings`, `reset_run_settings`, `validate_run_setting`.
+* `gui/settings/run_tab.py` (`RunSettingsTab`): pestaña con las claves agrupadas, ayuda por tooltip, validación, *Restablecer valores*. Textos en `locales/es.json` y `en.json` (60 claves `run.*`).
+* `tests/orchestration/test_run_settings.py`, `tests/gui/test_run_tab.py`.
+
+### Modificado
+* Precedencia **GUI (`app_settings`) > `.env` > defecto**; al guardar solo se persisten los valores distintos del defecto/`.env` (los demás siguen el `.env`). `cli/main.py` carga los ajustes tras abrir la base (`run_continue` y `--run`) y los aplica con `RunSettings.apply_to(settings)`; la base v1 sigue usando solo `.env`.
+* Ahora configurables: reintentos (máximo, tope de stories, tope de «Media not found», espera base/máxima — `retry_policy` y `AccountOrchestratorConfig` aceptan los topes), plazo total y silencio, eventos sí/no y sondeo de respaldo, descargas simultáneas, carpeta de descarga propia, vigilante, descarga por enlace (activar, plazos, MB), comprobación de Instagram (activar, intervalo, plazo), `flood_sleep_threshold` de Telethon (nuevo campo `Settings.telegram_flood_sleep_threshold`, `TelegramClientConfig.flood_sleep_threshold`) y telemetría (nivel, retención). `InstagramPostAvailabilityChecker` acepta `timeout_seconds`.
+* `processing.stories_first` se mueve de la pestaña *Procesamiento* a *Ejecución*.
+* Documentación: `CLAUDE.md`, `README.md`, `docs/manual-usuario.md`, `docs/tutorial-v3.md`, `docs/arquitectura-v3.md`, `docs/plan-v3-features.md`, `gui/settings/MODULE.md`, `tasks/feat-run-30.md`. `AGENTS.md` revisado sin cambios. Versión 4.7.0.
+
+### Pruebas
+* `python -m pytest`: 688 passed (precedencia, validación, guardado solo de diferencias, restablecer, base v1, topes de reintento, plazo de Instagram, umbral de Telethon, eventos on/off, pestaña con Tk). Comprobado a mano abriendo *Configuración* con una base nueva: aparece la pestaña y guardar sin cambios no escribe claves.
+* **Por decisión:** los plazos por tipo de URL, el fin por conteo (`grace`, `completion_mode`), la cola global de reintentos y `no_response_max` **no** se añaden aún (no hay código que los use); entran con los feats 5 y 6. Los defectos de plazo total (300 s) y silencio (10 s) se mantienen hasta el feat 5 para no cambiar el comportamiento antes de tiempo. **No probado** con una ejecución real.
+
 ## v4.6.0 - feat-run-32: telemetría de ejecución
 
 Fecha: 2026-10-24 · Rama: `v4/main`

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import re
 import time
 import urllib.error
@@ -60,13 +61,13 @@ def _canonical_url(url: str) -> str:
     return url.strip().split("?", 1)[0].split("#", 1)[0]
 
 
-def _fetch_html(url: str) -> str | None:
+def _fetch_html(url: str, timeout: float = REQUEST_TIMEOUT_SECONDS) -> str | None:
     request = urllib.request.Request(
         _canonical_url(url),
         headers={"User-Agent": _USER_AGENT},
     )
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         logger.info("Post availability request failed: url={} error={}", url, exc)
@@ -81,7 +82,10 @@ class InstagramPostAvailabilityChecker:
         *,
         fetcher: Callable[[str], str | None] = _fetch_html,
         min_interval_seconds: float = MIN_SECONDS_BETWEEN_CHECKS,
+        timeout_seconds: float | None = None,
     ) -> None:
+        if timeout_seconds is not None and fetcher is _fetch_html:
+            fetcher = functools.partial(_fetch_html, timeout=timeout_seconds)
         self._fetcher = fetcher
         self._min_interval = min_interval_seconds
         self._last_call = 0.0

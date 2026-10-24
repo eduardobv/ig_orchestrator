@@ -49,6 +49,8 @@ from ig_orchestrator.orchestration.post_availability import (
 from ig_orchestrator.reports import MarkdownReportBuilder
 from ig_orchestrator.settings import Settings, SettingsError, load_settings
 from ig_orchestrator.telemetry import build_observer
+from ig_orchestrator.telegram.large_file import LargeFileConfig
+from ig_orchestrator.orchestration.run_settings import load_run_settings
 from ig_orchestrator.telegram import (
     BotConversationConfig,
     BotConversationService,
@@ -330,6 +332,8 @@ def _run_batch(
 
     init_database(settings.sqlite_db_path)
     connection = connect(settings.sqlite_db_path)
+    run_settings = load_run_settings(connection, settings)
+    settings = run_settings.apply_to(settings)
     report_paths: list[Path] = []
     telegram_client = TelethonTelegramClient(
         TelegramClientConfig.from_settings(settings)
@@ -370,6 +374,10 @@ def _run_batch(
                 download_stable_seconds=settings.download_stable_seconds,
                 parallel_downloads=settings.telegram_parallel_downloads,
                 watcher_fallback_enabled=settings.telegram_watcher_fallback,
+                response_poll_interval_seconds=run_settings.fallback_poll_ms / 1000,
+                response_fallback_poll_seconds=run_settings.fallback_poll_ms / 1000,
+                use_events=run_settings.use_events,
+                large_file=_large_file_config(run_settings),
             ),
         )
         url_job_processor = UrlJobProcessor(
@@ -381,7 +389,7 @@ def _run_batch(
             config=UrlJobProcessorConfig(
                 default_working_folder=settings.working_folder,
                 error_notifier=_make_error_notifier(connection, telegram_client),
-                availability_checker=InstagramPostAvailabilityChecker(),
+                availability_checker=_availability_checker(run_settings),
             ),
         )
         account_orchestrator = AccountOrchestrator(
@@ -396,6 +404,8 @@ def _run_batch(
                 max_retries=settings.max_retries,
                 retry_base_seconds=settings.retry_base_seconds,
                 retry_max_seconds=settings.retry_max_seconds,
+                story_max_retries=run_settings.story_max_retries,
+                media_not_found_max_retries=run_settings.media_not_found_max_retries,
                 wait_between_retries=True,
                 item_progress_callback=(
                     _print_item_progress
@@ -473,6 +483,24 @@ def _run_batch(
     return 0
 
 
+def _large_file_config(run_settings):
+    return LargeFileConfig(
+        enabled=run_settings.large_enabled,
+        connect_timeout_seconds=run_settings.large_connect_timeout_s,
+        read_timeout_seconds=run_settings.large_read_timeout_s,
+        max_megabytes=run_settings.large_max_mb,
+    )
+
+
+def _availability_checker(run_settings):
+    if not run_settings.availability_enabled:
+        return None
+    return InstagramPostAvailabilityChecker(
+        min_interval_seconds=run_settings.availability_min_interval_ms / 1000,
+        timeout_seconds=run_settings.availability_timeout_ms / 1000,
+    )
+
+
 def _build_observer(connection, settings):
     return build_observer(
         connection,
@@ -501,6 +529,8 @@ def _run_continue(
 
     prepare_sqlite(settings.sqlite_db_path)
     connection = connect(settings.sqlite_db_path)
+    run_settings = load_run_settings(connection, settings)
+    settings = run_settings.apply_to(settings)
     telegram_client = (
         None
         if dry_run
@@ -541,6 +571,10 @@ def _run_continue(
                     download_stable_seconds=settings.download_stable_seconds,
                     parallel_downloads=settings.telegram_parallel_downloads,
                     watcher_fallback_enabled=settings.telegram_watcher_fallback,
+                    response_poll_interval_seconds=run_settings.fallback_poll_ms / 1000,
+                    response_fallback_poll_seconds=run_settings.fallback_poll_ms / 1000,
+                    use_events=run_settings.use_events,
+                    large_file=_large_file_config(run_settings),
                 ),
             )
             url_job_processor = UrlJobProcessor(
@@ -552,7 +586,7 @@ def _run_continue(
                 config=UrlJobProcessorConfig(
                     default_working_folder=settings.working_folder,
                     error_notifier=_make_error_notifier(connection, telegram_client),
-                    availability_checker=InstagramPostAvailabilityChecker(),
+                    availability_checker=_availability_checker(run_settings),
                 ),
             )
         account_orchestrator = AccountOrchestrator(
@@ -567,6 +601,8 @@ def _run_continue(
                 max_retries=settings.max_retries,
                 retry_base_seconds=settings.retry_base_seconds,
                 retry_max_seconds=settings.retry_max_seconds,
+                story_max_retries=run_settings.story_max_retries,
+                media_not_found_max_retries=run_settings.media_not_found_max_retries,
                 wait_between_retries=not dry_run,
                 dry_run=dry_run,
                 item_progress_callback=(

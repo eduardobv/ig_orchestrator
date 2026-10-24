@@ -123,10 +123,8 @@ from ig_orchestrator.gui.theme import Tooltip, compact_icon_button, icon_button
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
 from ig_orchestrator.input.batch_creation_service import DuplicateBatchNameError
 from ig_orchestrator.models import AccountHistoryStatus
-from ig_orchestrator.orchestration.processing_policy import (
-    read_stories_first_enabled,
-    write_stories_first_enabled,
-)
+from ig_orchestrator.gui.settings.run_tab import RunSettingsTab
+from ig_orchestrator.settings import SettingsError, load_settings
 
 
 class SettingsDialogWithTabs:
@@ -151,6 +149,7 @@ class SettingsDialogWithTabs:
         # Build tabs
         self._build_general_tab()
         self._build_ui_tab()
+        self._build_run_tab()
         self._build_processing_tab()
         self._build_catalog_tab()
         self._build_instances_tab()
@@ -213,21 +212,24 @@ class SettingsDialogWithTabs:
                 variable=self.window_position,
             ).grid(row=0, column=index, sticky="w", padx=(0, 16))
 
+    def _build_run_tab(self) -> None:
+        self.run_tab: RunSettingsTab | None = None
+        if not is_gui_schema(self.connection):
+            return
+        try:
+            env_settings = load_settings()
+        except SettingsError:
+            frame = ttk.Frame(self.notebook, padding=12)
+            ttk.Label(frame, text=t("run.unavailable"), wraplength=500).pack(anchor="w")
+            self.notebook.add(frame, text=t("settings.tabs.run"))
+            return
+        self.run_tab = RunSettingsTab(self.notebook, self.connection, env_settings)
+        self.notebook.add(self.run_tab, text=t("settings.tabs.run"))
+
     def _build_processing_tab(self) -> None:
         frame = ttk.Frame(self.notebook, padding=12)
         self.notebook.add(frame, text=t("settings.tabs.processing"))
 
-        self.stories_first = tk.BooleanVar(
-            value=read_stories_first_enabled(self.connection)
-        )
-        ttk.Checkbutton(
-            frame,
-            text=t("settings.stories_first"),
-            variable=self.stories_first,
-        ).grid(row=0, column=0, sticky="w")
-        ttk.Label(frame, text=t("settings.stories_first_help"), wraplength=500).grid(
-            row=1, column=0, sticky="w", pady=(2, 12)
-        )
         self.rename_engine_var = tk.StringVar(value=read_engine(self.connection))
         ttk.Label(frame, text=t("settings.rename_engine")).grid(row=3, column=0, sticky="w", pady=(14, 0))
         engines = ttk.Frame(frame)
@@ -380,6 +382,11 @@ class SettingsDialogWithTabs:
 
     def _on_save(self) -> None:
         """Apply changes and close dialog."""
+        if self.run_tab is not None:
+            problem = self.run_tab.validate()
+            if problem is not None:
+                self.run_tab.save()  # shows the error; nothing is stored
+                return
         if is_gui_schema(self.connection):
             # Language
             if self.language.get() != current_language():
@@ -406,8 +413,8 @@ class SettingsDialogWithTabs:
                 (self.window_position.get(),),
             )
 
-            # Stories first
-            write_stories_first_enabled(self.connection, self.stories_first.get())
+            # Run settings (includes processing.stories_first)
+            self.run_tab.save() if self.run_tab is not None else None
 
             # Renamer and accounts_lite mirror
             write_setting(self.connection, "renaming.engine", self.rename_engine_var.get())

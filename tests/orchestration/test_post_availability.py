@@ -57,3 +57,25 @@ def test_checker_skips_stories_without_a_request() -> None:
     checker = InstagramPostAvailabilityChecker(fetcher=fetch, min_interval_seconds=0)
 
     assert asyncio.run(checker("https://www.instagram.com/stories/u/")) is PostAvailability.UNKNOWN
+
+
+def test_checker_passes_the_configured_timeout_to_the_default_fetcher(monkeypatch) -> None:
+    from ig_orchestrator.orchestration import post_availability as module
+
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        seen["timeout"] = timeout
+        raise OSError("offline")
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", fake_urlopen)
+    checker = module.InstagramPostAvailabilityChecker(
+        min_interval_seconds=0, timeout_seconds=4.5
+    )
+
+    import asyncio
+
+    result = asyncio.run(checker("https://www.instagram.com/reel/ABC123xyz/"))
+
+    assert result is module.PostAvailability.UNKNOWN
+    assert seen["timeout"] == 4.5

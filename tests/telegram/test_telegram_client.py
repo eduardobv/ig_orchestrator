@@ -205,3 +205,23 @@ def _path(value: str) -> Any:
     from pathlib import Path
 
     return Path(value)
+
+
+def test_flood_sleep_threshold_is_applied_to_the_client() -> None:
+    async def scenario() -> None:
+        fake = FakeTelethonClient()
+        config = _config()
+        wrapper = TelethonTelegramClient(
+            type(config)(
+                api_id=config.api_id,
+                api_hash=config.api_hash,
+                session_name=config.session_name,
+                bot_username=config.bot_username,
+                flood_sleep_threshold=120,
+            ),
+            client_factory=lambda *_a: fake,
+        )
+        await wrapper.start()
+        assert fake.flood_sleep_threshold == 120
+
+    asyncio.run(scenario())

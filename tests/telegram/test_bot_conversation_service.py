@@ -767,3 +767,26 @@ def test_large_file_download_can_be_disabled(tmp_path: Path) -> None:
     result = asyncio.run(service.process_url_job(_stored_job(job_repo)))
 
     assert result.job.last_error_type == "FILE_TOO_LARGE_DOWNLOAD_FAILED"
+
+
+def test_events_can_be_disabled_to_force_polling(tmp_path: Path) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    client = EventTelegramClient([])
+    service = BotConversationService(
+        telegram_client=client,
+        url_job_repository=job_repo,
+        download_repository=DownloadRepository(connection),
+        config=BotConversationConfig(
+            download_folder=tmp_path,
+            download_wait_timeout_seconds=0,
+            download_stable_seconds=0,
+            response_wait_timeout_seconds=0,
+            use_events=False,
+        ),
+        watcher=lambda *_args: [],
+    )
+
+    asyncio.run(service.process_url_job(_stored_job(job_repo)))
+
+    assert client.subscribed_before_send is False and client.polls >= 1

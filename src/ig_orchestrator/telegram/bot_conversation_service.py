@@ -85,6 +85,7 @@ class BotConversationConfig:
     parallel_downloads: int = 4
     watcher_fallback_enabled: bool = True
     large_file: LargeFileConfig = LargeFileConfig()
+    use_events: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -195,7 +196,7 @@ class BotConversationService:
 
     def _open_subscription(self) -> Any | None:
         subscribe = getattr(self._telegram_client, "subscribe_bot_messages", None)
-        if not callable(subscribe):
+        if not self._config.use_events or not callable(subscribe):
             return None
         try:
             return subscribe()

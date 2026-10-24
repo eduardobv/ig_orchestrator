@@ -1143,6 +1143,19 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 33 · Pestaña «Ejecución» y ajustes `run.*` (v4.7.0)
+
+*Configuración > Ejecución* reúne todos los ajustes de la descarga. Antes estaban en `.env` (hay que reiniciar y editar un fichero) o fijos en el código.
+
+* **Dónde:** menú *Configuración* > pestaña **Ejecución**. Pasa el ratón sobre un ajuste para ver su ayuda.
+* **Cuándo se aplica:** a la próxima ejecución (el proceso hijo lee los valores al arrancar).
+* **Prioridad:** pestaña > `.env` > valor por defecto. Solo se guardan los valores que cambias; *Restablecer valores* vuelve a `.env`.
+* **Ejemplo:** pon *Descargas simultáneas* a 2 y *Nivel* de telemetría a `ATTEMPTS`, guarda, ejecuta un lote y comprueba en el log «parallel_downloads» (en `url_job_attempts.settings_json`) o en la telemetría.
+* **Validación:** un valor fuera de rango (p. ej. 0 descargas simultáneas) se rechaza con un mensaje y no se guarda nada.
+* **Base v1 (rollback):** sin pestaña; sigue usando solo `.env`.
+* **Tests:** `python -m pytest tests/orchestration/test_run_settings.py tests/gui/test_run_tab.py`.
+* Los plazos por tipo de URL, el fin por conteo, la cola global de reintentos y sus ajustes llegan con los feats siguientes; los valores por defecto de plazos y silencio siguen siendo los de siempre (300 s / 10 s) hasta entonces.
+
 ## Feat 32 · Telemetría de ejecución (v4.6.0)
 
 Cada intento de descarga deja una fila en `url_job_attempts` (base `data/orchestrator_gui.sqlite`) con cuánto tardó cada fase, y un registro por mensaje del bot en `bot_message_events`. No cambia ninguna regla de descarga.

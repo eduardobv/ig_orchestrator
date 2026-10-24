@@ -71,13 +71,16 @@ def resolve_max_retries_for_error(
     max_retries: int,
     last_error_type: str | None,
     publication_type: PublicationType | None = None,
+    *,
+    story_max_retries: int = STORY_MAX_RETRIES,
+    media_not_found_max_retries: int = MEDIA_NOT_FOUND_MAX_RETRIES,
 ) -> int:
     """Cap max_retries for known error types that should not use the global budget."""
 
     if publication_type is PublicationType.STORY:
-        max_retries = min(max_retries, STORY_MAX_RETRIES)
+        max_retries = min(max_retries, story_max_retries)
     if last_error_type == MEDIA_NOT_FOUND_ERROR_TYPE:
-        return min(max_retries, MEDIA_NOT_FOUND_MAX_RETRIES)
+        return min(max_retries, media_not_found_max_retries)
     return max_retries
 
 
@@ -90,6 +93,8 @@ def calculate_retry_decision(
     non_retryable: bool,
     last_error_type: str | None = None,
     publication_type: PublicationType | None = None,
+    story_max_retries: int = STORY_MAX_RETRIES,
+    media_not_found_max_retries: int = MEDIA_NOT_FOUND_MAX_RETRIES,
 ) -> RetryDecision:
     """Calculate retry backoff and final-failure decisions without sleeping."""
 
@@ -102,6 +107,8 @@ def calculate_retry_decision(
         max_retries,
         last_error_type,
         publication_type,
+        story_max_retries=story_max_retries,
+        media_not_found_max_retries=media_not_found_max_retries,
     )
 
     if non_retryable:

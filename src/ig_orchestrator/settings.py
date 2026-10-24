@@ -42,6 +42,8 @@ class Settings:
     telegram_watcher_fallback: bool = False
     telemetry_level: str = "FULL"
     telemetry_retention_days: int = 90
+    # Set from Settings > Ejecución (run.telethon.flood_sleep_threshold), not .env.
+    telegram_flood_sleep_threshold: int = 60
 
     @property
     def telegram_download_target_folder(self) -> Path:

@@ -24,6 +24,7 @@ class TelegramClientConfig:
     api_hash: str = field(repr=False)
     session_name: str
     bot_username: str
+    flood_sleep_threshold: int = 60
 
     @classmethod
     def from_settings(cls, settings: Settings) -> TelegramClientConfig:
@@ -32,6 +33,7 @@ class TelegramClientConfig:
             api_hash=settings.telegram_api_hash,
             session_name=settings.telethon_session_name,
             bot_username=settings.telegram_download_bot_username,
+            flood_sleep_threshold=settings.telegram_flood_sleep_threshold,
         )
 
 
@@ -106,6 +108,11 @@ class TelethonTelegramClient:
             self._config.api_id,
             self._config.api_hash,
         )
+        # Telethon sleeps silently on FloodWaits up to this many seconds.
+        try:
+            client.flood_sleep_threshold = self._config.flood_sleep_threshold
+        except AttributeError:  # pragma: no cover - fakes without the attribute
+            pass
         await client.start()
         self._client = client
         logger.info(

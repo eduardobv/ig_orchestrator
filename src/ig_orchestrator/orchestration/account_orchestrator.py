@@ -65,6 +65,8 @@ class AccountOrchestratorConfig:
     max_retries: int = 5
     retry_base_seconds: int = 90
     retry_max_seconds: int = 900
+    story_max_retries: int = 2
+    media_not_found_max_retries: int = 3
     wait_between_retries: bool = False
     retry_delay_handler: RetryDelayHandler | None = None
     item_progress_callback: ItemProgressCallback | None = None
@@ -542,6 +544,8 @@ class AccountOrchestrator:
             else self._config.max_retries,
             base_seconds=self._config.retry_base_seconds,
             max_seconds=self._config.retry_max_seconds,
+            story_max_retries=self._config.story_max_retries,
+            media_not_found_max_retries=self._config.media_not_found_max_retries,
             non_retryable=job.non_retryable,
             last_error_type=job.last_error_type,
             publication_type=job.publication_type,
