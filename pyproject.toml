@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ig-orchestrator"
-version = "4.3.0"
+version = "4.4.0"
 description = "Instagram manual download orchestrator"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "python-dotenv>=1.0.0",
     "telethon>=1.43.0",
+    "cryptg>=0.4.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.4.0 - feat-run-30 (parte 1): `cryptg` y eventos en vez de sondeo
+
+Fecha: 2026-10-24 · Rama: `v4/main`
+
+### Modificado
+* Dependencia `cryptg>=0.4.0` (`pyproject.toml`, `requirements.txt`): Telethon cifra/descifra con AES nativo en vez de `pyaes` (medido: 4,5× más rápido en serie, hasta 35× en paralelo). Al arrancar el cliente se registra en el log «Telegram download acceleration (cryptg): yes/no» (`cryptg_available()`).
+* `telegram/telegram_client.py`: nuevo `subscribe_bot_messages()` (handler `events.NewMessage(incoming=True)` del bot → cola) y `BotMessageSubscription`.
+* `telegram/bot_conversation_service.py`: la conversación se suscribe **antes de enviar** la URL y recibe las respuestas por eventos, sin `iter_messages` cada 0,5 s (que provocaba `FloodWait` ocultos de 11 s cada ~30 s). Respaldo: un sondeo de `get_bot_messages_after` cada `response_fallback_poll_seconds` (1,5 s) por si una reconexión pierde mensajes. Si el cliente no tiene suscripción (fakes, errores), se usa el sondeo de antes. Sin cambios en nombres de ficheros ni en `media_id`.
+* Documentación: `CLAUDE.md`, `README.md`, `docs/arquitectura-v3.md`, `docs/tutorial-v3.md`, `docs/plan-v3-features.md`, `tasks/feat-run-30.md`. `AGENTS.md` y `docs/manual-usuario.md` revisados: sin cambios (no hay menús ni ajustes nuevos). Versión 4.4.0.
+
+### Pruebas
+* `python -m pytest`: 633 passed, 1 skipped (nuevas: conversación por eventos sin sondeo, suscripción antes del envío y cierre, sondeo de respaldo). **No probado** contra Telegram real: probar con un lote pequeño y mirar el log.
+* Pendiente (v4.4.1): una sola descarga por nombre, sin miniaturas, descargas en paralelo, carpeta temporal propia y vigilante desactivado.
+
 ## v4.3.0 - feat-run-29: no reintentar posts eliminados
 
 Fecha: 2026-10-24 · Rama: `v4/main`

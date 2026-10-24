@@ -489,3 +489,97 @@ def _document(file_name: str, mime_type: str) -> object:
             ],
         },
     )()
+
+
+class EventTelegramClient(FakeTelegramClient):
+    """Fake client delivering replies through a subscription, never polling."""
+
+    def __init__(self, replies: list[FakeMessage]) -> None:
+        super().__init__([])
+        self.replies = replies
+        self.polls = 0
+        self.closed = False
+        self.subscribed_before_send = False
+
+    def subscribe_bot_messages(self) -> "EventTelegramClient":
+        self.subscribed_before_send = not self.sent_urls
+        self._queue: asyncio.Queue[FakeMessage] = asyncio.Queue()
+        return self
+
+    async def send_message_to_bot(self, text: str) -> FakeMessage:
+        sent = await super().send_message_to_bot(text)
+        for reply in self.replies:
+            self._queue.put_nowait(reply)
+        return sent
+
+    async def get(self, timeout: float) -> FakeMessage | None:
+        try:
+            return await asyncio.wait_for(self._queue.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
+
+    def get_nowait(self) -> FakeMessage | None:
+        try:
+            return self._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def close(self) -> None:
+        self.closed = True
+
+    async def get_bot_messages_after(self, timestamp, *, limit=100):
+        self.polls += 1
+        return []
+
+
+def _event_service(tmp_path: Path, client: EventTelegramClient, job_repo, download_repo):
+    folder = tmp_path / "downloads"
+    folder.mkdir(exist_ok=True)
+    return BotConversationService(
+        telegram_client=client,
+        url_job_repository=job_repo,
+        download_repository=download_repo,
+        config=BotConversationConfig(
+            download_folder=folder,
+            download_wait_timeout_seconds=1,
+            download_stable_seconds=0,
+            response_wait_timeout_seconds=1,
+            response_fallback_poll_seconds=0.3,
+        ),
+        watcher=lambda *_args: [],
+    )
+
+
+def test_process_url_job_uses_event_subscription_without_polling(
+    tmp_path: Path,
+) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(job_repo)
+    client = EventTelegramClient(
+        [_incoming("The service is overloaded, please try again later.")]
+    )
+    service = _event_service(tmp_path, client, job_repo, download_repo)
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.status == UrlJobStatus.RETRY_PENDING
+    assert client.subscribed_before_send is True
+    assert client.closed is True
+    assert client.polls == 0
+
+
+def test_event_mode_runs_backup_poll_when_no_event_arrives(tmp_path: Path) -> None:
+    connection = _connection(tmp_path)
+    job_repo = UrlJobRepository(connection)
+    download_repo = DownloadRepository(connection)
+    job = _stored_job(job_repo)
+    client = EventTelegramClient([])
+    service = _event_service(tmp_path, client, job_repo, download_repo)
+
+    result = asyncio.run(service.process_url_job(job))
+
+    assert result.job.last_error_type == "NO_BOT_RESPONSE"
+    assert 1 <= client.polls <= 4
+    assert client.closed is True

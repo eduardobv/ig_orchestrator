@@ -25,7 +25,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v4.3.0; serie v3 cerrada en v3.26.0)
+### Estado Actual (v4.4.0; serie v3 cerrada en v3.26.0)
 
 - Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
@@ -56,6 +56,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 ### Reglas de Arquitectura (de AGENTS.md)
 
 - Usar Python 3.11+
+- Dependencia `cryptg` obligatoria en el rendimiento de Telegram (v4.4.0); las respuestas del bot llegan por eventos, con sondeo de respaldo
 - Mantener módulos pequeños y testeables
 - Separar CLI, servicios de aplicación, repositorios, modelos, Telegram, filesystem y reportes
 - SQLite es la fuente de verdad tras importar el JSON; el JSON solo carga datos iniciales

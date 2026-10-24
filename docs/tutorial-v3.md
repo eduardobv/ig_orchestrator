@@ -1153,3 +1153,10 @@ Cuando el bot responde «Media not found or unavailable» para un post o reel, e
 Solo aplica a posts y reels; las stories y highlights no se comprueban. Una petición por URL fallida, con 2 s mínimo entre peticiones.
 
 Probar: `python -m pytest tests/orchestration/test_post_availability.py tests/orchestration/test_url_job_processor.py`. En un lote real, busca en `logs/app.log` «Post availability: … result=».
+
+## Feat 30 · `cryptg` y eventos de Telegram (v4.4.0)
+
+* **Qué cambia:** las descargas de Telegram usan cifrado nativo (`cryptg`) y las respuestas del bot llegan por eventos en vez de preguntar cada 0,5 s. Resultado esperado: reels ~4× más rápidos de bajar y sin las paradas ocultas de 11 s.
+* **Instalar:** `pip install -r requirements.txt` (en cada instancia, Windows 10 y 11).
+* **Probar:** lanza un lote pequeño y abre `logs/app.log`: debe aparecer «Telegram download acceleration (cryptg): yes» y no «cryptg module not installed». Compara la duración de un reel con la de antes (~38 s de mediana).
+* **Tests:** `python -m pytest tests/telegram`.

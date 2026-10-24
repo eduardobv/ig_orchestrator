@@ -62,7 +62,7 @@ src/ig_orchestrator/
   input/                 Parser/importador/clasificador de URLs.
   db/                    SQLite, schema y repositorios.
   orchestration/         Orquestadores y politica de reintentos.
-  telegram/              Telethon y parser de respuestas del bot.
+  telegram/              Telethon (eventos + cryptg) y parser de respuestas del bot.
   filesystem/            Carpetas, watcher, clasificacion y movimiento.
   reports/               Reporte Markdown desde SQLite.
 ```

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.settings import Settings
+
+logger = get_logger()
 
 
 class TelegramClientError(RuntimeError):
@@ -32,6 +36,35 @@ class TelegramClientConfig:
 
 
 TelethonClientFactory = Callable[[str, int, str], Any]
+
+
+class BotMessageSubscription:
+    """Queue of incoming bot messages fed by a Telethon NewMessage handler."""
+
+    def __init__(self, client: Any, handler: Any, queue: asyncio.Queue[Any]) -> None:
+        self._client = client
+        self._handler = handler
+        self._queue = queue
+
+    async def get(self, timeout: float) -> Any | None:
+        """Wait up to timeout seconds for the next message; None if none arrived."""
+
+        try:
+            return await asyncio.wait_for(self._queue.get(), timeout=max(timeout, 0.0))
+        except asyncio.TimeoutError:
+            return None
+
+    def get_nowait(self) -> Any | None:
+        try:
+            return self._queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def close(self) -> None:
+        try:
+            self._client.remove_event_handler(self._handler)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Could not remove Telegram event handler: {}", exc)
 
 
 class TelethonTelegramClient:
@@ -75,6 +108,10 @@ class TelethonTelegramClient:
         )
         await client.start()
         self._client = client
+        logger.info(
+            "Telegram download acceleration (cryptg): {}",
+            "yes" if cryptg_available() else "no (slow Python AES; pip install cryptg)",
+        )
 
     async def disconnect(self) -> None:
         if self._client is None:
@@ -97,6 +134,23 @@ class TelethonTelegramClient:
         destination = (target or "me").strip() or "me"
         client = self._require_started_client()
         return await client.send_message(destination, message)
+
+    def subscribe_bot_messages(self) -> BotMessageSubscription:
+        """Start receiving incoming bot messages as events (no GetHistory polling)."""
+
+        client = self._require_started_client()
+        from telethon import events
+
+        queue: asyncio.Queue[Any] = asyncio.Queue()
+
+        async def handler(event: Any) -> None:
+            queue.put_nowait(event.message)
+
+        client.add_event_handler(
+            handler,
+            events.NewMessage(chats=self._config.bot_username, incoming=True),
+        )
+        return BotMessageSubscription(client, handler, queue)
 
     async def get_latest_bot_messages(self, *, limit: int = 10) -> list[Any]:
         """Return the latest messages from the configured bot."""
@@ -144,6 +198,14 @@ class TelethonTelegramClient:
         return self._client
 
 
+def cryptg_available() -> bool:
+    try:
+        import cryptg  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _default_client_factory(session_name: str, api_id: int, api_hash: str) -> Any:
     try:
         from telethon import TelegramClient
@@ -169,6 +231,8 @@ def _as_utc(value: datetime) -> datetime:
 
 
 __all__ = [
+    "BotMessageSubscription",
+    "cryptg_available",
     "TelegramClientConfig",
     "TelegramClientError",
     "TelethonTelegramClient",

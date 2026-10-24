@@ -56,6 +56,7 @@ class BotConversationConfig:
     response_wait_timeout_seconds: float = 30.0
     response_poll_interval_seconds: float = 0.5
     response_message_limit: int = 50
+    response_fallback_poll_seconds: float = 1.5
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -69,6 +70,8 @@ class BotConversationConfig:
         )
         if self.response_poll_interval_seconds <= 0:
             raise ValueError("response_poll_interval_seconds must be positive")
+        if self.response_fallback_poll_seconds <= 0:
+            raise ValueError("response_fallback_poll_seconds must be positive")
         if self.response_message_limit <= 0:
             raise ValueError("response_message_limit must be positive")
 
@@ -112,13 +115,31 @@ class BotConversationService:
         self._config = config
         self._watcher = watcher
         self._lock = asyncio.Lock()
+        self._subscription: Any | None = None
 
     async def process_url_job(self, job: UrlJob) -> BotConversationResult:
         if job.id is None:
             raise ValueError("UrlJob.id is required to process a conversation")
 
         async with self._lock:
-            return await self._process_url_job_locked(job)
+            # Subscribe before sending so no bot reply can be missed.
+            self._subscription = self._open_subscription()
+            try:
+                return await self._process_url_job_locked(job)
+            finally:
+                if self._subscription is not None:
+                    self._subscription.close()
+                self._subscription = None
+
+    def _open_subscription(self) -> Any | None:
+        subscribe = getattr(self._telegram_client, "subscribe_bot_messages", None)
+        if not callable(subscribe):
+            return None
+        try:
+            return subscribe()
+        except Exception as exc:
+            logger.warning("Event subscription failed, falling back to polling: {}", exc)
+            return None
 
     async def _process_url_job_locked(self, job: UrlJob) -> BotConversationResult:
         job_id = _require_job_id(job)
@@ -291,11 +312,23 @@ class BotConversationService:
         last_media_at: float | None = None
         bot_responded = False
 
+        subscription = self._subscription
+        last_fallback_poll = asyncio.get_running_loop().time()
         while True:
-            messages = await self._telegram_client.get_bot_messages_after(
-                since,
-                limit=self._config.response_message_limit,
-            )
+            if subscription is None:
+                messages = await self._telegram_client.get_bot_messages_after(
+                    since,
+                    limit=self._config.response_message_limit,
+                )
+            else:
+                messages, polled = await self._next_event_messages(
+                    subscription,
+                    since=since,
+                    deadline=deadline,
+                    last_fallback_poll=last_fallback_poll,
+                )
+                if polled:
+                    last_fallback_poll = asyncio.get_running_loop().time()
             for message in messages:
                 message_id = _message_id(message)
                 if message_id is not None:
@@ -356,9 +389,38 @@ class BotConversationService:
                     bot_responded,
                 )
 
-            await asyncio.sleep(
-                min(self._config.response_poll_interval_seconds, deadline - now)
+            if subscription is None:
+                await asyncio.sleep(
+                    min(self._config.response_poll_interval_seconds, deadline - now)
+                )
+
+    async def _next_event_messages(
+        self,
+        subscription: Any,
+        *,
+        since: datetime,
+        deadline: float,
+        last_fallback_poll: float,
+    ) -> tuple[list[Any], bool]:
+        """Wait for event messages; returns (messages, backup_poll_ran)."""
+
+        loop = asyncio.get_running_loop()
+        fallback_due = last_fallback_poll + self._config.response_fallback_poll_seconds
+        wait = min(max(min(fallback_due, deadline) - loop.time(), 0.0), 0.5)
+        first = await subscription.get(wait)
+        if first is not None:
+            messages = [first]
+            while (extra := subscription.get_nowait()) is not None:
+                messages.append(extra)
+            return messages, False
+        if loop.time() >= fallback_due:
+            # Backup poll recovers messages lost to a reconnection.
+            polled = await self._telegram_client.get_bot_messages_after(
+                since,
+                limit=self._config.response_message_limit,
             )
+            return list(polled), True
+        return [], False
 
     async def _download_bot_message_media(
         self,
