@@ -6,7 +6,7 @@
 
 ## Resultado de la implementación
 * `bot_conversation_service.py`: en `STORY` solo cuentan las miniaturas sin nombre; con 1-2 se espera a los adjuntos (`story_attachment_wait_seconds`, 20 s) y se descartan las miniaturas; ignora mensajes con `reply_to` a otro mensaje nuestro.
-* `gui/batches/restart.py` + `Lote > Reiniciar desde cero…`: URLs y cuentas a PENDING, lote a IMPORTED, `download_files` a DELETED, archivos del disco intactos; luego ejecuta.
+* `gui/batches/restart.py` + `Lote > Reiniciar desde cero…`: URLs y cuentas a PENDING, lote a IMPORTED, registros de descarga eliminados de la base, archivos del disco intactos; luego ejecuta.
 * Tests: `tests/telegram/test_completion.py` (4 nuevos), `tests/gui/test_restart_batch.py`.
 
 ## No hecho

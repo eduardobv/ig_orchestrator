@@ -1,5 +1,16 @@
 # Changelog
 
+## v4.12.1 - fix feat-run-38: reinicio de lote en la base de la GUI
+
+Fecha: 2026-10-27 · Rama: `v4/main`
+
+### Corregido
+* `gui/batches/restart.py`: *Reiniciar* fallaba con `sqlite3.OperationalError: no such table: download_files`. La base de la GUI (v2) guarda las descargas en `downloaded_files` y no tiene estado `DELETED`; ahora se detecta el esquema y se eliminan los registros de descarga del lote (nunca los archivos del disco). El recuento de URLs se hace con `COUNT(*)` porque las vistas compatibles devuelven rowcount 0.
+* `tests/gui/test_restart_batch.py`: nuevo test sobre `init_gui_database` (el anterior solo usaba la base v1, por eso no lo detectó).
+
+### Pruebas
+* `python -m pytest`: 714 passed. La modal con Tk real sigue sin probarse.
+
 ## v4.12.0 - feat-run-38: Reiniciar lote desde el modal de lotes
 
 Fecha: 2026-10-27 · Rama: `v4/main`
@@ -27,7 +38,7 @@ Corrige una mala definición de los feats 30-36 sobre las stories y añade *Rein
 * `gui/run/controller.py`, `gui/chrome/menubar.py`: **Lote > Reiniciar desde cero…**.
 
 ### Creado
-* `gui/batches/restart.py` (`restart_batch`): deja todas las URLs en `PENDING` (reintentos, errores, mensaje enviado y fechas a cero), las cuentas en `PENDING` y el lote en `IMPORTED`. Los archivos del disco **no se tocan**; las filas `download_files` previas pasan a `DELETED` (auditoría). Tras confirmar, el lote se ejecuta de nuevo.
+* `gui/batches/restart.py` (`restart_batch`): deja todas las URLs en `PENDING` (reintentos, errores, mensaje enviado y fechas a cero), las cuentas en `PENDING` y el lote en `IMPORTED`. Los archivos del disco **no se tocan**; se eliminan los registros de descarga previos de la base (no los archivos). Tras confirmar, el lote se ejecuta de nuevo.
 * `tests/gui/test_restart_batch.py` y 4 tests de stories en `tests/telegram/test_completion.py`.
 * `tasks/done/v3/feat-run-37.md`.
 

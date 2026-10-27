@@ -79,8 +79,7 @@ def test_restart_resets_urls_accounts_and_batch(tmp_path: Path) -> None:
             assert job.non_retryable is False
         assert AccountRepository(connection).get_by_id(account_id).status is AccountStatus.PENDING
         assert BatchRepository(connection).get_by_id(batch_id).status is InputBatchStatus.IMPORTED
-        row = connection.execute("SELECT status FROM download_files").fetchone()
-        assert row["status"] == "DELETED"
+        assert connection.execute("SELECT COUNT(*) FROM download_files").fetchone()[0] == 0
 
 
 def test_restart_rejects_unknown_batch_and_drafts(tmp_path: Path) -> None:
@@ -92,3 +91,40 @@ def test_restart_rejects_unknown_batch_and_drafts(tmp_path: Path) -> None:
         result = save_batch_draft(_draft(), connection)
         with pytest.raises(ValueError):
             restart_batch(connection, result.batch.id)
+
+
+def test_restart_works_on_the_gui_database(tmp_path: Path) -> None:
+    from ig_orchestrator.db import DownloadRepository, init_gui_database
+    from ig_orchestrator.models import (
+        DownloadFile,
+        DownloadFileStatus,
+        MediaType,
+    )
+
+    db_path = tmp_path / "orchestrator_gui.sqlite"
+    init_gui_database(db_path)
+    with connect(db_path) as connection:
+        result = save_batch_draft(_draft(), connection)
+        batch_id = result.batch.id
+        account_id = result.accounts[0].id
+        job = UrlJobRepository(connection).list_by_account(account_id)[0]
+        DownloadRepository(connection).create(
+            DownloadFile(
+                url_job_id=job.id,
+                original_path=tmp_path / "a.mp4",
+                media_type=MediaType.VIDEO,
+                file_extension=".mp4",
+                status=DownloadFileStatus.DETECTED,
+            )
+        )
+        connection.execute(
+            "UPDATE input_batches SET status = 'PARTIAL' WHERE id = ?", (batch_id,)
+        )
+        connection.commit()
+
+        outcome = restart_batch(connection, batch_id)
+
+        assert outcome.urls_reset == 2 and outcome.download_records_discarded == 1
+        assert BatchRepository(connection).get_by_id(batch_id).status is InputBatchStatus.IMPORTED
+        stored = DownloadRepository(connection).list_by_url_job(job.id)
+        assert stored == []

@@ -31,9 +31,8 @@ def restart_batch(connection: Connection, batch_id: int) -> BatchRestartResult:
 
     Every URL goes back to ``PENDING`` with its retries and errors cleared and
     every account to ``PENDING``, so the next execution downloads it all again.
-    Files already on disk are never touched; their ``download_files`` rows are
-    kept as audit with status ``DELETED`` (discarded) so reports and rename do
-    not count them again.
+    Files already on disk are never touched; their download records are deleted so reports
+    and rename do not count them again.
     """
 
     batch = connection.execute(
@@ -53,16 +52,8 @@ def restart_batch(connection: Connection, batch_id: int) -> BatchRestartResult:
     urls_reset = 0
     discarded = 0
     for account_id in account_ids:
-        discarded += connection.execute(
-            """
-            UPDATE download_files
-            SET status = 'DELETED', updated_at = datetime('now')
-            WHERE status <> 'DELETED'
-              AND url_job_id IN (SELECT id FROM url_jobs WHERE account_id = ?)
-            """,
-            (account_id,),
-        ).rowcount
-        urls_reset += connection.execute(
+        discarded += _discard_download_records(connection, account_id)
+        connection.execute(
             """
             UPDATE url_jobs
             SET status = 'PENDING',
@@ -78,7 +69,13 @@ def restart_batch(connection: Connection, batch_id: int) -> BatchRestartResult:
             WHERE account_id = ?
             """,
             (account_id,),
-        ).rowcount
+        )
+        # Views report rowcount 0 (INSTEAD OF triggers): count explicitly.
+        urls_reset += int(
+            connection.execute(
+                "SELECT COUNT(*) FROM url_jobs WHERE account_id = ?", (account_id,)
+            ).fetchone()[0]
+        )
     connection.execute(
         """
         UPDATE accounts SET status = 'PENDING', updated_at = datetime('now')
@@ -99,6 +96,28 @@ def restart_batch(connection: Connection, batch_id: int) -> BatchRestartResult:
         urls_reset=urls_reset,
         download_records_discarded=discarded,
     )
+
+
+def _discard_download_records(connection: Connection, account_id: int) -> int:
+    """Delete the account's download rows (never the files) in either schema."""
+
+    tables = {
+        str(row[0])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+        ).fetchall()
+    }
+    if "downloaded_files" in tables:  # GUI (v2) database
+        table, column = "downloaded_files", "batch_url_id"
+    elif "download_files" in tables:  # v1 database
+        table, column = "download_files", "url_job_id"
+    else:
+        return 0
+    return connection.execute(
+        f"DELETE FROM {table} WHERE {column} IN "
+        "(SELECT id FROM url_jobs WHERE account_id = ?)",
+        (account_id,),
+    ).rowcount
 
 
 __all__ = ["BatchRestartResult", "restart_batch"]
