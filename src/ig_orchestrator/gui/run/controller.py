@@ -39,6 +39,7 @@ from ig_orchestrator.gui.batch_queue_service import (
     remove_queue_item,
     start_or_resume_queue,
 )
+from ig_orchestrator.gui.batches.restart import restart_batch
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
     ProblemUrlKind,
@@ -506,6 +507,47 @@ class RunControllerMixin:
         self._set_pause_button_mode(False)
         if batch_id is not None:
             self._start_batch(batch_id)
+
+    def _restart_batch(self) -> None:
+        """Reset the current batch to PENDING and run it again from scratch."""
+
+        if self.process_runner.is_running():
+            messagebox.showwarning(
+                t("warning"), t("batch.restart.running"), parent=self.root
+            )
+            return
+        batch_id = self.paused_batch_id or self.active_batch_id
+        row = (
+            self.connection.execute(
+                "SELECT status FROM input_batches WHERE id = ?", (batch_id,)
+            ).fetchone()
+            if batch_id is not None
+            else None
+        )
+        if row is None or str(row["status"]) == "DRAFT":
+            messagebox.showwarning(
+                t("warning"), t("batch.restart.none"), parent=self.root
+            )
+            return
+        if not messagebox.askyesno(
+            t("batch.restart.title"), t("batch.restart.confirm"), parent=self.root
+        ):
+            return
+        try:
+            result = restart_batch(self.connection, batch_id)
+        except ValueError as exc:
+            messagebox.showerror(t("batch.restart.title"), str(exc), parent=self.root)
+            return
+        self.paused_batch_id = None
+        self._set_pause_button_mode(False)
+        self._set_status_tone(STATUS_TONE_IDLE)
+        self._write_console(
+            f"Lote {batch_id} reiniciado: {result.urls_reset} URLs y "
+            f"{result.accounts_reset} cuentas en PENDING "
+            f"({result.download_records_discarded} registros de descarga descartados; "
+            "los archivos del disco no se tocan).\n"
+        )
+        self._start_batch(batch_id)
 
     def _toggle_pause_resume(self) -> None:
         if self.paused_batch_id is not None and not self.process_runner.is_running():

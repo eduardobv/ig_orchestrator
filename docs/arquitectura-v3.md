@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v4.10.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
+| Versión | **v4.11.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
 | Rama de trabajo | `v3/integration` (serie cerrada en v3.26.0; PR a `master` abierto) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |

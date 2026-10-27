@@ -246,3 +246,60 @@ def test_late_messages_of_the_previous_url_are_not_taken_as_a_response(tmp_path:
 
     assert result.job.last_error_type == "NO_BOT_RESPONSE"
     assert client.downloaded == []
+
+
+STORY_URL = "https://www.instagram.com/stories/someone/"
+
+
+def test_one_item_story_waits_for_the_attachment_after_the_thumbnail(tmp_path: Path) -> None:
+    # The attachment arrives well after the grace period (0.3 s): it must not be
+    # cut off, or it would be attributed to the next URL.
+    script = [(0.02, photo_msg(100)), (0.9, doc_msg(101, "story1.mp4", mime="video/mp4"))]
+
+    result, client, _ = _run(
+        tmp_path, script, url=STORY_URL, story_attachment_wait_seconds=2.0,
+        download_wait_timeout_seconds=5,
+    )
+
+    assert result.trace.exit_reason == "COUNT_REACHED"
+    assert [f.original_path.name for f in result.files] == ["story1.mp4"]
+    assert client.downloaded == [101]  # thumbnail not saved as content
+
+
+def test_two_item_story_downloads_both_attachments_not_the_thumbnails(tmp_path: Path) -> None:
+    script = [(0.02, photo_msg(100, group=1)), (0.02, photo_msg(101, group=1)),
+              (0.8, doc_msg(102, "a.mp4", mime="video/mp4")),
+              (0.85, doc_msg(103, "b.jpg"))]
+
+    result, client, _ = _run(
+        tmp_path, script, url=STORY_URL, story_attachment_wait_seconds=2.0,
+        download_wait_timeout_seconds=5,
+    )
+
+    assert result.trace.expected_items == 2
+    assert sorted(f.original_path.name for f in result.files) == ["a.mp4", "b.jpg"]
+    assert sorted(client.downloaded) == [102, 103]
+
+
+def test_story_without_attachment_falls_back_to_thumbnails(tmp_path: Path) -> None:
+    script = [(0.02, photo_msg(100))]
+
+    result, _, _ = _run(
+        tmp_path, script, url=STORY_URL, story_attachment_wait_seconds=0.6,
+    )
+
+    assert result.trace.exit_reason == "GRACE"
+    assert len(result.files) == 1
+
+
+def test_reply_to_an_older_message_is_not_attributed_to_this_url(tmp_path: Path) -> None:
+    class Reply:
+        reply_to_msg_id = 1
+
+    late = doc_msg(101, "late.mp4", mime="video/mp4")
+    late.reply_to = Reply()  # type: ignore[attr-defined]
+    script = [(0.02, late), (0.05, doc_msg(102, "mine.mp4", mime="video/mp4"))]
+
+    result, _, _ = _run(tmp_path, script)
+
+    assert [f.original_path.name for f in result.files] == ["mine.mp4"]

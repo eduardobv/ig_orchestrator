@@ -10,6 +10,8 @@ Diálogo “Lotes guardados y ejecuciones” (activos / históricos) e import/ex
 - `manage.py` — nuevo lote vacío, renombrar, listar cuentas, borrar, recuperar del histórico (feat-uc2-21)
 - `pause.py` — pausar cuentas sin empezar: las mueve a un lote DRAFT `<nombre>_PAUSA` (feat-uc2-18); con `target_name` y `suggest_split_name` mueve a un lote con nombre elegido (feat-uc2-19)
 
+- `restart.py` — `restart_batch`: reinicia un lote ejecutado (URLs/cuentas a PENDING, lote a IMPORTED; no toca archivos; feat-run-37). Test: `tests/gui/test_restart_batch.py`
+
 `execution_report.py` · modal *Informe de ejecución* (telemetría de un lote; abre desde el menú Lote y el clic derecho del modal de lotes).
 
 ## Habla con

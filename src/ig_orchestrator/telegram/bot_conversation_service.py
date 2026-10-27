@@ -109,6 +109,9 @@ class BotConversationConfig:
     completion_mode: str = COMPLETION_STABLE
     grace_seconds: float = 2.5
     album_settle_seconds: float = 1.5
+    # Stories of 1-2 items: the bot sends the thumbnails and then the real
+    # attachments; wait this long (after the last message) for them.
+    story_attachment_wait_seconds: float = 20.0
     first_response_timeouts: FirstResponseTimeouts = FirstResponseTimeouts()
 
     def __post_init__(self) -> None:
@@ -127,6 +130,8 @@ class BotConversationConfig:
             raise ValueError("completion_mode must be EXPECTED_COUNT or STABLE")
         if self.grace_seconds <= 0 or self.album_settle_seconds < 0:
             raise ValueError("grace_seconds must be positive")
+        if self.story_attachment_wait_seconds <= 0:
+            raise ValueError("story_attachment_wait_seconds must be positive")
         if self.parallel_downloads <= 0:
             raise ValueError("parallel_downloads must be positive")
         if self.response_fallback_poll_seconds <= 0:
@@ -182,6 +187,7 @@ class BotConversationService:
         self._observer: RunObserver = observer or NullObserver()
         self._trace: AttemptTrace | None = None
         self._story_like = False
+        self._story_job = False
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
         self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
@@ -210,6 +216,7 @@ class BotConversationService:
             }
             self._trace = trace
             self._story_like = _is_story_like(job)
+            self._story_job = _is_story_job(job)
             self._observer.begin_attempt(trace)
             try:
                 result = await self._process_url_job_locked(job)
@@ -466,6 +473,15 @@ class BotConversationService:
                     # it can still be in flight): Telegram ids only grow, so a
                     # reply to this URL always has a higher id than our message.
                     continue
+                reply_to_id = _reply_to_id(message)
+                if (
+                    sent_message_id is not None
+                    and reply_to_id is not None
+                    and reply_to_id != sent_message_id
+                ):
+                    # The bot answered another of our messages (a late reply
+                    # to the previous URL): never attribute it to this one.
+                    continue
 
                 bot_responded = True
                 last_message_at = loop.time()
@@ -500,7 +516,18 @@ class BotConversationService:
                 ):
                     last_media_at = asyncio.get_running_loop().time()
                     file_name = _original_file_name(message)
-                    if _int_or_none(getattr(message, "grouped_id", None)) is not None:
+                    if self._story_job:
+                        # Stories: only the unnamed thumbnails count as items;
+                        # named documents are their attachments (1-2 items).
+                        if file_name is None:
+                            expected_items += 1
+                            last_album_at = (
+                                last_media_at
+                                if _int_or_none(getattr(message, "grouped_id", None))
+                                is not None
+                                else last_album_at
+                            )
+                    elif _int_or_none(getattr(message, "grouped_id", None)) is not None:
                         expected_items += 1
                         last_album_at = last_media_at
                     elif not standalone_counted and expected_items == 0:
@@ -544,7 +571,8 @@ class BotConversationService:
                     exit_reason = EXIT_DESCRIPTION
                 elif (
                     last_message_at is not None
-                    and now - last_message_at >= self._config.grace_seconds
+                    and now - last_message_at
+                    >= self._grace_for(expected_items, len(named_files))
                 ):
                     exit_reason = EXIT_GRACE
                 if exit_reason is not None:
@@ -582,6 +610,15 @@ class BotConversationService:
                 await asyncio.sleep(
                     min(self._config.response_poll_interval_seconds, deadline - now)
                 )
+
+    def _grace_for(self, expected_items: int, named_count: int) -> float:
+        """Silence that ends the wait; longer while story attachments are due."""
+
+        if self._story_job and 0 < expected_items <= 2 and named_count < expected_items:
+            return max(
+                self._config.grace_seconds, self._config.story_attachment_wait_seconds
+            )
+        return self._config.grace_seconds
 
     def _first_response_timeout(self, job: UrlJob) -> float:
         timeouts = self._config.first_response_timeouts
@@ -731,9 +768,13 @@ class BotConversationService:
             for download in downloads
             if download.path is not None and download.path.exists()
         ]
-        if self._story_like:
-            # Stories/highlights have no attachments: unnamed photos of the
-            # album are real content unless every named file is an image.
+        if self._story_job and bool(named_paths) and len(previews) <= 2:
+            # 1-2 item stories: the named attachments are the content and the
+            # unnamed media are their thumbnails; 3+ items only have thumbnails.
+            skip_previews = True
+        elif self._story_like:
+            # Highlights: unnamed photos of the album are real content unless
+            # every named file is an image.
             skip_previews = bool(named_paths) and all(
                 _is_image_path(p) for p in named_paths
             )
@@ -945,6 +986,18 @@ def _is_story_like(job: UrlJob) -> bool:
         job.publication_type in (PublicationType.STORY, PublicationType.HIGHLIGHTS)
         or "/stories/" in job.url.lower()
     )
+
+
+def _is_story_job(job: UrlJob) -> bool:
+    url = job.url.lower()
+    return "/stories/highlights" not in url and (
+        job.publication_type is PublicationType.STORY or "/stories/" in url
+    )
+
+
+def _reply_to_id(message: Any) -> int | None:
+    reply_to = getattr(message, "reply_to", None)
+    return _int_or_none(getattr(reply_to, "reply_to_msg_id", None))
 
 
 def _int_or_none(value: Any) -> int | None:

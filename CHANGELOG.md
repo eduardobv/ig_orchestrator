@@ -1,5 +1,32 @@
 # Changelog
 
+## v4.11.0 - feat-run-37: stories de 1-2 items bien atribuidas y reinicio de lote
+
+Fecha: 2026-10-27 · Rama: `v4/main`
+
+Corrige una mala definición de los feats 30-36 sobre las stories y añade *Reiniciar lote*.
+
+### Problema corregido
+* El bot responde a una story con un mensaje de **miniaturas** y, si tiene **1 o 2 items**, con un segundo mensaje con los **adjuntos** (el vídeo/foto real). A partir de 3 items solo envía miniaturas. El fin de espera `GRACE` (2,5 s) cortaba la URL tras las miniaturas; el adjunto llegaba después, con un id mayor que el mensaje de la **URL siguiente**, y el filtro por id (`id < enviado`) no lo descartaba: se descargaba y se guardaba en la cuenta equivocada.
+
+### Modificado
+* `telegram/bot_conversation_service.py`: en stories (no highlights) solo las **miniaturas sin nombre** cuentan como items; si son 1-2 se **esperan los adjuntos** hasta `story_attachment_wait_seconds` (20 s de silencio) en lugar de los 2,5 s; con adjuntos descargados las miniaturas (≤ 2) se descartan (antes las miniaturas de un vídeo se guardaban como contenido). Con 3+ miniaturas el comportamiento no cambia. Si el adjunto no llega, se cae a las miniaturas.
+* Defensa adicional: un mensaje del bot que responde (`reply_to`) a un mensaje nuestro distinto del enviado para esta URL se ignora.
+* `orchestration/run_settings.py`, `cli/main.py`, locales: ajuste `run.bot.story_attachment_wait_seconds` (*Configuración > Ejecución > Bot y descargas*, 20 s).
+* `gui/run/controller.py`, `gui/chrome/menubar.py`: **Lote > Reiniciar desde cero…**.
+
+### Creado
+* `gui/batches/restart.py` (`restart_batch`): deja todas las URLs en `PENDING` (reintentos, errores, mensaje enviado y fechas a cero), las cuentas en `PENDING` y el lote en `IMPORTED`. Los archivos del disco **no se tocan**; las filas `download_files` previas pasan a `DELETED` (auditoría). Tras confirmar, el lote se ejecuta de nuevo.
+* `tests/gui/test_restart_batch.py` y 4 tests de stories en `tests/telegram/test_completion.py`.
+* `tasks/done/v3/feat-run-37.md`.
+
+### Documentación
+`CLAUDE.md`, `README.md`, manual, tutorial (Feat 37), arquitectura, `plan-v3-features.md`, `gui/batches/MODULE.md`. `AGENTS.md` revisado sin cambios. Versión 4.11.0.
+
+### Pruebas
+* `python -m pytest`: 713 passed.
+* **No probado** con el bot real ni con la GUI abierta (el diálogo de confirmación y el arranque tras reiniciar solo se compilaron; la lógica de datos y de espera tiene tests).
+
 ## v4.10.0 - feat-run-36: informe de ejecución, recomendaciones y purga de telemetría
 
 Fecha: 2026-10-24 · Rama: `v4/main`

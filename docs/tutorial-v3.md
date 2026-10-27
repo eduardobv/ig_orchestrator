@@ -1143,6 +1143,12 @@ Así una cuenta con 100 posts que también tenía stories ya no se adelanta a cu
 
 Probar: `python -m pytest tests/orchestration/test_processing_policy.py tests/orchestration/test_retry_policy.py`. Con un lote real, revisa en `logs/app.log` el orden de las líneas «Processing batch account … scope=».
 
+## Feat 37 · Stories de 1-2 items y Reiniciar lote (v4.11.0)
+
+* **Stories:** el bot contesta con un mensaje de miniaturas y, si la story tiene 1 o 2 items, con un segundo mensaje con los adjuntos reales; con 3 o más solo miniaturas. La app ahora espera esos adjuntos (hasta *Espera de adjuntos de story*, 20 s de silencio) y descarta las miniaturas, así lo descargado ya no se cruza con la URL siguiente. Con 3+ items se guardan las miniaturas como antes.
+* **Reiniciar desde cero:** *Lote > Reiniciar desde cero…* (con el lote parado o pausado). Pide confirmación, deja todas las URLs y cuentas en pendiente con reintentos y errores a cero y ejecuta el lote otra vez. Los archivos ya descargados no se borran: si se bajan de nuevo se guardan con sufijo `_1`, `_2`…
+* **Probar:** `python -m pytest tests/telegram/test_completion.py tests/gui/test_restart_batch.py`. Con bot real: lanza una story de 1 item y otra de 2 y mira en la telemetría `SELECT exit_reason, expected_items, files_count FROM url_job_attempts ORDER BY id DESC LIMIT 5;` (debe ser `COUNT_REACHED` con `files_count` = items).
+
 ## Feat 36 · Informe de ejecución (v4.10.0)
 
 Convierte la telemetría en un informe legible del lote.

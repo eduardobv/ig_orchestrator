@@ -27,6 +27,11 @@
   "menu.batch": "Lote",
   "menu.batch.execute": "Ejecutar",
   "menu.batch.stop": "Detener",
+  "menu.batch.restart": "Reiniciar desde cero…",
+  "batch.restart.title": "Reiniciar lote",
+  "batch.restart.confirm": "Todas las URLs y cuentas del lote volverán a PENDING (reintentos y errores a cero) y el lote se ejecutará de nuevo desde el principio.\n\nLos archivos ya descargados NO se borran: si se vuelven a descargar, se guardarán con sufijo _1, _2…\n\n¿Reiniciar y ejecutar?",
+  "batch.restart.running": "Detén o pausa el lote antes de reiniciarlo.",
+  "batch.restart.none": "No hay un lote ya ejecutado que reiniciar.",
   "menu.batch.pause": "Pausar",
   "menu.batch.stories": "Organizar stories…",
   "menu.batch.rename": "Renombrar",
@@ -738,5 +743,7 @@
   "run.completion_mode": "Cómo dar por terminada una URL",
   "run.completion_mode.help": "EXPECTED_COUNT: termina al llegar todos los items anunciados, la descripción, o tras un breve silencio. STABLE: modo antiguo (espera el silencio de «Silencio para dar por terminado»).",
   "run.grace_ms": "Silencio breve (ms)",
-  "run.grace_ms.help": "Con EXPECTED_COUNT: si no llega nada más durante este tiempo tras el último mensaje, se da por terminado."
+  "run.grace_ms.help": "Con EXPECTED_COUNT: si no llega nada más durante este tiempo tras el último mensaje, se da por terminado.",
+  "run.story_attachment_wait_seconds": "Espera de adjuntos de story (s)",
+  "run.story_attachment_wait_seconds.help": "En stories de 1-2 items el bot envía miniaturas y luego los adjuntos; silencio máximo esperándolos."
 }

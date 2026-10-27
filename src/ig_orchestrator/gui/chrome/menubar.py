@@ -166,6 +166,7 @@ class MenubarMixin:
         batch_menu.add_command(label=t("menu.batch.execute"), command=self._execute)
         batch_menu.add_command(label=t("menu.batch.stop"), command=self._cancel_process)
         batch_menu.add_command(label=t("menu.batch.pause"), command=self._toggle_pause_resume)
+        batch_menu.add_command(label=t("menu.batch.restart"), command=self._restart_batch)
         batch_menu.add_separator()
         batch_menu.add_command(label=t("menu.batch.stories"), command=self._open_stories_inbox)
         batch_menu.add_command(

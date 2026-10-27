@@ -25,7 +25,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v4.10.0; serie v3 cerrada en v3.26.0)
+### Estado Actual (v4.11.0; serie v3 cerrada en v3.26.0)
 
 - Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
@@ -58,6 +58,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 - Usar Python 3.11+
 - Descarga de Telegram (v4.4.1): una descarga por `(nombre, tamaño)`, miniaturas solo como respaldo, paralelo (`TELEGRAM_PARALLEL_DOWNLOADS`), carpeta propia opcional (`TELEGRAM_DOWNLOAD_TEMP_FOLDER`), vigilante off por defecto (`TELEGRAM_WATCHER_FALLBACK`)
 - Reels > 50 MB (v4.5.0): el bot responde `error_file_too_large_link` + URL; se descarga directo como `<media_id>.mp4` (`telegram/large_file.py`); fallo → `FILE_TOO_LARGE_DOWNLOAD_FAILED`, reintentable
+- Stories (v4.11.0): el bot responde con miniaturas y, si hay 1-2 items, con un 2.º mensaje con los adjuntos; con 3+ solo miniaturas. En `STORY` solo las miniaturas sin nombre cuentan como items y se esperan los adjuntos (`run.bot.story_attachment_wait_seconds`). Reinicio de lote: `gui/batches/restart.py` (Lote > Reiniciar desde cero…)
 - Informe de ejecución (v4.10.0): `telemetry/report.py` + modal `gui/batches/execution_report.py` (Lote > Informe de ejecución…, clic derecho en el modal de lotes); botón de purga en *Ejecución*
 - Reintentos (v4.9.0): cola global al final del lote (`run.retry.global_queue`, ordenada por `next_retry_at`); `NO_BOT_RESPONSE` máx. 3 (`run.retry.no_response_max`)
 - Fin de la espera (v4.8.0): `EXPECTED_COUNT` (nombres únicos ≥ items anunciados, descripción, o silencio breve 2,5 s) en vez de 10 s de silencio; primera respuesta 30 s (reel/post/story/error) o 75 s (carrusel, `/p/`, highlights), luego plazo de 120 s renovado por mensaje. Se ignoran mensajes del bot con id < el enviado

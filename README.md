@@ -125,6 +125,8 @@ DOWNLOAD_STABLE_SECONDS=10
 
 Variables opcionales de descarga de Telegram (v4.4.1): `TELEGRAM_DOWNLOAD_TEMP_FOLDER` (carpeta propia de descarga; vacío = la de Telegram Desktop), `TELEGRAM_PARALLEL_DOWNLOADS` (4) y `TELEGRAM_WATCHER_FALLBACK` (`false`: no busca ficheros en la carpeta de Telegram Desktop si la descarga directa falla).
 
+Reiniciar lote (v4.11.0): *Lote > Reiniciar desde cero…* vuelve a ejecutar el lote entero desde pendiente. Stories de 1-2 items: se esperan sus adjuntos tras las miniaturas.
+
 Informe de ejecución (v4.10.0): *Lote > Informe de ejecución…* muestra dónde se fue el tiempo de un lote y qué ajustes conviene cambiar.
 
 Cola global de reintentos (v4.9.0): las URLs con error temporal se reintentan todas juntas al final del lote, sin bloquear a las demás cuentas.

@@ -120,6 +120,8 @@ RUN_SETTING_SPECS: tuple[RunSettingSpec, ...] = (
                    lambda s: "EXPECTED_COUNT", choices=("EXPECTED_COUNT", "STABLE")),
     RunSettingSpec("run.bot.grace_ms", "grace_ms", KIND_INT, GROUP_BOT,
                    lambda s: 2500, 200, 30000),
+    RunSettingSpec("run.bot.story_attachment_wait_seconds", "story_attachment_wait_seconds",
+                   KIND_INT, GROUP_BOT, lambda s: 20, 2, 300),
     RunSettingSpec("run.bot.stable_seconds", "stable_seconds", KIND_INT, GROUP_BOT,
                    lambda s: s.download_stable_seconds, 0, 120),
     RunSettingSpec("run.bot.use_events", "use_events", KIND_BOOL, GROUP_BOT, lambda s: True),
@@ -175,6 +177,7 @@ class RunSettings:
     total_timeout_seconds: int
     completion_mode: str
     grace_ms: int
+    story_attachment_wait_seconds: int
     stable_seconds: int
     use_events: bool
     fallback_poll_ms: int

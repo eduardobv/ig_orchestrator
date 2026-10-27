@@ -27,6 +27,11 @@
   "menu.batch": "Batch",
   "menu.batch.execute": "Run",
   "menu.batch.stop": "Stop",
+  "menu.batch.restart": "Restart from scratch…",
+  "batch.restart.title": "Restart batch",
+  "batch.restart.confirm": "Every URL and account of the batch goes back to PENDING (retries and errors cleared) and the batch runs again from the start.\n\nFiles already downloaded are NOT deleted: if downloaded again they are saved with a _1, _2… suffix.\n\nRestart and run?",
+  "batch.restart.running": "Stop or pause the batch before restarting it.",
+  "batch.restart.none": "There is no already-executed batch to restart.",
   "menu.batch.pause": "Pause",
   "menu.batch.stories": "Organize stories…",
   "menu.batch.rename": "Rename",
@@ -738,5 +743,7 @@
   "run.completion_mode": "How a URL is considered done",
   "run.completion_mode.help": "EXPECTED_COUNT: ends when all announced items arrived, the description arrives, or after a short silence. STABLE: legacy mode (waits the “Quiet time to finish”).",
   "run.grace_ms": "Short silence (ms)",
-  "run.grace_ms.help": "With EXPECTED_COUNT: if nothing else arrives for this long after the last message, the URL is considered done."
+  "run.grace_ms.help": "With EXPECTED_COUNT: if nothing else arrives for this long after the last message, the URL is considered done.",
+  "run.story_attachment_wait_seconds": "Story attachment wait (s)",
+  "run.story_attachment_wait_seconds.help": "For 1-2 item stories the bot sends thumbnails then the attachments; max silence to wait for them."
 }
