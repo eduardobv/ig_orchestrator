@@ -28,6 +28,8 @@
   "menu.batch.execute": "Ejecutar",
   "menu.batch.stop": "Detener",
   "menu.batch.restart": "Reiniciar desde cero…",
+  "batches.btn.restart": "Reiniciar…",
+  "batch.restart.dialog_confirm": "ATENCIÓN: vas a REINICIAR el lote {batch} (estado actual: {status}).\n\n• Se perderá su estado actual: todas las URLs y cuentas volverán a pendiente y los reintentos y errores se pondrán a cero.\n• Lo ya descargado NO se borra del disco, pero se volverá a descargar: los archivos nuevos se guardarán junto a los antiguos con sufijo _1, _2… (o los sobrescribirás/perderás si luego limpias esas carpetas).\n• El lote se ejecutará de nuevo desde el principio, ahora mismo.\n\n¿Reiniciar y ejecutar?",
   "batch.restart.title": "Reiniciar lote",
   "batch.restart.confirm": "Todas las URLs y cuentas del lote volverán a PENDING (reintentos y errores a cero) y el lote se ejecutará de nuevo desde el principio.\n\nLos archivos ya descargados NO se borran: si se vuelven a descargar, se guardarán con sufijo _1, _2…\n\n¿Reiniciar y ejecutar?",
   "batch.restart.running": "Detén o pausa el lote antes de reiniciarlo.",

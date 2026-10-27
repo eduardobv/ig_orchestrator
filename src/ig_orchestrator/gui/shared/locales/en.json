@@ -28,6 +28,8 @@
   "menu.batch.execute": "Run",
   "menu.batch.stop": "Stop",
   "menu.batch.restart": "Restart from scratch…",
+  "batches.btn.restart": "Restart…",
+  "batch.restart.dialog_confirm": "WARNING: you are about to RESTART batch {batch} (current status: {status}).\n\n• Its current state will be lost: every URL and account goes back to pending and retries and errors are cleared.\n• What was already downloaded is NOT deleted from disk but will be downloaded again: new files are saved next to the old ones with a _1, _2… suffix (or overwritten/lost if you clean those folders afterwards).\n• The batch will run again from the start, right now.\n\nRestart and run?",
   "batch.restart.title": "Restart batch",
   "batch.restart.confirm": "Every URL and account of the batch goes back to PENDING (retries and errors cleared) and the batch runs again from the start.\n\nFiles already downloaded are NOT deleted: if downloaded again they are saved with a _1, _2… suffix.\n\nRestart and run?",
   "batch.restart.running": "Stop or pause the batch before restarting it.",

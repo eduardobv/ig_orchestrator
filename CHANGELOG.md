@@ -1,5 +1,16 @@
 # Changelog
 
+## v4.12.0 - feat-run-38: Reiniciar lote desde el modal de lotes
+
+Fecha: 2026-10-27 · Rama: `v4/main`
+
+### Modificado
+* `gui/batches/dialog.py`: botón **Reiniciar…** (pestañas *Activos* e *Históricos*) y entrada en el clic derecho. Funciona con lotes en cualquier estado salvo GUARDADO (nunca ejecutado) y con la app recién abierta: advierte de que se pierde el estado actual, de que lo descargado no se borra pero se volverá a bajar (sufijo `_1`, `_2`…, o se perderá si se limpian esas carpetas) y, tras confirmar, reinicia (`restart_batch`) y ejecuta. Rechaza si ya hay un proceso en marcha.
+* Locales `es.json`/`en.json`. Documentación: manual, tutorial (Feat 37), `gui/batches/MODULE.md`, `CLAUDE.md`, `tasks/done/v3/feat-run-37.md`, `plan-v3-features.md`. `AGENTS.md` revisado sin cambios. Versión 4.12.0.
+
+### Pruebas
+* `python -m pytest`: 713 passed. El modal con Tk real y el arranque tras reiniciar **no se probaron** (solo compilación y la lógica `restart_batch`, ya cubierta por tests).
+
 ## v4.11.0 - feat-run-37: stories de 1-2 items bien atribuidas y reinicio de lote
 
 Fecha: 2026-10-27 · Rama: `v4/main`

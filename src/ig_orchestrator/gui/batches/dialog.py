@@ -39,6 +39,7 @@ from ig_orchestrator.gui.batch_queue_service import (
     remove_queue_item,
     start_or_resume_queue,
 )
+from ig_orchestrator.gui.batches.restart import restart_batch
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
     ProblemUrlKind,
@@ -366,6 +367,52 @@ class BatchesDialogMixin:
             except ValueError as exc:
                 messagebox.showerror("Ejecutar lote", str(exc), parent=dialog)
                 return
+            dialog.destroy()
+            self._load_persisted_draft(batch_id, draft)
+            self._start_batch(batch_id)
+
+        def restart_selected() -> None:
+            batch_id = selected_batch_id_from(
+                history_tree if current_is_history() else active_tree
+            )
+            if batch_id is None:
+                return
+            if self.process_runner.is_running():
+                messagebox.showwarning(
+                    t("warning"), t("batch.restart.running"), parent=dialog
+                )
+                return
+            row = self.connection.execute(
+                "SELECT status FROM input_batches WHERE id = ?", (batch_id,)
+            ).fetchone()
+            if row is None or str(row["status"]) == "DRAFT":
+                messagebox.showwarning(
+                    t("batch.restart.title"), t("batch.restart.none"), parent=dialog
+                )
+                return
+            if not messagebox.askyesno(
+                t("batch.restart.title"),
+                t("batch.restart.dialog_confirm").format(
+                    batch=batch_id, status=str(row["status"])
+                ),
+                icon="warning",
+                parent=dialog,
+            ):
+                return
+            try:
+                result = restart_batch(self.connection, batch_id)
+                draft = load_batch_draft(self.connection, batch_id)
+            except ValueError as exc:
+                messagebox.showerror(t("batch.restart.title"), str(exc), parent=dialog)
+                return
+            self._write_console(
+                f"Lote {batch_id} reiniciado: {result.urls_reset} URLs y "
+                f"{result.accounts_reset} cuentas en PENDING "
+                f"({result.download_records_discarded} registros de descarga descartados; "
+                "los archivos del disco no se tocan).\n"
+            )
+            self.paused_batch_id = None
+            self._set_pause_button_mode(False)
             dialog.destroy()
             self._load_persisted_draft(batch_id, draft)
             self._start_batch(batch_id)
@@ -857,6 +904,9 @@ class BatchesDialogMixin:
         ttk.Button(active_actions, text=t("batches.btn.edit"), command=recover_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
+        ttk.Button(
+            active_actions, text=t("batches.btn.restart"), command=restart_selected
+        ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(active_actions, text="Renombrar", command=rename_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
@@ -884,6 +934,9 @@ class BatchesDialogMixin:
             command=open_history_selected,
         ).pack(side=tk.RIGHT)
         ttk.Button(
+            history_actions, text=t("batches.btn.restart"), command=restart_selected
+        ).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(
             history_actions,
             text=t("batches.btn.restore"),
             command=restore_selected,
@@ -907,6 +960,7 @@ class BatchesDialogMixin:
                 label=t("report.menu"),
                 command=lambda: open_execution_report(dialog, self.connection, int(row)),
             )
+            menu.add_command(label=t("batches.btn.restart"), command=restart_selected)
             try:
                 menu.tk_popup(event.x_root, event.y_root)
             finally:

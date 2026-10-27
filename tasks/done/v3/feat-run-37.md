@@ -13,3 +13,6 @@
 * No se ha probado con el bot real ni con la GUI abierta.
 * Un adjunto que llegue después de agotar la espera (20 s) aún podría cruzarse con la URL siguiente; `reply_to` solo ayuda si el bot responde como respuesta.
 * No hay entrada de *Reiniciar* en el clic derecho del modal de lotes (solo menú Lote, sobre el lote activo).
+
+## Ampliación v4.12.0 (feat-run-38)
+Botón y clic derecho **Reiniciar…** en el modal de lotes (activos e históricos), con advertencia de pérdida de estado y de descargas.

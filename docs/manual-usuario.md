@@ -77,6 +77,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 | **Ejecutar** | Lanza el lote actual: envía URLs al bot de Telegram, espera descargas y las mueve a la carpeta de trabajo. Progreso en consola y tabla. |
 | **Detener** | Detiene el proceso en curso (descarga o renombrado integrado; este último para antes de la siguiente cuenta). |
 | **Pausar / Reanudar** (mismo botón que Ejecutar) | **Pausar** detiene el proceso y deja el lote en PARTIAL (el trabajo hecho se conserva); el icono pasa a *Reanudar* y continúa el mismo lote desde SQLite. |
+| **Lotes / ejecuciones… > Reiniciar…** (botón y clic derecho, en Activos e Históricos) | Igual que *Reiniciar desde cero* pero sobre el lote seleccionado, en cualquier estado salvo GUARDADO y aunque la app se acabe de abrir. Avisa de que se pierde el estado actual y de que lo descargado se volverá a bajar (sufijo `_1`, `_2`… o pérdida si se limpian las carpetas); al confirmar reinicia y ejecuta. |
 | **Lote > Reiniciar desde cero…** | Con el lote parado o pausado: tras confirmar, todas sus URLs y cuentas vuelven a pendiente (reintentos y errores a cero) y se ejecuta de nuevo desde el principio. Los archivos ya descargados no se borran (los nuevos llevan sufijo `_1`, `_2`…). Distinto de Reanudar, que continúa donde se quedó. |
 | **Ejecutar tras Detener/Pausar** | Con un lote ya iniciado, Ejecutar lo **reanuda** (no intenta registrarlo de nuevo, así que no aparece «Batch name … already exists»). |
 | **Lotes guardados y ejecuciones…** | Modal para organizar los lotes (ver «Modal» más abajo). |
