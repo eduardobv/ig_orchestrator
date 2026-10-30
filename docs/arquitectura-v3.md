@@ -9,7 +9,7 @@ Documento de referencia para quien (persona o IA) abra el proyecto sin contexto 
 
 | | |
 |---|---|
-| Versión | **v4.17.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
+| Versión | **v4.18.0** (serie v4, rama `v4/main`; la serie v3 se cerró en `v3.26.0`) |
 | Rama de trabajo | `v3/integration` (serie cerrada en v3.26.0; PR a `master` abierto) |
 | Serie | v1.x CLI/Tk + SQLite v1 (rollback) · v2.x GUI modular + SQLite v2 · **v3.x** integra los procesos manuales en la app |
 | Base de datos única (**bdapp**) | `data/orchestrator_gui.sqlite` (esquema v2 + parches aditivos v3). Es la fuente de verdad. |
@@ -191,6 +191,7 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 |---|---|
 | PR `v3/integration` → `master` | Abierto al cerrar la serie (v3.26.0). |
 | «Eliminar carpeta vacía» | Hecho en v3.16 (`plan_delete_empty_folder`). |
+| inst_sync (v4.18.0) | `inst_sync/` (fuera del paquete): espeja `src`, `tools`, `inst_sync`, `pyproject.toml` y `requirements.txt` desde el PC principal y nunca toca `.env`, `data`, `logs`, `reports`, `config`, `.venv` ni sesiones. Instala dependencias si cambian, aplica `sql/*.sql` una vez y migra la base. No probado en `inst1` real; el batch debe estar detenido (se pregunta, no se detecta). |
 | Renew (v4.17.0) | Solo probado con bibliotecas temporales. Renombra **en sitio** ficheros de `G:` (irreversible; probar con una copia). Necesita `G:` accesible (no usa el índice) y el Owner Id en el catálogo. Los ficheros ya renombrados de la carpeta no se usan como referencia: los solo-id se reparten entre el primer post y la fecha del lote. Se guarda sin columna nueva (`is_new_account=0` + `rename_start_init_date`, sin owner/ruta) y se infiere al recargar. |
 | Bot sin respuesta (v4.16.0) | Solo probado con un bot simulado. La atribución de respuestas desordenadas usa `reply_to`; sin él, los mensajes se asignan a la URL más antigua. El modo espera no tiene límite de tiempo (se sale con Pausar/Detener); una URL muda de hace más de 5 min ya no cuenta como sospecha. |
 | Probar con `G:` real | Renombrado sin `G:`, almacén/volcado, publicar/importar con inst1 y papelera **solo probados con copias/datos sintéticos**. |

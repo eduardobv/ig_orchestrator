@@ -345,6 +345,10 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 **G: está apagada, ¿qué puedo hacer?** Descargar, renombrar (con índice) y dejar en el almacén o pendiente de mover; ver, filtrar y editar fichas. No se pueden mover/eliminar/sincronizar carpetas.
 
 
+## Replicar el código en otra instancia (v4.18.0)
+
+No es una opción de la GUI: en la instancia, detén el batch y haz doble clic en `inst_sync\sincronizar.bat` (la ruta del PC principal se escribe una vez en `inst_sync\origen.txt`). Copia lo que cambió, instala lo que falte y migra la base. Con `--simular` solo informa.
+
 ## Pausa entre URLs y bot sin respuesta (v4.16.0)
 
 * **Pausa entre URLs:** *Configuración > Ejecución > Bot y descargas > Pausa entre URLs (s)* (2 por defecto, 0 = sin pausa). La app espera ese tiempo entre una URL terminada y el envío de la siguiente, para no saturar al bot en cuentas con cientos de URLs.

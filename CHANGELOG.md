@@ -1,5 +1,30 @@
 # Changelog
 
+## v4.18.0 - feat-uc4-7: inst_sync, replicar el código en otra instancia con doble clic
+
+Fecha: 2026-10-30 · Rama: `v4/main`
+
+### Añadido
+* **Carpeta `inst_sync/`** con `sincronizar.bat` (doble clic en la instancia) y `sync.py` (solo biblioteca estándar). Lee la ruta del PC principal de `inst_sync\origen.txt` (o `--origen`) y:
+  1. Copia lo nuevo/cambiado y **borra lo que ya no existe** en `src`, `tools`, `inst_sync`, `pyproject.toml` y `requirements.txt`.
+  2. Guarda antes una copia de `src` en `inst_sync\bkp` (las 3 últimas).
+  3. Instala `requirements.txt` si cambió o si falta `cryptg` (motivo: una instancia sin `cryptg` descargaba mucho más lento).
+  4. Aplica una sola vez cada `inst_sync\sql\*.sql` pendiente (con copia previa de la base) y abre la base para que corran las migraciones aditivas.
+  5. Muestra las entradas de `inst_sync\CAMBIOS.md` posteriores a la versión que tenía la instancia (pasos manuales por versión).
+* `--simular` (solo informa), `--si` (sin confirmación). Pide confirmar que el batch está detenido.
+* **Nunca toca** `.env`, `data`, `logs`, `reports`, `config`, `.venv`, `*.session*`, `origen.txt`, `estado.json`, `bkp` ni `sincronizar.bat` (si cambia el lanzador, se copia a mano).
+* Estado local en `inst_sync\estado.json` (hash de requirements, SQL aplicados, versión).
+
+### Archivos creados
+* `inst_sync/{sync.py,sincronizar.bat,origen.txt,CAMBIOS.md,README.md,sql/README.txt}`, `tests/inst_sync/test_inst_sync_script.py`, `tasks/done/v3/feat-uc4-7.md`.
+
+### Modificado
+* Versión 4.18.0 (`pyproject.toml`, `__init__.py`, smoke tests); documentación.
+
+### Pruebas
+* `python -m pytest`: **768 passed** (suite completa). Nuevos (8) en `tests/inst_sync`: plan de copia/borrado, datos de la instancia intactos, `__pycache__` y carpetas vacías, copias de seguridad, entradas de `CAMBIOS.md`, SQL una vez, origen, simulación. Simulación real contra el propio proyecto.
+* **No probado** en `inst1` real ni la instalación con `pip` por red; pruébalo primero con `--simular`.
+
 ## v4.17.0 - feat-uc1-10: Renew, volver a empezar el renombrado de una cuenta existente
 
 Fecha: 2026-10-30 · Rama: `v4/main`

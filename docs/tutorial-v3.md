@@ -1284,3 +1284,12 @@ Probar: `python -m pytest tests/orchestration/test_post_availability.py tests/or
 * **Carpeta propia (opcional):** pon `TELEGRAM_DOWNLOAD_TEMP_FOLDER=<carpeta>` en `.env` para no mezclar con la de Telegram Desktop (vacío = la de siempre). Reinicia la app tras cambiarlo.
 * **Vigilante off:** con `TELEGRAM_WATCHER_FALLBACK=false` (por defecto) no se mira la carpeta de Telegram Desktop; si la descarga directa falla, la URL se reintenta.
 * **Probar:** lote pequeño con un reel, un carrusel y un highlight; en `logs/app.log` busca «Duplicate bot attachment skipped» y «previews not downloaded»; comprueba tiempos y que los nombres de fichero no cambian.
+
+## Feat 43 · inst_sync: replicar el código en otra instancia (v4.18.0)
+
+1. **Una vez**, en la instancia: copia la carpeta `inst_sync` y escribe en `inst_sync\origen.txt` la ruta del proyecto del PC principal (p. ej. `\\PC-PRINCIPAL\ig_orchestrator`).
+2. Detén el batch de la instancia.
+3. Doble clic en `inst_sync\sincronizar.bat`. Primero puedes probar con `sincronizar.bat --simular`.
+4. Al terminar lee los «Cambios desde tu versión» y abre la app.
+
+Cuando un feat necesite un paso manual, se añade una entrada a `inst_sync\CAMBIOS.md`; un cambio de datos puntual va en `inst_sync\sql\NNN_nombre.sql` (se aplica una vez). Comprobación: debe decir `cryptg ... OK` y `Migraciones de la base: OK`.

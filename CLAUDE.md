@@ -25,7 +25,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v4.17.0; serie v3 cerrada en v3.26.0)
+### Estado Actual (v4.18.0; serie v3 cerrada en v3.26.0)
 
 - Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
@@ -56,6 +56,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 ### Reglas de Arquitectura (de AGENTS.md)
 
 - Usar Python 3.11+
+- inst_sync (v4.18.0): carpeta `inst_sync/` (`sync.py`, `sincronizar.bat`, `CAMBIOS.md`, `sql/`) para replicar el código en otra instancia; **si un feat necesita un paso manual en las instancias, añade una entrada a `inst_sync/CAMBIOS.md`, y un cambio de datos va en `inst_sync/sql/NNN_*.sql`**
 - Renew (v4.17.0): casilla del editor (`AccountDraft.is_renew`) que pide solo la fecha del primer post; el renombrado (`renaming/planner.py: process_renew_tree`, estado `RENEW`) une los ficheros solo-id de `G:` con los descargados y los renombra como cuenta nueva (los de `G:` en sitio); ignora cualquier otro nombre; necesita `G:` y el Owner Id del catálogo; sin columna nueva (se infiere de `rename_start_init_date`)
 - Pausa entre URLs y bot sin respuesta (v4.16.0): `run.bot.between_urls_seconds` (2 s) espacia los envíos; tras una URL sin respuesta, la siguiente espera `run.bot.stall_probe_delay_seconds` (10 s) y, si tampoco responde, modo espera sin enviar más (barra de estado de la GUI, marcador `[GUI_BOT_STATUS]`) hasta que el bot conteste y se recogen las dos respuestas (`BotConversationResult.late_results`, atribución por `reply_to`); `run.bot.stall_enabled` lo desactiva. Código en `telegram/bot_conversation_service.py` y `orchestration/url_job_processor.py`
 - Descarga de Telegram (v4.4.1): una descarga por `(nombre, tamaño)`, miniaturas solo como respaldo, paralelo (`TELEGRAM_PARALLEL_DOWNLOADS`), carpeta propia opcional (`TELEGRAM_DOWNLOAD_TEMP_FOLDER`), vigilante off por defecto (`TELEGRAM_WATCHER_FALLBACK`)
