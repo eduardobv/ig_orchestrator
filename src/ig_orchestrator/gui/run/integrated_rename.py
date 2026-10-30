@@ -59,7 +59,7 @@ class IntegratedRenameMixin:
                 on_execute=self._run_integrated_rename,
             )
             return
-        specs = tuple(NewAccountSpec(a.username, a.owner_id, a.start_init_date, a.destination_path) for a in new_accounts)
+        specs = tuple(NewAccountSpec(a.username, a.owner_id, a.start_init_date, a.destination_path, a.renew) for a in new_accounts)
         try:
             preview = RenameService(self.connection).preview(RenameJob(working, start_now_date, specs))
         except ValueError as exc:

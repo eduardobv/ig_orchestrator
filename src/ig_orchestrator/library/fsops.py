@@ -117,6 +117,11 @@ class FsOperationService:
             if _under(str(r["rel_path"]), rel)
         ]
 
+    def accounts_under(self, rel: str) -> list[sqlite3.Row]:
+        """Catalog accounts whose folder is ``rel`` or any folder below it."""
+
+        return self._accounts_under(rel)
+
     def _folders_under(self, rel: str) -> list[sqlite3.Row]:
         return [
             r
@@ -193,6 +198,36 @@ class FsOperationService:
             plan.conflicts.append(Conflict("DEST_IN_CATALOG", f"Ya existe en el catalogo: {dst}"))
         plan.steps.append(Step(OpType.MKDIR, None, dst))
         return plan
+
+    def existing_unregistered_folder(self, parent_folder_id: int, name: str) -> str | None:
+        """Relative path of ``parent/name`` when it already exists on disk but is not in the catalog."""
+
+        if validate_name(name) or not self.is_online():
+            return None
+        dst = _join(self.folder(parent_folder_id).rel_path, name)
+        if os.path.isdir(self.abs(dst)) and self.folder_id_for_rel(dst) is None:
+            return dst
+        return None
+
+    def adopt_folder(self, rel: str) -> int:
+        """Register an existing disk folder in the catalog (no disk change). Returns its folder id."""
+
+        self._check_adoptable(rel)
+        try:
+            folder_id = self.ensure_folder_rows(rel)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        if folder_id is None:
+            raise FsOpsError(f"No existe en disco: {rel}")
+        return folder_id
+
+    def _check_adoptable(self, rel: str) -> None:
+        absolute = os.path.abspath(self.abs(rel))
+        root = os.path.abspath(self.root)
+        if os.path.normcase(os.path.commonpath([absolute, root])) != os.path.normcase(root):
+            raise FsOpsError(f"Fuera de la biblioteca: {rel}")
 
     def plan_rename_folder(self, folder_id: int, new_name: str) -> Plan:
         folder = self.folder(folder_id)

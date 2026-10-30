@@ -68,7 +68,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 |---|---|
 | **Estado de ejecución…** | Abre/oculta la ventana de log. |
 | **Catálogo en lista / en árbol** | Cambia la vista del catálogo. El **árbol** es necesario para las acciones sobre carpetas, selección múltiple y arrastrar. |
-| **Mostrar biblioteca completa (archivadas)** | Incluye las cuentas archivadas (p. ej. importadas sin lote). |
+| **Mostrar biblioteca completa (archivadas)** | Incluye las cuentas archivadas (p. ej. importadas sin lote). Viene marcada por defecto y la app **recuerda** tu elección entre sesiones. |
 
 ### Lote
 
@@ -149,6 +149,7 @@ Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos**
 | **Stories** (casilla) / **Priority** | Genera la story de la cuenta y/o la prioriza. |
 | **New account** | Marca una cuenta nueva. Muestra *Datos de cuenta nueva*: **Owner Id**, **Fecha del primer post**, **Ruta** (carpeta de la biblioteca donde irá). La Ruta es un campo con sugerencias: escribe `models-d` y lista esa carpeta primero, luego su contenido y el resto por orden alfabético; vacío (o con ▾) muestra primero las contenedoras (`00.MODELS-A`, `00.MODELS-B`…) y luego las demás. Flechas ↑↓ + Enter, clic para elegir, Esc para cerrar. |
 | **Update** | Cuenta existente: muestra *Datos de catálogo (Actualizar)* con sus datos actuales. |
+| **Renew** (v4.17.0) | Cuenta ya registrada cuyos ficheros en `G:` no tienen el formato final. Pide solo la **Fecha del primer post**; Owner Id y ruta se mantienen. Al renombrar, los ficheros de `G:` cuyo nombre es solo el media id se juntan con los descargados y se renombran todos como si la cuenta fuera nueva (los de `G:` en su sitio; los descargados se mueven después). Cualquier otro nombre se ignora. Excluyente con *New account* y *Update*; necesita `G:` conectado. |
 
 Si pegas un username que está *Eliminada*, la app avisa y pregunta si añadirla igualmente.
 
@@ -186,7 +187,7 @@ El menú está dividido en seis grupos separados por líneas:
 | **Sugerencias** (hasta 3) | Carpetas «inversas» a donde está la cuenta: desde `X-Model` → `X-Model-Deleted`, `X-Model-Inactive` y la carpeta de eliminadas; desde `X-Model-Deleted` → `X-Model` y `X-Model-Inactive`; desde `X-Model-Inactive` → `X-Model` y `X-Model-Deleted`. También «donde estaba antes». Un clic elige la carpeta. Si la hermana no existe, aparece como **Crear «…»** (pide confirmación, la crea y la elige). |
 | **Buscar carpeta** | Escribe parte del nombre: el árbol expande y selecciona la coincidencia. **Enter** o las flechas ↑↓ pasan a la siguiente; se indica «Coincidencia n de m». |
 | **Árbol** | Todas las carpetas, también las archivadas. Doble clic o **Elegir** confirma la carpeta seleccionada. |
-| **Nueva carpeta aquí…** | Crea una carpeta dentro de la seleccionada (en disco y catálogo, registrada en *Operaciones de disco*, se puede deshacer) y la selecciona. |
+| **Nueva carpeta aquí…** | Crea una carpeta dentro de la seleccionada (en disco y catálogo, registrada en *Operaciones de disco*, se puede deshacer) y la selecciona. Si ya existe en el disco pero no está en el catálogo (p. ej. una carpeta vacía como `01.ACTIVE`), avisa y pregunta si **agregar la carpeta existente** al catálogo; nunca la reemplaza ni la borra. |
 
 ### 5.2 Sobre una **carpeta** (vista árbol)
 
@@ -198,9 +199,27 @@ El menú está dividido en seis grupos separados por líneas:
 | **Eliminar carpeta vacía…** | Borra la carpeta (y sus subcarpetas) en disco y en el catálogo. **Solo** si no hay ficheros ni cuentas dentro; si no, el plan se bloquea y dice por qué. Con vista previa y *Deshacer*. |
 | **Copiar ruta** | Copia al portapapeles la ruta completa de la carpeta en el disco. |
 | **Verificar categoría seleccionada** | Sincroniza con el disco todas las cuentas de esa carpeta. |
+| **Comprobar estado de las cuentas…** | Abre la modal *Estado de las cuentas* (ver 5.2b). |
 
-Las acciones sobre carpetas son estas seis.
+Las acciones sobre carpetas son estas siete.
 Todas las operaciones de disco muestran primero una **vista previa** (*Operación de disco*: acciones, de/a, cuentas y carpetas afectadas) y solo se ejecutan con **Ejecutar**.
+
+### 5.2b Estado de las cuentas (modal)
+
+Se abre con **Comprobar estado de las cuentas…** en una carpeta (por ejemplo `09.DELETED`). Consulta en Instagram, de una en una y con una espera entre cada una, si las cuentas de esa carpeta (y de sus subcarpetas) siguen existiendo.
+
+* **Tabla:** *Usuario*, *Estado* (✔ existe, ✘ no existe, ? sin respuesta, … pendiente), *Analizada* (fecha y hora de la respuesta), *Movida* (`MOVED`, en rojo, si la cuenta ya no está en la carpeta donde se analizó), *Ruta destino* (dónde está ahora, solo si fue movida) y *Ruta origen*. Pulsa la cabecera de cada columna para ordenar (otra vez para invertir). El selector **Mostrar** filtra por estado.
+* **Análisis:** el desplegable lista los análisis guardados de esa carpeta (número, fecha, estado, total). **Nuevo análisis** toma una foto de las cuentas actuales; **Eliminar análisis** borra solo el análisis, nunca carpetas.
+* **Iniciar / Reanudar:** comprueba las cuentas pendientes (las ya respondidas no se repiten; las «?» se reintentan). **Detener** para en cuanto termina la consulta en curso. Si Instagram responde **429**, la comprobación se detiene sola y avisa; el progreso queda guardado y se reanuda más tarde (sube la espera en *Configuración > Ejecución > Estado de cuentas de Instagram*).
+* **Cuentas ya analizadas (reutilización):** al pulsar *Nuevo análisis*, las cuentas que otro análisis ya respondió en las últimas N horas (*Configuración > Catálogo*, 48 h por defecto) salen ya con su resultado y su fecha en *Analizada* (`(#12)` = análisis de origen) y **no se vuelven a consultar**; solo se consultan las que faltan o son más antiguas. Para volver a consultar también las ya analizadas, marca **Re-analizar las ya analizadas en otros análisis** y pulsa *Iniciar/Reanudar*.
+* **Seleccionadas: N:** contador de filas seleccionadas (al lado de *Mostrar*). Las cuentas ya movidas no se pueden seleccionar y todos los botones de mover las ignoran; el filtro *Movidas* las muestra.
+* **Mover no existentes:** selecciona de una vez todas las ✘ que no se hayan movido y abre el mismo flujo que *Mover seleccionadas…*.
+* **Mover seleccionadas…:** elige una o varias filas (o **Seleccionar todas**, con el filtro puesto si solo quieres las ✘ o las ✔) y abre el selector de destino con sugerencias, búsqueda y *Nueva carpeta aquí*; después muestra la vista previa de la operación de disco. Se puede mover con el análisis parcial. Con muchas cuentas la preparación tarda (se mira el disco de cada una): la modal muestra «Preparando el movimiento…» con barra animada y no se puede cerrar hasta terminar.
+* **Doble clic sobre una cuenta:** abre su perfil de Instagram en el navegador (atajo de *Abrir en el navegador*).
+* **Clic derecho sobre una cuenta:** *Abrir en el navegador* (su perfil de Instagram) y *Abrir en el explorador* (su carpeta en la biblioteca).
+* Cerrar la modal con una comprobación en marcha pregunta si detenerla; el análisis no se pierde.
+
+Menú **Catálogo > Revisar análisis de estado…** abre esta misma modal con **todos** los análisis guardados de cualquier carpeta (para revisarlos o mover cuentas más tarde); desde ahí no se puede crear un análisis nuevo (eso se hace con clic derecho en la carpeta).
 
 ### 5.3 Ficha de la cuenta (modal)
 
@@ -269,7 +288,7 @@ Clic derecho sobre un nombre: mismo menú de cuenta (las acciones de carpeta y l
 | **Vista previa / Otra semilla** | Calcula todo sin tocar nada (árbol cuenta → fichero → nombre nuevo → fecha). Cualquier cambio de opción invalida la vista previa. |
 | **Ejecutar** | Confirma y renombra en segundo plano; resumen por cuenta. Si la unidad de la biblioteca (G:) **no está conectada**, antes de empezar sale una modal: «se renombrará pero no se moverá a G:». **Aceptar** renombra las carpetas en su sitio (quedan pendientes de mover); **Cancelar** no hace nada. |
 
-Estados: *Renombrar*, *Cuenta nueva*, *Omitida* (con motivo), aviso `!`, *Conflicto al mover*, *Pendiente de mover*, *Referencia: índice*.
+Estados: *Renombrar*, *Cuenta nueva*, *Renew* (cuenta existente renombrada otra vez desde la fecha del primer post; ficheros de `G:` solo-id + descargados), *Omitida* (con motivo), aviso `!`, *Conflicto al mover*, *Pendiente de mover*, *Referencia: índice*.
 
 ### 7.2 Mover renombradas pendientes
 Con G: conectada, mueve las carpetas que se renombraron mientras no estaba. Nunca sobrescribe; un choque deja esa cuenta pendiente.
@@ -305,9 +324,9 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 |---|---|
 | **General** | Idioma (reinicia la app). |
 | **Interfaz** | Colores del catálogo, posición de la ventana principal (izquierda/centro/derecha) y *Guardar posición*. |
-| **Ejecución** | Todos los ajustes de la descarga, agrupados (pasa el ratón sobre cada uno para ver su ayuda; se aplican a la **próxima ejecución**): *Orden del lote* (*Priorizar stories (dos barridas)*: primero las stories —cuentas con prioridad, luego por orden de alta— y después posts/reels/highlights de la cuenta con menos URLs a la que más); *Reintentos* (cola global de reintentos al final del lote, máximo general, máximo para stories, para «Media not found», para «sin respuesta del bot», espera base y máxima); *Bot y descargas* (plazos de primera respuesta por tipo —reel/post, story, carrusel, highlights—, plazo sin mensajes nuevos, cómo dar por terminada una URL —por conteo/descripción o por silencio—, silencio breve, silencio para dar por terminado en modo antiguo, recibir por eventos, consulta de respaldo, descargas simultáneas, carpeta de descarga propia con botón «…»); *Vigilante de Telegram Desktop*; *Reels grandes* (descarga por enlace: activar, plazos, tamaño máximo); *Comprobación en Instagram*; *Telethon* (esperas automáticas de Telegram); *Telemetría* (nivel y días de retención; botón *Purgar telemetría…* que borra todo lo medido). **Prioridad:** esta pestaña > `.env` > valor por defecto; solo se guardan los valores que cambias, y **Restablecer valores** borra lo guardado. Un valor no válido se rechaza al pulsar *Guardar* y no se guarda nada. |
+| **Ejecución** | Todos los ajustes de la descarga, agrupados (pasa el ratón sobre cada uno para ver su ayuda; se aplican a la **próxima ejecución**): *Orden del lote* (*Priorizar stories (dos barridas)*: primero las stories —cuentas con prioridad, luego por orden de alta— y después posts/reels/highlights de la cuenta con menos URLs a la que más); *Reintentos* (cola global de reintentos al final del lote, máximo general, máximo para stories, para «Media not found», para «sin respuesta del bot», espera base y máxima); *Bot y descargas* (plazos de primera respuesta por tipo —reel/post, story, carrusel, highlights—, **pausa entre URLs** —2 s—, **detectar bot sin respuesta** y espera antes de probar de nuevo —10 s—, plazo sin mensajes nuevos, cómo dar por terminada una URL —por conteo/descripción o por silencio—, silencio breve, silencio para dar por terminado en modo antiguo, recibir por eventos, consulta de respaldo, descargas simultáneas, carpeta de descarga propia con botón «…»); *Vigilante de Telegram Desktop*; *Reels grandes* (descarga por enlace: activar, plazos, tamaño máximo); *Comprobación en Instagram*; *Estado de cuentas de Instagram* (espera entre cuentas —30 s— y plazo de cada consulta, para la modal 5.2b); *Telethon* (esperas automáticas de Telegram); *Telemetría* (nivel y días de retención; botón *Purgar telemetría…* que borra todo lo medido). **Prioridad:** esta pestaña > `.env` > valor por defecto; solo se guardan los valores que cambias, y **Restablecer valores** borra lo guardado. Un valor no válido se rechaza al pulsar *Guardar* y no se guarda nada. |
 | **Procesamiento** | **Motor de renombrado** (integrado o script externo) y **vista previa siempre**; *Vaciar tabla de ficheros descargados*. |
-| **Catálogo** | Carpeta de cuentas eliminadas y *Conservar la carpeta de grupo*; **Mantener actualizado accounts_lite**; **Almacén** (carpeta local) y **Tras renombrar** (preguntar / almacén / biblioteca); **Papelera: días de retención** (0 = sin límite). |
+| **Catálogo** | Carpeta de cuentas eliminadas y *Conservar la carpeta de grupo*; **Mantener actualizado accounts_lite**; **Almacén** (carpeta local) y **Tras renombrar** (preguntar / almacén / biblioteca); **Papelera: días de retención** (0 = sin límite); **Estado de cuentas: reutilizar análisis de las últimas N horas** (48 = 2 días; 0 = no reutilizar). |
 | **Notificaciones** | Aviso por Telegram al terminar un lote: activar, destino, plantilla, errores del bot que avisan, *Enviar prueba*. |
 | **Instancias** | Registro de equipos: nombre, rol, es-local, carpeta de descargas, carpeta compartida (ruta desde este PC y en la propia), notas; *Añadir / Editar / Eliminar / Probar*. |
 
@@ -324,3 +343,10 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 **¿Cómo elimino una carpeta vacía?** Clic derecho sobre la carpeta (vista árbol) → **Eliminar carpeta vacía…**. Si tiene ficheros o cuentas, no se puede (el plan explica por qué).
 
 **G: está apagada, ¿qué puedo hacer?** Descargar, renombrar (con índice) y dejar en el almacén o pendiente de mover; ver, filtrar y editar fichas. No se pueden mover/eliminar/sincronizar carpetas.
+
+
+## Pausa entre URLs y bot sin respuesta (v4.16.0)
+
+* **Pausa entre URLs:** *Configuración > Ejecución > Bot y descargas > Pausa entre URLs (s)* (2 por defecto, 0 = sin pausa). La app espera ese tiempo entre una URL terminada y el envío de la siguiente, para no saturar al bot en cuentas con cientos de URLs.
+* **Bot sin respuesta:** si el bot no contesta a una URL, la app espera *Espera antes de probar de nuevo (s)* (10) y envía otra (la siguiente o, si no queda ninguna, la misma). Si esa sí recibe respuesta, la anterior queda en la cola de reintentos. Si **tampoco** contesta, la **barra de estado** muestra *«Bot sin respuesta: en espera (no se envían más URLs hasta que conteste)…»* y la app no envía nada más hasta que el bot responda (puede ser minutos u horas; para salir usa **Pausar** o **Detener**). Al responder, recoge el contenido de las dos URLs, aunque lleguen desordenadas, y continúa con normalidad (*«El bot volvió a responder; se continúa.»*).
+* Se desactiva con la casilla *Detectar bot sin respuesta* (entonces una URL sin respuesta va directa a reintentos, como antes). Los cambios se aplican a la **próxima ejecución**.

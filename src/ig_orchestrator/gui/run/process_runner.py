@@ -18,6 +18,7 @@ class NewAccountRenameParameters:
     owner_id: str
     start_init_date: str
     destination_path: str
+    renew: bool = False  # only the integrated renamer supports Renew
 
 
 def build_run_continue_command(batch_id: int, *, dry_run: bool = False) -> list[str]:
@@ -46,7 +47,7 @@ def build_manual_rename_command(
         "--startNowDate",
         start_now_date,
     ]
-    for account in new_accounts:
+    for account in (a for a in new_accounts if not a.renew):
         command.extend(
             [
                 "--new-account",
@@ -80,8 +81,8 @@ def format_manual_rename_command_preview(
     shell_line = format_command_for_shell(command)
     args_block = "\n".join(f"  [{index}] {part}" for index, part in enumerate(command))
     new_account_lines: list[str] = []
-    if new_accounts:
-        for account in new_accounts:
+    if any(not a.renew for a in new_accounts):
+        for account in (a for a in new_accounts if not a.renew):
             new_account_lines.append(
                 "  --new-account "
                 f"{account.username} {account.owner_id} "

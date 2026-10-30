@@ -230,6 +230,12 @@ class EditorPanelMixin:
         ).pack(side=tk.LEFT, padx=(12, 0))
         tk.Checkbutton(
             flags,
+            text=t("label.renew"),
+            variable=self.renew_var,
+            command=self._on_renew_toggle,
+        ).pack(side=tk.LEFT, padx=(12, 0))
+        tk.Checkbutton(
+            flags,
             text=t("label.priority"),
             variable=self.priority_var,
             command=self._update_indicators,
@@ -391,10 +397,11 @@ class EditorPanelMixin:
 
 
     def _reset_editor_account_flags(self) -> None:
-        """Return Stories / New account / Update / Priority to the empty-editor state."""
+        """Return Stories / New account / Update / Renew / Priority to the empty-editor state."""
         self.stories_var.set(False)
         self.new_account_var.set(False)
         self.catalog_update_var.set(False)
+        self._set_renew(False)
         priority_var = getattr(self, "priority_var", None)
         if priority_var is not None:
             priority_var.set(False)
@@ -423,15 +430,35 @@ class EditorPanelMixin:
         self._apply_catalog_date()
 
 
+    def _renew_on(self) -> bool:
+        var = getattr(self, "renew_var", None)
+        return bool(var.get()) if var is not None else False
+
+
+    def _set_renew(self, value: bool) -> None:
+        var = getattr(self, "renew_var", None)
+        if var is not None:
+            var.set(value)
+
+
     def _on_new_account_toggle(self) -> None:
         if self.new_account_var.get():
             self.catalog_update_var.set(False)
+            self._set_renew(False)
         self._toggle_catalog_metadata_fields()
 
 
     def _on_catalog_update_toggle(self) -> None:
         if self.catalog_update_var.get():
             self.new_account_var.set(False)
+            self._set_renew(False)
+        self._toggle_catalog_metadata_fields()
+
+
+    def _on_renew_toggle(self) -> None:
+        if self._renew_on():
+            self.new_account_var.set(False)
+            self.catalog_update_var.set(False)
         self._toggle_catalog_metadata_fields()
 
 
@@ -457,6 +484,21 @@ class EditorPanelMixin:
                 self.path_row.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
             self.new_account_frame.grid()
             return
+        if self._renew_on():
+            # Renew: only the First Post Date; owner id and path stay as the catalog has them.
+            self.new_account_frame.configure(text=t("label.renew_frame"))
+            self.start_init_date_label.grid()
+            self.start_init_date_entry.grid()
+            if hasattr(self, "paste_start_date_btn"):
+                self.paste_start_date_btn.grid()
+            if hasattr(self, "clear_start_date_btn"):
+                self.clear_start_date_btn.grid()
+            if hasattr(self, "path_label"):
+                self.path_label.grid_remove()
+            if hasattr(self, "path_row"):
+                self.path_row.grid_remove()
+            self.new_account_frame.grid()
+            return
         if self.catalog_update_var.get():
             self.new_account_frame.configure(text="Datos de catálogo (Update)")
             self.start_init_date_label.grid_remove()
@@ -478,7 +520,8 @@ class EditorPanelMixin:
     def _editor_account(self) -> AccountDraft:
         urls = self.urls_text.get("1.0", tk.END).splitlines()
         is_new = self.new_account_var.get()
-        is_update = self.catalog_update_var.get() and not is_new
+        is_renew = self._renew_on() and not is_new
+        is_update = self.catalog_update_var.get() and not is_new and not is_renew
         priority_var = getattr(self, "priority_var", None)
         return AccountDraft(
             username=self.username_var.get(),
@@ -487,6 +530,7 @@ class EditorPanelMixin:
             start_now_date=self.account_date_var.get(),
             is_new_account=is_new,
             is_catalog_update=is_update,
+            is_renew=is_renew,
             owner_id=self.owner_id_var.get(),
             start_init_date=self.start_init_date_var.get(),
             destination_path=self.destination_path_var.get(),
@@ -530,6 +574,7 @@ class EditorPanelMixin:
             start_now_date=account.start_now_date.strip(),
             is_new_account=account.is_new_account,
             is_catalog_update=account.is_catalog_update,
+            is_renew=account.is_renew,
             owner_id=account.owner_id.strip(),
             start_init_date=account.start_init_date.strip(),
             destination_path=account.destination_path.strip(),
@@ -555,7 +600,7 @@ class EditorPanelMixin:
             for index, item in enumerate(self.accounts)
             if item.username.casefold() == stored.username.casefold()
         )
-        if stored.is_new_account or stored.is_catalog_update:
+        if stored.is_new_account or stored.is_catalog_update or stored.is_renew:
             self.catalog_entries = self.catalog_service.list_entries()
             self.destination_paths = self.catalog_service.list_destination_paths()
             self.username_combo.configure(
@@ -724,6 +769,7 @@ class EditorPanelMixin:
         self.stories_var.set(False)
         self.new_account_var.set(False)
         self.catalog_update_var.set(False)
+        self._set_renew(False)
         if getattr(self, "priority_var", None) is not None:
             self.priority_var.set(False)
         self.owner_id_var.set("")

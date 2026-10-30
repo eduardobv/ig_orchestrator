@@ -47,6 +47,7 @@ def export_batch_payload(connection: Connection, batch_id: int) -> dict[str, Any
                     "urls": list(account.urls),
                     "is_new_account": bool(account.is_new_account),
                     "is_catalog_update": bool(account.is_catalog_update),
+                    "is_renew": bool(account.is_renew),
                     "owner_id": account.owner_id,
                     "start_init_date": account.start_init_date,
                     "destination_path": account.destination_path,
@@ -188,6 +189,13 @@ def _draft_from_payload(
             )
         if is_new_account and is_catalog_update:
             is_catalog_update = False
+        start_init_date = str(raw.get("start_init_date") or "")
+        if "is_renew" in raw:
+            is_renew = bool(raw.get("is_renew"))
+        else:
+            is_renew = not is_new_account and not is_catalog_update and bool(start_init_date.strip())
+        if is_renew:
+            is_new_account = is_catalog_update = False
         accounts.append(
             AccountDraft(
                 username=username.strip(),
@@ -197,8 +205,9 @@ def _draft_from_payload(
                 is_new_account=is_new_account,
                 is_catalog_update=is_catalog_update,
                 owner_id=owner_id,
-                start_init_date=str(raw.get("start_init_date") or ""),
+                start_init_date=start_init_date,
                 destination_path=destination_path,
+                is_renew=is_renew,
             )
         )
 

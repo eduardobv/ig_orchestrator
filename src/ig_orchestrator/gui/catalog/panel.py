@@ -381,6 +381,16 @@ class CatalogPanelMixin:
     def _toggle_full_library(self) -> None:
         """Show/hide ARCHIVED accounts (on disk only, never downloaded by the app)."""
         self.catalog_service.include_archived = bool(self.show_library_var.get())
+        if is_gui_schema(self.connection):  # remembered for the next start
+            self.connection.execute(
+                """
+                INSERT INTO app_settings (key, value, value_type, updated_at)
+                VALUES ('ui.catalog_show_archived', ?, 'BOOLEAN', datetime('now'))
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                """,
+                ("1" if self.catalog_service.include_archived else "0",),
+            )
+            self.connection.commit()
         self._reload_catalog()
 
 

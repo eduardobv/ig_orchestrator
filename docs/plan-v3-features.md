@@ -46,6 +46,11 @@ y renombra o mueve al workplace principal las carpetas descargadas por otras; re
 | 22 ✅ | [`feat-uc2-22`](../tasks/done/v3/feat-uc2-22.md) · Stories Inbox: informe de problemas, sobrantes y forzar mover (incremental) | UC2 | Saber qué falló al mover stories sin leer un log | ⬤○○○ | 21 | 0,5 d |
 | 23 ✅ | [`feat-uc2-23`](../tasks/done/v3/feat-uc2-23.md) · Ocultar carpetas -Deleted/-Inactive en el árbol del catálogo (incremental) | UC2 | Árbol menos saturado sin perder acceso | ⬤○○○ | 22 | 0,25 d |
 | 24 ✅ | [`feat-uc2-24`](../tasks/done/v3/feat-uc2-24.md) · El árbol del catálogo conserva lo expandido al refrescar; -Deleted/-Inactive ocultas por defecto (incremental) | UC2 | Navegar sin reabrir nodos | ⬤○○○ | 23 | 0,25 d |
+| 42 ✅ | [`feat-uc1-10`](../tasks/done/v3/feat-uc1-10.md) · Renew: volver a empezar el renombrado de una cuenta existente (v4.17.0) | UC1 | renombrar ficheros solo-id de G: junto con lo nuevo | ⬤⬤⬤○ | 9 | 1 d |
+| 41 ✅ | [`feat-run-39`](../tasks/done/v3/feat-run-39.md) · Pausa entre URLs y modo espera con el bot sin respuesta (v4.16.0) | Descarga | no saturar al bot ni seguir enviando si no contesta | ⬤⬤⬤⬤ | 37 | 1 d |
+| 40 ✅ | [`feat-uc2-28`](../tasks/done/v3/feat-uc2-28.md) · Biblioteca completa recordada y carpetas existentes (v4.15.0) | UC2 | agregar carpetas ya existentes al catálogo | ⬤○○○ | 39 | 0.3 d |
+| 39 ✅ | [`feat-uc2-27`](../tasks/done/v3/feat-uc2-27.md) · No repetir cuentas analizadas recientemente (v4.14.0) | UC2 | reutilizar análisis de las últimas 48 h | ⬤⬤○○ | 38 | 0.5 d |
+| 38 ✅ | [`feat-uc2-26`](../tasks/done/v3/feat-uc2-26.md) · Estado de las cuentas de una carpeta y mover (v4.13.0) | UC2 | comprobar existencia en Instagram y reorganizar | ⬤⬤⬤ | 13 | 1 d |
 | 37 ✅ | [`feat-run-37`](../tasks/done/v3/feat-run-37.md) · Stories de 1-2 items (adjuntos tras las miniaturas) y Reiniciar lote (v4.11.0) | Descarga / Lotes | corrección + reinicio | ⬤⬤⬤ | 34 | 1 d |
 | 36 ✅ | [`feat-run-36`](../tasks/feat-run-30.md) · Informe de ejecución, recomendaciones y purga de telemetría (v4.10.0) | Telemetría | calibrar con datos | ⬤⬤⬤ | 32 | 1 d |
 | 35 ✅ | [`feat-run-35`](../tasks/feat-run-30.md) · Cola global de reintentos y tope de `NO_BOT_RESPONSE` (v4.9.0) | Orquestación | lotes sin bloqueos por reintentos | ⬤⬤⬤⬤ | 34 | 1 d |

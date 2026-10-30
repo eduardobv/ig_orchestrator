@@ -125,6 +125,14 @@ class AccountOrchestrator:
         self._url_job_processor = url_job_processor
         self._config = config or AccountOrchestratorConfig()
 
+    def stall_pending(self) -> bool:
+        """True while the bot is being probed after a URL it did not answer.
+
+        The next send then waits only the probe delay, not the retry backoff.
+        """
+
+        return bool(getattr(self._url_job_processor, "stall_pending", False))
+
     async def process_account(
         self,
         account_id: int,
@@ -423,6 +431,7 @@ class AccountOrchestrator:
                     self._config.wait_between_retries
                     and decision.delay_seconds
                     and not deferred
+                    and not self.stall_pending()
                 ):
                     logger.info(
                         "Waiting before retry: job_id={} delay_seconds={}",

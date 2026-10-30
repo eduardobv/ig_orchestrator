@@ -143,7 +143,23 @@ class FsOpsActionsMixin:
         name = simpledialog.askstring(t("fsops.new_folder"), t("fsops.new_folder_name"), parent=self.root)
         if not name:
             return
-        self._plan_and_run(lambda s: s.plan_mkdir(folder_id, name.strip()))
+        name = name.strip()
+        service = self._fsops_service()
+        existing = service.existing_unregistered_folder(folder_id, name)
+        if existing is not None:  # on disk but not in the catalog (e.g. an empty 01.ACTIVE)
+            if messagebox.askyesno(
+                t("fsops.new_folder"), t("fsops.folder_exists", path=existing), parent=self.root
+            ):
+                try:
+                    service.adopt_folder(existing)
+                except FsOpsError as exc:
+                    messagebox.showerror(t("plan.title"), str(exc), parent=self.root)
+                    return
+                self._write_console(f"{t('fsops.folder_added', path=existing)}\n")
+                self._set_status(t("fsops.folder_added", path=existing))
+                self._after_fsops_change()
+            return
+        self._plan_and_run(lambda s: s.plan_mkdir(folder_id, name))
 
     def _catalog_rename_folder(self) -> None:
         folder_id = self._selected_catalog_folder_id()
@@ -226,6 +242,7 @@ class FsOpsActionsMixin:
             menu.add_command(label=t("fsops.copy_path"), command=self._catalog_copy_folder_path)
             menu.add_separator()
             menu.add_command(label=t("scan.category"), command=self._sync_category)
+            menu.add_command(label=t("acs.menu"), command=self._catalog_check_accounts)
             menu.add_separator()
             menu.add_checkbutton(
                 label=t("catalog.show_deleted"),

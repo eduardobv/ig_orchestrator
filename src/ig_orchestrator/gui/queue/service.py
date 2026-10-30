@@ -535,7 +535,7 @@ def _append_new_account(
     collected: list[NewAccountRenameParameters],
     seen: set[str],
 ) -> None:
-    if not account.is_new_account:
+    if not (account.is_new_account or account.is_renew):
         return
     key = account.username.casefold()
     if key in seen:
@@ -547,6 +547,7 @@ def _append_new_account(
             owner_id=account.owner_id,
             start_init_date=account.start_init_date,
             destination_path=account.destination_path,
+            renew=account.is_renew,
         )
     )
 

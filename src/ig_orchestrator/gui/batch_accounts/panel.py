@@ -379,6 +379,7 @@ class BatchAccountsPanelMixin:
         self.catalog_update_var.set(
             account.is_catalog_update and not account.is_new_account
         )
+        self._set_renew(account.is_renew and not account.is_new_account)
         self.owner_id_var.set(account.owner_id)
         self.start_init_date_var.set(account.start_init_date)
         self.destination_path_var.set(account.destination_path)
@@ -419,6 +420,7 @@ class BatchAccountsPanelMixin:
                 start_now_date=account.start_now_date,
                 is_new_account=account.is_new_account,
                 is_catalog_update=account.is_catalog_update,
+                is_renew=account.is_renew,
                 owner_id=account.owner_id,
                 start_init_date=account.start_init_date,
                 destination_path=account.destination_path,

@@ -22,6 +22,7 @@ GROUP_BOT = "bot"
 GROUP_WATCHER = "watcher"
 GROUP_LARGE = "largefile"
 GROUP_INSTAGRAM = "instagram"
+GROUP_ACCOUNTCHECK = "accountcheck"
 GROUP_TELETHON = "telethon"
 GROUP_TELEMETRY = "telemetry"
 GROUPS = (
@@ -31,6 +32,7 @@ GROUPS = (
     GROUP_WATCHER,
     GROUP_LARGE,
     GROUP_INSTAGRAM,
+    GROUP_ACCOUNTCHECK,
     GROUP_TELETHON,
     GROUP_TELEMETRY,
 )
@@ -124,6 +126,12 @@ RUN_SETTING_SPECS: tuple[RunSettingSpec, ...] = (
                    KIND_INT, GROUP_BOT, lambda s: 20, 2, 300),
     RunSettingSpec("run.bot.stable_seconds", "stable_seconds", KIND_INT, GROUP_BOT,
                    lambda s: s.download_stable_seconds, 0, 120),
+    RunSettingSpec("run.bot.between_urls_seconds", "between_urls_seconds", KIND_INT, GROUP_BOT,
+                   lambda s: 2, 0, 600),
+    RunSettingSpec("run.bot.stall_enabled", "stall_enabled", KIND_BOOL, GROUP_BOT,
+                   lambda s: True),
+    RunSettingSpec("run.bot.stall_probe_delay_seconds", "stall_probe_delay_seconds", KIND_INT,
+                   GROUP_BOT, lambda s: 10, 1, 600),
     RunSettingSpec("run.bot.use_events", "use_events", KIND_BOOL, GROUP_BOT, lambda s: True),
     RunSettingSpec("run.bot.fallback_poll_ms", "fallback_poll_ms", KIND_INT, GROUP_BOT,
                    lambda s: 1500, 500, 30000),
@@ -147,6 +155,10 @@ RUN_SETTING_SPECS: tuple[RunSettingSpec, ...] = (
                    GROUP_INSTAGRAM, lambda s: 2000, 0, 60000),
     RunSettingSpec("run.availability.timeout_ms", "availability_timeout_ms", KIND_INT,
                    GROUP_INSTAGRAM, lambda s: 8000, 1000, 60000),
+    RunSettingSpec("run.accountcheck.interval_seconds", "accountcheck_interval_seconds", KIND_INT,
+                   GROUP_ACCOUNTCHECK, lambda s: 30, 5, 3600),
+    RunSettingSpec("run.accountcheck.timeout_seconds", "accountcheck_timeout_seconds", KIND_INT,
+                   GROUP_ACCOUNTCHECK, lambda s: 15, 3, 120),
     RunSettingSpec("run.telethon.flood_sleep_threshold", "flood_sleep_threshold", KIND_INT,
                    GROUP_TELETHON, lambda s: s.telegram_flood_sleep_threshold, 0, 3600),
     RunSettingSpec("run.telemetry.level", "telemetry_level", KIND_CHOICE, GROUP_TELEMETRY,
@@ -178,6 +190,9 @@ class RunSettings:
     completion_mode: str
     grace_ms: int
     story_attachment_wait_seconds: int
+    between_urls_seconds: int
+    stall_enabled: bool
+    stall_probe_delay_seconds: int
     stable_seconds: int
     use_events: bool
     fallback_poll_ms: int
@@ -191,6 +206,8 @@ class RunSettings:
     availability_enabled: bool
     availability_min_interval_ms: int
     availability_timeout_ms: int
+    accountcheck_interval_seconds: int
+    accountcheck_timeout_seconds: int
     flood_sleep_threshold: int
     telemetry_level: str
     telemetry_retention_days: int

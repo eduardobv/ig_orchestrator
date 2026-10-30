@@ -94,7 +94,7 @@ def save_batch_draft(
         rename_values = (
             int(account.is_new_account),
             account.owner_id.strip() if has_catalog_meta else None,
-            account.start_init_date.strip() if account.is_new_account else None,
+            account.start_init_date.strip() if account.is_new_account or account.is_renew else None,
             account.destination_path.strip() if has_catalog_meta else None,
             stored.id,
         )
@@ -140,11 +140,16 @@ def save_catalog_metadata_to_history(
     account: AccountDraft,
     connection: Connection,
 ) -> None:
-    """Persist New account or Update metadata into account_history."""
-    if account.is_new_account and account.is_catalog_update:
-        raise BatchDraftValidationError(
-            "New account and Update cannot be enabled at the same time"
+    """Persist New account, Update or Renew metadata into account_history."""
+    _check_exclusive_flags(account)
+    if account.is_renew:
+        username = _normalize_username(account.username)
+        if not username:
+            raise BatchDraftValidationError("username must not be blank")
+        AccountHistoryRepository(connection).update_start_init_date(
+            username, start_init_date=validate_renew_details(account)
         )
+        return
     if account.is_new_account:
         username = _normalize_username(account.username)
         if not username:
@@ -230,11 +235,16 @@ def _validate_account(
     if not username:
         raise BatchDraftValidationError(f"{context}: username must not be blank")
 
-    if account.is_new_account and account.is_catalog_update:
-        raise BatchDraftValidationError(
-            f"{context}: New account and Update cannot be enabled at the same time"
-        )
-    if account.is_new_account:
+    try:
+        _check_exclusive_flags(account)
+    except BatchDraftValidationError as exc:
+        raise BatchDraftValidationError(f"{context}: {exc}") from exc
+    if account.is_renew:
+        try:
+            validate_renew_details(account)
+        except BatchDraftValidationError as exc:
+            raise BatchDraftValidationError(f"{context}: {exc}") from exc
+    elif account.is_new_account:
         try:
             validate_new_account_details(account)
         except BatchDraftValidationError as exc:
@@ -270,6 +280,23 @@ def _validate_account(
         urls=tuple(urls),
         priority=max(0, int(account.priority or 0)),
     )
+
+
+def _check_exclusive_flags(account: AccountDraft) -> None:
+    if sum((account.is_new_account, account.is_catalog_update, account.is_renew)) > 1:
+        raise BatchDraftValidationError(
+            "New account, Update and Renew cannot be enabled at the same time"
+        )
+
+
+def validate_renew_details(account: AccountDraft) -> str:
+    """Renew only needs the First Post Date; owner id and path stay as they are in the catalog."""
+
+    start_init_date = account.start_init_date.strip()
+    if not start_init_date:
+        raise BatchDraftValidationError("startInitDate is required for Renew")
+    _parse_date(start_init_date, "startInitDate")
+    return start_init_date
 
 
 def validate_new_account_details(account: AccountDraft) -> NewAccountDetails:
@@ -410,5 +437,6 @@ __all__ = [
     "save_batch_draft",
     "validate_catalog_update_details",
     "validate_new_account_details",
+    "validate_renew_details",
     "validate_batch_draft",
 ]

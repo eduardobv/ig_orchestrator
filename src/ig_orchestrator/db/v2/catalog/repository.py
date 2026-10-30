@@ -189,6 +189,18 @@ class GuiCatalogRepository(AccountHistoryRepository):
             raise RuntimeError("Catalog account disappeared during update")
         return stored
 
+    def update_start_init_date(self, user_name: str, *, start_init_date: str) -> AccountHistory:
+        record = self.create_or_get(user_name)
+        self.connection.execute(
+            "UPDATE catalog_accounts SET start_init_date = ?, updated_at = datetime('now') WHERE id = ?",
+            (start_init_date, record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Catalog account disappeared during update")
+        return stored
+
     def update_identity_and_path(
         self,
         user_name: str,

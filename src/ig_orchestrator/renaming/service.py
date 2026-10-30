@@ -42,11 +42,13 @@ from ig_orchestrator.renaming.planner import (
     RealOps,
     TreeResult,
     process_folder_tree,
+    process_renew_tree,
 )
 from ig_orchestrator.renaming.timeline import TimelineContext
 
 ProgressCallback = Callable[[int, int, str], None]
 RENAMED, NEW_ACCOUNT, SKIPPED = "RENAMED", "NEW", "SKIPPED"
+RENEW = "RENEW"
 PENDING_MOVE = "RENAMED_PENDING_MOVE"
 REFERENCES = ("auto", "index", "disk")
 
@@ -57,6 +59,7 @@ class NewAccountSpec:
     owner_id: str
     start_init_date: str
     destination_path: str
+    renew: bool = False  # Renew: registered account whose library files are renamed again from start_init_date
 
 
 @dataclass(slots=True)
@@ -76,7 +79,7 @@ class AccountPlan:
     folder_name: str
     manual_path: str
     consult_folder: str = ""
-    status: str = RENAMED  # RENAMED | NEW | SKIPPED
+    status: str = RENAMED  # RENAMED | NEW | RENEW | SKIPPED
     reason: str = ""
     spec: NewAccountSpec | None = None
     account_id: int | None = None
@@ -115,7 +118,7 @@ class RenamePreview:
 @dataclass(slots=True)
 class AccountResult:
     username: str
-    status: str  # RENAMED | NEW | SKIPPED | MOVE_CONFLICT | ERROR | NO_FILES
+    status: str  # RENAMED | NEW | RENEW | SKIPPED | MOVE_CONFLICT | ERROR | NO_FILES
     renamed: int = 0
     duplicated: int = 0
     deleted_duplicates: int = 0
@@ -124,6 +127,7 @@ class AccountResult:
     warnings: list[str] = field(default_factory=list)
     pending: bool = False
     staged: bool = False
+    renamed_in_library: int = 0  # Renew: files renamed in place inside the library folder
 
 
 @dataclass(slots=True)
@@ -206,7 +210,9 @@ class RenameService:
                 (name,),
             ).fetchone()
             plan = AccountPlan(name, name, manual_path, spec=spec, account_id=int(row["id"]) if row else None)
-            if spec is not None:
+            if spec is not None and spec.renew:
+                self._plan_renew(plan, spec, row)
+            elif spec is not None:
                 if row is not None:
                     plan.status, plan.reason = SKIPPED, "Declarada como nueva pero ya esta registrada en la app"
                 else:
@@ -221,6 +227,32 @@ class RenameService:
                 self._staging_target(plan)
             plans.append(plan)
         return plans
+
+    def _plan_renew(self, plan: AccountPlan, spec: NewAccountSpec, row: sqlite3.Row | None) -> None:
+        """Renew needs a registered account whose library folder is reachable: its files are renamed in place."""
+
+        if row is None:
+            plan.status, plan.reason = SKIPPED, "Renew: la cuenta no esta registrada en la app (sin carpeta en la biblioteca)"
+            return
+        plan.consult_folder = self.fs.abs(str(row["rel_path"]))
+        if not os.path.isdir(plan.consult_folder):
+            plan.status, plan.reason = SKIPPED, f"Renew: la carpeta de la biblioteca no esta accesible: {plan.consult_folder}"
+            return
+        owner = self.conn.execute(
+            "SELECT instagram_user_id FROM catalog_accounts WHERE id = ?", (plan.account_id,)
+        ).fetchone()[0]
+        owner = str(owner or "").strip()
+        if not owner:
+            plan.status, plan.reason = SKIPPED, "Renew: la cuenta no tiene Owner Id en el catalogo"
+            return
+        plan.status, plan.reference = RENEW, "DISK"
+        plan.spec = dataclasses.replace(spec, owner_id=owner)
+
+    def _process_tree(self, plan: AccountPlan, ops, rng: random.Random, now: datetime) -> TreeResult:
+        ctx, new_user = self._context(rng, now, plan.spec)
+        if plan.status == RENEW:
+            return process_renew_tree(plan.manual_path, plan.consult_folder, ops, ctx, new_user, TreeResult())
+        return process_folder_tree(plan.manual_path, self._provider(plan), ops, ctx, new_user)
 
     def _staging_target(self, plan: AccountPlan) -> None:
         """Where a renamed folder goes in the staging area: the same relative place it will have in the library."""
@@ -260,7 +292,7 @@ class RenameService:
             return IndexConsultProvider(self.conn, plan.account_id)
         return DiskConsultProvider(plan.consult_folder)
 
-    def _context(self, job: RenameJob, rng: random.Random, now: datetime, spec: NewAccountSpec | None):
+    def _context(self, rng: random.Random, now: datetime, spec: NewAccountSpec | None):
         if spec is None:
             return TimelineContext(rng, now), None
         start = datetime.strptime(spec.start_init_date, "%Y-%m-%d")
@@ -279,8 +311,7 @@ class RenameService:
             preview.accounts.append(plan)
             if plan.status == SKIPPED:
                 continue
-            ctx, new_user = self._context(job, rng, stamp, plan.spec)
-            plan.tree = process_folder_tree(plan.manual_path, self._provider(plan), DryOps(), ctx, new_user)
+            plan.tree = self._process_tree(plan, DryOps(), rng, stamp)
             if job.move_renamed and job.destination == "staging" and plan.status != SKIPPED:
                 staging = StagingService(self.conn, root=self.fs.root)
                 plan.move = preview_move_to(plan.manual_path, staging.staging_path(plan.staging_rel))
@@ -321,14 +352,14 @@ class RenameService:
     def _run_account(self, job: RenameJob, plan: AccountPlan, rng: random.Random, now: datetime) -> AccountResult:
         if plan.status == SKIPPED:
             return AccountResult(plan.username, "SKIPPED", detail=plan.reason)
-        ctx, new_user = self._context(job, rng, now, plan.spec)
-        tree = process_folder_tree(plan.manual_path, self._provider(plan), RealOps(), ctx, new_user)
+        tree = self._process_tree(plan, RealOps(), rng, now)
         outcome = AccountResult(
             plan.username,
             plan.status,
             renamed=sum(1 for a in tree.actions if a.kind == "RENAME"),
             duplicated=sum(1 for a in tree.actions if a.kind == "DUPLICATE"),
             warnings=[*tree.warnings, *tree.errors],
+            renamed_in_library=sum(1 for a in tree.actions if a.kind == "RENAME" and a.in_library),
         )
         if tree.errors:
             outcome.status = "ERROR"
@@ -353,7 +384,7 @@ class RenameService:
         try:
             account_id = self._record_in_bdapp(plan, outcome)
             plan.account_id = account_id if account_id is not None else plan.account_id
-            if not outcome.moved and plan.account_id is not None and tree.actions:
+            if not outcome.moved and plan.account_id is not None and tree.actions and plan.status != RENEW:
                 self._index_renamed(plan, tree)
         except Exception as exc:  # noqa: BLE001 - the files are already renamed; report it
             outcome.warnings.append(f"No se pudo actualizar la base de la app: {exc}")
@@ -405,11 +436,17 @@ class RenameService:
         account_id = plan.account_id
         if plan.status == NEW_ACCOUNT and plan.spec is not None:
             account_id = self._register_new(plan, outcome)
+        if plan.status == RENEW and plan.spec is not None and account_id is not None:
+            self.conn.execute(
+                "UPDATE catalog_accounts SET start_init_date = ?, updated_at = ? WHERE id = ?",
+                (plan.spec.start_init_date, _now(), account_id),
+            )
+            self.conn.commit()
         if account_id is not None and outcome.staged:
             StagingService(self.conn, root=self.fs.root).record(
                 account_id, plan.staging_rel, plan.target_rel, getattr(self, "_run_id", None)
             )
-        if account_id is not None and outcome.moved:
+        if account_id is not None and (outcome.moved or outcome.renamed_in_library):
             try:
                 LibraryScanner(self.conn, root=self.fs.root).scan(ACCOUNT, account_id=account_id)
             except Exception as exc:  # noqa: BLE001 - a scan in progress or an offline disk must not fail the rename

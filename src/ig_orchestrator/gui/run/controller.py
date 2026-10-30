@@ -78,6 +78,7 @@ from ig_orchestrator.gui.rename_folder_status import (
 from ig_orchestrator.gui.shared.helpers import (
     _ACCOUNT_PROGRESS_RE,
     _BATCH_COLUMNS,
+    _BOT_STATUS_RE,
     _CATALOG_COLORS,
     _ITEM_PROGRESS_RE,
     _account_display_status,
@@ -109,6 +110,7 @@ from ig_orchestrator.gui.text_edit import (
     read_clipboard,
 )
 from ig_orchestrator.gui.theme import (
+    STATUS_TONE_BUSY,
     STATUS_TONE_IDLE,
     Tooltip,
     compact_icon_button,
@@ -379,6 +381,15 @@ class RunControllerMixin:
 
 
     def _handle_process_output(self, line: str) -> None:
+        bot_match = _BOT_STATUS_RE.search(line)
+        if bot_match:
+            # The bot stopped answering: the run waits (no more URLs are sent).
+            stalled = bot_match.group("state") == "STALLED"
+            message = t("run.bot_stalled") if stalled else t("run.bot_resumed")
+            self._set_status_tone(STATUS_TONE_BUSY if stalled else STATUS_TONE_IDLE)
+            self._set_status(message)
+            self._write_console(message + "\n")
+            return
         account_match = _ACCOUNT_PROGRESS_RE.search(line)
         if account_match:
             self.account_progress_var.set(

@@ -25,7 +25,7 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 
 ## Información Crítica
 
-### Estado Actual (v4.12.1; serie v3 cerrada en v3.26.0)
+### Estado Actual (v4.17.0; serie v3 cerrada en v3.26.0)
 
 - Serie v3 cerrada en `v3.26.0` (rama `v3/integration`, PR a `master`). Rama de trabajo nueva: `v4/main` (serie v4; hasta que el usuario defina su versionado, seguir las reglas de este documento con `v4.x`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - v3 integra en la app los procesos manuales (sincronización con el disco en lugar de sc1, renombrado integrado en lugar de sc2, catálogo = disco con operaciones reales, instancias, almacén/volcado, papelera); la base de la app (`orchestrator_gui.sqlite`) es la única fuente de verdad.
@@ -56,8 +56,13 @@ El usuario escribe un lote de cuentas y URLs en JSON, la aplicación lo importa 
 ### Reglas de Arquitectura (de AGENTS.md)
 
 - Usar Python 3.11+
+- Renew (v4.17.0): casilla del editor (`AccountDraft.is_renew`) que pide solo la fecha del primer post; el renombrado (`renaming/planner.py: process_renew_tree`, estado `RENEW`) une los ficheros solo-id de `G:` con los descargados y los renombra como cuenta nueva (los de `G:` en sitio); ignora cualquier otro nombre; necesita `G:` y el Owner Id del catálogo; sin columna nueva (se infiere de `rename_start_init_date`)
+- Pausa entre URLs y bot sin respuesta (v4.16.0): `run.bot.between_urls_seconds` (2 s) espacia los envíos; tras una URL sin respuesta, la siguiente espera `run.bot.stall_probe_delay_seconds` (10 s) y, si tampoco responde, modo espera sin enviar más (barra de estado de la GUI, marcador `[GUI_BOT_STATUS]`) hasta que el bot conteste y se recogen las dos respuestas (`BotConversationResult.late_results`, atribución por `reply_to`); `run.bot.stall_enabled` lo desactiva. Código en `telegram/bot_conversation_service.py` y `orchestration/url_job_processor.py`
 - Descarga de Telegram (v4.4.1): una descarga por `(nombre, tamaño)`, miniaturas solo como respaldo, paralelo (`TELEGRAM_PARALLEL_DOWNLOADS`), carpeta propia opcional (`TELEGRAM_DOWNLOAD_TEMP_FOLDER`), vigilante off por defecto (`TELEGRAM_WATCHER_FALLBACK`)
 - Reels > 50 MB (v4.5.0): el bot responde `error_file_too_large_link` + URL; se descarga directo como `<media_id>.mp4` (`telegram/large_file.py`); fallo → `FILE_TOO_LARGE_DOWNLOAD_FAILED`, reintentable
+- Versionado (desde v4.13.1): feat nuevo = minor (`v4.14.0`); ajuste pequeño de algo ya entregado = patch (`v4.13.1`), con commit y tag igualmente.
+- Estado de cuentas, reutilización (v4.14.0): un análisis nuevo copia las respuestas de otros análisis de las últimas `accountcheck.reuse_hours` (48 h, *Configuración > Catálogo*) con `source_run_id` y no las consulta; casilla *Re-analizar…* para forzar
+- Estado de cuentas (v4.13.2; modal también desde *Catálogo > Revisar análisis de estado…*; el disco nunca se toca en el hilo de Tk): clic derecho en carpeta > *Comprobar estado de las cuentas…* (`account_status/` + `gui/library/account_status_dialog.py`); `profile_id` en `instagram.com/<cuenta>/`; espera `run.accountcheck.interval_seconds`; para solo en el primer 429; análisis guardados en `account_check_runs/results`; mover con `plan_move_accounts`
 - Stories (v4.11.0): el bot responde con miniaturas y, si hay 1-2 items, con un 2.º mensaje con los adjuntos; con 3+ solo miniaturas. En `STORY` solo las miniaturas sin nombre cuentan como items y se esperan los adjuntos (`run.bot.story_attachment_wait_seconds`). Reinicio de lote: `gui/batches/restart.py` (Lote > Reiniciar desde cero… y botón/clic derecho **Reiniciar…** en el modal de lotes, v4.12.0, cualquier estado salvo GUARDADO)
 - Informe de ejecución (v4.10.0): `telemetry/report.py` + modal `gui/batches/execution_report.py` (Lote > Informe de ejecución…, clic derecho en el modal de lotes); botón de purga en *Ejecución*
 - Reintentos (v4.9.0): cola global al final del lote (`run.retry.global_queue`, ordenada por `next_retry_at`); `NO_BOT_RESPONSE` máx. 3 (`run.retry.no_response_max`)

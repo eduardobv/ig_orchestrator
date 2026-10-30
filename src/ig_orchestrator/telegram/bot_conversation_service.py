@@ -113,6 +113,14 @@ class BotConversationConfig:
     # attachments; wait this long (after the last message) for them.
     story_attachment_wait_seconds: float = 20.0
     first_response_timeouts: FirstResponseTimeouts = FirstResponseTimeouts()
+    # Pause between the end of a URL and the next send, so a long account does
+    # not flood the bot.
+    between_urls_seconds: float = 0.0
+    # Unresponsive-bot guard: after a URL without any answer, wait
+    # ``stall_probe_delay_seconds`` and send another one; if that is silent too,
+    # stop sending and wait for the bot to answer both.
+    stall_guard_enabled: bool = False
+    stall_probe_delay_seconds: float = 10.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.download_folder, Path):
@@ -132,6 +140,8 @@ class BotConversationConfig:
             raise ValueError("grace_seconds must be positive")
         if self.story_attachment_wait_seconds <= 0:
             raise ValueError("story_attachment_wait_seconds must be positive")
+        _validate_non_negative("between_urls_seconds", self.between_urls_seconds)
+        _validate_non_negative("stall_probe_delay_seconds", self.stall_probe_delay_seconds)
         if self.parallel_downloads <= 0:
             raise ValueError("parallel_downloads must be positive")
         if self.response_fallback_poll_seconds <= 0:
@@ -146,6 +156,28 @@ class BotConversationResult:
     files: tuple[DownloadFile, ...] = ()
     bot_message: str | None = None
     trace: AttemptTrace | None = None
+    # Answers of earlier, previously unanswered URLs that arrived once the bot
+    # woke up (see the unresponsive-bot guard); the caller must finish them too.
+    late_results: tuple["BotConversationResult", ...] = ()
+
+
+STALL_WAITING = "STALLED"
+STALL_RESUMED = "RESUMED"
+# An unanswered URL older than this no longer counts as "the bot is silent".
+STALL_STALE_SECONDS = 300.0
+
+StatusCallback = Callable[[str], None]
+Sleeper = Callable[[float], Awaitable[None]]
+
+
+@dataclass(slots=True)
+class _UnansweredSend:
+    """A URL sent to the bot that got no answer before its timeout."""
+
+    job: UrlJob
+    started_at: datetime
+    sent_ids: frozenset[int]
+    at: float  # loop time of the timeout
 
 
 @dataclass(slots=True)
@@ -176,6 +208,8 @@ class BotConversationService:
         large_file_downloader: LargeFileDownloader = download_large_file,
         clock: Callable[[], float] = time.monotonic,
         observer: RunObserver | None = None,
+        status_callback: StatusCallback | None = None,
+        sleeper: Sleeper | None = None,
     ) -> None:
         self._telegram_client = telegram_client
         self._url_job_repository = url_job_repository
@@ -191,12 +225,25 @@ class BotConversationService:
         self._lock = asyncio.Lock()
         self._subscription: Any | None = None
         self._download_tasks: list[asyncio.Task[_MediaDownload]] = []
+        self._status_callback = status_callback
+        self._sleeper: Sleeper = sleeper or asyncio.sleep
+        self._unanswered: _UnansweredSend | None = None
+        self._last_finished_at: float | None = None
+        self._claimed_message_ids: set[int] = set()
+
+    @property
+    def has_unanswered(self) -> bool:
+        """True while the last URL got no answer and the bot is being probed."""
+
+        return self._unanswered is not None
 
     async def process_url_job(self, job: UrlJob) -> BotConversationResult:
         if job.id is None:
             raise ValueError("UrlJob.id is required to process a conversation")
 
         async with self._lock:
+            await self._pause_before_send()
+            self._claimed_message_ids = set()
             # Subscribe before sending so no bot reply can be missed.
             self._subscription = self._open_subscription()
             trace = AttemptTrace.start(
@@ -230,6 +277,37 @@ class BotConversationService:
                 for task in self._download_tasks:
                     task.cancel()
                 self._download_tasks = []
+                self._last_finished_at = asyncio.get_running_loop().time()
+
+    async def _pause_before_send(self) -> None:
+        """Space URLs out and, after an unanswered one, wait before probing."""
+
+        now = asyncio.get_running_loop().time()
+        wait = 0.0
+        if self._unanswered is not None and now - self._unanswered.at > STALL_STALE_SECONDS:
+            self._unanswered = None  # too old to say anything about the bot now
+        if self._last_finished_at is not None:
+            wait = self._config.between_urls_seconds - (now - self._last_finished_at)
+        if self._unanswered is not None:
+            wait = max(
+                wait,
+                self._config.stall_probe_delay_seconds - (now - self._unanswered.at),
+            )
+        if wait > 0:
+            logger.info(
+                "Waiting before sending the next URL: seconds={:.1f} probing_silent_bot={}",
+                wait,
+                self._unanswered is not None,
+            )
+            await self._sleeper(wait)
+
+    def _notify_status(self, status: str) -> None:
+        if self._status_callback is None:
+            return
+        try:
+            self._status_callback(status)
+        except Exception:
+            logger.warning("Bot status callback failed", exc_info=True)
 
     def _open_subscription(self) -> Any | None:
         subscribe = getattr(self._telegram_client, "subscribe_bot_messages", None)
@@ -302,11 +380,199 @@ class BotConversationService:
                 first_response_timeout=self._first_response_timeout(job),
             )
         )
+        late_results: tuple[BotConversationResult, ...] = ()
+        if self._config.stall_guard_enabled:
+            (
+                bot_message,
+                direct_paths,
+                bot_responded,
+                late_results,
+            ) = await self._guard_against_silent_bot(
+                job,
+                started_at=started_at,
+                sent_message_id=sent_message_id,
+                bot_message=bot_message,
+                direct_paths=direct_paths,
+                bot_responded=bot_responded,
+            )
         logger.info(
             "Bot response received: job_id={} response={}",
             job_id,
             bot_message or "<no text response>",
         )
+        result = await self._finish_after_wait(
+            job,
+            bot_message=bot_message,
+            direct_paths=direct_paths,
+            bot_responded=bot_responded,
+            started_at=started_at,
+        )
+        if late_results:
+            result = dataclasses.replace(result, late_results=late_results)
+        return result
+
+    async def _guard_against_silent_bot(
+        self,
+        job: UrlJob,
+        *,
+        started_at: datetime,
+        sent_message_id: int | None,
+        bot_message: str | None,
+        direct_paths: list[Path],
+        bot_responded: bool,
+    ) -> tuple[str | None, list[Path], bool, tuple[BotConversationResult, ...]]:
+        """Track URLs without an answer; two in a row put the bot in wait mode.
+
+        First silent URL: remember it (the next send waits the probe delay). An
+        answered URL clears it (the silent one stays in the retry queue). A second
+        silent URL means the bot is stalled: stop sending, wait until it answers
+        and collect the answers of both URLs, which may arrive out of order.
+        """
+
+        if bot_responded or direct_paths:
+            self._unanswered = None
+            return bot_message, direct_paths, bot_responded, ()
+
+        loop = asyncio.get_running_loop()
+        current = _UnansweredSend(
+            job=job,
+            started_at=started_at,
+            sent_ids=frozenset() if sent_message_id is None else frozenset({sent_message_id}),
+            at=loop.time(),
+        )
+        previous, self._unanswered = self._unanswered, None
+        if previous is None:
+            self._unanswered = current
+            logger.warning(
+                "Bot did not answer; the next URL will probe it: job_id={}", job.id
+            )
+            return bot_message, direct_paths, bot_responded, ()
+
+        logger.warning(
+            "Bot stalled: no answer to job_id={} nor job_id={}; waiting for it",
+            previous.job.id,
+            job.id,
+        )
+        if self._trace is not None:
+            self._trace.settings["stall_recovered"] = True
+        self._notify_status(STALL_WAITING)
+        try:
+            await self._wait_for_bot_recovery(previous, current)
+        finally:
+            self._notify_status(STALL_RESUMED)
+        logger.info("Bot answered again; collecting the pending answers")
+
+        same_job = previous.job.id == job.id
+        late: list[BotConversationResult] = []
+        if not same_job:
+            late_result = await self._collect_late_answer(previous)
+            if late_result is not None:
+                late.append(late_result)
+        accepted = previous.sent_ids | current.sent_ids if same_job else frozenset()
+        bot_message, direct_paths, bot_responded = (
+            await self._wait_for_bot_response_and_downloads(
+                job_id=_require_job_id(job),
+                media_filename_prefix=_media_filename_prefix(job),
+                since=previous.started_at if same_job else started_at,
+                sent_message_id=sent_message_id,
+                first_response_timeout=self._first_response_timeout(job),
+                accepted_ids=accepted,
+            )
+        )
+        return bot_message, direct_paths, bot_responded, tuple(late)
+
+    async def _wait_for_bot_recovery(
+        self,
+        previous: _UnansweredSend,
+        current: _UnansweredSend,
+    ) -> None:
+        """Block, without sending anything, until the bot answers either URL."""
+
+        accepted = previous.sent_ids | current.sent_ids
+        floor = min(accepted) if accepted else None
+        loop = asyncio.get_running_loop()
+        subscription = self._subscription
+        last_fallback_poll = loop.time()
+        while True:
+            if subscription is None:
+                messages = await self._telegram_client.get_bot_messages_after(
+                    previous.started_at,
+                    limit=self._config.response_message_limit,
+                )
+            else:
+                messages, polled = await self._next_event_messages(
+                    subscription,
+                    since=previous.started_at,
+                    deadline=loop.time() + 1.0,
+                    last_fallback_poll=last_fallback_poll,
+                )
+                if polled:
+                    last_fallback_poll = loop.time()
+            for message in messages:
+                if _is_outgoing_message(message):
+                    continue
+                message_id = _message_id(message)
+                if floor is not None and message_id is not None and message_id <= floor:
+                    continue
+                reply_to_id = _reply_to_id(message)
+                if accepted and reply_to_id is not None and reply_to_id not in accepted:
+                    continue
+                return
+            if subscription is None:
+                await self._sleeper(self._config.response_poll_interval_seconds)
+
+    async def _collect_late_answer(
+        self,
+        previous: _UnansweredSend,
+    ) -> BotConversationResult | None:
+        """Take the answer of the earlier silent URL once the bot woke up."""
+
+        job = previous.job
+        job_id = _require_job_id(job)
+        saved = (self._trace, self._story_like, self._story_job)
+        self._trace = None  # the attempt of this URL already closed its trace
+        self._story_like = _is_story_like(job)
+        self._story_job = _is_story_job(job)
+        try:
+            first_id = min(previous.sent_ids) if previous.sent_ids else None
+            bot_message, direct_paths, bot_responded = (
+                await self._wait_for_bot_response_and_downloads(
+                    job_id=job_id,
+                    media_filename_prefix=_media_filename_prefix(job),
+                    since=previous.started_at,
+                    sent_message_id=first_id,
+                    first_response_timeout=self._first_response_timeout(job),
+                )
+            )
+            if not bot_responded and not direct_paths:
+                logger.warning(
+                    "Late answer never arrived; it stays in the retry queue: job_id={}",
+                    job_id,
+                )
+                return None
+            logger.info("Late bot answer collected: job_id={}", job_id)
+            return await self._finish_after_wait(
+                job,
+                bot_message=bot_message,
+                direct_paths=direct_paths,
+                bot_responded=bot_responded,
+                started_at=previous.started_at,
+            )
+        finally:
+            self._trace, self._story_like, self._story_job = saved
+
+    async def _finish_after_wait(
+        self,
+        job: UrlJob,
+        *,
+        bot_message: str | None,
+        direct_paths: list[Path],
+        bot_responded: bool,
+        started_at: datetime,
+    ) -> BotConversationResult:
+        """Turn what the bot sent into a stored result for the job."""
+
+        job_id = _require_job_id(job)
         if not bot_responded and not direct_paths:
             logger.warning("Telegram bot did not respond before timeout: job_id={}", job_id)
             retry_job = self._url_job_repository.update_error(
@@ -402,6 +668,7 @@ class BotConversationService:
             bot_message=bot_message,
         )
 
+
     async def _wait_for_bot_response_and_downloads(
         self,
         *,
@@ -410,8 +677,15 @@ class BotConversationService:
         since: datetime,
         sent_message_id: int | None,
         first_response_timeout: float,
+        accepted_ids: frozenset[int] = frozenset(),
     ) -> tuple[str | None, list[Path], bool]:
         loop = asyncio.get_running_loop()
+        # Ids that identify this URL: its own send (plus an earlier send of the
+        # same URL that also went unanswered).
+        own_ids = {*accepted_ids}
+        if sent_message_id is not None:
+            own_ids.add(sent_message_id)
+        floor_id = min(own_ids) if own_ids else None
         legacy = self._config.completion_mode == COMPLETION_STABLE
         if legacy:
             deadline = loop.time() + max(
@@ -460,14 +734,16 @@ class BotConversationService:
                     if message_id in seen_message_ids:
                         continue
                     seen_message_ids.add(message_id)
+                    if message_id in self._claimed_message_ids:
+                        continue  # already taken by another URL of the stall
                 if _is_outgoing_message(message):
                     continue
-                if sent_message_id is not None and message_id == sent_message_id:
+                if message_id is not None and message_id in own_ids:
                     continue
                 if (
-                    sent_message_id is not None
+                    floor_id is not None
                     and message_id is not None
-                    and message_id < sent_message_id
+                    and message_id < floor_id
                 ):
                     # Late message of the previous URL (now that we stop early
                     # it can still be in flight): Telegram ids only grow, so a
@@ -475,15 +751,17 @@ class BotConversationService:
                     continue
                 reply_to_id = _reply_to_id(message)
                 if (
-                    sent_message_id is not None
+                    own_ids
                     and reply_to_id is not None
-                    and reply_to_id != sent_message_id
+                    and reply_to_id not in own_ids
                 ):
                     # The bot answered another of our messages (a late reply
                     # to the previous URL): never attribute it to this one.
                     continue
 
                 bot_responded = True
+                if message_id is not None:
+                    self._claimed_message_ids.add(message_id)
                 last_message_at = loop.time()
                 if not legacy:
                     # Any bot message renews the plazo (it becomes the total one).

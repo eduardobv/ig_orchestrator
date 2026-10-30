@@ -16,7 +16,7 @@ Panel de username, stories, nueva cuenta / update, URLs.
   `_load_selected_row` hidrata flags con `hydrate=True`
 
 ## Identidad de username
-Los checks Stories / New account / Update / Priority van ligados al
+Los checks Stories / New account / Update / Renew / Priority van ligados al
 username normalizado (`strip`, quitar `@`, `casefold`). Si esa identidad
 cambia (catálogo, pegar, combobox, limpiar Username) los checks vuelven
 al estado inicial. Cargar una fila del lote hidrata los flags de esa

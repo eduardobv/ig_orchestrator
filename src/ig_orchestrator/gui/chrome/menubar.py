@@ -154,7 +154,7 @@ class MenubarMixin:
             command=lambda: self._set_catalog_view("tree"),
         )
         view_menu.add_separator()
-        self.show_library_var = tk.BooleanVar(value=False)
+        self.show_library_var = tk.BooleanVar(value=self.catalog_service.include_archived)
         view_menu.add_checkbutton(
             label=t("menu.view.full_library"),
             variable=self.show_library_var,
@@ -212,6 +212,7 @@ class MenubarMixin:
         sync_menu.add_command(label=t("scan.findings_menu"), command=self._open_scan_findings)
         catalog_menu.add_cascade(label=t("scan.menu"), menu=sync_menu)
         catalog_menu.add_command(label=t("menu.catalog.audit"), command=self._open_library_audit)
+        catalog_menu.add_command(label=t("acs.review"), command=self._review_account_status)
         catalog_menu.add_command(label=t("card.menu"), command=self._catalog_edit_card)
         catalog_menu.add_command(label=t("trash.open"), command=self._open_trash_dialog)
         catalog_menu.add_command(label=t("index.menu"), command=self._verify_account_index)

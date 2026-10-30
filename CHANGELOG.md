@@ -1,5 +1,160 @@
 # Changelog
 
+## v4.17.0 - feat-uc1-10: Renew, volver a empezar el renombrado de una cuenta existente
+
+Fecha: 2026-10-30 · Rama: `v4/main`
+
+### Añadido
+* **Casilla «Renew»** en el editor del lote, entre *Update* y *Priority*. Es excluyente con *New account* y *Update*. Al marcarla solo pide la **Fecha del primer post** (*First Post Date*); el Owner Id y la ruta se mantienen como están en el catálogo.
+* **Renombrado «Renew»** (`renaming/planner.py: process_renew_tree`): por cada carpeta (raíz, `reels`, `story`, `highlights`…) se juntan los ficheros de la carpeta de la cuenta en `G:` **cuyo nombre es solo el media id** (`<id>.jpg|jpeg|mp4`) con los recién descargados, y se renombran **como si la cuenta fuera nueva**: bloques repartidos entre la fecha del primer post y la fecha del lote. Los de `G:` se renombran **en su sitio**; los descargados se renombran en la carpeta de descargas y la carpeta se **mueve** a `G:` como siempre.
+* Cualquier otro nombre (`foto.jpg`, ficheros que ya tienen el formato final…) **se ignora**: no se renombra ni se usa como referencia de fechas (aviso en la vista previa si la carpeta ya tiene ficheros renombrados). Un descargado cuyo id ya está en `G:` (con formato o solo id) pasa a `<id>_duplicated.ext` como siempre.
+* Al terminar, la cuenta recibe la fecha del primer post en el catálogo (`catalog_accounts.start_init_date`, se sobrescribe) y se refrescan contadores/índice con el escáner. Ruta y Owner Id **no cambian**.
+* Estado **Renew** en la vista previa y en el resultado del renombrado; estado **Renew** en la tabla del lote.
+* *Omitida* con motivo si la cuenta no está registrada con carpeta en la biblioteca, si la carpeta de `G:` no está accesible o si el catálogo no tiene su Owner Id (Renew **necesita `G:` conectado**, no usa el índice).
+
+### Modificado
+* `gui/draft/models.py` (`AccountDraft.is_renew`), `gui/draft/service.py` (`validate_renew_details`, exclusividad New/Update/Renew), `db/account_history_repository.py` y `db/v2/catalog/repository.py` (`update_start_init_date`), `gui/batches/resume.py` y `gui/batches/transfer.py` (recarga e import/export; clave `is_renew`), `gui/queue/service.py`, `gui/shared/helpers.py`, `gui/run/process_runner.py` (`NewAccountRenameParameters.renew`; el renombrador externo `sc2` no recibe cuentas Renew), `gui/run/integrated_rename.py`, `gui/run/rename_preview_dialog.py`, `gui/editor/panel.py`, `gui/batch_accounts/panel.py`, `gui/shell/app.py`, `renaming/service.py` (`NewAccountSpec.renew`, estado `RENEW`), locales `es.json`/`en.json`. Versión 4.17.0.
+* **Sin cambios de esquema:** Renew se guarda como `is_new_account = 0` + `rename_start_init_date` con Owner Id y ruta vacíos, y se infiere al recargar (igual que *Update*).
+
+### Archivos creados
+* `tests/renaming/test_renew_rename.py`, `tests/gui/test_renew_batch.py`, `tasks/done/v3/feat-uc1-10.md`.
+
+### Pruebas
+* `python -m pytest`: **759 passed, 1 skipped** (suite completa). Nuevos (17): unión de `G:` + descargas con nombres ajenos ignorados, subcarpeta `reels`, fechas desde el primer post y orden por id, registro de la fecha sin tocar ruta ni owner, owner del catálogo en los nombres, omisiones (sin carpeta / sin owner), ficheros ya renombrados intactos, validación y exclusión, persistencia v1 y GUI, export/import, paso al renombrador y al comando externo, editor.
+* **No se probó** en la GUI abierta ni sobre `G:` real (solo bibliotecas temporales). Renombrar en sitio ficheros de `G:` es irreversible: **pruébalo antes con una copia de una cuenta**.
+
+## v4.16.0 - feat-run-39: pausa entre URLs y modo espera cuando el bot deja de responder
+
+Fecha: 2026-10-29 · Rama: `v4/main`
+
+### Añadido
+* **Pausa entre URLs** (`run.bot.between_urls_seconds`, **2 s** por defecto, 0-600; *Configuración > Ejecución > Bot y descargas > Pausa entre URLs (s)*): entre el final de una URL y el envío de la siguiente al bot. Antes se enviaba la siguiente al instante. No se aplica antes de la primera URL del proceso y vale para el pase principal, los reintentos y todas las cuentas.
+* **Detección de bot sin respuesta** (`run.bot.stall_enabled`, activa por defecto; `run.bot.stall_probe_delay_seconds`, **10 s**, 1-600):
+  1. Una URL sin ninguna respuesta del bot (plazo de primera respuesta) sigue yendo a la cola de reintentos como `NO_BOT_RESPONSE`, pero el servicio recuerda que el bot está «en sospecha».
+  2. La siguiente URL (la siguiente del lote o, si no queda ninguna, la misma en la ronda de reintentos) **espera 10 s** antes de enviarse. En la ronda de reintentos se omite el *backoff* mientras el bot está en sospecha (solo manda el sondeo de 10 s).
+  3. Si esa URL sí recibe respuesta, el bot está vivo: la anterior sigue en la cola de reintentos.
+  4. Si **tampoco** responde, el bot entra en **modo espera**: no se envía nada más, la barra de estado de la GUI muestra *«Bot sin respuesta: en espera…»* (tono ocupado) y la app espera, sin límite, al primer mensaje del bot a cualquiera de las dos URLs.
+  5. Al despertar el bot se recoge el contenido de **las dos** URLs aunque lleguen desordenadas: cada mensaje se asigna por `reply_to` a la URL a la que contesta. La URL anterior se completa (archivos movidos, `COMPLETED`, estado de su cuenta recalculado) y se sigue con el flujo normal.
+* **Marcador `[GUI_BOT_STATUS] STALLED|RESUMED`** impreso por el CLI y leído por la GUI para la barra de estado.
+* Si la misma URL se envía dos veces sin respuesta, se acepta la respuesta a cualquiera de los dos envíos y se descarta el duplicado por `(nombre, tamaño)`.
+
+### Modificado
+* `telegram/bot_conversation_service.py`: `BotConversationConfig` (`between_urls_seconds`, `stall_guard_enabled`, `stall_probe_delay_seconds`), `BotConversationResult.late_results`, `has_unanswered`, parámetro `status_callback`; la parte posterior a la espera se extrajo a `_finish_after_wait`; el filtro de mensajes acepta varios ids propios.
+* `orchestration/url_job_processor.py`: cierra los `late_results` (mueve archivos y marca `COMPLETED`), recalcula la cuenta (`PARTIAL`/`INCOMPLETE` → estado real si ya no queda nada abierto) y expone `stall_pending`.
+* `orchestration/account_orchestrator.py` y `batch_orchestrator.py`: sin *backoff* de reintento mientras `stall_pending`.
+* `orchestration/run_settings.py`, `cli/main.py`, `gui/run/controller.py`, `gui/shared/helpers.py`, locales `es.json`/`en.json`. Versión 4.16.0.
+
+### Archivos creados
+* `tests/telegram/test_stall_guard.py`, `tests/orchestration/test_stall_guard_flow.py`, `tasks/done/v3/feat-run-39.md`.
+
+### Pruebas
+* `python -m pytest`: **743 passed** (suite completa). Nuevos: pausa entre URLs (con y sin primera URL), URL muda + URL respondida (sin modo espera), dos URLs mudas con respuesta desordenada (se recogen las dos y solo hay dos envíos), misma URL dos veces, solo responde la segunda, guarda desactivada por defecto, ronda de reintentos sin *backoff* con bot en sospecha, cierre de la respuesta tardía en el procesador, marcador de la GUI y ajustes.
+* **No se probó con el bot real ni con la GUI abierta.** La atribución de respuestas desordenadas depende de que el bot conteste con `reply_to` (respuesta) al mensaje enviado; si no lo hace, los mensajes sin `reply_to` se asignan a la URL más antigua y la otra queda para reintento.
+
+## v4.15.0 - feat-uc2-28: biblioteca completa recordada y carpetas existentes en «Nueva carpeta»
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+### Añadido
+* **Ver > Mostrar biblioteca completa (archivadas)** ahora se **recuerda** (`ui.catalog_show_archived` en `app_settings`) y viene **marcada por defecto**: el catálogo ya arranca con todas las cuentas. Se puede desmarcar y se conserva.
+* **Nueva carpeta con un nombre que ya existe en el disco** (p. ej. `G:\4K Stogram\01.ACTIVE` vacía, que no aparecía porque el catálogo solo registra carpetas con cuentas): en vez del error «Ya existe en disco», la app avisa de que la carpeta ya existe, de que no se crea ni se reemplaza nada y pregunta si se **agrega la carpeta existente al catálogo** (solo se añade la fila; no se toca el disco). Funciona en *Nueva carpeta aquí…* (clic derecho) y en *Nueva carpeta aquí* del selector de destino.
+* `library/fsops.py`: `existing_unregistered_folder(parent_id, name)` y `adopt_folder(rel)`. Locales `fsops.folder_exists`/`fsops.folder_added`.
+* Test `test_existing_unregistered_folder_can_be_adopted_without_touching_disk`.
+
+### Decisión
+* **No se ofrece «reemplazar»**: reemplazar una carpeta existente implicaría borrarla (y si no está vacía perdería datos); para una carpeta vacía el resultado sería idéntico a agregarla. Solo se ofrece agregar o cancelar.
+* Las carpetas vacías de `G:` siguen sin aparecer solas tras sincronizar; se agregan con *Nueva carpeta…* usando su nombre.
+
+### Modificado
+* `gui/shell/app.py`, `gui/chrome/menubar.py`, `gui/catalog/panel.py`, `gui/library/fsops_actions.py`, `gui/library/folder_picker.py`, locales `es.json`/`en.json`. Documentación: manual, tutorial (Feat 40), `tasks/done/v3/feat-uc2-28.md`, `docs/plan-v3-features.md`, `CLAUDE.md`, `library/MODULE.md`. Versión 4.15.0.
+
+### Pruebas
+* `python -m pytest`: ver cifra final. **No se probó** en la GUI real ni sobre `G:` (solo el test unitario con biblioteca temporal): ni el arranque con la biblioteca completa, ni el aviso de carpeta existente.
+
+## v4.14.1 - feat-uc2-26 (patch): doble clic abre la cuenta en el navegador
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+### Añadido
+* En la tabla del análisis de estado de cuentas, **doble clic sobre una fila** abre `https://www.instagram.com/<cuenta>/` en el navegador predeterminado (igual que *Abrir en el navegador* del clic derecho). Funciona también con filas movidas; el doble clic sobre las cabeceras (ordenar) no hace nada.
+
+### Modificado
+* `gui/library/account_status_dialog.py` (`on_double_click`). Documentación: manual (5.2b), tutorial (Feat 38), `tasks/done/v3/feat-uc2-26.md`. `README.md`, `AGENTS.md`, `CLAUDE.md` (estado v4.14.1) y `MODULE.md` revisados. Versión 4.14.1.
+
+### Pruebas
+* `python -m pytest`: 728 passed, 1 skipped. **No se probó** el doble clic en la GUI (ni con Tk simulado ni abriendo el navegador real): el handler reutiliza `open_browser` del clic derecho y solo añade el enlace `<Double-1>`.
+
+## v4.14.0 - feat-uc2-27: no volver a analizar cuentas analizadas recientemente
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+Al crear un análisis nuevo de estado de cuentas, las cuentas que otro análisis ya respondió (existe / no existe) dentro de una ventana de tiempo conservan ese resultado y no se vuelven a consultar a Instagram. Pensado para analizar `Deleted` sin repetir las cuentas que se acaban de mover allí tras analizarlas en otra carpeta.
+
+### Añadido
+* Ajuste **Configuración > Catálogo > «Estado de cuentas: reutilizar análisis de las últimas N horas»** (`accountcheck.reuse_hours` en `app_settings`; por defecto **48 h = 2 días**; 0 = no reutilizar).
+* `account_status/service.py`: `create_run(folder_id, reuse_hours)` copia la respuesta más reciente (`AVAILABLE`/`UNAVAILABLE`, nunca `UNKNOWN`) de otros análisis dentro de la ventana y la marca con `source_run_id`; si no queda nada pendiente, el análisis nace *completado*. `force_reanalysis` olvida lo copiado. `reuse_hours(conn)` lee el ajuste. La fecha/hora conserva la del análisis original.
+* `account_status/schema.py`: columna `account_check_results.source_run_id` (se añade sola a bases de v4.13.x) e índice `(username, checked_at)`.
+* Modal: columna **Analizada** (fecha y hora de la respuesta, con `(#análisis)` de origen si fue reutilizada), «reutilizadas N» en el resumen, aviso al crear el análisis y casilla **Re-analizar las ya analizadas en otros análisis**: marcada antes de *Iniciar/Reanudar* vuelve a consultar solo las reutilizadas (también activa *Iniciar* en un análisis ya completado).
+* `tests/account_status/test_reuse.py` (6 tests).
+
+### Modificado
+* `gui/settings/dialog.py` (campo en la pestaña Catálogo), `gui/library/account_status_dialog.py`, locales `es.json`/`en.json`.
+* Documentación: manual (5.2b y pestaña Catálogo), tutorial (Feat 39), `docs/arquitectura-v3.md`, `account_status/MODULE.md`, `docs/plan-v3-features.md`, `tasks/done/v3/feat-uc2-27.md`, `CLAUDE.md`. `README.md` y `AGENTS.md` revisados sin cambios. Versión 4.14.0.
+
+### Pruebas
+* `python -m pytest`: 728 passed, 1 skipped. Probado con Tk real y una base temporal: con 2 de 3 cuentas analizadas hace 1 h, *Iniciar* consultó solo la tercera y, con la casilla marcada, volvió a consultar las 2 reutilizadas (fetcher simulado). **No se probó** sobre las 54 cuentas reales ni con la pestaña Catálogo de Configuración abierta en la GUI (solo se compila y el valor se lee/escribe vía `app_settings`).
+
+## v4.13.2 - feat-uc2-26 (patch): mover no existentes, contador, cuentas movidas, revisar análisis y fin del cuelgue
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+### Corregido
+* **Cuelgue al mover muchas cuentas (54):** el plan de movimiento comprueba el disco de la biblioteca (`G:`) por cada cuenta y se ejecutaba en el hilo de la ventana, sin aviso; además la vista previa se abría como hija de la ventana principal (no de la modal) y podía quedar **detrás** con el foco capturado, dejando toda la app sin respuesta y sin error en consola. Ahora el plan, la ejecución, la sincronización de estado y el espejo `accounts_lite` corren en un hilo con su propia conexión, la modal muestra «Preparando el movimiento de N cuenta(s)…» (barra animada y cursor de espera), la vista previa es hija de la modal y no se puede cerrar la modal mientras se mueve.
+
+### Añadido
+* Botón **Mover no existentes** (*Move disabled*): selecciona todas las ✘ aún sin mover y abre el mismo flujo que *Mover seleccionadas…*.
+* Contador **Seleccionadas: N** junto al filtro, y **movidas N** en el resumen.
+* Columnas **Movida** (`MOVED`, en rojo) y **Ruta destino**; la columna de ruta pasa a ser **Ruta origen** (donde estaba al analizar). Una cuenta movida no se puede seleccionar (se deselecciona sola), *Seleccionar todas*, *Mover seleccionadas* y *Mover no existentes* la ignoran, y hay filtro **Movidas**. «Movida» se calcula comparando con la ruta actual del catálogo, así que también detecta movimientos hechos fuera del análisis; «Abrir en el explorador» abre la carpeta nueva.
+* **Catálogo > Revisar análisis de estado…**: abre la modal con todos los análisis guardados (de cualquier carpeta); sin carpeta no se puede crear un análisis nuevo desde ahí.
+
+### Modificado
+* `account_status/service.py`: `CheckResult.current_path/moved/destination`; `results()` une con el catálogo; se elimina `refresh_paths` (la ruta del análisis ya no se reescribe).
+* `gui/library/account_status_dialog.py` reescrita; `gui/chrome/menubar.py`; locales `es.json`/`en.json`.
+* Documentación: manual (5.2b y menú Catálogo), tutorial (Feat 38), `account_status/MODULE.md`, `docs/arquitectura-v3.md`, `tasks/done/v3/feat-uc2-26.md`, `CLAUDE.md`. `README.md` y `AGENTS.md` revisados sin cambios. Versión 4.13.2.
+
+### Pruebas
+* `python -m pytest`: 723 passed. Probado con Tk real y una biblioteca temporal en disco: *Mover no existentes* movió 2 carpetas, la tabla mostró `MOVED` en rojo con la ruta destino y la selección de filas movidas se bloqueó. **No se probó** con 54 cuentas sobre `G:` real (la causa del cuelgue se deduce del código; si vuelve a ocurrir, ahora la ventana sigue viva y avisa de lo que hace) ni con la vista previa real (se simuló su confirmación).
+
+## v4.13.1 - feat-uc2-26 (patch): abrir la cuenta en el navegador o en el explorador
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+### Modificado
+* `gui/library/account_status_dialog.py`: clic derecho sobre una fila de la tabla del análisis > **Abrir en el navegador** (`https://www.instagram.com/<cuenta>/` en el navegador predeterminado) y **Abrir en el explorador** (carpeta de la cuenta en el Explorador de Windows; avisa si la biblioteca no está disponible o la carpeta ya no existe).
+* Locales `es.json`/`en.json`. Documentación: manual (5.2b), tutorial (Feat 38), `tasks/done/v3/feat-uc2-26.md`, `CLAUDE.md` (los feats pequeños se versionan también como patch). `README.md`, `AGENTS.md` y `docs/arquitectura-v3.md` revisados sin cambios. Versión 4.13.1.
+
+### Pruebas
+* `python -m pytest`: 722 passed. El menú se probó construyendo la modal con Tk real; **no se probó** abrir el navegador/Explorador reales desde el menú.
+
+## v4.13.0 - feat-uc2-26: comprobar el estado de las cuentas de una carpeta y moverlas
+
+Fecha: 2026-10-28 · Rama: `v4/main`
+
+Clic derecho en una carpeta del catálogo > **Comprobar estado de las cuentas…**: consulta `https://www.instagram.com/<cuenta>/` (sin login) para cada cuenta de la carpeta (y subcarpetas) y busca `profile_id` en el HTML: si está, la cuenta existe (✔); si no, ya no existe (✘). Después se pueden mover las cuentas elegidas a otra carpeta (p. ej. `01.ACTIVE`).
+
+### Creado
+* `account_status/` (`schema.py`, `checker.py`, `service.py`, `MODULE.md`): tablas aditivas `account_check_runs` y `account_check_results` (el análisis se guarda aunque esté sin empezar, parcial, detenido por 429 o completo); `check_account` / `classify_profile`; `AccountStatusService` y `run_checks` (espera entre cuentas, parada manual, parada en el primer 429, reanudar sin repetir lo ya respondido).
+* `gui/library/account_status_dialog.py`: modal con tabla ordenable (usuario, estado ✔/✘/?/…, ruta), filtro, historial de análisis de la carpeta, *Iniciar/Reanudar*, *Detener*, *Seleccionar todas*, *Mover seleccionadas…* (reutiliza el selector de carpetas con sugerencias, búsqueda y nueva carpeta, y la vista previa de la operación de disco) y *Eliminar análisis*.
+* `tests/account_status/test_account_status.py` (8 tests).
+
+### Modificado
+* `orchestration/run_settings.py`: ajustes `run.accountcheck.interval_seconds` (30 s, 5-3600) y `run.accountcheck.timeout_seconds` (15 s) en *Configuración > Ejecución > Estado de cuentas de Instagram*.
+* `db/gui_migrations.py` (crea las tablas), `library/fsops.py` (`accounts_under` público), `gui/library/fsops_actions.py` (entrada de menú), `gui/shell/app.py` (mixin), locales `es.json`/`en.json`.
+* Documentación: manual, tutorial (Feat 38), `docs/arquitectura-v3.md`, `docs/plan-v3-features.md`, `tasks/done/v3/feat-uc2-26.md`, `CLAUDE.md`. `README.md` y `AGENTS.md` revisados sin cambios. Versión 4.13.0.
+
+### Pruebas
+* `python -m pytest`: 722 passed, 1 skipped. Comprobado a mano **una** petición real por cuenta existente (`instagram`: 200 con `profile_id`) y una inexistente (200 sin `profile_id`); el modal se probó con Tk real y respuestas simuladas. **No se probó** un 429 real ni un movimiento real de carpetas desde el modal.
+
 ## v4.12.1 - fix feat-run-38: reinicio de lote en la base de la GUI
 
 Fecha: 2026-10-27 · Rama: `v4/main`

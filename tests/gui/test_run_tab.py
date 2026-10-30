@@ -59,3 +59,25 @@ def test_every_run_field_has_locale_texts() -> None:
         assert f"run.{spec.field}" in keys and f"run.{spec.field}.help" in keys
     for group in GROUPS:
         assert f"run.group.{group}" in keys
+
+
+def test_bot_stall_marker_updates_the_status_bar() -> None:
+    from types import SimpleNamespace
+
+    from ig_orchestrator.gui.run.controller import RunControllerMixin
+    from ig_orchestrator.gui.theme import STATUS_TONE_BUSY, STATUS_TONE_IDLE
+
+    calls: list[tuple[str, str]] = []
+    app = SimpleNamespace(
+        _set_status_tone=lambda tone: calls.append(("tone", tone)),
+        _set_status=lambda text: calls.append(("status", text)),
+        _write_console=lambda text: calls.append(("console", text)),
+    )
+
+    RunControllerMixin._handle_process_output(app, "[GUI_BOT_STATUS] STALLED\n")
+    RunControllerMixin._handle_process_output(app, "[GUI_BOT_STATUS] RESUMED\n")
+
+    assert calls[0] == ("tone", STATUS_TONE_BUSY)
+    assert calls[1][0] == "status" and "esper" in calls[1][1].lower()
+    assert ("tone", STATUS_TONE_IDLE) in calls
+    assert calls[-2][0] == "status" and "esper" not in calls[-2][1].lower()

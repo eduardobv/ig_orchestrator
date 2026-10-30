@@ -12,11 +12,22 @@ from ig_orchestrator.filesystem import (
     resolve_publication_type_after_download,
 )
 from ig_orchestrator.logging_config import get_logger
-from ig_orchestrator.models import DownloadFile, PublicationType, UrlJob, UrlJobStatus
+from ig_orchestrator.models import (
+    Account,
+    AccountStatus,
+    DownloadFile,
+    PublicationType,
+    UrlJob,
+    UrlJobStatus,
+)
 from ig_orchestrator.orchestration.post_availability import (
     MEDIA_REMOVED_ERROR_TYPE,
     AvailabilityChecker,
     PostAvailability,
+)
+from ig_orchestrator.orchestration.processing_policy import (
+    TERMINAL_URL_STATUSES,
+    account_status_from_jobs,
 )
 from ig_orchestrator.orchestration.retry_policy import MEDIA_NOT_FOUND_ERROR_TYPE
 from ig_orchestrator.telegram import BotConversationResult
@@ -83,6 +94,12 @@ class UrlJobProcessor:
         self._observer: RunObserver = observer or NullObserver()
         self._trace: AttemptTrace | None = None
 
+    @property
+    def stall_pending(self) -> bool:
+        """True while the bot is being probed after a URL without an answer."""
+
+        return bool(getattr(self._conversation_service, "has_unanswered", False))
+
     async def process(self, url_job_id: int) -> UrlJobProcessorResult:
         self._trace = None
         try:
@@ -128,9 +145,63 @@ class UrlJobProcessor:
             job.url,
         )
         conversation_result = await self._conversation_service.process_url_job(job)
+        # Answers of earlier silent URLs that arrived once the bot woke up.
+        late_accounts: list[Account] = []
+        for late in conversation_result.late_results:
+            late_account = await self._finish_late_result(late)
+            if late_account is not None:
+                late_accounts.append(late_account)
         self._trace = conversation_result.trace
         if self._trace is not None:
             self._trace.batch_id = account.batch_id
+        result = await self._finalize_conversation(url_job_id, account, conversation_result)
+        for late_account in late_accounts:
+            self._refresh_account_status(late_account)
+        return result
+
+    async def _finish_late_result(self, late: BotConversationResult) -> Account | None:
+        """Move and store the files of a URL answered after its own attempt ended."""
+
+        late_job_id = late.job.id
+        try:
+            if late_job_id is None:
+                return None
+            late_account = self._account_repository.get_by_id(late.job.account_id)
+            if late_account is None:
+                return None
+            result = await self._finalize_conversation(late_job_id, late_account, late)
+            logger.info(
+                "Late bot answer finished: job_id={} status={} files={}",
+                late_job_id,
+                result.job.status.value,
+                len(result.files),
+            )
+            return late_account
+        except Exception:
+            logger.exception("Finishing a late bot answer failed: job_id={}", late_job_id)
+            return None
+
+    def _refresh_account_status(self, account: Account) -> None:
+        """An account that already ended may become complete through a late answer."""
+
+        if account.id is None:
+            return
+        current = self._account_repository.get_by_id(account.id)
+        if current is None or current.status not in (
+            AccountStatus.PARTIAL,
+            AccountStatus.INCOMPLETE,
+        ):
+            return
+        jobs = self._url_job_repository.list_by_account(account.id)
+        if jobs and all(job.status in TERMINAL_URL_STATUSES for job in jobs):
+            self._account_repository.update_status(account.id, account_status_from_jobs(jobs))
+
+    async def _finalize_conversation(
+        self,
+        url_job_id: int,
+        account: Account,
+        conversation_result: BotConversationResult,
+    ) -> UrlJobProcessorResult:
         processed_job = conversation_result.job
         detected_files = list(conversation_result.files)
 

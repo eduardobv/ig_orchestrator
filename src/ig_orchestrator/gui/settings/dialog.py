@@ -9,6 +9,7 @@ from tkinter import font as tkfont
 from tkinter import colorchooser, filedialog, messagebox, ttk
 
 from ig_orchestrator import __version__
+from ig_orchestrator.account_status.service import DEFAULT_REUSE_HOURS, REUSE_SETTING, reuse_hours
 from ig_orchestrator.library.trash import configured_retention_days
 from ig_orchestrator.renaming.settings import (
     lite_mirror_enabled,
@@ -296,6 +297,9 @@ class SettingsDialogWithTabs:
         ttk.Label(frame, text=t("settings.trash_retention")).grid(row=11, column=0, sticky="w", pady=(14, 0))
         self.trash_retention_var = tk.StringVar(value=str(configured_retention_days(self.connection) or 0))
         ttk.Entry(frame, textvariable=self.trash_retention_var, width=8).grid(row=12, column=0, sticky="w")
+        ttk.Label(frame, text=t("settings.accountcheck_reuse")).grid(row=13, column=0, sticky="w", pady=(14, 0))
+        self.accountcheck_reuse_var = tk.StringVar(value=str(reuse_hours(self.connection)))
+        ttk.Entry(frame, textvariable=self.accountcheck_reuse_var, width=8).grid(row=14, column=0, sticky="w")
         ttk.Label(frame, text=t("settings.staging_root")).grid(row=7, column=0, sticky="w", pady=(14, 0))
         self.staging_root_var = tk.StringVar(value=staging_root_setting(self.connection))
         ttk.Entry(frame, textvariable=self.staging_root_var, width=48).grid(row=8, column=0, sticky="w")
@@ -421,6 +425,8 @@ class SettingsDialogWithTabs:
             write_setting(self.connection, "renaming.preview", "1" if self.rename_preview_var.get() else "0", "BOOLEAN")
             retention = self.trash_retention_var.get().strip()
             write_setting(self.connection, "trash.retention_days", retention if retention.isdigit() else "0")
+            reuse = self.accountcheck_reuse_var.get().strip()
+            write_setting(self.connection, REUSE_SETTING, reuse if reuse.isdigit() else str(DEFAULT_REUSE_HOURS))
             write_setting(self.connection, "staging.root", self.staging_root_var.get().strip().rstrip("\\/"), "PATH")
             write_setting(self.connection, "staging.after_rename", self.staging_after_var.get())
             write_setting(self.connection, "compat.lite.enabled", "1" if self.lite_mirror_var.get() else "0", "BOOLEAN")

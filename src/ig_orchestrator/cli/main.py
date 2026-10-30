@@ -383,7 +383,9 @@ def _run_batch(
                 story_attachment_wait_seconds=run_settings.story_attachment_wait_seconds,
                 first_response_timeouts=_first_response_timeouts(run_settings),
                 large_file=_large_file_config(run_settings),
+                **_pacing_config(run_settings),
             ),
+            status_callback=_print_bot_status,
         )
         url_job_processor = UrlJobProcessor(
             observer=observer,
@@ -594,10 +596,12 @@ def _run_continue(
                     use_events=run_settings.use_events,
                     completion_mode=run_settings.completion_mode,
                     grace_seconds=run_settings.grace_ms / 1000,
-                story_attachment_wait_seconds=run_settings.story_attachment_wait_seconds,
+                    story_attachment_wait_seconds=run_settings.story_attachment_wait_seconds,
                     first_response_timeouts=_first_response_timeouts(run_settings),
                     large_file=_large_file_config(run_settings),
+                    **_pacing_config(run_settings),
                 ),
+                status_callback=_print_bot_status,
             )
             url_job_processor = UrlJobProcessor(
                 observer=observer,
@@ -826,6 +830,25 @@ def _print_account_progress(current: int, total: int, account) -> None:
         f"[{current}/{total} | {percentage:3d}%] Processing account: "
         f"{account.username}"
     )
+
+
+def _pacing_config(run_settings) -> dict[str, object]:
+    """Pause between URLs and unresponsive-bot guard for BotConversationConfig."""
+
+    return {
+        "between_urls_seconds": float(run_settings.between_urls_seconds),
+        "stall_guard_enabled": run_settings.stall_enabled,
+        "stall_probe_delay_seconds": float(run_settings.stall_probe_delay_seconds),
+    }
+
+
+def _print_bot_status(status: str) -> None:
+    # Read by the GUI to show "bot waiting" in the status bar (and by humans).
+    print(f"[GUI_BOT_STATUS] {status}", flush=True)
+    if status == "STALLED":
+        print("The bot stopped answering: waiting for it before sending more URLs.")
+    else:
+        print("The bot answered again: continuing.")
 
 
 def _print_item_progress(current: int, total: int, account, job, is_retry: bool) -> None:

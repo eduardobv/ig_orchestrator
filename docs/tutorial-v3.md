@@ -715,6 +715,7 @@ En la lista, cada cuenta muestra su estado:
 |---|---|
 | **Renombrar** | Cuenta de la biblioteca: se renombrará y moverá (ves a qué carpeta). |
 | **Cuenta nueva** | Estaba declarada como nueva en el lote: se registrará en la app. |
+| **Renew** | Cuenta existente declarada *Renew*: se renombrarán sus ficheros solo-id de `G:` junto con los descargados (v4.17.0). |
 | **Omitida** | No se tocará. La razón sale en la línea: *no está registrada y no se declaró como nueva*, *la carpeta registrada no existe*, *declarada como nueva pero ya está registrada*, *no está como carpeta en el origen*. |
 | `!` (aviso) | Por ejemplo, una subcarpeta (como `story`) que no existe en la biblioteca: no se renombra. |
 | ✖ Conflicto al mover | Algún fichero choca con uno de la biblioteca: la carpeta se queda sin mover. |
@@ -1194,6 +1195,50 @@ Antes la app esperaba 10 s de silencio tras el último fichero de cada URL. Ahor
 * **Base v1 (rollback):** sin pestaña; sigue usando solo `.env`.
 * **Tests:** `python -m pytest tests/orchestration/test_run_settings.py tests/gui/test_run_tab.py`.
 * Los plazos por tipo de URL, el fin por conteo, la cola global de reintentos y sus ajustes llegan con los feats siguientes; los valores por defecto de plazos y silencio siguen siendo los de siempre (300 s / 10 s) hasta entonces.
+
+## Feat 41 · Pausa entre URLs y modo espera con el bot sin respuesta (v4.16.0)
+
+1. **Pausa entre URLs:** *Configuración > Ejecución > Bot y descargas > Pausa entre URLs (s)* (2 s por defecto). Ejecuta una cuenta con varias URLs y mira el chat de Telegram: cada URL se envía ~2 s después de terminar la anterior. Sube el valor si el bot sigue saturándose.
+2. **Bot sin respuesta (escenario):** el bot se congela. La URL A no recibe respuesta (30 s) → va a reintentos. La app espera 10 s y envía la URL B. Si B tampoco recibe respuesta (30 s) → **modo espera**: la barra de estado dice *«Bot sin respuesta: en espera…»* y no se envía nada más. Cuando el bot despierta y contesta (en el orden que sea), la app descarga A y B, mueve los archivos, marca ambas `COMPLETED` y sigue.
+3. Si B sí recibe respuesta: no hay modo espera; A se reintentará al final del lote como siempre.
+4. Si no quedan más URLs: en la ronda de reintentos se vuelve a enviar la misma URL a los 10 s (no tras el *backoff* de 90 s+).
+5. **Ajustes:** *Pausa entre URLs (s)*, *Detectar bot sin respuesta* (activa/inactiva) y *Espera antes de probar de nuevo (s)*. Valores por defecto 2 / sí / 10.
+6. **Probar sin esperar horas:** `python -m pytest tests/telegram/test_stall_guard.py tests/orchestration/test_stall_guard_flow.py`. En real: baja los plazos de primera respuesta a 5-10 s y silencia el chat del bot (o desconecta la red unos segundos durante una cuenta con 3-4 URLs); en `logs/app.log` aparecen «Bot did not answer; the next URL will probe it», «Bot stalled…» y «Late bot answer collected».
+
+## Feat 42 · Renew: volver a empezar el renombrado de una cuenta (v4.17.0)
+
+Para una cuenta que **ya está en el catálogo y en `G:`** pero cuyos ficheros no tienen el formato de renombrado (solo `<media_id>.jpg|jpeg|mp4`).
+
+1. En el editor del lote escribe la cuenta, añade sus URLs y marca **Renew** (entre *Update* y *Priority*). Aparece solo **Fecha del primer post**; rellénala (`YYYY-MM-DD`) y pulsa Agregar. Owner Id y ruta no se piden: se usan los del catálogo. La cuenta sale como *Renew* en la tabla.
+2. Ejecuta el lote. Al renombrar (con `G:` conectado), la vista previa marca la cuenta como **Renew**. Por cada carpeta (raíz, `reels`, `story`…) se juntan los ficheros solo-id de `G:` con los descargados y se reparten las fechas entre la fecha del primer post y la fecha del lote, como en una cuenta nueva.
+3. Al ejecutar: los de `G:` se renombran **donde están**, los descargados se renombran y la carpeta se mueve a `G:`. Un descargado cuyo id ya existe en `G:` queda `<id>_duplicated.ext`.
+4. **Se ignora** todo nombre que no sea solo el media id (también lo ya renombrado: la vista previa avisa con `!`). La cuenta guarda la fecha del primer post; ruta y Owner Id no cambian.
+5. **Omitida** si: la cuenta no tiene carpeta registrada, la carpeta de `G:` no está accesible o falta su Owner Id en el catálogo.
+6. **Probar:** `python -m pytest tests/renaming/test_renew_rename.py tests/gui/test_renew_batch.py`. En real, **primero con una copia** de una cuenta (renombrar en `G:` no se puede deshacer): `SELECT username, start_init_date, rel_path FROM catalog_accounts WHERE username='cuenta';` antes y después.
+
+## Feat 40 · Biblioteca completa recordada y carpetas existentes (v4.15.0)
+
+1. **Ver > Mostrar biblioteca completa (archivadas)** arranca marcada y se recuerda al cambiarla.
+2. Para que una carpeta vacía de `G:` (p. ej. `01.ACTIVE`) aparezca en el catálogo: clic derecho en su carpeta padre > *Nueva carpeta aquí…* > escribe su nombre. La app dice que ya existe y pregunta si agregarla; al aceptar aparece en el árbol sin tocar el disco. No hay opción de reemplazar (borraría la carpeta).
+3. **Probar:** `SELECT value FROM app_settings WHERE key='ui.catalog_show_archived';` y `SELECT rel_path FROM catalog_folders WHERE rel_path LIKE '%01.ACTIVE';`.
+
+## Feat 39 · No repetir cuentas analizadas recientemente (v4.14.0)
+
+1. Analizas `Inactive`, mueves 54 cuentas ✘ a `Deleted`.
+2. Clic derecho en `Deleted` > *Comprobar estado de las cuentas…* (o *Nuevo análisis*): las 54 salen con su resultado anterior y su fecha en *Analizada* con `(#n)`; el aviso dice cuántas se reutilizaron. *Iniciar* solo consulta las demás.
+3. **Ajuste:** *Configuración > Catálogo > Estado de cuentas: reutilizar análisis de las últimas N horas* (48 por defecto; 0 desactiva). Una respuesta más antigua que la ventana se vuelve a pedir.
+4. **Forzar:** marca *Re-analizar las ya analizadas en otros análisis* y pulsa *Iniciar/Reanudar*.
+5. **Probar:** `SELECT username, status, checked_at, source_run_id FROM account_check_results WHERE run_id = (SELECT MAX(id) FROM account_check_runs);` (`source_run_id` no nulo = respuesta reutilizada).
+
+## Feat 38 · Estado de las cuentas de una carpeta (v4.13.0)
+
+1. En el catálogo (vista árbol) haz clic derecho en una carpeta contenedora, p. ej. `09.DELETED` > **Comprobar estado de las cuentas…**. Se crea un análisis con todas las cuentas de la carpeta.
+2. **Iniciar**: cada cuenta se consulta con `GET https://www.instagram.com/<cuenta>/`; si el HTML contiene `profile_id` → ✔, si no → ✘. Entre cuentas se espera `run.accountcheck.interval_seconds` (30 s por defecto; en *Configuración > Ejecución*).
+3. Con un 429 se detiene solo; con **Detener** se para a mano. **Reanudar** continúa donde se quedó.
+4. Selecciona filas (filtra por ✘ y *Seleccionar todas*) > **Mover seleccionadas…** > elige `01.ACTIVE` u otra carpeta (o crea una) > confirma la vista previa.
+5. **Clic derecho** en una fila: *Abrir en el navegador* abre `instagram.com/<cuenta>/` y *Abrir en el explorador* abre su carpeta (v4.13.1). **Doble clic** en una fila abre directamente el perfil en el navegador (v4.14.1).
+6. **Mover rápido (v4.13.2):** *Mover no existentes* mueve todas las ✘ de golpe. Las movidas pasan a `MOVED` (rojo) con su *Ruta destino* y quedan fuera de cualquier selección. El contador *Seleccionadas: N* muestra cuántas llevas. **Catálogo > Revisar análisis de estado…** reabre cualquier análisis guardado.
+7. **Probar:** `SELECT state, total FROM account_check_runs;` y `SELECT username, status, http_status FROM account_check_results WHERE run_id = 1;` en `data/orchestrator_gui.sqlite`. Para no esperar, baja la espera a 5 s y prueba con una carpeta de pocas cuentas.
 
 ## Feat 32 · Telemetría de ejecución (v4.6.0)
 

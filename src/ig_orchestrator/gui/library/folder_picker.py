@@ -137,6 +137,15 @@ def pick_folder(
         window.destroy()
 
     def create_folder(parent_id: int, name: str) -> int | None:
+        existing = service.existing_unregistered_folder(parent_id, name)
+        if existing is not None:  # already on disk, only missing from the catalog
+            if not messagebox.askyesno(title, t("fsops.folder_exists", path=existing), parent=window):
+                return None
+            try:
+                return service.adopt_folder(existing)
+            except FsOpsError as exc:
+                messagebox.showerror(title, str(exc), parent=window)
+                return None
         plan = service.plan_mkdir(parent_id, name)
         if not plan.can_execute:
             messagebox.showerror(

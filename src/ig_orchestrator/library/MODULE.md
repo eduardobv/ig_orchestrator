@@ -21,7 +21,7 @@ Herramientas de biblioteca (serie v3). Hoy: auditoría de solo lectura.
 ## Operaciones de disco (feat 4)
 
 - `fsops.py` — `FsOperationService`: toda modificación de carpetas de la biblioteca pasa por aquí. `plan_*` (sin efectos) → `execute(plan)`:
-  por paso, fila en `fs_operations` (`PLANNED`) → `os.rename` → `DISK_DONE` → actualizar `catalog_folders`/`catalog_accounts` (prefijo) → `COMMITTED`.
+  `existing_unregistered_folder`/`adopt_folder` (v4.15.0) registran en el catálogo una carpeta que ya existe en disco sin tocarla. Por paso, fila en `fs_operations` (`PLANNED`) → `os.rename` → `DISK_DONE` → actualizar `catalog_folders`/`catalog_accounts` (prefijo) → `COMMITTED`.
   `recover()` resuelve pasos interrumpidos mirando el disco; `undo(op_group)` crea las operaciones inversas.
 - `fsops_plan.py` — `Plan`/`Step`/`Conflict` (códigos: `OFFLINE`, `OUTSIDE_ROOT`, `SRC_MISSING`, `DEST_EXISTS`, `DEST_IN_CATALOG`, `INVALID_NAME`, `INTO_ITSELF`, `IS_ROOT`, `NO_CHANGE`, `NO_PATH`, `ACCOUNT_IN_ACTIVE_BATCH`).
 - `compat_lite.py` — `mirror_to_lite`: solo actualiza `accounts_dir.path` donde difiere (idempotente); `compat.lite.enabled` lo desactiva.

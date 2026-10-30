@@ -93,6 +93,24 @@ def test_mkdir_conflicts(env) -> None:
     assert service.plan_mkdir(folders["00.FAVORITES"], "a?b").blocking[0].code == "INVALID_NAME"
 
 
+def test_existing_unregistered_folder_can_be_adopted_without_touching_disk(env) -> None:
+    service, conn, lib, folders, _ = env
+    (lib / "00.FAVORITES" / "Empty").mkdir()
+    marker = lib / "00.FAVORITES" / "Empty" / "keep.txt"
+    marker.write_text("x")
+
+    rel = service.existing_unregistered_folder(folders["00.FAVORITES"], "Empty")
+    assert rel == "00.FAVORITES\\Empty"
+    assert service.existing_unregistered_folder(folders["00.FAVORITES"], "Group") is None  # already registered
+    assert service.existing_unregistered_folder(folders["00.FAVORITES"], "Missing") is None  # not on disk
+
+    folder_id = service.adopt_folder(rel)
+
+    assert service.folder_id_for_rel(rel) == folder_id
+    assert marker.exists()
+    assert service.existing_unregistered_folder(folders["00.FAVORITES"], "Empty") is None
+
+
 def test_move_account_updates_disk_and_db(env) -> None:
     service, conn, lib, folders, accounts = env
 

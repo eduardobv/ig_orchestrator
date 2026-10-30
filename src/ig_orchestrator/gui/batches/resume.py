@@ -265,6 +265,9 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
         is_catalog_update = (
             not is_new_account and bool(owner_id.strip() or destination_path.strip())
         )
+        # Renew is inferred too: a first post date without being a new account (Renew stores no owner id/path).
+        start_init_date = str(row["rename_start_init_date"] or "")
+        is_renew = not is_new_account and not is_catalog_update and bool(start_init_date.strip())
         keys = set(row.keys())
         try:
             priority = int(row["priority"] or 0) if "priority" in keys else 0
@@ -279,9 +282,10 @@ def load_batch_draft(connection: Connection, batch_id: int) -> BatchDraft:
                 is_new_account=is_new_account,
                 is_catalog_update=is_catalog_update,
                 owner_id=owner_id,
-                start_init_date=str(row["rename_start_init_date"] or ""),
+                start_init_date=start_init_date,
                 destination_path=destination_path,
                 priority=priority if priority > 0 else 0,
+                is_renew=is_renew,
             )
         )
 

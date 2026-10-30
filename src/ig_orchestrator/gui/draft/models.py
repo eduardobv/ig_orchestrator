@@ -15,6 +15,7 @@ class AccountDraft:
     start_init_date: str = ""
     destination_path: str = ""
     priority: int = 0
+    is_renew: bool = False  # Renew: registered account whose library files are renamed again from start_init_date
 
 
 @dataclass(slots=True)

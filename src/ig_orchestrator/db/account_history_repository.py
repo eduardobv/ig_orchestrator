@@ -209,6 +209,19 @@ class AccountHistoryRepository:
             raise RuntimeError("Account history row disappeared during update")
         return stored
 
+    def update_start_init_date(self, user_name: str, *, start_init_date: str) -> AccountHistory:
+        """Renew: set only the first post date (field2); owner id and path are kept."""
+        record = self.create_or_get(user_name)
+        self.connection.execute(
+            "UPDATE account_history SET field2 = ?, updated_at = datetime('now') WHERE id = ?",
+            (start_init_date, record.id),
+        )
+        self.connection.commit()
+        stored = self.get_by_id(record.id)
+        if stored is None:
+            raise RuntimeError("Account history row disappeared during update")
+        return stored
+
     def update_identity_and_path(
         self,
         user_name: str,

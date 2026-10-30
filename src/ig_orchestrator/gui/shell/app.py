@@ -156,6 +156,7 @@ from ig_orchestrator.gui.run.rename import RenameMixin
 from ig_orchestrator.gui.settings.dialog import SettingsDialogMixin
 from ig_orchestrator.gui.exchange.publish_dialog import PublishDialogMixin
 from ig_orchestrator.gui.exchange.pull_dialog import PullDialogMixin
+from ig_orchestrator.gui.library.account_status_dialog import AccountStatusMixin
 from ig_orchestrator.gui.library.audit_dialog import LibraryAuditMixin
 from ig_orchestrator.gui.library.fsops_actions import FsOpsActionsMixin
 from ig_orchestrator.gui.library.lifecycle_actions import AccountLifecycleActionsMixin
@@ -208,6 +209,7 @@ class InstagramOrchestratorApp(
     StagingPanelMixin,
     StoriesInboxMixin,
     LibraryAuditMixin,
+    AccountStatusMixin,
     LibraryImportMixin,
     FsOpsActionsMixin,
     AccountLifecycleActionsMixin,
@@ -231,6 +233,9 @@ class InstagramOrchestratorApp(
         self.catalog_service = AccountCatalogService(
             connection,
             batch_json_path=batch_json_path,
+        )
+        self.catalog_service.include_archived = (
+            _gui_setting(connection, "ui.catalog_show_archived", "1") == "1"
         )
         self.catalog_entries = self.catalog_service.list_entries()
         self.today_catalog_usernames = list_usernames_active_on_date(
@@ -289,6 +294,7 @@ class InstagramOrchestratorApp(
         self.stories_var = tk.BooleanVar(value=False)
         self.new_account_var = tk.BooleanVar(value=False)
         self.catalog_update_var = tk.BooleanVar(value=False)
+        self.renew_var = tk.BooleanVar(value=False)
         self.priority_var = tk.BooleanVar(value=False)
         self.owner_id_var = tk.StringVar()
         self.start_init_date_var = tk.StringVar()

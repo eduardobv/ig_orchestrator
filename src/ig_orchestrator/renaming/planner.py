@@ -20,6 +20,7 @@ from ig_orchestrator.renaming.files import (
     FILENAME_MANUAL_RE,
     ConsultItem,
     consult_files_structure,
+    consult_items_from_names,
     find_media_files,
     group_manual_files_by_prefix,
 )
@@ -98,6 +99,7 @@ class FileAction:
     old: str
     new: str
     date: str = ""
+    in_library: bool = False  # renew: the file was renamed in place inside the library folder
 
 
 @dataclass(slots=True)
@@ -172,13 +174,13 @@ def rename_manual_files(entries, manual_root, relpath, ops: FileOps, ctx: Timeli
         for item, item_time in zip(items, times):
             date_str = item_time.strftime("%Y-%m-%d %H.%M.%S")
             new_basename = build_new_basename(date_str, item["num_id"], user_id, item["ext"])
-            folder = os.path.join(manual_root, relpath) if relpath else manual_root
+            folder = item.get("folder") or (os.path.join(manual_root, relpath) if relpath else manual_root)
             old_path = os.path.join(folder, item["filename"])
             new_path = find_unique_filepath(os.path.join(folder, new_basename), folder, ops)
             try:
                 ops.rename(old_path, new_path)
                 result.renamed_files.append(new_path)
-                result.actions.append(FileAction("RENAME", old_path, new_path, date_str))
+                result.actions.append(FileAction("RENAME", old_path, new_path, date_str, in_library=bool(item.get("folder"))))
             except OSError as exc:
                 result.errors.append(f"Error renombrando {item['filename']} -> {os.path.basename(new_path)}: {exc}")
 
@@ -198,6 +200,63 @@ def process_new_manual_files(manual_path, manual_root, relpath, new_user: NewUse
     combined = build_combined_timeline([], groups)
     assign_dates_for_new_entries(combined, start_date, end_date)
     rename_manual_files(combined, manual_root, relpath, ops, ctx, result)
+
+
+def _relative_dirs(root: str) -> set[str]:
+    """Every sub-folder of *root* as a path relative to it, plus ``''`` for the root itself."""
+
+    found = {""}
+    for current, dirs, _files in os.walk(root):
+        for name in dirs:
+            found.add(os.path.relpath(os.path.join(current, name), root))
+    return found
+
+
+def process_renew_tree(
+    manual_root: str, library_root: str, ops: FileOps, ctx: TimelineContext, new_user: NewUser, result: TreeResult
+) -> TreeResult:
+    """Renew: restart an account's rename from the First Post Date.
+
+    Per folder, the files named only by media id (``{id}.ext``) in the library account folder are joined with the
+    downloaded ones and renamed together as if the account were new (blocks spread between the first post date and
+    ``startNowDate``). Library files are renamed in place; already-named library files are never touched, they only
+    make a downloaded copy of the same id a duplicate.
+    """
+
+    start = new_user.start_init
+    if not start:
+        result.warnings.append("Renew sin fecha del primer post: no se renombra")
+        return result
+    end = ctx.now
+    if end < start:
+        result.warnings.append("startNowDate es anterior a la fecha del primer post: se usa la del primer post")
+        end = start
+    folders = _relative_dirs(manual_root) | _relative_dirs(library_root)
+    for rel in sorted(folders, key=lambda r: (r.count(os.sep) if r else -1, r.casefold())):
+        manual_dir = os.path.join(manual_root, rel) if rel else manual_root
+        library_dir = os.path.join(library_root, rel) if rel else library_root
+        manual_names = find_media_files(manual_dir) if os.path.isdir(manual_dir) else []
+        library_names = find_media_files(library_dir) if os.path.isdir(library_dir) else []
+        library_raw = [
+            {"filename": name, "num_id": int(m.group(1)), "ext": m.group(2), "folder": library_dir}
+            for name in library_names
+            if (m := FILENAME_MANUAL_RE.match(name))
+        ]
+        named = consult_items_from_names(library_names)
+        known_ids = {item.num_id for item in named} | {item["num_id"] for item in library_raw}
+        downloaded = rename_duplicate_manual_files(manual_names, known_ids, manual_dir, ops, result)
+        if named and (library_raw or downloaded):
+            result.warnings.append(
+                f"'{rel or '.'}': la biblioteca ya tiene {len(named)} ficheros renombrados; Renew no los toca "
+                "ni los usa como referencia de fechas"
+            )
+        groups = group_manual_files_by_prefix(downloaded + library_raw)
+        if not groups:
+            continue
+        combined = build_combined_timeline([], groups)
+        assign_dates_for_new_entries(combined, start, end)
+        rename_manual_files(combined, manual_root, rel, ops, ctx, result)
+    return result
 
 
 def process_folder_tree(

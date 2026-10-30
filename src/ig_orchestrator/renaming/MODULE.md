@@ -16,6 +16,7 @@ Renombrado integrado de descargas (port de `ManualRenameFiles --newRename`). Sin
 
 - Ficheros descargados `^\d{10,}\.(jpg|jpeg|mp4)$`; si el id ya está en la carpeta de referencia **de la misma subcarpeta** → `{id}_duplicated.ext` (se borra con *Eliminar duplicados*, solo nombres con `_duplicated` dentro de la carpeta procesada).
 - Grupos por los 6 primeros dígitos; fechas por interpolación entre vecinos de la biblioteca; por encima del último fichero, entre su fecha y `startNowDate`; nombre `{fecha} {id}_{owner}_manual.ext` (con `(n)` si choca).
+- **Renew (v4.17.0)**: `process_renew_tree` junta, por carpeta, los ficheros de la cuenta en la biblioteca con nombre solo-id y los descargados y los renombra como una cuenta nueva (primer post → `startNowDate`); los de la biblioteca se renombran en sitio (`FileAction.in_library`). Estado `RENEW` en `service.py` (`NewAccountSpec.renew`): exige cuenta registrada, carpeta accesible y Owner Id en el catálogo; guarda `start_init_date`.
 - Cuenta nueva: fechas repartidas entre su fecha de inicio y `startNowDate`; el id de propietario viene del lote.
 - Una subcarpeta que no existe en la biblioteca no se renombra (aviso) — igual que `sc2`.
 

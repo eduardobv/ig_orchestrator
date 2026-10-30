@@ -55,6 +55,34 @@ def test_defaults_come_from_env_and_builtin_values(tmp_path: Path) -> None:
     assert run.flood_sleep_threshold == 60
     assert run.telemetry_level == "FULL" and run.stories_first is True
     assert run.download_temp_folder is None
+    assert run.between_urls_seconds == 2
+    assert run.stall_enabled is True and run.stall_probe_delay_seconds == 10
+
+
+def test_pause_and_stall_settings_are_validated_and_saved(tmp_path: Path) -> None:
+    connection = _gui(tmp_path)
+    env = _env(tmp_path)
+
+    save_run_settings(
+        connection,
+        {
+            "run.bot.between_urls_seconds": "5",
+            "run.bot.stall_enabled": "0",
+            "run.bot.stall_probe_delay_seconds": "20",
+        },
+        env,
+    )
+    run = load_run_settings(connection, env)
+
+    assert (run.between_urls_seconds, run.stall_enabled, run.stall_probe_delay_seconds) == (
+        5,
+        False,
+        20,
+    )
+    with pytest.raises(ValueError):
+        validate_run_setting("run.bot.between_urls_seconds", "-1")
+    with pytest.raises(ValueError):
+        validate_run_setting("run.bot.stall_probe_delay_seconds", "0")
 
 
 def test_gui_value_beats_env_and_apply_to_overrides_settings(tmp_path: Path) -> None:

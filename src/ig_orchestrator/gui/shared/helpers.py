@@ -41,6 +41,7 @@ _BATCH_COLUMNS = (
 _ACCOUNT_PROGRESS_RE = re.compile(
     r"\[(?P<current>\d+)/(?P<total>\d+)\s*\|\s*(?P<percentage>\d+)%\]"
 )
+_BOT_STATUS_RE = re.compile(r"\[GUI_BOT_STATUS\]\s+(?P<state>STALLED|RESUMED)")
 _ITEM_PROGRESS_RE = re.compile(
     r"\[GUI_ITEM_PROGRESS\]\s+(?P<username>[^:]+):\s+"
     r"(?P<percentage>\d+)%\s+\((?P<current>\d+)/(?P<total>\d+)\)"
@@ -353,6 +354,7 @@ def _draft_signature(draft: BatchDraft) -> tuple[object, ...]:
                 account.start_now_date,
                 account.is_new_account,
                 account.is_catalog_update,
+                account.is_renew,
                 account.owner_id,
                 account.start_init_date,
                 account.destination_path,
@@ -372,9 +374,10 @@ def _new_account_rename_parameters(
             owner_id=account.owner_id,
             start_init_date=account.start_init_date,
             destination_path=account.destination_path,
+            renew=account.is_renew,
         )
         for account in accounts
-        if account.is_new_account
+        if account.is_new_account or account.is_renew
     )
 
 
@@ -387,6 +390,8 @@ def _account_display_status(
             return "Nueva", "pending"
         if account.is_catalog_update:
             return "Catálogo", "pending"
+        if account.is_renew:
+            return "Renew", "pending"
         if account.download_stories or account.urls:
             return "Preparada", "pending"
         return "Vacia", "failed"
@@ -513,6 +518,7 @@ __all__ = [
     "_ACCOUNT_PROGRESS_RE",
     "_BATCH_COLUMNS",
     "_CATALOG_COLORS",
+    "_BOT_STATUS_RE",
     "_ITEM_PROGRESS_RE",
     "_account_display_status",
     "_batch_column_samples",

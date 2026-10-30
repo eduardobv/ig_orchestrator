@@ -15,7 +15,7 @@ from ig_orchestrator.gui.i18n import t
 from ig_orchestrator.gui.shared.helpers import bind_escape_close
 from ig_orchestrator.library.audit_cli import native_path_text
 from ig_orchestrator.renaming import NewAccountSpec, RenameJob, RenamePreview, RenameService
-from ig_orchestrator.renaming.service import NEW_ACCOUNT, SKIPPED
+from ig_orchestrator.renaming.service import NEW_ACCOUNT, RENEW, SKIPPED
 from ig_orchestrator.renaming.settings import staging_after_rename, staging_root_setting
 
 MAX_FILES_SHOWN = 400
@@ -38,6 +38,8 @@ def source_choices(connection: Connection, working_folder: str) -> list[tuple[st
 def account_status_text(plan) -> str:
     if plan.status == SKIPPED:
         return t("rename.status.skipped")
+    if plan.status == RENEW:
+        return t("rename.status.renew")
     return t("rename.status.new") if plan.status == NEW_ACCOUNT else t("rename.status.rename")
 
 
@@ -66,7 +68,7 @@ def show_rename_dialog(
     """Interactive preview. ``on_execute(preview)`` is called when the user confirms."""
 
     service = RenameService(connection, root=root)
-    specs = tuple(NewAccountSpec(a.username, a.owner_id, a.start_init_date, a.destination_path) for a in new_accounts)
+    specs = tuple(NewAccountSpec(a.username, a.owner_id, a.start_init_date, a.destination_path, a.renew) for a in new_accounts)
     window = tk.Toplevel(parent)
     window.title(t("rename.dialog.title"))
     window.geometry("1000x620")

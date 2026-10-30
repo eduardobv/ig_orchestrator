@@ -1026,6 +1026,13 @@ Politica:
 - Si el bot no devuelve ningún mensaje ni archivo antes del timeout, se registra
   `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
   `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.
+- Renew (v4.17.0): casilla del editor para volver a empezar el renombrado de una cuenta existente (ficheros solo-id de `G:` + descargados, desde la fecha del primer post); ver `docs/manual-usuario.md`.
+- Pausa entre URLs (v4.16.0): `run.bot.between_urls_seconds` (2 s por defecto)
+  espacia los envíos al bot. Tras una URL sin respuesta, la siguiente espera
+  `run.bot.stall_probe_delay_seconds` (10 s); si tampoco responde, la app entra en
+  **modo espera** (aviso en la barra de estado de la GUI) sin enviar más URLs hasta
+  que el bot conteste, y recoge las respuestas de las dos aunque lleguen desordenadas
+  (`run.bot.stall_enabled` lo desactiva). Ajustes en *Configuración > Ejecución*.
 - Backoff por defecto: 90, 180, 360, 720, 900 segundos.
 - Las stories tienen como máximo **2 reintentos** (v4.2.0), porque caducan.
 

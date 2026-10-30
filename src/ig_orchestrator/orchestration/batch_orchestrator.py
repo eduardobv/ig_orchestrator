@@ -352,7 +352,11 @@ class BatchOrchestrator:
             next_retry_at, job, account = candidates[0]
             now = datetime.now(timezone.utc)
             wait_seconds = (_aware(next_retry_at) - now).total_seconds()
-            if wait_seconds > 0 and self._config.wait_between_retries:
+            if (
+                wait_seconds > 0
+                and self._config.wait_between_retries
+                and not self._stall_pending()
+            ):
                 logger.info(
                     "Retry round waiting for the earliest retry: job_id={} wait_seconds={:.0f} pending={}",
                     job.id,
@@ -400,6 +404,12 @@ class BatchOrchestrator:
                 candidates.append((job.next_retry_at, job, account))
         candidates.sort(key=lambda item: (_aware(item[0]), item[1].id or 0))
         return candidates
+
+    def _stall_pending(self) -> bool:
+        """The bot is being probed: send the next URL after the probe delay only."""
+
+        check = getattr(self._account_orchestrator, "stall_pending", None)
+        return bool(check()) if callable(check) else False
 
     async def _wait_retry_delay(self, seconds: float) -> None:
         if self._config.retry_delay_handler is not None:

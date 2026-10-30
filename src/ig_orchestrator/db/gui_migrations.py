@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlite3 import Connection
 
 from ig_orchestrator.db.connection import connect
+from ig_orchestrator.account_status.schema import ensure_account_status_schema
 from ig_orchestrator.telemetry.schema import ensure_telemetry_schema
 
 
@@ -89,6 +90,7 @@ def _patch_gui_schema(connection: Connection) -> None:
 
     backup_before_library_migration(connection)
     ensure_telemetry_schema(connection)
+    ensure_account_status_schema(connection)
 
     connection.execute(
         """

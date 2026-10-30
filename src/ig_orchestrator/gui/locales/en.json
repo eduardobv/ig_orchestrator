@@ -70,6 +70,8 @@
   "label.stories": "Stories",
   "label.new_account": "New account",
   "label.update": "Update",
+  "label.renew": "Renew",
+  "label.renew_frame": "Renew details (owner id and path are kept)",
   "label.new_account_frame": "New account details",
   "status.ready": "Ready",
   "status.accounts": "Accounts: {value}",
