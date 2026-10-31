@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-rem Doble clic en la instancia: copia lo que cambio en el PC principal. Detén el batch antes.
-rem Ruta del PC principal: inst_sync\origen.txt (una linea).
+rem PARTE 2, doble clic en la instancia (solo si el PC principal lo pide): dependencias, SQL y base.
+rem Detén el batch antes. El codigo lo copia empujar.bat desde el PC principal.
 cd /d "%~dp0\.."
 
 if exist ".venv\Scripts\python.exe" (

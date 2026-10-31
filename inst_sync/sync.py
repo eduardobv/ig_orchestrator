@@ -1,14 +1,15 @@
-"""Sync this instance with the main PC code (feat-uc4-7).
+"""Sync an instance with the main PC code (feat-uc4-7, two parts since v4.18.1).
 
-Run from the instance (double click ``sincronizar.bat``). Standard library only.
+Part 1 · ``--empujar`` (``empujar.bat``, run on the main PC): mirrors ``src``, ``tools``,
+``inst_sync`` and the dependency files into the instance folder reachable by network (file copies
+only, no Python and no database of the instance are touched) and says whether part 2 is needed.
 
-* Mirrors ``src``, ``tools``, ``inst_sync`` and the dependency files from the source folder,
-  copying new/changed files and deleting the ones removed upstream.
-* Never touches instance-owned data: ``.env``, ``data``, ``logs``, ``reports``, ``config``,
-  ``.venv``, ``*.session*`` (they are simply not in the mirrored set).
-* Installs ``requirements.txt`` when it changed (or ``cryptg`` is missing).
-* Applies pending ``sql/*.sql`` once each, opens the GUI database so schema migrations run, and
-  prints the ``CAMBIOS.md`` entries newer than the previously installed version.
+Part 2 · no flag (``sincronizar.bat``, run on the instance): installs ``requirements.txt`` when it
+changed (or ``cryptg`` is missing), applies pending ``sql/*.sql`` once each and opens the GUI
+database so schema migrations run.
+
+Never touches instance-owned data: ``.env``, ``data``, ``logs``, ``reports``, ``config``,
+``.venv``, ``*.session*`` (they are simply not in the mirrored set). Standard library only.
 """
 
 from __future__ import annotations
@@ -28,14 +29,15 @@ from pathlib import Path
 
 MIRROR_DIRS = ("src", "tools", "inst_sync")
 MIRROR_FILES = ("pyproject.toml", "requirements.txt")
-# Relative to the ``inst_sync`` folder: instance-owned, never copied nor deleted.
-KEEP_IN_SYNC_DIR = {"origen.txt", "estado.json", "bkp", "sincronizar.bat"}
+# Relative to the ``inst_sync`` folder: owned by one side, never copied nor deleted.
+KEEP_IN_SYNC_DIR = {"origen.txt", "destino.txt", "empujar.bat", "estado.json", "bkp"}
 SKIP_DIR_NAMES = {"__pycache__"}
 SKIP_SUFFIXES = {".pyc", ".pyo"}
 GUI_DB = Path("data") / "orchestrator_gui.sqlite"
 BACKUPS_TO_KEEP = 3
 VERSION_RE = re.compile(r'__version__\s*=\s*"([^"]+)"')
 HEADING_RE = re.compile(r"^##\s+v?(\d+\.\d+\.\d+)\b.*$", re.MULTILINE)
+MAX_LISTED = 15
 
 
 def _skip(rel: Path, top: str) -> bool:
@@ -58,6 +60,7 @@ def _files(root: Path, top: str) -> dict[Path, Path]:
 
 def plan_mirror(source: Path, target: Path) -> dict[str, list[Path]]:
     """Return ``{"copy": [...], "delete": [...]}`` with paths relative to the project root."""
+    filecmp.clear_cache()  # the cache keys on size+mtime: stale hits hide quick same-size rewrites
     copy: list[Path] = []
     delete: list[Path] = []
     for top in MIRROR_DIRS:
@@ -142,19 +145,38 @@ def apply_sql(db_path: Path, scripts: list[Path]) -> list[str]:
     return done
 
 
-def read_source(inst_dir: Path, cli_value: str | None) -> Path:
+def instance_pending(target: Path, state: dict) -> list[str]:
+    """Reasons why part 2 (``sincronizar.bat`` on the instance) is needed; empty when it is not."""
+    reasons = []
+    if file_sha(target / "requirements.txt") != state.get("requirements_sha", ""):
+        reasons.append("instalar las dependencias (requirements.txt)")
+    scripts = pending_sql(target / "inst_sync" / "sql", state.get("sql_applied", []))
+    if scripts:
+        reasons.append("aplicar SQL: " + ", ".join(s.name for s in scripts))
+    return reasons
+
+
+def read_destination(inst_dir: Path, cli_value: str | None) -> Path:
+    """Instance folder as seen from the main PC: ``--destino`` or the first line of ``destino.txt``."""
     if cli_value:
         return Path(cli_value)
-    origin = inst_dir / "origen.txt"
-    if origin.is_file():
-        for line in origin.read_text(encoding="utf-8").splitlines():
+    path_file = inst_dir / "destino.txt"
+    if path_file.is_file():
+        for line in path_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line and not line.startswith("#"):
                 return Path(line)
     raise SystemExit(
-        "Falta la carpeta de origen. Escribe su ruta en inst_sync\\origen.txt "
-        "(una línea, p. ej. \\\\PC-PRINCIPAL\\ig_orchestrator) o usa --origen."
+        "Falta la carpeta de la instancia. Escribe su ruta en inst_sync\\destino.txt "
+        "(una línea, p. ej. \\\\INST1\\ig_orchestrator) o usa --destino."
     )
+
+
+def _same_folder(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return a == b
 
 
 def _load_state(path: Path) -> dict:
@@ -162,6 +184,11 @@ def _load_state(path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def _save_state(path: Path, state: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 def _run_python(target: Path, code: str) -> subprocess.CompletedProcess:
@@ -175,48 +202,97 @@ def _run_python(target: Path, code: str) -> subprocess.CompletedProcess:
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Sincroniza esta instancia con el PC principal.")
-    parser.add_argument("--origen", help="Carpeta del proyecto en el PC principal.")
-    parser.add_argument("--destino", help="Carpeta de esta instancia (por defecto, la del script).")
-    parser.add_argument("--simular", action="store_true", help="Solo muestra lo que haría.")
-    parser.add_argument("--si", action="store_true", help="No pedir confirmación.")
-    args = parser.parse_args(argv)
+def _confirm_stopped(args, where: str) -> bool:
+    if args.si or input(f"¿Está detenido el batch en {where}? (s/N) ").strip().lower() in {"s", "si", "sí", "y"}:
+        return True
+    print("Cancelado. Detén el batch y vuelve a ejecutar.")
+    return False
 
-    inst_dir = Path(__file__).resolve().parent
-    target = Path(args.destino).resolve() if args.destino else inst_dir.parent
-    source = read_source(inst_dir, args.origen).resolve()
+
+def _print_changes(cambios: Path, since: str) -> None:
+    news = pending_changes(cambios.read_text(encoding="utf-8"), since) if cambios.is_file() else []
+    if news:
+        print("\n=== Cambios desde la versión de la instancia (léelos por si piden algún paso manual) ===")
+        for _, body in news:
+            print(body + "\n")
+
+
+def run_push(args, inst_dir: Path) -> int:
+    """Part 1, on the main PC: copy the code into the instance folder and say whether part 2 is needed."""
+    source = Path(args.origen).resolve() if args.origen else inst_dir.parent
+    target = read_destination(inst_dir, args.destino).resolve()
     if not (source / "src" / "ig_orchestrator").is_dir():
         print(f"ERROR: {source} no parece un proyecto ig_orchestrator.")
         return 2
-    if source == target:
-        print("ERROR: el origen y el destino son la misma carpeta.")
+    if not (target / "src" / "ig_orchestrator").is_dir():
+        print(f"ERROR: {target} no parece un proyecto ig_orchestrator (¿ruta de red accesible?).")
+        return 2
+    if _same_folder(source, target):
+        print("ERROR: la carpeta de la instancia es la de este PC (revisa inst_sync\\destino.txt).")
         return 2
 
     state_path = target / "inst_sync" / "estado.json"
     state = _load_state(state_path)
-    before = installed_version(target)
+    before, pc_version = installed_version(target), installed_version(source)
     plan = plan_mirror(source, target)
-    req_changed = file_sha(source / "requirements.txt") != state.get("requirements_sha", "")
-    scripts = pending_sql(source / "inst_sync" / "sql", state.get("sql_applied", []))
 
-    print(f"Origen : {source}\nDestino: {target}\nVersión instalada: {before}")
+    print(f"PC     : {source} (v{pc_version})\nInst.  : {target} (v{before})")
     print(f"Ficheros a copiar: {len(plan['copy'])} · a borrar: {len(plan['delete'])}")
-    for rel in plan["delete"]:
-        print(f"  - borrar {rel}")
-    print(f"Dependencias: {'se instalarán' if req_changed else 'sin cambios'} · SQL pendientes: {len(scripts)}")
+    for label, items in (("copiar", plan["copy"]), ("borrar", plan["delete"])):
+        for rel in items[:MAX_LISTED]:
+            print(f"  - {label} {rel}")
+        if len(items) > MAX_LISTED:
+            print(f"  … y {len(items) - MAX_LISTED} más a {label}")
+
+    if not plan["copy"] and not plan["delete"]:
+        reasons = instance_pending(target, state)
+        if reasons:
+            print("El código ya está copiado, pero falta la parte 2: ejecuta inst_sync\\sincronizar.bat EN LA INSTANCIA para "
+                  + "; ".join(reasons) + ".")
+        else:
+            print(f"Instancia sincronizada con el PC (v{before}). No hay nada que hacer.")
+        return 0
     if args.simular:
         print("Simulación: no se ha cambiado nada.")
         return 0
-    if not args.si and input("¿Está detenido el batch en esta instancia? (s/N) ").strip().lower() not in {"s", "si", "sí", "y"}:
-        print("Cancelado. Detén el batch y vuelve a ejecutar.")
+    if not _confirm_stopped(args, "la instancia"):
         return 1
 
-    now = datetime.now()
-    backup = backup_code(target, before, now)
+    backup = backup_code(target, before, datetime.now())
     apply_mirror(source, target, plan)
     after = installed_version(target)
-    print(f"Código sincronizado ({before} -> {after}). Copia anterior: {backup}")
+    print(f"Código copiado ({before} -> {after}). Copia anterior: {backup}")
+    _print_changes(target / "inst_sync" / "CAMBIOS.md", state.get("version", before))
+    state["version"] = after
+    _save_state(state_path, state)
+
+    reasons = instance_pending(target, state)
+    if reasons:
+        print("PARTE 2 NECESARIA: ejecuta inst_sync\\sincronizar.bat EN LA INSTANCIA para " + "; ".join(reasons) + ".")
+    else:
+        print("No hace falta ejecutar nada en la instancia (la base se migra sola al abrir la app).")
+    return 0
+
+
+def run_local(args, inst_dir: Path) -> int:
+    """Part 2, on the instance: what needs its own Python and database."""
+    target = Path(args.destino).resolve() if args.destino else inst_dir.parent
+    if not (target / "src" / "ig_orchestrator").is_dir():
+        print(f"ERROR: {target} no parece un proyecto ig_orchestrator.")
+        return 2
+    state_path = target / "inst_sync" / "estado.json"
+    state = _load_state(state_path)
+    reasons = instance_pending(target, state)
+    req_changed = file_sha(target / "requirements.txt") != state.get("requirements_sha", "")
+    scripts = pending_sql(target / "inst_sync" / "sql", state.get("sql_applied", []))
+
+    print(f"Instancia: {target} (v{installed_version(target)})")
+    print(f"Pendiente: {'; '.join(reasons) if reasons else 'nada (solo se comprueba cryptg y se abre la base)'}")
+    if args.simular:
+        print("Simulación: no se ha cambiado nada.")
+        return 0
+    if not _confirm_stopped(args, "esta instancia"):
+        return 1
 
     cryptg_ok = _run_python(target, "import cryptg").returncode == 0
     if req_changed or not cryptg_ok:
@@ -230,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
 
     db_path = target / GUI_DB
     if scripts and db_path.is_file():
+        now = datetime.now()
         db_backup = db_path.with_name(f"{db_path.stem}_pre_sync_{now:%Y%m%d_%H%M%S}{db_path.suffix}")
         (target / "inst_sync" / "bkp").mkdir(parents=True, exist_ok=True)
         shutil.copy2(db_path, target / "inst_sync" / "bkp" / db_backup.name)
@@ -242,18 +319,23 @@ def main(argv: list[str] | None = None) -> int:
             f"prepare_sqlite(r'{db_path}')",
         )
         print("Migraciones de la base: " + ("OK" if migrated.returncode == 0 else f"ERROR\n{migrated.stderr}"))
-    state["version"] = after
-    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
-
-    cambios = target / "inst_sync" / "CAMBIOS.md"
-    if cambios.is_file():
-        news = pending_changes(cambios.read_text(encoding="utf-8"), before)
-        if news:
-            print("\n=== Cambios desde tu versión (léelos por si piden algún paso manual) ===")
-            for _, body in news:
-                print(body + "\n")
-    print("Listo. Ya puedes abrir la app.")
+    state["version"] = installed_version(target)
+    _save_state(state_path, state)
+    print("Listo. La instancia está al día y ya puedes abrir la app.")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Sincroniza una instancia con el PC principal (dos partes).")
+    parser.add_argument("--empujar", action="store_true", help="Parte 1 (en el PC): copia el código a la instancia.")
+    parser.add_argument("--origen", help="Parte 1: carpeta del proyecto en este PC (por defecto, la del script).")
+    parser.add_argument("--destino", help="Parte 1: carpeta de la instancia (por defecto, destino.txt). "
+                                          "Parte 2: carpeta de la instancia (por defecto, la del script).")
+    parser.add_argument("--simular", action="store_true", help="Solo muestra lo que haría.")
+    parser.add_argument("--si", action="store_true", help="No pedir confirmación.")
+    args = parser.parse_args(argv)
+    inst_dir = Path(__file__).resolve().parent
+    return run_push(args, inst_dir) if args.empujar else run_local(args, inst_dir)
 
 
 if __name__ == "__main__":

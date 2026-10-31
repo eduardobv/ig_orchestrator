@@ -1026,7 +1026,7 @@ Politica:
 - Si el bot no devuelve ningún mensaje ni archivo antes del timeout, se registra
   `NO_BOT_RESPONSE`. Se reintenta con la misma política y, al agotar
   `MAX_RETRIES`, termina en `FAILED_FINAL` sin bloquear las URLs siguientes.
-- inst_sync (v4.18.0): `inst_sync\sincronizar.bat` replica en otra instancia el código del PC principal (copia/borra, instala dependencias, SQL, migraciones); ver `inst_sync/README.md`.
+- inst_sync (v4.18.0): `inst_sync\empujar.bat` (PC principal) copia por red el código a otra instancia y avisa si hay que ejecutar allí `inst_sync\sincronizar.bat` (dependencias, SQL, migraciones); ver `inst_sync/README.md`.
 - Renew (v4.17.0): casilla del editor para volver a empezar el renombrado de una cuenta existente (ficheros solo-id de `G:` + descargados, desde la fecha del primer post); ver `docs/manual-usuario.md`.
 - Pausa entre URLs (v4.16.0): `run.bot.between_urls_seconds` (2 s por defecto)
   espacia los envíos al bot. Tras una URL sin respuesta, la siguiente espera

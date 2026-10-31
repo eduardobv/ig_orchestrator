@@ -1,0 +1,2 @@
+# Ruta de la carpeta del proyecto de la instancia, vista desde este PC (una sola linea, sin comillas).
+\\DESKTOP-OM856P7\ig_orchestrator

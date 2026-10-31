@@ -345,9 +345,9 @@ No existe «Analizar carpeta» como opción propia: se usa la **sincronización*
 **G: está apagada, ¿qué puedo hacer?** Descargar, renombrar (con índice) y dejar en el almacén o pendiente de mover; ver, filtrar y editar fichas. No se pueden mover/eliminar/sincronizar carpetas.
 
 
-## Replicar el código en otra instancia (v4.18.0)
+## Replicar el código en otra instancia (v4.18.0, dos partes desde v4.18.1)
 
-No es una opción de la GUI: en la instancia, detén el batch y haz doble clic en `inst_sync\sincronizar.bat` (la ruta del PC principal se escribe una vez en `inst_sync\origen.txt`). Copia lo que cambió, instala lo que falte y migra la base. Con `--simular` solo informa.
+No es una opción de la GUI; son dos dobles clics. **Parte 1, en este PC:** detén el batch de la instancia y ejecuta `inst_sync\empujar.bat` (la ruta de la instancia, vista desde este PC, está en `inst_sync\destino.txt`). Copia por red el código que cambió y avisa al final si además hay que ejecutar la parte 2 o si no hace falta; si todo coincide dice «Instancia sincronizada con el PC» y no mueve nada, por muchas veces que lo ejecutes. **Parte 2, en la instancia (solo si la parte 1 lo pide):** `inst_sync\sincronizar.bat` instala las dependencias, aplica los SQL pendientes y migra la base. Ambos aceptan `--simular` (solo informan).
 
 ## Pausa entre URLs y bot sin respuesta (v4.16.0)
 

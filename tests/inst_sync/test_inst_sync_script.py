@@ -50,6 +50,8 @@ def test_instance_owned_data_is_never_touched(pair):
         _write(target, rel, "mine")
     _write(source, ".env", "other")
     _write(target, "inst_sync/origen.txt", "mine")
+    _write(target, "inst_sync/destino.txt", "mine")
+    _write(target, "inst_sync/empujar.bat", "mine")
     _write(target, "inst_sync/estado.json", "{}")
     _write(target, "inst_sync/bkp/src_old/a.py")
     _write(source, "inst_sync/sincronizar.bat", "new launcher")
@@ -60,7 +62,8 @@ def test_instance_owned_data_is_never_touched(pair):
     assert (target / "inst_sync/origen.txt").read_text() == "mine"
     assert (target / "inst_sync/estado.json").exists()
     assert (target / "inst_sync/bkp/src_old/a.py").exists()
-    assert not (target / "inst_sync/sincronizar.bat").exists()
+    assert (target / "inst_sync/destino.txt").read_text() == "mine"
+    assert (target / "inst_sync/sincronizar.bat").read_text() == "new launcher"
 
 
 def test_pycache_ignored_and_empty_dirs_removed(pair):
@@ -102,21 +105,67 @@ def test_sql_applied_once(tmp_path):
     assert sqlite3.connect(db).execute("select a from t").fetchall() == [(1,)]
 
 
-def test_source_from_file_and_missing(tmp_path):
-    (tmp_path / "origen.txt").write_text("# c" + chr(10) + "X:/pc1/proj" + chr(10), encoding="utf-8")
-    assert sync.read_source(tmp_path, None) == Path("X:/pc1/proj")
-    assert sync.read_source(tmp_path, "X:/p") == Path("X:/p")
+def test_destination_from_file_and_missing(tmp_path):
+    (tmp_path / "destino.txt").write_text("# c" + chr(10) + "X:/inst1/proj" + chr(10), encoding="utf-8")
+    assert sync.read_destination(tmp_path, None) == Path("X:/inst1/proj")
+    assert sync.read_destination(tmp_path, "X:/p") == Path("X:/p")
     empty = tmp_path / "e"
     empty.mkdir()
     with pytest.raises(SystemExit):
-        sync.read_source(empty, None)
+        sync.read_destination(empty, None)
 
 
-def test_main_simulation_changes_nothing(pair, capsys):
+def _push(source, target, *extra):
+    return sync.main(["--empujar", "--origen", str(source), "--destino", str(target), *extra])
+
+
+def test_push_simulation_changes_nothing(pair, capsys):
     source, target = pair
     _write(source, "src/ig_orchestrator/__init__.py", '__version__ = "1.2.0"\n')
     _write(source, "src/ig_orchestrator/x.py")
-    code = sync.main(["--origen", str(source), "--destino", str(target), "--simular"])
-    assert code == 0
+    assert _push(source, target, "--simular") == 0
     assert sync.installed_version(target) == "1.0.0"
     assert "Simulación" in capsys.readouterr().out
+
+
+def test_push_copies_then_reports_synced(pair, capsys):
+    source, target = pair
+    _write(source, "src/ig_orchestrator/__init__.py", '__version__ = "1.2.0"\n')
+    _write(source, "requirements.txt", "cryptg\n")
+    assert _push(source, target, "--si") == 0
+    out = capsys.readouterr().out
+    assert sync.installed_version(target) == "1.2.0"
+    assert "PARTE 2 NECESARIA" in out and "requirements.txt" in out
+    assert _push(source, target, "--si") == 0
+    assert "falta la parte 2" in capsys.readouterr().out
+    # part 2 done on the instance (simulated by recording the state): everything is in sync
+    state = {"requirements_sha": sync.file_sha(target / "requirements.txt"), "version": "1.2.0"}
+    (target / "inst_sync" / "estado.json").write_text(sync.json.dumps(state), encoding="utf-8")
+    assert _push(source, target, "--si") == 0
+    assert "sincronizada con el PC" in capsys.readouterr().out
+
+
+def test_push_without_part_two_needed_and_changes_shown(pair, capsys):
+    source, target = pair
+    _write(source, "src/ig_orchestrator/__init__.py", '__version__ = "1.1.0"\n')
+    _write(source, "inst_sync/CAMBIOS.md", "# c\n\n## v1.1.0 · paso\nhaz esto\n")
+    assert _push(source, target, "--si") == 0
+    out = capsys.readouterr().out
+    assert "haz esto" in out and "No hace falta ejecutar nada" in out
+    assert sync.json.loads((target / "inst_sync" / "estado.json").read_text())["version"] == "1.1.0"
+
+
+def test_push_refuses_same_folder_and_non_project(pair, tmp_path, capsys):
+    source, _ = pair
+    assert _push(source, source) == 2
+    assert "es la de este PC" in capsys.readouterr().out
+    assert _push(source, tmp_path / "nada") == 2
+
+
+def test_instance_pending_reasons(tmp_path):
+    _write(tmp_path, "requirements.txt", "cryptg\n")
+    _write(tmp_path, "inst_sync/sql/001_a.sql", "select 1;")
+    reasons = sync.instance_pending(tmp_path, {})
+    assert len(reasons) == 2
+    state = {"requirements_sha": sync.file_sha(tmp_path / "requirements.txt"), "sql_applied": ["001_a.sql"]}
+    assert sync.instance_pending(tmp_path, state) == []

@@ -1,2 +1,1 @@
-# Ruta del proyecto en el PC principal (una sola linea, sin comillas). Ejemplo:
-# \PC-PRINCIPAL\ig_orchestrator
+# Ya no se usa desde v4.18.1 (el codigo se empuja desde el PC principal con empujar.bat).

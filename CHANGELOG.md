@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.18.1 - fix inst_sync: dos partes (empujar desde el PC, sincronizar en la instancia)
+
+Fecha: 2026-10-31 · Rama: `v4/main`
+
+### Cambiado
+* **Parte 1 `inst_sync\empujar.bat`** (`sync.py --empujar`, ruta de la instancia en `destino.txt`): se ejecuta en el PC principal y copia/borra por red hacia la instancia (con copia de `src`), imprime las entradas nuevas de `CAMBIOS.md`, guarda la versión en el `estado.json` de la instancia y avisa si hace falta la parte 2. Sin cambios: «Instancia sincronizada con el PC». Rechaza destino = origen.
+* **Parte 2 `sincronizar.bat`** (en la instancia): solo `pip` (si cambió `requirements.txt` o falta `cryptg`), SQL pendientes y migración de la base; ya no usa `origen.txt`.
+* Los SQL no se aplican por red (la base usa WAL). `sincronizar.bat` pasa a copiarse con el espejo; `empujar.bat`, `destino.txt` y `origen.txt` quedan protegidos.
+* `plan_mirror` limpia la caché de `filecmp` (test intermitente por reescrituras del mismo tamaño).
+* Motivo: la carpeta del PC no está compartida y `origen.txt` apuntaba a la propia instancia (0 ficheros a copiar).
+
+### Archivos creados
+* `inst_sync/empujar.bat`, `inst_sync/destino.txt`.
+
+### Modificados
+* `inst_sync/{sync.py,sincronizar.bat,origen.txt,README.md,CAMBIOS.md}`, `tests/inst_sync/test_inst_sync_script.py`, versión 4.18.1 (`pyproject.toml`, `__init__.py`, smoke), `CLAUDE.md`, `README.md`, `docs/{manual-usuario,arquitectura-v3,tutorial-v3,plan-v3-features}.md`, `tasks/done/v3/feat-uc4-7.md`. `AGENTS.md` revisado: sin cambios.
+
+### Pruebas
+* `python -m pytest`: **772 passed** (suite completa; 12 en `tests/inst_sync`, 5 nuevos de empuje). Simulación real `--empujar --simular` contra la ruta de red de INST1 (v4.16.0 → 26 ficheros). **No probada** la copia real ni la parte 2 en INST1.
+
 ## v4.18.0 - feat-uc4-7: inst_sync, replicar el código en otra instancia con doble clic
 
 Fecha: 2026-10-30 · Rama: `v4/main`
