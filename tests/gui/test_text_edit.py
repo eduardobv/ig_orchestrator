@@ -18,6 +18,7 @@ from ig_orchestrator.gui.text_edit import (
     select_all,
     selected_text,
 )
+from ig_orchestrator.gui.editor.text_edit import with_trailing_newline
 
 
 class FakeEntry:
@@ -196,5 +197,29 @@ def test_context_menu_paste_into_real_entry() -> None:
         assert selected_text(text) == "one"
         assert cut_selection(text) is True
         assert text.get("1.0", "end-1c") == "\n"
+    finally:
+        root.destroy()
+
+
+def test_with_trailing_newline() -> None:
+    assert with_trailing_newline("a") == "a\n"
+    assert with_trailing_newline("a\n") == "a\n"
+    assert with_trailing_newline("") == ""
+
+
+def test_urls_text_paste_adds_newline() -> None:
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        pytest.skip("Tk display is not available")
+    root.withdraw()
+    try:
+        text = tk.Text(root)
+        menu = bind_edit_context_menu(text, paste_newline=True)
+        root.clipboard_clear()
+        root.clipboard_append("https://x/1")
+        menu.invoke(t("edit.paste"))
+        menu.invoke(t("edit.paste"))
+        assert text.get("1.0", "end-1c") == "https://x/1\nhttps://x/1\n"
     finally:
         root.destroy()

@@ -28,6 +28,14 @@ def first_clipboard_line(raw: str) -> str:
     return raw.strip()
 
 
+def with_trailing_newline(text: str) -> str:
+    """Return ``text`` ending in a line break (empty text stays empty)."""
+
+    if not text or text.endswith("\n"):
+        return text
+    return text + "\n"
+
+
 def _is_text_widget(widget: tk.Misc) -> bool:
     return isinstance(widget, tk.Text)
 
@@ -117,8 +125,13 @@ def bind_edit_context_menu(
     widget: tk.Widget,
     *,
     after_change: Callable[[], None] | None = None,
+    paste_newline: bool = False,
 ) -> tk.Menu:
-    """Attach Cut/Copy/Paste/Delete/Select all. ``break`` avoids a native duplicate."""
+    """Attach Cut/Copy/Paste/Delete/Select all. ``break`` avoids a native duplicate.
+
+    With ``paste_newline`` every paste (Ctrl+V, menu) ends with a line break so the
+    next paste starts on a new line (URLs editor).
+    """
 
     menu = tk.Menu(widget, tearoff=False)
     cut_label = t("edit.cut")
@@ -142,8 +155,14 @@ def bind_edit_context_menu(
         text = read_clipboard(widget)
         if text is None:
             return
+        if paste_newline:
+            text = with_trailing_newline(text)
         if paste_at_insert(widget, text):
             _changed()
+
+    def _paste_key(_event: tk.Event) -> str:
+        _paste()
+        return "break"
 
     def _delete() -> None:
         if delete_selection(widget):
@@ -180,6 +199,9 @@ def bind_edit_context_menu(
 
     for sequence in ("<Button-3>", "<Shift-F10>"):
         widget.bind(sequence, _popup)
+    if paste_newline:
+        for sequence in ("<Control-v>", "<Control-V>", "<<Paste>>"):
+            widget.bind(sequence, _paste_key)
     return menu
 
 
@@ -194,4 +216,5 @@ __all__ = [
     "select_all",
     "selected_text",
     "selection_range",
+    "with_trailing_newline",
 ]

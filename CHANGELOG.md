@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.19.0 - feat-gui-28: pegado con salto de línea y «Abrir en Chrome» en el lote
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* **Editor:** al pegar URLs (Ctrl+V, *Pegar* del clic derecho o botón Pegar) se añade un salto de línea tras lo pegado.
+* **Cuentas del lote actual:** clic derecho → **Abrir en Chrome** y **doble clic** abren `instagram.com/<usuario>/`. El doble clic ya no abre *Ver URLs…* (sigue en el clic derecho).
+
+### Modificados
+* `gui/editor/text_edit.py`, `gui/editor/panel.py`, `gui/batch_accounts/{panel,problem_urls}.py`, `tests/gui/test_text_edit.py`, `docs/manual-usuario.md`, versión 4.19.0.
+
+### Pruebas
+* `python -m pytest -q` : 774 passed. No probado con Chrome real.
+
 ## v4.18.1 - fix inst_sync: dos partes (empujar desde el PC, sincronizar en la instancia)
 
 Fecha: 2026-10-31 · Rama: `v4/main`

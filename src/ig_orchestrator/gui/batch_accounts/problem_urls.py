@@ -121,6 +121,23 @@ from ig_orchestrator.orchestration.processing_policy import (
 class ProblemUrlsMixin:
     """Mixin: completed/retry/failed URL dialog and folder open."""
 
+    def _on_batch_double_click(self, event: tk.Event) -> None:
+        """Double click on an account row opens its Instagram profile in Chrome."""
+        if not self.tree.identify_row(event.y):
+            return
+        self._open_selected_account_in_chrome()
+
+
+    def _open_selected_account_in_chrome(self) -> None:
+        if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
+            return
+        username = self.accounts[self.selected_index].username
+        if not _open_chrome_tab(_instagram_profile_url(username)):
+            messagebox.showwarning(
+                "Abrir en Chrome", f"No se pudo abrir @{username} en el navegador."
+            )
+
+
     def _open_selected_problem_urls(self) -> None:
         self._load_selected_row()
         kind = self._problem_kind_for_runtime(self._selected_runtime_progress())

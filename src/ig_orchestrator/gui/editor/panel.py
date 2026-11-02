@@ -110,10 +110,11 @@ from ig_orchestrator.gui.shared.helpers import (
     stories_cell_text,
 )
 from ig_orchestrator.gui.editor.path_suggest import PathSuggestEntry
-from ig_orchestrator.gui.text_edit import (
+from ig_orchestrator.gui.editor.text_edit import (
     bind_edit_context_menu,
     first_clipboard_line,
     read_clipboard,
+    with_trailing_newline,
 )
 from ig_orchestrator.gui.theme import Tooltip, compact_icon_button, icon_button
 from ig_orchestrator.gui.treeview_sort import bind_treeview_sort
@@ -386,7 +387,11 @@ class EditorPanelMixin:
         urls_scroll.grid(row=4, column=3, sticky="ns", pady=(8, 0))
         self.urls_text.configure(yscrollcommand=urls_scroll.set)
         self.urls_text.bind("<KeyRelease>", lambda _event: self._update_indicators())
-        bind_edit_context_menu(self.urls_text, after_change=self._update_indicators)
+        bind_edit_context_menu(
+            self.urls_text,
+            after_change=self._update_indicators,
+            paste_newline=True,
+        )
         ttk.Label(parent, textvariable=self.indicators_var).grid(
             row=5, column=2, columnspan=2, sticky="w", pady=(6, 0)
         )
@@ -801,7 +806,7 @@ class EditorPanelMixin:
             text = self.root.clipboard_get()
         except tk.TclError:
             return False
-        self.urls_text.insert(tk.INSERT, text)
+        self.urls_text.insert(tk.INSERT, with_trailing_newline(text))
         self._focus_urls_end()
         self._update_indicators()
         return True

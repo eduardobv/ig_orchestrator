@@ -56,7 +56,7 @@ Colores del catálogo (configurables en Configuración → Interfaz): favorito, 
 |---|---|
 | **Pegar/Agregar** | Pega del portapapeles un username (y URLs) y lo añade/actualiza en el lote de una vez. |
 | **Agregar/Actualizar** | Añade el contenido del editor al lote, o actualiza la cuenta si ya está. |
-| **Pegar** | Pega URLs del portapapeles en el cuadro de URLs. |
+| **Pegar** | Pega URLs del portapapeles en el cuadro de URLs. Igual que **Ctrl+V** y *Pegar* del clic derecho: tras lo pegado añade un salto de línea, así la siguiente tanda empieza en línea nueva sin pulsar Enter. |
 | **Copiar** (icono junto a *Pegar*) | En username, Owner Id, fecha del primer post y ruta: copia el valor del campo al portapapeles (vacío = no hace nada). |
 | ~~Normalizar~~ | Oculto desde v3.25 (se usaba poco); la función sigue en el código. |
 | **Limpiar editor** | Vacía los campos del editor. |
@@ -263,7 +263,8 @@ Clic derecho sobre un nombre: mismo menú de cuenta (las acciones de carpeta y l
 
 | Elemento | Qué hace |
 |---|---|
-| Doble clic | *Ver URLs…* de la cuenta (problemáticas). |
+| Doble clic | **Abre el perfil de la cuenta en Chrome** (como *Abrir en Chrome*). Antes abría *Ver URLs…*; ahora está en el clic derecho. |
+| Clic derecho → **Abrir en Chrome** | Abre `instagram.com/<usuario>/` en una pestaña nueva de Chrome (o del navegador por defecto si no hay Chrome). |
 | Clic derecho → **Completar** | Marca la cuenta como completada manualmente. |
 | Clic derecho → **Pausar (mover a lote guardado)…** | Selecciona una o varias cuentas **sin empezar** (estado pendiente, ninguna URL enviada) —también con el lote en ejecución— y pide confirmación. Las cuentas salen del lote y pasan a un lote **GUARDADO** (borrador) llamado `<lote>_PAUSA` (se amplía si ya existe; `_PAUSA2`… si el nombre está ocupado). El lote actual se da por terminado sin ellas y queda listo para renombrar; el lote guardado se ejecuta después desde *Lotes guardados*. Deshabilitado si alguna cuenta ya empezó o si pausarías todas. |
 | Clic derecho → **Mover a nuevo lote guardado…** | Igual que *Pausar* (mismas condiciones: cuentas sin empezar, también con el lote en ejecución) pero **pregunta el nombre** del lote GUARDADO destino. Propone `<lote>_PARTE2` (o `_PARTE3`… si está usado); si escribes el nombre de un borrador existente, las cuentas se añaden a él. Rechaza el nombre del propio lote, el de un lote ya no borrador o un nombre vacío. |

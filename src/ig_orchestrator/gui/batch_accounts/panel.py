@@ -185,11 +185,12 @@ class BatchAccountsPanelMixin:
         self.tree.configure(yscrollcommand=batch_scroll.set)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._load_selected_row())
         self.tree.bind("<Button-3>", self._show_batch_menu)
-        self.tree.bind(
-            "<Double-Button-1>",
-            lambda _event: self._open_selected_problem_urls(),
-        )
+        self.tree.bind("<Double-Button-1>", self._on_batch_double_click)
         self.batch_menu = tk.Menu(self.root, tearoff=False)
+        self.batch_menu.add_command(
+            label="Abrir en Chrome", command=self._open_selected_account_in_chrome
+        )
+        self.batch_menu.add_separator()
         self.batch_menu.add_command(
             label="Completar", command=self._complete_selected_account
         )
