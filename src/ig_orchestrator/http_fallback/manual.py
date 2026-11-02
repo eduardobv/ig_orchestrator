@@ -51,6 +51,29 @@ class ManualProgress:
     error: str | None = None
 
 
+def estimate_http_duration(count: int, interval_seconds: float) -> float:
+    """Seconds a manual HTTP run waits: ``count`` URLs x pause between URLs.
+
+    Only the pause is counted (the time of each request itself is not known).
+    """
+    return max(0, int(count)) * max(0.0, float(interval_seconds))
+
+
+def format_http_duration(seconds: float) -> str:
+    """``5 min``, ``1 h 57 min 30 s``, ``45 s`` (rounded to whole seconds)."""
+    total = int(round(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    parts = []
+    if hours:
+        parts.append(f"{hours} h")
+    if minutes:
+        parts.append(f"{minutes} min")
+    if secs or not parts:
+        parts.append(f"{secs} s")
+    return " ".join(parts)
+
+
 def list_http_candidate_ids(connection, account_id: int) -> list[int]:
     """Ids of the account's posts/reels that are not COMPLETED, in import order."""
 
@@ -188,6 +211,8 @@ def run_manual_http_download(
 
 
 __all__ = [
+    "estimate_http_duration",
+    "format_http_duration",
     "DEFAULT_TEST_URL",
     "HttpFallbackError",
     "ManualProgress",

@@ -24,7 +24,7 @@ Orquestador para preparar, trazar y procesar descargas manuales de Instagram med
 
 ## Estado
 
-- Versión actual **v4.22.x**, rama `v4/main` (serie v4 abierta; sigue las reglas de este documento con `v4.x`). La serie v3 se cerró en `v3.26.0` (rama `v3/integration`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
+- Versión actual **v4.23.x**, rama `v4/main` (serie v4 abierta; sigue las reglas de este documento con `v4.x`). La serie v3 se cerró en `v3.26.0` (rama `v3/integration`). Detalle y limitaciones: `docs/arquitectura-v3.md`.
 - Desde v3 la app integra los procesos manuales (sincronización con el disco, renombrado, catálogo = disco, instancias, almacén/volcado, papelera). Python 3.11+.
 - **SQLite v2 (`data/orchestrator_gui.sqlite`) es la única fuente de verdad en la GUI.** SQLite v1 (`data/orchestrator.sqlite`) es el rollback y lo usa la CLI; **la GUI nunca escribe en v1**.
 

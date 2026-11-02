@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import re
 import threading
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from sqlite3 import IntegrityError
 import tkinter as tk
@@ -66,6 +66,8 @@ from ig_orchestrator.gui.batch_transfer_service import (
     import_batch_from_path,
 )
 from ig_orchestrator.http_fallback.manual import (
+    estimate_http_duration,
+    format_http_duration,
     list_http_candidate_ids,
     run_manual_http_download,
 )
@@ -229,6 +231,55 @@ class ProblemUrlsMixin:
         ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(10, 0))
         sync_count_state()
 
+        estimate_var = tk.StringVar(value="")
+        ttk.Label(
+            body,
+            textvariable=estimate_var,
+            font=("Segoe UI", 10, "bold"),
+            wraplength=360,
+            justify="left",
+        ).grid(row=5, column=0, columnspan=2, sticky="w", pady=(10, 0))
+
+        def refresh_estimate(*_args) -> None:
+            """Live total time and finish clock for the current count and pause."""
+            try:
+                interval = float(interval_var.get().replace(",", "."))
+                count = len(job_ids) if all_var.get() else int(count_var.get())
+            except ValueError:
+                estimate_var.set(t("complete_http.estimate_invalid"))
+                return
+            count = min(count, len(job_ids))
+            if interval < 0 or count < 1:
+                estimate_var.set(t("complete_http.estimate_invalid"))
+                return
+            seconds = estimate_http_duration(count, interval)
+            finish = datetime.now() + timedelta(seconds=seconds)
+            days = (finish.date() - date.today()).days
+            when = finish.strftime("%H:%M")
+            if days == 1:
+                when += " " + t("complete_http.tomorrow")
+            elif days > 1:
+                when += " " + finish.strftime("%d/%m")
+            estimate_var.set(
+                t(
+                    "complete_http.estimate",
+                    count=count,
+                    interval=f"{interval:g}",
+                    duration=format_http_duration(seconds),
+                    finish=when,
+                )
+            )
+
+        def tick() -> None:
+            if not dialog.winfo_exists():
+                return
+            refresh_estimate()
+            dialog.after(15000, tick)
+
+        for variable in (all_var, count_var, interval_var):
+            variable.trace_add("write", refresh_estimate)
+        tick()
+
         def start() -> None:
             try:
                 interval = float(interval_var.get().replace(",", "."))
@@ -247,7 +298,7 @@ class ProblemUrlsMixin:
             self._start_complete_http(username, job_ids[:count], interval)
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        buttons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(12, 0))
         ttk.Button(buttons, text=t("complete_http.cancel"), command=dialog.destroy).pack(
             side=tk.RIGHT
         )

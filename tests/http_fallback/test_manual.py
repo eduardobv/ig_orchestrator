@@ -89,3 +89,18 @@ def test_interval_override_is_exact_and_not_stored(tmp_path, monkeypatch) -> Non
 
     config = seen["config"]
     assert (config.interval_seconds, config.jitter_percent, config.night_enabled) == (7.0, 0, False)
+
+
+def test_estimate_http_duration_and_format() -> None:
+    from ig_orchestrator.http_fallback.manual import (
+        estimate_http_duration,
+        format_http_duration,
+    )
+
+    assert estimate_http_duration(10, 30) == 300
+    assert estimate_http_duration(0, 30) == 0
+    assert estimate_http_duration(5, -1) == 0
+    assert format_http_duration(300) == "5 min"
+    assert format_http_duration(235 * 30) == "1 h 57 min 30 s"
+    assert format_http_duration(45) == "45 s"
+    assert format_http_duration(0) == "0 s"

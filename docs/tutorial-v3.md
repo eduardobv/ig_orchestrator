@@ -1321,3 +1321,7 @@ Cuando un feat necesite un paso manual, se añade una entrada a `inst_sync\CAMBI
 2. Ejecuta un lote y pulsa Stop (queda PARTIAL). Abre el modal, selecciona el lote y pulsa **Sacar completadas…**; acepta o cambia el nombre `<lote>_LISTAS`.
 3. Aparece un lote POR RENOMBRAR con las cuentas terminadas (con su Nueva/Update/Renew) y el original conserva las incompletas. Renómbralo o publícalo para otra instancia.
 4. **Importar / Exportar / Ejecutado en otra instancia** están ahora en la fila de *Nuevo lote*.
+
+## Feat run-34 · Tiempo estimado en Completar por http (v4.23.0)
+
+Clic derecho en una cuenta → **Completar por http…**. Cambia la espera (p. ej. 30) y, con *Solo las primeras N*, el número de URLs: la línea en negrita muestra al instante la duración y la hora de fin (235 URLs × 30 s = 1 h 57 min 30 s).

@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.23.0 - feat-run-34: tiempo estimado en «Completar por http»
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* La modal **Completar por http…** muestra en tiempo real `N URLs × X s de espera = duración · terminaría hacia las HH:MM` (con «(mañana)» o fecha si cruza de día). Se recalcula al marcar *todas*, cambiar *N* o la espera, y cada 15 s para que la hora de fin siga al reloj. Es una estimación: solo cuenta la espera entre URLs, no lo que tarda cada petición, ni la variación/franja nocturna (que se ignoran con espera elegida).
+
+### Archivos creados
+* `tasks/done/v4/feat-run-34.md`.
+
+### Archivos modificados
+* `http_fallback/manual.py` (`estimate_http_duration`, `format_http_duration`), `gui/batch_accounts/problem_urls.py`, `gui/shared/locales/{es,en}.json`, `tests/http_fallback/test_manual.py`, documentación y versión.
+
+### Pruebas
+* `python -m pytest -q`: 818 passed. **No probado:** la modal Tk a mano.
+
 ## v4.22.0 - feat-gui-29/30 y feat-run-33: Cargar, botonera de lotes y «Sacar completadas»
 
 Fecha: 2026-11-02 · Rama: `v4/main`
