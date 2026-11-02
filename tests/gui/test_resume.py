@@ -366,6 +366,23 @@ def test_list_account_problem_urls_filters_retry_and_failed(tmp_path: Path) -> N
             "https://www.instagram.com/reel/OKDONE01/",
         ]
         assert completed_rows[0].status == UrlJobStatus.COMPLETED.value
+        pending_rows = list_account_problem_urls(
+            connection,
+            account_id=account.id,
+            kind="pending",
+        )
+        # Everything not COMPLETED, whatever its state (5 URLs, 1 completed).
+        assert [row.url for row in pending_rows] == [
+            "https://www.instagram.com/reel/RETRYME01/",
+            "https://www.instagram.com/reel/RETRYME02/",
+            "https://www.instagram.com/reel/FAILME01/",
+            "https://www.instagram.com/p/STILLPENDING/",
+        ]
+        from ig_orchestrator.http_fallback.manual import list_http_candidate_ids
+
+        assert list_http_candidate_ids(connection, account.id) == [
+            row.job_id for row in pending_rows
+        ]
 
         progress = get_account_runtime_progress(connection, result.batch.id)[0]
         status_label, status_tag = _account_display_status(

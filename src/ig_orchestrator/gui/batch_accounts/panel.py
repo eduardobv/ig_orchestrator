@@ -195,6 +195,9 @@ class BatchAccountsPanelMixin:
             label="Completar", command=self._complete_selected_account
         )
         self.batch_menu.add_command(
+            label="Completar por http…", command=self._complete_selected_by_http
+        )
+        self.batch_menu.add_command(
             label="Pausar (mover a lote guardado)…",
             command=self._pause_selected_accounts,
         )
@@ -203,6 +206,10 @@ class BatchAccountsPanelMixin:
             command=self._move_selected_accounts_to_new_batch,
         )
         self.batch_menu.add_separator()
+        self.batch_menu.add_command(
+            label="Ver URLs pendientes…",
+            command=lambda: self._open_account_problem_urls("pending"),
+        )
         self.batch_menu.add_command(
             label="Ver URLs completadas…",
             command=lambda: self._open_account_problem_urls("completed"),

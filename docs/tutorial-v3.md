@@ -1196,6 +1196,14 @@ Antes la app esperaba 10 s de silencio tras el último fichero de cada URL. Ahor
 * **Tests:** `python -m pytest tests/orchestration/test_run_settings.py tests/gui/test_run_tab.py`.
 * Los plazos por tipo de URL, el fin por conteo, la cola global de reintentos y sus ajustes llegan con los feats siguientes; los valores por defecto de plazos y silencio siguen siendo los de siempre (300 s / 10 s) hasta entonces.
 
+## Feat 45 · Completar por http y Ver URLs pendientes (v4.21.0)
+
+1. **Cuentas del lote actual > clic derecho en una cuenta incompleta > Completar por http…** (con el lote parado). Elige *Descargar todas* o *Solo las primeras N* y la espera en segundos; **Descargar**.
+2. Mira la barra de estado inferior: `HTTP @cuenta: 3/40 · …`. Al terminar sale el resumen (descargadas / con problemas / omitidas) y la tabla de cuentas se actualiza.
+3. **Ver URLs pendientes…** lista las que faltan (no completadas) con las mismas opciones que las otras modales.
+4. Si cierras la app, los valores de la modal se pierden; el ajuste de Ejecución no cambia.
+5. **Tests:** `python -m pytest tests/http_fallback/test_manual.py tests/gui/test_resume.py -q`.
+
 ## Feat 44 · Descarga de respaldo por HTTP y bot caído (v4.20.0)
 
 1. **Sesión:** *Configuración > Ejecución > Sesión HTTP*: pega `sessionid` (Chrome, F12 > Application > Cookies) y pulsa **Probar sesión** (descarga la info del post de prueba; un 401/403 explica qué hacer).

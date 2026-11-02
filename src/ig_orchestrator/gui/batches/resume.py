@@ -25,7 +25,7 @@ _RETRY_JOB_STATUSES = (
 _FAILED_JOB_STATUSES = ("FAILED_FINAL",)
 _COMPLETED_JOB_STATUSES = ("COMPLETED",)
 
-ProblemUrlKind = Literal["retry", "failed", "completed"]
+ProblemUrlKind = Literal["retry", "failed", "completed", "pending"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,7 +345,7 @@ def list_account_problem_urls(
     account_id: int,
     kind: ProblemUrlKind,
 ) -> list[AccountProblemUrl]:
-    """List completed, retryable or finally-failed URL jobs for one account."""
+    """List completed, retryable, finally-failed or still-missing URL jobs of an account."""
 
     if account_id <= 0:
         raise ValueError("account_id must be positive")
@@ -355,17 +355,21 @@ def list_account_problem_urls(
         statuses = _FAILED_JOB_STATUSES
     elif kind == "completed":
         statuses = _COMPLETED_JOB_STATUSES
+    elif kind == "pending":
+        # Everything still missing, whatever its state: not COMPLETED.
+        statuses = _COMPLETED_JOB_STATUSES
     else:
         raise ValueError(f"Unsupported problem URL kind: {kind}")
 
     placeholders = ", ".join("?" for _ in statuses)
+    negate = "NOT " if kind == "pending" else ""
     rows = connection.execute(
         f"""
         SELECT id, url, status, publication_type, source, retries,
                last_error, last_error_type
         FROM url_jobs
         WHERE account_id = ?
-          AND status IN ({placeholders})
+          AND status {negate}IN ({placeholders})
         ORDER BY id
         """,
         (account_id, *statuses),

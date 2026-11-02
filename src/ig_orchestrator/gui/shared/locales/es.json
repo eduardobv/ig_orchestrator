@@ -901,5 +901,19 @@
   "problem_urls.http_progress": "HTTP: {done}/{total} · {text}",
   "problem_urls.http_done": "HTTP terminado: {ok} descargada(s), {failed} con problemas.",
   "problem_urls.http_disabled": "La descarga HTTP está desactivada en Configuración > Ejecución.",
-  "problem_urls.http_error": "Descarga HTTP detenida:\n\n{reason}"
+  "problem_urls.http_error": "Descarga HTTP detenida:\n\n{reason}",
+  "complete_http.title": "Completar por http",
+  "complete_http.stop_first": "Detén primero la ejecución antes de completar por http.",
+  "complete_http.running": "Ya hay una descarga por http en curso.",
+  "complete_http.none": "@{user} no tiene posts ni reels pendientes (las stories no se pueden descargar por http).",
+  "complete_http.available": "@{user}: {n} post(s)/reel(s) pendientes, en cualquier estado.",
+  "complete_http.all": "Descargar todas las que faltan",
+  "complete_http.first_n": "Solo las primeras N:",
+  "complete_http.interval": "Espera entre URLs (segundos):",
+  "complete_http.note": "Estos valores valen solo para esta ejecución y no se guardan. Hace falta la sesión de Configuración > Ejecución > Sesión HTTP. El avance se ve en la barra de estado.",
+  "complete_http.invalid": "Valores no válidos: el número de URLs debe ser 1 o más y la espera 0 o más.",
+  "complete_http.start": "Descargar",
+  "complete_http.cancel": "Cancelar",
+  "complete_http.status": "HTTP @{user}: {done}/{total} · {text}",
+  "complete_http.done": "HTTP @{user} terminado: {ok} descargada(s), {failed} con problemas, {skipped} omitida(s)."
 }

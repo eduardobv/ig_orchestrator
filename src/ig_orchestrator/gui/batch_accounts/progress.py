@@ -175,6 +175,16 @@ class BatchProgressMixin:
         )
         complete_state = "disabled" if self.history_readonly else "normal"
         self.batch_menu.entryconfigure("Completar", state=complete_state)
+        missing = (
+            runtime.total_items - runtime.completed_items if runtime is not None else 0
+        )
+        self.batch_menu.entryconfigure(
+            "Completar por http…",
+            state="disabled" if self.history_readonly or missing <= 0 else "normal",
+        )
+        self.batch_menu.entryconfigure(
+            "Ver URLs pendientes…", state="normal" if missing > 0 else "disabled"
+        )
         pause_state = "disabled"
         if not self.history_readonly and self.active_batch_id is not None:
             selected = self._selected_batch_usernames()

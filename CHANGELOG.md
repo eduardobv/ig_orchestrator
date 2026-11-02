@@ -1,5 +1,26 @@
 # Changelog
 
+## v4.21.0 - feat-run-32: «Completar por http» y «Ver URLs pendientes»
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* **Cuentas del lote actual → clic derecho → Completar por http…** (debajo de *Completar*): abre una modal con *Descargar todas las que faltan* (casilla) o *Solo las primeras N*, y *Espera entre URLs (segundos)* (por defecto el ajuste de Ejecución). Esos valores valen solo para esa ejecución: no se guardan. Descarga en un hilo los posts y reels no completados de la cuenta, **en cualquier estado** (incluidas `SENT_TO_BOT`/`WAITING_DOWNLOAD` que quedaron colgadas), y muestra el avance en la barra de estado inferior y en la consola. Con una ejecución en marcha no se permite.
+* **Ver URLs pendientes…**: nueva modal con todas las URLs de la cuenta que no están completadas, sea cual sea su estado (450 URLs, 200 completadas → 250). Mismas opciones que las otras (copiar, abrir en Chrome, selección múltiple y **Descargar por HTTP**).
+* En *Descargar por HTTP* de las modales, con el lote parado también se descargan las URLs colgadas en `SENT_TO_BOT`/`WAITING_DOWNLOAD` (antes se omitían).
+
+### Cambiado
+* Con una espera elegida por el usuario se ignoran la variación (±20 %) y la franja nocturna: se respeta exactamente ese intervalo.
+
+### Archivos creados
+* `tests/http_fallback/test_manual.py`; `tasks/done/v4/feat-run-32.md`.
+
+### Archivos modificados
+* `http_fallback/manual.py` (`interval_seconds`, `allow_busy`, `list_http_candidate_ids`), `gui/batches/resume.py` (tipo `pending`), `gui/batch_accounts/{panel,progress,problem_urls}.py`, `gui/shared/locales/{es,en}.json`, tests de `gui/test_resume.py`, documentación y versión.
+
+### Pruebas
+* `python -m pytest -q`: 815 passed. **No probado:** la modal y la descarga con Instagram real ni con un lote grande (solo con simulados); no se impide lanzar una ejecución mientras corre un *Completar por http* (no lo hagas a la vez).
+
 ## v4.20.0 - feat-run-31: descarga de respaldo por HTTP y detección de bot caído
 
 Fecha: 2026-11-02 · Rama: `v4/main`

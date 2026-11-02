@@ -65,7 +65,10 @@ from ig_orchestrator.gui.batch_transfer_service import (
     export_batch_to_path,
     import_batch_from_path,
 )
-from ig_orchestrator.http_fallback.manual import run_manual_http_download
+from ig_orchestrator.http_fallback.manual import (
+    list_http_candidate_ids,
+    run_manual_http_download,
+)
 from ig_orchestrator.orchestration.run_settings import load_run_settings
 from ig_orchestrator.gui.catalog_colors import load_catalog_colors, save_color
 from ig_orchestrator.gui.catalog_tree import build_catalog_tree
@@ -151,6 +154,175 @@ class ProblemUrlsMixin:
         self._open_account_problem_urls(kind)
 
 
+    def _complete_selected_by_http(self) -> None:
+        """«Completar por http…»: ask how many URLs and the pause, then download.
+
+        Runs in a worker thread; progress goes to the bottom status bar. The
+        pause is for this run only and is never stored.
+        """
+
+        if self.process_runner.is_running():
+            messagebox.showwarning(
+                t("complete_http.title"), t("complete_http.stop_first")
+            )
+            return
+        thread = getattr(self, "_complete_http_thread", None)
+        if isinstance(thread, threading.Thread) and thread.is_alive():
+            messagebox.showinfo(t("complete_http.title"), t("complete_http.running"))
+            return
+        runtime = self._selected_runtime_progress()
+        if runtime is None or self.selected_index is None:
+            return
+        username = self.accounts[self.selected_index].username
+        job_ids = list_http_candidate_ids(self.connection, runtime.account_id)
+        if not job_ids:
+            messagebox.showinfo(
+                t("complete_http.title"), t("complete_http.none", user=username)
+            )
+            return
+        default_interval = int(
+            load_run_settings(self.connection, self.settings).http_interval_seconds
+        )
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"{t('complete_http.title')} · @{username}")
+        dialog.transient(self.root)
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        body = ttk.Frame(dialog, padding=14)
+        body.grid(row=0, column=0)
+        ttk.Label(
+            body, text=t("complete_http.available", n=len(job_ids), user=username)
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        all_var = tk.BooleanVar(value=True)
+        count_var = tk.StringVar(value=str(len(job_ids)))
+        interval_var = tk.StringVar(value=str(default_interval))
+        count_entry = ttk.Spinbox(
+            body, from_=1, to=len(job_ids), textvariable=count_var, width=8
+        )
+
+        def sync_count_state() -> None:
+            count_entry.configure(state="disabled" if all_var.get() else "normal")
+
+        ttk.Checkbutton(
+            body,
+            text=t("complete_http.all"),
+            variable=all_var,
+            command=sync_count_state,
+        ).grid(row=1, column=0, columnspan=2, sticky="w")
+        ttk.Label(body, text=t("complete_http.first_n")).grid(
+            row=2, column=0, sticky="w", pady=(6, 0)
+        )
+        count_entry.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(6, 0))
+        ttk.Label(body, text=t("complete_http.interval")).grid(
+            row=3, column=0, sticky="w", pady=(6, 0)
+        )
+        ttk.Spinbox(
+            body, from_=0, to=3600, textvariable=interval_var, width=8
+        ).grid(row=3, column=1, sticky="w", padx=(8, 0), pady=(6, 0))
+        ttk.Label(
+            body,
+            text=t("complete_http.note"),
+            foreground="#57606a",
+            wraplength=360,
+            justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        sync_count_state()
+
+        def start() -> None:
+            try:
+                interval = float(interval_var.get().replace(",", "."))
+                count = len(job_ids) if all_var.get() else int(count_var.get())
+            except ValueError:
+                messagebox.showerror(
+                    t("complete_http.title"), t("complete_http.invalid"), parent=dialog
+                )
+                return
+            if interval < 0 or count < 1:
+                messagebox.showerror(
+                    t("complete_http.title"), t("complete_http.invalid"), parent=dialog
+                )
+                return
+            dialog.destroy()
+            self._start_complete_http(username, job_ids[:count], interval)
+
+        buttons = ttk.Frame(body)
+        buttons.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        ttk.Button(buttons, text=t("complete_http.cancel"), command=dialog.destroy).pack(
+            side=tk.RIGHT
+        )
+        ttk.Button(buttons, text=t("complete_http.start"), command=start).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
+        center_modal_on_parent(dialog, self.root, self.root.state() == "zoomed")
+        bind_escape_close(dialog, on_close=dialog.destroy)
+
+    def _start_complete_http(
+        self, username: str, job_ids: list[int], interval: float
+    ) -> None:
+        progress_box: dict[str, object] = {"progress": None}
+
+        def report(progress) -> None:
+            progress_box["progress"] = dataclasses.replace(progress)
+
+        cancel_event = threading.Event()
+        self._complete_http_cancel = cancel_event
+        thread = threading.Thread(
+            target=run_manual_http_download,
+            kwargs={
+                "settings": self.settings,
+                "job_ids": job_ids,
+                "allow_completed": False,
+                "allow_busy": True,
+                "interval_seconds": interval,
+                "cancel": cancel_event,
+                "report": report,
+            },
+            daemon=True,
+        )
+        self._complete_http_thread = thread
+        self._write_console(
+            f"[HTTP] @{username}: {len(job_ids)} URL(s), una cada {interval:g} s.\n"
+        )
+        self._set_status(
+            t("complete_http.status", user=username, done=0, total=len(job_ids), text="")
+        )
+        thread.start()
+
+        def poll() -> None:
+            progress = progress_box["progress"]
+            if progress is not None:
+                self._set_status(
+                    t(
+                        "complete_http.status",
+                        user=username,
+                        done=progress.done,
+                        total=progress.total,
+                        text=progress.text,
+                    )
+                )
+            if thread.is_alive():
+                self.root.after(1000, poll)
+                return
+            self._refresh_runtime_progress()
+            if progress is not None and progress.finished:
+                summary = t(
+                    "complete_http.done",
+                    user=username,
+                    ok=progress.ok,
+                    failed=progress.failed,
+                    skipped=progress.skipped,
+                )
+                self._set_status(summary)
+                self._write_console(f"[HTTP] {summary}\n")
+                if progress.error:
+                    messagebox.showerror(
+                        t("complete_http.title"),
+                        t("problem_urls.http_error", reason=progress.error),
+                    )
+
+        self.root.after(1000, poll)
+
     def _open_selected_account_folder(self) -> None:
         if self.selected_index is None or not (0 <= self.selected_index < len(self.accounts)):
             messagebox.showwarning(
@@ -206,6 +378,12 @@ class ProblemUrlsMixin:
                 "Abre o reanuda el lote para consultar URLs, fallos y reintentos.",
             )
             return
+        if kind == "pending" and runtime.total_items - runtime.completed_items <= 0:
+            messagebox.showinfo(
+                "URLs pendientes",
+                f"@{account.username} no tiene URLs pendientes: todas están completadas.",
+            )
+            return
         if kind == "completed" and not runtime.completed_items:
             messagebox.showinfo(
                 "URLs completadas",
@@ -226,6 +404,7 @@ class ProblemUrlsMixin:
             return
 
         kind_labels = {
+            "pending": "Pendientes",
             "completed": "Completadas",
             "retry": "Reintentos",
             "failed": "Fallidas",
@@ -599,6 +778,7 @@ class ProblemUrlsMixin:
                     "settings": self.settings,
                     "job_ids": [int(iid) for iid in usable],
                     "allow_completed": kind == "completed",
+                    "allow_busy": not self.process_runner.is_running(),
                     "cancel": cancel_event,
                     "report": report,
                 },
@@ -612,7 +792,7 @@ class ProblemUrlsMixin:
         actions = ttk.Frame(dialog, padding=10)
         actions.grid(row=3, column=0, sticky="ew")
         ttk.Button(actions, text="Cerrar", command=on_close).pack(side=tk.LEFT)
-        if kind in ("retry", "completed"):
+        if kind in ("retry", "completed", "pending"):
             http_button = ttk.Button(
                 actions,
                 text=t("problem_urls.http_download"),

@@ -51,6 +51,18 @@ class ManualProgress:
     error: str | None = None
 
 
+def list_http_candidate_ids(connection, account_id: int) -> list[int]:
+    """Ids of the account's posts/reels that are not COMPLETED, in import order."""
+
+    rows = connection.execute(
+        "SELECT id, publication_type FROM url_jobs "
+        "WHERE account_id = ? AND status != 'COMPLETED' ORDER BY id",
+        (account_id,),
+    ).fetchall()
+    usable = {PublicationType.POST.value, PublicationType.REEL.value}
+    return [int(r["id"]) for r in rows if str(r["publication_type"]) in usable]
+
+
 def check_session(config: HttpFallbackConfig) -> int:
     """Ask Instagram for a known post with the session; returns the file count.
 
@@ -74,8 +86,16 @@ def run_manual_http_download(
     cancel: threading.Event,
     report: Callable[[ManualProgress], None],
     now: Callable[[], datetime] = datetime.now,
+    interval_seconds: float | None = None,
+    allow_busy: bool = False,
 ) -> ManualProgress:
-    """Download ``job_ids`` over HTTP one by one, with the configured pauses."""
+    """Download ``job_ids`` over HTTP one by one, with the configured pauses.
+
+    ``interval_seconds`` overrides the pause for this call only (nothing is
+    saved): no jitter and no night window, the user asked for that exact gap.
+    ``allow_busy`` also takes jobs left in SENT_TO_BOT/WAITING_DOWNLOAD; only
+    valid when no batch run is active.
+    """
 
     progress = ManualProgress(total=len(job_ids))
     connection = connect(Path(settings.sqlite_gui_db_path))
@@ -87,6 +107,13 @@ def run_manual_http_download(
             max_per_run=1_000_000,
             max_429=1,  # manual: stop at the first 429 instead of pausing for minutes
         )
+        if interval_seconds is not None:
+            config = dataclasses.replace(
+                config,
+                interval_seconds=max(0.0, float(interval_seconds)),
+                jitter_percent=0,
+                night_enabled=False,
+            )
         ensure_http_fallback_schema(connection)
         jobs = UrlJobRepository(connection)
         accounts = AccountRepository(connection)
@@ -130,7 +157,7 @@ def run_manual_http_download(
                 if (
                     job is None
                     or job.publication_type not in (PublicationType.POST, PublicationType.REEL)
-                    or job.status in _BUSY_STATUSES
+                    or (job.status in _BUSY_STATUSES and not allow_busy)
                     or (job.status is UrlJobStatus.COMPLETED and not allow_completed)
                 ):
                     progress.skipped += 1
@@ -164,6 +191,7 @@ __all__ = [
     "DEFAULT_TEST_URL",
     "HttpFallbackError",
     "ManualProgress",
+    "list_http_candidate_ids",
     "run_manual_http_download",
     "check_session",
 ]
