@@ -3,6 +3,9 @@
 Una entrada por versión que pida algo más que copiar código. `sincronizar.bat` muestra las
 entradas posteriores a la versión que tenías. Formato del título: `## vX.Y.Z · resumen`.
 
+## v4.20.0 · Descarga HTTP y bot caído
+En cada instancia: *Configuración > Ejecución > Sesión HTTP* → pega la cookie `sessionid` de Instagram (puede ser otra cuenta) y pulsa **Probar sesión**. Sin ella la descarga HTTP no se usa (la detección de bot caído sí). La tabla `http_downloads` se crea sola; no hay SQL. Revisa que la URL de prueba (*Bot caído*) siga existiendo.
+
 ## v4.18.1 · inst_sync en dos partes
 Desde el PC principal ejecuta `inst_sync\empujar.bat` (la ruta de la instancia está en `inst_sync\destino.txt`): copia el código y avisa si hace falta ejecutar `inst_sync\sincronizar.bat` en la instancia (ahora solo dependencias, SQL y base; ya no necesita `origen.txt`).
 

@@ -42,6 +42,10 @@ Viven en `app_settings`, editables en *Configuración > Ejecución*; precedencia
 
 `run.bot.between_urls_seconds` (2 s) espacia los envíos. Tras una URL sin respuesta, la siguiente espera `run.bot.stall_probe_delay_seconds` (10 s); si tampoco responde, modo espera sin enviar más (barra de estado de la GUI, marcador `[GUI_BOT_STATUS]`) hasta que el bot conteste, y se recogen las dos respuestas (`BotConversationResult.late_results`, atribución por `reply_to`). `run.bot.stall_enabled` lo desactiva. Código: `url_job_processor.py` y `telegram/bot_conversation_service.py`.
 
+## Respaldo HTTP y bot caído (v4.20.0)
+
+`AccountOrchestrator` y `BatchOrchestrator` reciben `fallback=` (el coordinador de `http_fallback/`, duck-typed para evitar ciclos). Tras cada intento del pase principal llaman a `after_attempt`; si pide aparcar la cuenta, el bucle de la cuenta se corta. `BatchOrchestrator._process_http_phase` (antes de la ronda de reintentos) corre el modo final. Con HTTP o bot caído activos, `cli/main.py` apaga el modo espera sin límite de v4.16.0. Detalle: `http_fallback/CLAUDE.md`. Ajustes `run.http.*`, `run.night.*`, `run.botdown.*`, `run.httpsession.*` (tipos nuevos `text`, `secret`, `list`, `time` en `RunSettingSpec`).
+
 ## Post-proceso
 
 `post_processing.py` (`POST_PROCESS_ENABLED`); al final del lote real se limpian `telegram_media*` en la raíz y `*_1.mp4` duplicados en `reels\` (`filesystem/batch_cleanup.py`).

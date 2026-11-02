@@ -618,3 +618,59 @@ def _create_job(
             max_retries=5,
         )
     )
+
+
+class _ParkingFallback:
+    """Stands in for the HTTP fallback coordinator: parks after the second job."""
+
+    def __init__(self) -> None:
+        self.parked = False
+        self.seen: list[int] = []
+
+    def is_parked(self, account_id: int) -> bool:
+        return self.parked
+
+    async def after_attempt(self, result, account):
+        from ig_orchestrator.http_fallback import AttemptOutcome
+
+        self.seen.append(result.job.id)
+        if len(self.seen) == 2:
+            self.parked = True
+        return AttemptOutcome(result, park_account=self.parked)
+
+
+def test_parked_account_stops_its_main_pass_and_keeps_the_rest_pending(
+    tmp_path: Path,
+) -> None:
+    stored = _stored_account(tmp_path)
+    jobs = [
+        _create_job(
+            stored.job_repo,
+            stored.account.id,
+            UrlSource.INPUT_URL,
+            publication_type=PublicationType.POST,
+            url=f"https://www.instagram.com/p/POST{n}/",
+        )
+        for n in range(4)
+    ]
+    processor = FakeUrlJobProcessor(
+        stored.job_repo, {job.id: [UrlJobStatus.COMPLETED] for job in jobs}
+    )
+    fallback = _ParkingFallback()
+    orchestrator = AccountOrchestrator(
+        account_repository=stored.account_repo,
+        url_job_repository=stored.job_repo,
+        download_repository=stored.download_repo,
+        run_repository=stored.run_repo,
+        url_job_processor=processor,
+        fallback=fallback,
+    )
+
+    asyncio.run(orchestrator.process_account(stored.account.id))
+
+    assert len(processor.calls) == 2  # the other two were never sent to the bot
+    pending = [
+        j for j in stored.job_repo.list_by_account(stored.account.id)
+        if j.status is UrlJobStatus.PENDING
+    ]
+    assert len(pending) == 2

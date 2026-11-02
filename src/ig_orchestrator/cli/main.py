@@ -399,12 +399,22 @@ def _run_batch(
                 availability_checker=_availability_checker(run_settings),
             ),
         )
+        http_fallback = _build_http_fallback(
+            connection=connection,
+            settings=settings,
+            run_settings=run_settings,
+            telegram_client=telegram_client,
+            url_job_repository=url_job_repository,
+            account_repository=account_repository,
+            url_job_processor=url_job_processor,
+        )
         account_orchestrator = AccountOrchestrator(
             account_repository=account_repository,
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             run_repository=run_repository,
             url_job_processor=url_job_processor,
+            fallback=http_fallback,
             config=AccountOrchestratorConfig(
                 default_working_folder=settings.working_folder,
                 execution_started_at=execution_started_at,
@@ -431,6 +441,7 @@ def _run_batch(
             download_repository=download_repository,
             run_repository=run_repository,
             account_orchestrator=account_orchestrator,
+            fallback=http_fallback,
             config=BatchOrchestratorConfig(
                 progress_callback=_print_account_progress,
                 telegram_download_folder=settings.telegram_download_target_folder,
@@ -615,12 +626,26 @@ def _run_continue(
                     availability_checker=_availability_checker(run_settings),
                 ),
             )
+        http_fallback = (
+            None
+            if dry_run or telegram_client is None
+            else _build_http_fallback(
+                connection=connection,
+                settings=settings,
+                run_settings=run_settings,
+                telegram_client=telegram_client,
+                url_job_repository=url_job_repository,
+                account_repository=account_repository,
+                url_job_processor=url_job_processor,
+            )
+        )
         account_orchestrator = AccountOrchestrator(
             account_repository=account_repository,
             url_job_repository=url_job_repository,
             download_repository=download_repository,
             run_repository=run_repository,
             url_job_processor=url_job_processor,
+            fallback=http_fallback,
             config=AccountOrchestratorConfig(
                 default_working_folder=settings.working_folder,
                 execution_started_at=execution_started_at,
@@ -648,6 +673,7 @@ def _run_continue(
             download_repository=download_repository,
             run_repository=run_repository,
             account_orchestrator=account_orchestrator,
+            fallback=http_fallback,
             config=BatchOrchestratorConfig(
                 dry_run=dry_run,
                 progress_callback=_print_account_progress,
@@ -837,9 +863,58 @@ def _pacing_config(run_settings) -> dict[str, object]:
 
     return {
         "between_urls_seconds": float(run_settings.between_urls_seconds),
-        "stall_guard_enabled": run_settings.stall_enabled,
+        # The HTTP fallback / bot-down guard replaces the open-ended wait.
+        "stall_guard_enabled": run_settings.stall_enabled
+        and not (run_settings.http_enabled or run_settings.botdown_enabled),
         "stall_probe_delay_seconds": float(run_settings.stall_probe_delay_seconds),
     }
+
+
+def _print_http_status(text: str) -> None:
+    # Read by the GUI to show the HTTP fallback / bot-down state in the status bar.
+    print(f"[GUI_HTTP_STATUS] {text}", flush=True)
+
+
+def _build_http_fallback(
+    *,
+    connection,
+    settings,
+    run_settings,
+    telegram_client,
+    url_job_repository,
+    account_repository,
+    url_job_processor,
+):
+    """Coordinator for posts/reels the bot leaves unanswered (None when off)."""
+
+    from ig_orchestrator.http_fallback import (
+        HttpFallbackConfig,
+        HttpFallbackCoordinator,
+        InstagramHttpClient,
+        TelegramBotProbe,
+        ensure_http_fallback_schema,
+    )
+
+    config = HttpFallbackConfig.from_run_settings(run_settings)
+    if not config.active:
+        return None
+    ensure_http_fallback_schema(connection)
+    probe = (
+        TelegramBotProbe(telegram_client, config.probe_urls, config.probe_timeout_seconds)
+        if config.botdown_enabled and config.probe_urls
+        else None
+    )
+    return HttpFallbackCoordinator(
+        config=config,
+        client=InstagramHttpClient(config),
+        url_job_repository=url_job_repository,
+        account_repository=account_repository,
+        processor=url_job_processor,
+        download_folder=settings.telegram_download_target_folder,
+        probe=probe,
+        connection=connection,
+        status_callback=_print_http_status,
+    )
 
 
 def _print_bot_status(status: str) -> None:

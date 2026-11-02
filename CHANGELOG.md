@@ -1,5 +1,33 @@
 # Changelog
 
+## v4.20.0 - feat-run-31: descarga de respaldo por HTTP y detección de bot caído
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* **Descarga por HTTP de posts y reels** que el bot no responde (módulo nuevo `http_fallback/`): `GET https://i.instagram.com/api/v1/media/<id>/info/` con la cookie `sessionid` (el `media_id` sale del shortcode, sin cargar la página). Cada elemento del carrusel se guarda con su `pk` (= `carousel_media_ids`) y la mejor resolución; los archivos entran por el flujo de siempre (`UrlJobProcessor.process_http`: clasificación, mover, `downloaded_files`, `COMPLETED`). Stories y highlights no.
+* **Algoritmo por cuenta:** 2 intentos al bot por URL (el 2.º tras la espera de 10 s ya existente) → HTTP, una petición cada 30 s (±20 %). Tras **3 descargas HTTP consecutivas** la cuenta se *aparca* (no se pregunta más al bot) y el lote sigue con otras cuentas; una respuesta del bot reinicia el contador.
+* **Modo final** (`BatchOrchestrator._process_http_phase`): las cuentas aparcadas se terminan por HTTP, probando al bot cada 10 descargas; si responde, el resto sigue el flujo normal.
+* **Franja nocturna** (00:00–06:00 local, admite cruzar medianoche): la pausa HTTP pasa a 300 s y manda sobre cualquier otra.
+* **Bot caído:** 2 URLs mudas seguidas lanzan una **URL de prueba** (lista configurable; basta que responda una, también si es un error del bot). Sin respuesta → bloques de 60 min de HTTP (1 URL/2 min), nueva prueba tras cada bloque; si vuelve, flujo normal; tras 6 bloques las cuentas con URLs pendientes pasan a `FAILED` y la ejecución termina. Sin HTTP disponible: espera de 60 min y, si hay más de 100 URLs pendientes y sigue caído, `FAILED`.
+* **401/403** desactivan HTTP en esa ejecución con un mensaje claro («cookie caducada, vuelve a entrar en Instagram y copia la nueva en Configuración > Ejecución > Sesión HTTP…»); **429**: pausa de 15 min que se duplica, y a los 3 seguidos se desactiva HTTP. Tope de seguridad de 200 descargas HTTP por ejecución.
+* **Configuración > Ejecución:** 4 secciones nuevas (*Descarga de respaldo por HTTP*, *Franja nocturna*, *Bot caído*, *Sesión HTTP*, 34 ajustes), campos de texto/secreto (enmascarado)/lista/hora y botón **Probar sesión**.
+* **Cuentas del lote actual → Ver URLs en reintento… / completadas…:** selección múltiple y botón **Descargar por HTTP** (una URL cada 30 s, con las mismas reglas; se puede detener; la tabla se refresca y las completadas desaparecen). En *completadas* pide confirmación (se vuelve a descargar).
+* Tabla `http_downloads` (se crea sola en la base de la GUI) con las URLs bajadas por HTTP.
+* La barra de estado muestra el estado HTTP/bot caído (marcador `[GUI_HTTP_STATUS]`).
+
+### Cambiado
+* Con HTTP o la detección de bot caído activos, la espera sin límite del *modo espera* (v4.16.0) se sustituye por esta lógica; con ambos apagados queda como antes.
+
+### Archivos creados
+* `src/ig_orchestrator/http_fallback/{__init__,config,schedule,client,probe,store,coordinator,manual}.py`, `CLAUDE.md`, `MODULE.md`; `tests/http_fallback/`; `tasks/done/v4/feat-run-31.md`; `tasks/spikes/poc_ig_media_info/`.
+
+### Archivos modificados
+* `orchestration/{run_settings,url_job_processor,account_orchestrator,batch_orchestrator}.py`, `cli/main.py`, `gui/settings/run_tab.py`, `gui/batch_accounts/problem_urls.py`, `gui/run/controller.py`, `gui/shared/{helpers.py,locales/es.json,locales/en.json}`, tests de ajustes/orquestadores/procesador, documentación y versión.
+
+### Pruebas
+* `python -m pytest -q`: todo en verde. Probado contra Instagram real solo en la POC (un carrusel de 5 fotos). **No probado:** bot caído real, franja nocturna real, 429/403 reales, reels/vídeos por HTTP, la GUI de la modal con una descarga larga.
+
 ## v4.19.0 - feat-gui-28: pegado con salto de línea y «Abrir en Chrome» en el lote
 
 Fecha: 2026-11-02 · Rama: `v4/main`

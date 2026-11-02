@@ -79,6 +79,7 @@ from ig_orchestrator.gui.shared.helpers import (
     _ACCOUNT_PROGRESS_RE,
     _BATCH_COLUMNS,
     _BOT_STATUS_RE,
+    _HTTP_STATUS_RE,
     _CATALOG_COLORS,
     _ITEM_PROGRESS_RE,
     _account_display_status,
@@ -387,6 +388,13 @@ class RunControllerMixin:
             stalled = bot_match.group("state") == "STALLED"
             message = t("run.bot_stalled") if stalled else t("run.bot_resumed")
             self._set_status_tone(STATUS_TONE_BUSY if stalled else STATUS_TONE_IDLE)
+            self._set_status(message)
+            self._write_console(message + "\n")
+            return
+        http_match = _HTTP_STATUS_RE.search(line)
+        if http_match:
+            message = t("run.http_status", text=http_match.group("text").strip())
+            self._set_status_tone(STATUS_TONE_BUSY)
             self._set_status(message)
             self._write_console(message + "\n")
             return

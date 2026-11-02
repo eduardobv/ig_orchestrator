@@ -94,7 +94,10 @@ class BatchOrchestrator:
         account_orchestrator: BatchAccountOrchestrator,
         account_history_repository: AccountHistoryRepository | None = None,
         config: BatchOrchestratorConfig | None = None,
+        fallback: object | None = None,
     ) -> None:
+        # ``fallback`` is the http_fallback coordinator (duck-typed: no import cycle).
+        self._fallback = fallback
         self._batch_repository = batch_repository
         self._account_repository = account_repository
         self._account_history_repository = (
@@ -168,7 +171,9 @@ class BatchOrchestrator:
                     accounts=processable_accounts,
                 )
             )
-            if self._config.global_retry_queue:
+            if self._fallback is not None:
+                account_results.extend(await self._process_http_phase(batch_id))
+            if self._config.global_retry_queue and not self._fallback_aborted():
                 account_results.extend(
                     await self._process_retry_round(batch_id=batch_id)
                 )
@@ -329,6 +334,55 @@ class BatchOrchestrator:
             summary=summary,
             account_results=tuple(account_results),
         )
+
+    def _fallback_aborted(self) -> bool:
+        return bool(self._fallback is not None and self._fallback.aborted)
+
+    async def _process_http_phase(self, batch_id: int) -> list[AccountOrchestratorResult]:
+        """Finish the accounts parked by the HTTP fallback (HTTP-only final mode).
+
+        When the bot answers again, the leftovers go through the normal flow.
+        """
+
+        results: list[AccountOrchestratorResult] = []
+        fallback = self._fallback
+        for _ in range(5):
+            if fallback is None or fallback.aborted:
+                break
+            await fallback.run_final_mode(batch_id)
+            if fallback.aborted:
+                break
+            leftovers = self._http_leftover_accounts(batch_id)
+            if not leftovers:
+                break
+            for account in leftovers:
+                if fallback.aborted:
+                    break
+                results.append(
+                    await self._account_orchestrator.process_account(
+                        account.id,
+                        scope=AccountJobScope.NON_STORIES,
+                    )
+                )
+        return results
+
+    def _http_leftover_accounts(self, batch_id: int) -> list[Account]:
+        """Accounts with posts/reels still PENDING (never sent) after the sweeps."""
+
+        leftovers: list[Account] = []
+        for account in self._account_repository.list_by_batch(batch_id):
+            if account.id is None or account.status not in PROCESSABLE_ACCOUNT_STATUSES:
+                continue
+            if self._fallback.is_parked(account.id):
+                continue
+            jobs = self._url_job_repository.list_by_account(account.id)
+            if any(
+                job.status is UrlJobStatus.PENDING
+                and job.publication_type.value in ("POST", "REEL")
+                for job in jobs
+            ):
+                leftovers.append(account)
+        return leftovers
 
     async def _process_retry_round(
         self,
@@ -502,6 +556,9 @@ class BatchOrchestrator:
         results: list[AccountOrchestratorResult] = []
         total = len(planned)
         for account_index, (account, scope) in enumerate(planned, start=1):
+            if self._fallback_aborted():
+                logger.warning("Batch stopped by the bot-down guard")
+                break
             current_account = self._account_repository.get_by_id(account.id)
             if (
                 current_account is None

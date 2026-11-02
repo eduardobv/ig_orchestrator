@@ -1196,6 +1196,15 @@ Antes la app esperaba 10 s de silencio tras el último fichero de cada URL. Ahor
 * **Tests:** `python -m pytest tests/orchestration/test_run_settings.py tests/gui/test_run_tab.py`.
 * Los plazos por tipo de URL, el fin por conteo, la cola global de reintentos y sus ajustes llegan con los feats siguientes; los valores por defecto de plazos y silencio siguen siendo los de siempre (300 s / 10 s) hasta entonces.
 
+## Feat 44 · Descarga de respaldo por HTTP y bot caído (v4.20.0)
+
+1. **Sesión:** *Configuración > Ejecución > Sesión HTTP*: pega `sessionid` (Chrome, F12 > Application > Cookies) y pulsa **Probar sesión** (descarga la info del post de prueba; un 401/403 explica qué hacer).
+2. **Probar con un lote real:** ejecuta un lote con URLs que el bot no contesta. En el log y en la barra de estado verás: 2.º intento al bot → *«Descargado por HTTP…»* → siguiente petición en ~30 s → tras 3 seguidas *«el bot no responde en esta cuenta; se pasa a la siguiente…»*. Al final: *«Modo final…»*. Los archivos quedan en la carpeta de la cuenta con el id del elemento (`<pk>.jpg`).
+3. **Manual:** *Cuentas del lote actual > clic derecho > Ver URLs en reintento…*, selecciona filas (Ctrl/Mayús), **Descargar por HTTP**. Una URL cada 30 s; las completadas salen de la tabla.
+4. **Franja nocturna:** cambia *Inicio/Fin* para que incluyan la hora actual y la pausa pasa a 300 s (baja *Pausa entre peticiones HTTP en la franja* para probar).
+5. **Bot caído:** silencia el chat del bot o pon una URL de prueba que no exista; con 2 URLs mudas seguidas verás *«El bot no responde ni a la URL de prueba»* y descargas cada 2 min. Baja *Duración de cada bloque* y *Bloques máximos* para ver el paso a FAILED.
+6. **Tests:** `python -m pytest tests/http_fallback tests/orchestration -q`.
+
 ## Feat 41 · Pausa entre URLs y modo espera con el bot sin respuesta (v4.16.0)
 
 1. **Pausa entre URLs:** *Configuración > Ejecución > Bot y descargas > Pausa entre URLs (s)* (2 s por defecto). Ejecuta una cuenta con varias URLs y mira el chat de Telegram: cada URL se envía ~2 s después de terminar la anterior. Sube el valor si el bot sigue saturándose.

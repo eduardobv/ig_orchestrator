@@ -11,11 +11,13 @@ from ig_orchestrator.filesystem import (
     move_downloaded_files,
     resolve_publication_type_after_download,
 )
+from ig_orchestrator.filesystem.file_classifier import classify_file_media_type
 from ig_orchestrator.logging_config import get_logger
 from ig_orchestrator.models import (
     Account,
     AccountStatus,
     DownloadFile,
+    DownloadFileStatus,
     PublicationType,
     UrlJob,
     UrlJobStatus,
@@ -156,7 +158,51 @@ class UrlJobProcessor:
             self._trace.batch_id = account.batch_id
         result = await self._finalize_conversation(url_job_id, account, conversation_result)
         for late_account in late_accounts:
-            self._refresh_account_status(late_account)
+            self.refresh_account_status(late_account)
+        return result
+
+    async def process_http(self, url_job_id: int, paths: list[Path]) -> UrlJobProcessorResult:
+        """Finish a URL whose files were downloaded over HTTP instead of the bot.
+
+        Same path as a bot download: files are stored, moved to the account
+        folders and the job ends COMPLETED.
+        """
+
+        job = self._url_job_repository.get_by_id(url_job_id)
+        if job is None:
+            raise ValueError(f"URL job not found: {url_job_id}")
+        account = self._account_repository.get_by_id(job.account_id)
+        if account is None:
+            raise ValueError(f"Account not found for URL job: {job.account_id}")
+        if not paths:
+            raise ValueError("process_http needs at least one file")
+        self._trace = None
+        stored = [
+            self._download_repository.create(
+                DownloadFile(
+                    url_job_id=url_job_id,
+                    original_path=path,
+                    media_type=classify_file_media_type(path),
+                    file_extension=path.suffix.lower(),
+                    file_size=path.stat().st_size if path.exists() else None,
+                    status=DownloadFileStatus.DETECTED,
+                )
+            )
+            for path in paths
+        ]
+        from datetime import datetime, timezone
+
+        downloaded = self._url_job_repository.update_status(
+            url_job_id,
+            UrlJobStatus.DOWNLOADED,
+            finished_at=datetime.now(timezone.utc),
+        )
+        result = await self._finalize_conversation(
+            url_job_id,
+            account,
+            BotConversationResult(job=downloaded, files=tuple(stored)),
+        )
+        self.refresh_account_status(account)
         return result
 
     async def _finish_late_result(self, late: BotConversationResult) -> Account | None:
@@ -181,7 +227,7 @@ class UrlJobProcessor:
             logger.exception("Finishing a late bot answer failed: job_id={}", late_job_id)
             return None
 
-    def _refresh_account_status(self, account: Account) -> None:
+    def refresh_account_status(self, account: Account) -> None:
         """An account that already ended may become complete through a late answer."""
 
         if account.id is None:

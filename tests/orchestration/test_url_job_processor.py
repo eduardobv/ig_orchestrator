@@ -300,3 +300,27 @@ def _download_file(
         file_size=path.stat().st_size if path.exists() else None,
         status=DownloadFileStatus.DETECTED,
     )
+
+
+def test_process_http_moves_the_files_and_completes_the_job(tmp_path: Path) -> None:
+    stored = _stored_entities(tmp_path)
+    photo = tmp_path / "downloads" / "3633190311026864317.jpg"
+    photo.parent.mkdir()
+    photo.write_bytes(b"jpeg")
+    working = tmp_path / "working"
+    processor = UrlJobProcessor(
+        url_job_repository=stored.job_repo,
+        account_repository=stored.account_repo,
+        download_repository=stored.download_repo,
+        conversation_service=FakeConversationService(None),  # type: ignore[arg-type]
+        config=UrlJobProcessorConfig(default_working_folder=working),
+    )
+
+    result = asyncio.run(processor.process_http(stored.job.id, [photo]))
+
+    assert result.job.status is UrlJobStatus.COMPLETED
+    assert len(result.files) == 1
+    assert not photo.exists()  # moved into the account folder
+    moved = result.files[0].working_path or result.files[0].final_path
+    assert moved is not None and moved.name == "3633190311026864317.jpg"
+    assert stored.download_repo.list_by_url_job(stored.job.id)

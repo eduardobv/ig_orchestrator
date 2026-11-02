@@ -42,6 +42,7 @@ _ACCOUNT_PROGRESS_RE = re.compile(
     r"\[(?P<current>\d+)/(?P<total>\d+)\s*\|\s*(?P<percentage>\d+)%\]"
 )
 _BOT_STATUS_RE = re.compile(r"\[GUI_BOT_STATUS\]\s+(?P<state>STALLED|RESUMED)")
+_HTTP_STATUS_RE = re.compile(r"\[GUI_HTTP_STATUS\]\s+(?P<text>.+)")
 _ITEM_PROGRESS_RE = re.compile(
     r"\[GUI_ITEM_PROGRESS\]\s+(?P<username>[^:]+):\s+"
     r"(?P<percentage>\d+)%\s+\((?P<current>\d+)/(?P<total>\d+)\)"
@@ -519,6 +520,7 @@ __all__ = [
     "_BATCH_COLUMNS",
     "_CATALOG_COLORS",
     "_BOT_STATUS_RE",
+    "_HTTP_STATUS_RE",
     "_ITEM_PROGRESS_RE",
     "_account_display_status",
     "_batch_column_samples",

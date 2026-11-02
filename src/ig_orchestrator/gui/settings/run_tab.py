@@ -7,6 +7,7 @@ to the next execution. Precedence: this tab > ``.env`` > built-in default.
 
 from __future__ import annotations
 
+import dataclasses
 import tkinter as tk
 from sqlite3 import Connection
 from tkinter import filedialog, messagebox, ttk
@@ -18,7 +19,11 @@ from ig_orchestrator.orchestration.run_settings import (
     KIND_BOOL,
     KIND_CHOICE,
     KIND_INT,
+    KIND_LIST,
     KIND_PATH,
+    KIND_SECRET,
+    KIND_TEXT,
+    KIND_TIME,
     RUN_SETTING_SPECS,
     RunSettingSpec,
     load_run_settings,
@@ -79,6 +84,17 @@ class RunSettingsTab(ttk.Frame):
             row += 1
             for index, spec in enumerate(specs):
                 self._build_spec_row(frame, index, spec, getattr(current, spec.field))
+            if group == "httpsession":
+                self.session_status = tk.StringVar(value="")
+                button_row = ttk.Frame(frame)
+                button_row.grid(row=len(specs), column=0, columnspan=2, sticky="w", pady=(6, 0))
+                self.test_session_button = ttk.Button(
+                    button_row, text=t("run.test_session"), command=self._on_test_session
+                )
+                self.test_session_button.pack(side=tk.LEFT)
+                ttk.Label(button_row, textvariable=self.session_status).pack(
+                    side=tk.LEFT, padx=8
+                )
         self.body.columnconfigure(0, weight=1)
 
     def _build_spec_row(
@@ -105,6 +121,14 @@ class RunSettingsTab(ttk.Frame):
                 width=3,
                 command=lambda v=variable: self._browse(v),
             ).pack(side=tk.LEFT, padx=(2, 0))
+        elif spec.kind in (KIND_TEXT, KIND_SECRET, KIND_LIST, KIND_TIME):
+            variable = tk.StringVar(value=text)
+            widget = ttk.Entry(
+                frame,
+                textvariable=variable,
+                width=8 if spec.kind == KIND_TIME else 52,
+                show="•" if spec.kind == KIND_SECRET else "",
+            )
         else:
             variable = tk.StringVar(value=text)
             widget = ttk.Spinbox(
@@ -119,6 +143,70 @@ class RunSettingsTab(ttk.Frame):
         help_text = t(f"run.{spec.field}.help")
         Tooltip(label, help_text)
         Tooltip(widget, help_text)
+
+    def _on_test_session(self) -> None:
+        """Ask Instagram for a known post with the typed session (worker thread)."""
+
+        import threading
+
+        from ig_orchestrator.http_fallback import HttpFallbackConfig, HttpFallbackError
+        from ig_orchestrator.http_fallback.manual import check_session
+
+        if not str(self.variables["run.httpsession.sessionid"].get()).strip():
+            messagebox.showwarning(
+                t("settings.title"), t("run.test_session_empty"), parent=self
+            )
+            return
+        problem = self.validate()
+        if problem is not None:
+            spec, reason = problem
+            messagebox.showerror(
+                t("settings.title"),
+                t("run.invalid", name=t(f"run.{spec.field}"), reason=reason),
+                parent=self,
+            )
+            return
+        # Settings are read on the Tk thread; only the network runs in the worker.
+        collected = self.collect()
+        base = load_run_settings(self.connection, self.env_settings)
+        values = {
+            spec.field: spec.parse(collected[spec.key]) for spec in RUN_SETTING_SPECS
+        }
+        config = HttpFallbackConfig.from_run_settings(dataclasses.replace(base, **values))
+        self.test_session_button.state(["disabled"])
+        self.session_status.set(t("run.test_session_wait"))
+        outcome: dict[str, object] = {}
+
+        def work() -> None:
+            try:
+                outcome["files"] = check_session(config)
+            except HttpFallbackError as exc:
+                outcome["error"] = str(exc)
+            except Exception as exc:  # network down, bad host, ...
+                outcome["error"] = f"{type(exc).__name__}: {exc}"
+
+        def poll() -> None:
+            if worker.is_alive():
+                self.after(300, poll)
+                return
+            self.test_session_button.state(["!disabled"])
+            self.session_status.set("")
+            if "error" in outcome:
+                messagebox.showerror(
+                    t("run.test_session"),
+                    t("run.test_session_fail", reason=outcome["error"]),
+                    parent=self,
+                )
+            else:
+                messagebox.showinfo(
+                    t("run.test_session"),
+                    t("run.test_session_ok", files=outcome.get("files", 0)),
+                    parent=self,
+                )
+
+        worker = threading.Thread(target=work, daemon=True)
+        worker.start()
+        self.after(300, poll)
 
     def _browse(self, variable: tk.Variable) -> None:
         folder = filedialog.askdirectory(parent=self)

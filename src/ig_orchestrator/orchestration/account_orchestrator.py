@@ -117,7 +117,10 @@ class AccountOrchestrator:
         run_repository: RunRepository,
         url_job_processor: AccountUrlJobProcessor,
         config: AccountOrchestratorConfig | None = None,
+        fallback: object | None = None,
     ) -> None:
+        # ``fallback`` is the http_fallback coordinator (duck-typed: no import cycle).
+        self._fallback = fallback
         self._account_repository = account_repository
         self._url_job_repository = url_job_repository
         self._download_repository = download_repository
@@ -378,6 +381,9 @@ class AccountOrchestrator:
             for job in main_pass_jobs:
                 if self._account_was_failed_externally(account_id):
                     break
+                if self._fallback is not None and self._fallback.is_parked(account_id):
+                    logger.info("Account parked by the HTTP fallback: {}", account.username)
+                    break
                 current_job = self._url_job_repository.get_by_id(_require_job_id(job))
                 if current_job is None or current_job.status in TERMINAL_URL_STATUSES:
                     continue
@@ -390,11 +396,18 @@ class AccountOrchestrator:
                     current_job.url,
                 )
                 result = await self._url_job_processor.process(_require_job_id(current_job))
+                park_account = False
+                if self._fallback is not None:
+                    outcome = await self._fallback.after_attempt(result, account)
+                    result = outcome.result
+                    park_account = outcome.park_account
                 processed_job_ids.append(_require_job_id(result.job))
                 if self._account_was_failed_externally(account_id):
                     self._mark_manually_removed_job(result.job)
                     break
                 self._enqueue_or_finalize_retry(result.job, retry_queue)
+                if park_account:
+                    break
 
             if single_retry:
                 retry_queue.enqueue(only_job_id)

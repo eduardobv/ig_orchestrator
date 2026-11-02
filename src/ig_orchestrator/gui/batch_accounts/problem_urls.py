@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
+import re
+import threading
 from datetime import date
 from pathlib import Path
 from sqlite3 import IntegrityError
@@ -62,6 +65,8 @@ from ig_orchestrator.gui.batch_transfer_service import (
     export_batch_to_path,
     import_batch_from_path,
 )
+from ig_orchestrator.http_fallback.manual import run_manual_http_download
+from ig_orchestrator.orchestration.run_settings import load_run_settings
 from ig_orchestrator.gui.catalog_colors import load_catalog_colors, save_color
 from ig_orchestrator.gui.catalog_tree import build_catalog_tree
 from ig_orchestrator.gui.i18n import current_language, t
@@ -263,7 +268,7 @@ class ProblemUrlsMixin:
             table_frame,
             columns=columns,
             show="headings",
-            selectmode="browse",
+            selectmode="extended",
         )
         for column, title, width, stretch in (
             ("url", "URL", 420, True),
@@ -379,6 +384,9 @@ class ProblemUrlsMixin:
                 refresh_after_id[0] = dialog.after(1000, schedule_auto_refresh)
 
         def on_close() -> None:
+            cancel_event = http_state.get("cancel")
+            if isinstance(cancel_event, threading.Event):
+                cancel_event.set()
             if refresh_after_id[0] is not None:
                 try:
                     dialog.after_cancel(refresh_after_id[0])
@@ -507,9 +515,111 @@ class ProblemUrlsMixin:
             """Atajo Ctrl+C para copiar URL seleccionada."""
             copy_selected_url()
 
+        http_state: dict[str, object] = {"cancel": None, "progress": None, "thread": None}
+        http_status_var = tk.StringVar(value="")
+        post_or_reel = re.compile(r"instagram\.com/(?:[^/?#]+/)?(?:p|reel|reels)/", re.I)
+
+        def http_running() -> bool:
+            thread = http_state["thread"]
+            return isinstance(thread, threading.Thread) and thread.is_alive()
+
+        def poll_http() -> None:
+            if not dialog.winfo_exists():
+                return
+            progress = http_state["progress"]
+            if progress is not None:
+                http_status_var.set(
+                    t(
+                        "problem_urls.http_progress",
+                        done=progress.done,
+                        total=progress.total,
+                        text=progress.text,
+                    )
+                )
+            reload_rows()
+            if http_running():
+                dialog.after(1000, poll_http)
+                return
+            http_button.configure(text=t("problem_urls.http_download"))
+            if progress is not None and progress.finished:
+                http_status_var.set(
+                    t("problem_urls.http_done", ok=progress.ok, failed=progress.failed)
+                )
+                if progress.error:
+                    messagebox.showerror(
+                        t("problem_urls.http_download"),
+                        t("problem_urls.http_error", reason=progress.error),
+                        parent=dialog,
+                    )
+
+        def start_or_stop_http() -> None:
+            if http_running():
+                cancel_event = http_state["cancel"]
+                if isinstance(cancel_event, threading.Event):
+                    cancel_event.set()
+                http_button.configure(text=t("problem_urls.http_download"))
+                return
+            selection = list(tree.selection())
+            if not selection:
+                messagebox.showinfo(
+                    t("problem_urls.http_download"),
+                    t("problem_urls.http_none"),
+                    parent=dialog,
+                )
+                return
+            usable = [iid for iid in selection if post_or_reel.search(url_by_iid.get(iid, ""))]
+            ignored = len(selection) - len(usable)
+            if not usable:
+                messagebox.showinfo(
+                    t("problem_urls.http_download"),
+                    t("problem_urls.http_unsupported", n=ignored),
+                    parent=dialog,
+                )
+                return
+            interval = load_run_settings(self.connection, self.settings).http_interval_seconds
+            question = t("problem_urls.http_confirm", n=len(usable), interval=interval)
+            if kind == "completed":
+                question = t("problem_urls.http_confirm_completed") + question
+            if ignored:
+                question = t("problem_urls.http_unsupported", n=ignored) + " " + question
+            if not messagebox.askyesno(
+                t("problem_urls.http_download"), question, parent=dialog
+            ):
+                return
+            cancel_event = threading.Event()
+            http_state["cancel"] = cancel_event
+            http_state["progress"] = None
+
+            def report(progress) -> None:
+                http_state["progress"] = dataclasses.replace(progress)
+
+            thread = threading.Thread(
+                target=run_manual_http_download,
+                kwargs={
+                    "settings": self.settings,
+                    "job_ids": [int(iid) for iid in usable],
+                    "allow_completed": kind == "completed",
+                    "cancel": cancel_event,
+                    "report": report,
+                },
+                daemon=True,
+            )
+            http_state["thread"] = thread
+            http_button.configure(text=t("problem_urls.http_stop"))
+            thread.start()
+            dialog.after(1000, poll_http)
+
         actions = ttk.Frame(dialog, padding=10)
         actions.grid(row=3, column=0, sticky="ew")
         ttk.Button(actions, text="Cerrar", command=on_close).pack(side=tk.LEFT)
+        if kind in ("retry", "completed"):
+            http_button = ttk.Button(
+                actions,
+                text=t("problem_urls.http_download"),
+                command=start_or_stop_http,
+            )
+            http_button.pack(side=tk.LEFT, padx=(8, 0))
+            ttk.Label(actions, textvariable=http_status_var).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text="Actualizar", command=reload_rows).pack(
             side=tk.RIGHT
         )

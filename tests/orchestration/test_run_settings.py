@@ -200,3 +200,22 @@ def test_saving_with_env_only_stores_values_that_differ(tmp_path: Path) -> None:
     assert connection.execute(
         "SELECT COUNT(*) FROM app_settings WHERE key = 'run.retry.max_retries'"
     ).fetchone()[0] == 0
+
+
+def test_http_fallback_settings_defaults_and_parsing() -> None:
+    from ig_orchestrator.orchestration.run_settings import SPECS_BY_KEY
+
+    assert SPECS_BY_KEY["run.night.start"].parse("6:05") == "06:05"
+    with pytest.raises(ValueError):
+        SPECS_BY_KEY["run.night.end"].parse("25:00")
+    assert (
+        SPECS_BY_KEY["run.botdown.probe_urls"].parse(" https://a/ ,\nhttps://b/;")
+        == "https://a/,https://b/"
+    )
+    assert SPECS_BY_KEY["run.httpsession.sessionid"].parse("  abc ") == "abc"
+    assert SPECS_BY_KEY["run.http.enabled"].default(None) is True
+    assert SPECS_BY_KEY["run.http.max_consecutive"].default(None) == 3
+    assert SPECS_BY_KEY["run.http.interval_seconds"].default(None) == 30
+    assert SPECS_BY_KEY["run.night.interval_seconds"].default(None) == 300
+    assert SPECS_BY_KEY["run.botdown.interval_seconds"].default(None) == 120
+    assert "DeO6TtQMqY9" in SPECS_BY_KEY["run.botdown.probe_urls"].default(None)
