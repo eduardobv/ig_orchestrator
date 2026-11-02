@@ -1,5 +1,23 @@
 # Changelog
 
+## v4.24.0 - feat-gui-31: avisos por bot de Telegram (suenan en el móvil)
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* Ajustes > Notificaciones: campos **Token del bot** y **Chat ID**. Si ambos están rellenos, los avisos (fin de lote y errores del bot) se envían por la Bot API de Telegram; al ser el bot el remitente, el móvil suena. Si están vacíos, todo funciona como antes (Telethon a `me`/@usuario, que **no** notifica porque lo envías tú mismo).
+* *Enviar prueba* usa el bot si está configurado. Con el bot configurado ya no hace falta cliente Telethon para avisar.
+* El bot lo crea el usuario con @BotFather (`/newbot`), pulsa Start en él y obtiene su chat id en `https://api.telegram.org/bot<TOKEN>/getUpdates`.
+
+### Archivos creados
+* `tasks/done/v4/feat-gui-31.md`, `tasks/spikes/spike_4_6_push_notifications.md`.
+
+### Archivos modificados
+* `telegram/notify_service.py` (`bot_api_credentials`, `send_bot_api_message`, `deliver_notification`), `gui/settings/dialog.py`, `gui/shared/helpers.py`, `gui/shared/locales/{es,en}.json`, `tests/telegram/test_notify_service.py`, versión y documentación.
+
+### Pruebas
+* `python -m pytest -q`: 821 passed. Tests nuevos con la Bot API simulada (sin red). **No probado:** envío real con un bot ni la pestaña Tk a mano.
+
 ## v4.23.0 - feat-run-34: tiempo estimado en «Completar por http»
 
 Fecha: 2026-11-02 · Rama: `v4/main`

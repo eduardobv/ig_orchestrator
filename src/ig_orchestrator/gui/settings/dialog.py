@@ -340,6 +340,26 @@ class SettingsDialogWithTabs:
             row=2, column=0, sticky="w", pady=(0, 8)
         )
 
+        ttk.Label(frame, text=t("settings.notify_bot_hint"), foreground="#555").grid(
+            row=7, column=0, sticky="w", pady=(0, 2)
+        )
+        bot_frame = ttk.Frame(frame)
+        bot_frame.grid(row=8, column=0, sticky="w", pady=(0, 8))
+        ttk.Label(bot_frame, text=t("settings.notify_bot_token")).grid(row=0, column=0, sticky="w")
+        self.bot_token_var = tk.StringVar(
+            value=_gui_setting(self.connection, "notify.bot_token", "")
+        )
+        ttk.Entry(bot_frame, textvariable=self.bot_token_var, width=48, show="•").grid(
+            row=0, column=1, sticky="w", padx=(6, 0)
+        )
+        ttk.Label(bot_frame, text=t("settings.notify_bot_chat_id")).grid(row=1, column=0, sticky="w")
+        self.bot_chat_id_var = tk.StringVar(
+            value=_gui_setting(self.connection, "notify.bot_chat_id", "")
+        )
+        ttk.Entry(bot_frame, textvariable=self.bot_chat_id_var, width=24).grid(
+            row=1, column=1, sticky="w", padx=(6, 0)
+        )
+
         ttk.Label(frame, text=t("settings.notify_template")).grid(
             row=3, column=0, sticky="w", pady=(0, 0)
         )
@@ -382,7 +402,7 @@ class SettingsDialogWithTabs:
             frame,
             text=t("settings.notify_test"),
             command=self._send_test_notification,
-        ).grid(row=7, column=0, sticky="w", pady=(12, 0))
+        ).grid(row=9, column=0, sticky="w", pady=(12, 0))
 
     def _on_save(self) -> None:
         """Apply changes and close dialog."""
@@ -469,6 +489,8 @@ class SettingsDialogWithTabs:
                 """,
                 (self.target_var.get().strip() or "me",),
             )
+            write_setting(self.connection, "notify.bot_token", self.bot_token_var.get().strip())
+            write_setting(self.connection, "notify.bot_chat_id", self.bot_chat_id_var.get().strip())
             self.connection.execute(
                 """
                 INSERT INTO app_settings (key, value, value_type, updated_at)
@@ -519,7 +541,14 @@ class SettingsDialogWithTabs:
             from ig_orchestrator.settings import load_settings
 
             settings = load_settings()
-            asyncio.run(_send_test_telegram(settings, self.target_var.get().strip() or "me"))
+            asyncio.run(
+                _send_test_telegram(
+                    settings,
+                    self.target_var.get().strip() or "me",
+                    bot_token=self.bot_token_var.get(),
+                    bot_chat_id=self.bot_chat_id_var.get(),
+                )
+            )
         except Exception as exc:
             messagebox.showerror(
                 t("settings.notify_test"), str(exc), parent=self.dialog

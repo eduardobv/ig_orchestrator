@@ -1,7 +1,7 @@
 # Módulo: gui/settings
 
 ## Propósito
-Diálogo Configuración: idioma, ejecución (`run.*`, incluye stories_first), colores, notify, purge.
+Diálogo Configuración: idioma, ejecución (`run.*`, incluye stories_first), colores, notify (incl. token/chat id del bot, v4.24.0), purge.
 
 ## Archivos
 - `dialog.py`

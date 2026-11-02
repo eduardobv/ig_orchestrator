@@ -65,12 +65,27 @@ def _gui_setting(connection: Connection, key: str, default: str) -> str:
     return str(row["value"])
 
 
-async def _send_test_telegram(settings: Settings, target: str) -> None:
-    from ig_orchestrator.telegram.notify_service import send_ephemeral_notification
+async def _send_test_telegram(
+    settings: Settings,
+    target: str,
+    *,
+    bot_token: str = "",
+    bot_chat_id: str = "",
+) -> None:
+    import asyncio
 
-    await send_ephemeral_notification(
-        settings, "Instagram Orchestrator: prueba de notificación", target=target
+    from ig_orchestrator.telegram.notify_service import (
+        send_bot_api_message,
+        send_ephemeral_notification,
     )
+
+    text = "Instagram Orchestrator: prueba de notificación"
+    if bot_token.strip() and bot_chat_id.strip():
+        await asyncio.to_thread(
+            send_bot_api_message, bot_token.strip(), bot_chat_id.strip(), text
+        )
+        return
+    await send_ephemeral_notification(settings, text, target=target)
 
 
 def _suggest_batch_name() -> str:

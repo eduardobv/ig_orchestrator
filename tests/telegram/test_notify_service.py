@@ -136,3 +136,83 @@ def test_notify_bot_error_respects_flag(tmp_path: Path) -> None:
         )
         assert inner.sent
         assert "demo" in inner.sent[0][1]
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._body
+
+
+def test_send_bot_api_message_posts_json() -> None:
+    import json as _json
+
+    from ig_orchestrator.telegram.notify_service import send_bot_api_message
+
+    seen = {}
+
+    def fake_urlopen(request, timeout):
+        seen["url"] = request.full_url
+        seen["body"] = _json.loads(request.data.decode("utf-8"))
+        return _FakeResponse(b'{"ok": true}')
+
+    send_bot_api_message("123:ABC", "42", "hola", urlopen=fake_urlopen)
+    assert seen["url"] == "https://api.telegram.org/bot123:ABC/sendMessage"
+    assert seen["body"] == {"chat_id": "42", "text": "hola"}
+
+
+def test_send_bot_api_message_error_hides_token() -> None:
+    import pytest
+
+    from ig_orchestrator.telegram.notify_service import send_bot_api_message
+
+    def fake_urlopen(request, timeout):
+        return _FakeResponse(b'{"ok": false, "description": "chat not found"}')
+
+    with pytest.raises(RuntimeError, match="chat not found") as info:
+        send_bot_api_message("123:SECRET", "42", "x", urlopen=fake_urlopen)
+    assert "SECRET" not in str(info.value)
+
+    def boom(request, timeout):
+        raise OSError("https://api.telegram.org/bot123:SECRET/sendMessage down")
+
+    with pytest.raises(RuntimeError) as info2:
+        send_bot_api_message("123:SECRET", "42", "x", urlopen=boom)
+    assert "SECRET" not in str(info2.value)
+
+
+def test_deliver_notification_prefers_bot_api(tmp_path: Path, monkeypatch) -> None:
+    from ig_orchestrator.telegram import notify_service
+
+    db_path = tmp_path / "orchestrator_gui.sqlite"
+    init_gui_database(db_path)
+    sent = []
+    monkeypatch.setattr(
+        notify_service, "send_bot_api_message", lambda *args: sent.append(args)
+    )
+    with connect(db_path) as connection:
+        wrapper, inner = _client()
+        # Not configured: falls back to Telethon (target "me").
+        assert asyncio.run(notify_service.deliver_notification(connection, wrapper, "a"))
+        assert inner.sent == [("me", "a")] and not sent
+        # No client and no bot: nothing is sent.
+        assert not asyncio.run(notify_service.deliver_notification(connection, None, "b"))
+        for key, value in (("notify.bot_token", "1:T"), ("notify.bot_chat_id", "7")):
+            connection.execute(
+                "INSERT INTO app_settings (key, value, value_type, updated_at) "
+                "VALUES (?, ?, 'TEXT', datetime('now'))",
+                (key, value),
+            )
+        connection.commit()
+        # Configured: Bot API wins, even without a Telethon client.
+        assert asyncio.run(notify_service.deliver_notification(connection, None, "c"))
+        assert sent == [("1:T", "7", "c")]
+        assert inner.sent == [("me", "a")]

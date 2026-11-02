@@ -1325,3 +1325,14 @@ Cuando un feat necesite un paso manual, se añade una entrada a `inst_sync\CAMBI
 ## Feat run-34 · Tiempo estimado en Completar por http (v4.23.0)
 
 Clic derecho en una cuenta → **Completar por http…**. Cambia la espera (p. ej. 30) y, con *Solo las primeras N*, el número de URLs: la línea en negrita muestra al instante la duración y la hora de fin (235 URLs × 30 s = 1 h 57 min 30 s).
+
+## Feat gui-31 · Avisos por bot de Telegram (v4.24.0)
+
+Por qué: un mensaje que envías tú a «me» o a tu @usuario nunca suena. Con un bot propio, el remitente es el bot y el móvil notifica.
+
+1. En Telegram, @BotFather → `/newbot` → copia el token.
+2. Abre tu bot y pulsa Start.
+3. Abre `https://api.telegram.org/bot<TOKEN>/getUpdates` y copia `message.chat.id`.
+4. Configuración > Notificaciones: pega *Token del bot* y *Chat ID*, activa los avisos y pulsa *Enviar prueba* (debe sonar). Guardar.
+
+Para volver al comportamiento anterior, vacía los dos campos.

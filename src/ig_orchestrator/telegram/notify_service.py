@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import urllib.error
+import urllib.request
 from sqlite3 import Connection
 from typing import TYPE_CHECKING, Any
 
@@ -46,6 +50,68 @@ def notification_target(connection: Connection) -> str:
     return _setting(connection, "notify.target", "me")
 
 
+def bot_api_credentials(connection: Connection) -> tuple[str, str] | None:
+    """Return (token, chat_id) when the Bot API channel is configured."""
+    token = _setting(connection, "notify.bot_token", "").strip()
+    chat_id = _setting(connection, "notify.bot_chat_id", "").strip()
+    if token and chat_id:
+        return token, chat_id
+    return None
+
+
+def send_bot_api_message(
+    token: str,
+    chat_id: str,
+    text: str,
+    *,
+    urlopen: Any = None,
+    timeout: float = 20.0,
+) -> None:
+    """Send ``text`` through the Telegram Bot API (blocking).
+
+    The sender is the bot, so Telegram notifies the phone (messages sent by
+    your own account to "me" never do). Raises ``RuntimeError`` on failure with
+    a message that never contains the token.
+    """
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+    request = urllib.request.Request(
+        url, data=payload, headers={"Content-Type": "application/json"}
+    )
+    opener = urlopen or urllib.request.urlopen
+    try:
+        with opener(request, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("description", "")
+        except Exception:
+            detail = ""
+        raise RuntimeError(f"Bot API HTTP {exc.code}: {detail}".strip()) from None
+    except Exception as exc:
+        raise RuntimeError(f"Bot API request failed: {type(exc).__name__}") from None
+    if not body.get("ok", False):
+        raise RuntimeError(f"Bot API error: {body.get('description', 'unknown')}")
+
+
+async def deliver_notification(
+    connection: Connection,
+    client: TelethonTelegramClient | None,
+    text: str,
+) -> bool:
+    """Send via Bot API when configured (rings the phone), else via Telethon."""
+    credentials = bot_api_credentials(connection)
+    if credentials is not None:
+        await asyncio.to_thread(send_bot_api_message, *credentials, text)
+        return True
+    if client is None:
+        return False
+    await send_user_notification(
+        client, text, target=notification_target(connection)
+    )
+    return True
+
+
 def format_template(template: str, **values: object) -> str:
     try:
         return template.format(**values)
@@ -79,7 +145,9 @@ async def notify_batch_complete(
     client: TelethonTelegramClient | None,
     result: BatchOrchestratorResult,
 ) -> None:
-    if client is None or not notifications_enabled(connection):
+    if not notifications_enabled(connection):
+        return
+    if client is None and bot_api_credentials(connection) is None:
         return
     if result.error:
         return
@@ -102,9 +170,7 @@ async def notify_batch_complete(
         urls_failed=result.summary.failed_urls,
     )
     try:
-        await send_user_notification(
-            client, text, target=notification_target(connection)
-        )
+        await deliver_notification(connection, client, text)
     except Exception:
         logger.warning("Batch completion Telegram notify failed", exc_info=True)
 
@@ -140,7 +206,9 @@ async def notify_bot_error(
     *,
     username: str = "",
 ) -> None:
-    if client is None or not notifications_enabled(connection):
+    if not notifications_enabled(connection):
+        return
+    if client is None and bot_api_credentials(connection) is None:
         return
     code = job.last_error_type
     if not bot_error_should_notify(connection, code):
@@ -152,15 +220,16 @@ async def notify_bot_error(
         error=job.last_error or code or "",
     )
     try:
-        await send_user_notification(
-            client, text, target=notification_target(connection)
-        )
+        await deliver_notification(connection, client, text)
     except Exception:
         logger.warning("Bot-error Telegram notify failed", exc_info=True)
 
 
 __all__ = [
     "DEFAULT_BATCH_TEMPLATE",
+    "bot_api_credentials",
+    "deliver_notification",
+    "send_bot_api_message",
     "format_template",
     "notifications_enabled",
     "notify_batch_complete",
