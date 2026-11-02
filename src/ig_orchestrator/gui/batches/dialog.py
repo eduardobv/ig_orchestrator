@@ -39,6 +39,12 @@ from ig_orchestrator.gui.batch_queue_service import (
     remove_queue_item,
     start_or_resume_queue,
 )
+from ig_orchestrator.gui.batches.extract import (
+    ExtractCompletedError,
+    extract_completed_accounts,
+    list_completed_usernames,
+    suggest_extract_name,
+)
 from ig_orchestrator.gui.batches.restart import restart_batch
 from ig_orchestrator.gui.batch_resume_service import (
     AccountRuntimeProgress,
@@ -347,6 +353,81 @@ class BatchesDialogMixin:
             self._load_persisted_draft(summary.batch_id, draft)
             self._write_console(
                 f"Lote guardado {summary.batch_id} abierto para modificacion.\n"
+            )
+
+        def load_selected() -> None:
+            """Cargar: open the batch in the main window without running it."""
+            summary = selected_active_summary()
+            if summary is None:
+                return
+            if self.process_runner.is_running():
+                messagebox.showwarning(
+                    t("batches.btn.load"), t("batch.restart.running"), parent=dialog
+                )
+                return
+            batch_id = summary.batch_id
+            try:
+                draft = load_batch_draft(self.connection, batch_id)
+            except ValueError as exc:
+                messagebox.showerror(t("batches.btn.load"), str(exc), parent=dialog)
+                return
+            dialog.destroy()
+            self._load_persisted_draft(batch_id, draft)
+            if summary.is_awaiting_rename:
+                self.saved_batch_id = None
+                self.saved_draft_signature = None
+                self.active_batch_id = batch_id
+                self.batch_ready_for_rename = True
+                self._update_batch_context()
+                self.rename_button.configure(state="normal")
+            self._write_console(t("batches.load.done", id=batch_id))
+
+        def extract_completed_action() -> None:
+            summary = selected_active_summary()
+            if summary is None:
+                return
+            title = t("batches.extract.title")
+            if self.process_runner.is_running():
+                messagebox.showwarning(title, t("batches.extract.running"), parent=dialog)
+                return
+            completed = list_completed_usernames(self.connection, summary.batch_id)
+            if not completed:
+                messagebox.showwarning(title, t("batches.extract.none"), parent=dialog)
+                return
+            name = simpledialog.askstring(
+                title,
+                t("batches.extract.prompt", count=len(completed)),
+                initialvalue=suggest_extract_name(self.connection, summary.batch_id),
+                parent=dialog,
+            )
+            if name is None:
+                return
+            try:
+                result = extract_completed_accounts(
+                    self.connection, batch_id=summary.batch_id, target_name=name
+                )
+            except ExtractCompletedError as exc:
+                messagebox.showerror(title, str(exc), parent=dialog)
+                return
+            self._write_console(
+                t(
+                    "batches.extract.done",
+                    count=len(result.usernames),
+                    name=result.target_batch_name,
+                    id=result.target_batch_id,
+                )
+            )
+            after_change(changed={summary.batch_id})
+            select_batch(result.target_batch_id)
+            messagebox.showinfo(
+                title,
+                t(
+                    "batches.extract.done",
+                    count=len(result.usernames),
+                    name=result.target_batch_name,
+                    id=result.target_batch_id,
+                ),
+                parent=dialog,
             )
 
         def resume_selected() -> None:
@@ -808,6 +889,17 @@ class BatchesDialogMixin:
         ttk.Button(manage_row, text=t("batches.btn.delete"), command=delete_selected).pack(
             side=tk.LEFT, padx=(6, 0)
         )
+        ttk.Button(manage_row, text="Importar", command=import_batch).pack(
+            side=tk.LEFT, padx=(18, 0)
+        )
+        ttk.Button(manage_row, text="Exportar", command=export_selected_active).pack(
+            side=tk.LEFT, padx=(6, 0)
+        )
+        ttk.Button(
+            manage_row,
+            text="Ejecutado en otra instancia",
+            command=mark_elsewhere_selected,
+        ).pack(side=tk.LEFT, padx=(6, 0))
 
         detail_frame = ttk.LabelFrame(dialog, text=t("batches.detail"), padding=8)
         detail_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 4))
@@ -904,6 +996,9 @@ class BatchesDialogMixin:
         ttk.Button(active_actions, text=t("batches.btn.edit"), command=recover_selected).pack(
             side=tk.RIGHT, padx=(0, 8)
         )
+        ttk.Button(active_actions, text=t("batches.btn.load"), command=load_selected).pack(
+            side=tk.RIGHT, padx=(0, 8)
+        )
         ttk.Button(
             active_actions, text=t("batches.btn.restart"), command=restart_selected
         ).pack(side=tk.RIGHT, padx=(0, 8))
@@ -917,15 +1012,9 @@ class BatchesDialogMixin:
         ).pack(side=tk.RIGHT, padx=(0, 8))
         ttk.Button(
             active_actions,
-            text="Ejecutado en otra instancia",
-            command=mark_elsewhere_selected,
+            text=t("batches.btn.extract"),
+            command=extract_completed_action,
         ).pack(side=tk.RIGHT, padx=(0, 8))
-        ttk.Button(active_actions, text="Exportar", command=export_selected_active).pack(
-            side=tk.RIGHT, padx=(0, 8)
-        )
-        ttk.Button(active_actions, text="Importar", command=import_batch).pack(
-            side=tk.RIGHT, padx=(0, 8)
-        )
         ttk.Button(active_actions, text="Cerrar", command=dialog.destroy).pack(side=tk.LEFT)
 
         ttk.Button(

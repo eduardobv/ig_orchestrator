@@ -1,5 +1,25 @@
 # Changelog
 
+## v4.22.0 - feat-gui-29/30 y feat-run-33: Cargar, botonera de lotes y «Sacar completadas»
+
+Fecha: 2026-11-02 · Rama: `v4/main`
+
+### Añadido
+* **Cargar** (modal *Lotes guardados y ejecuciones*, a la izquierda de *Editar*): abre el lote en la ventana principal en cualquier estado (PARTIAL incluido) sin ejecutarlo (feat-gui-29).
+* **Sacar completadas…**: de un lote PARTIAL, mueve las cuentas COMPLETADAS a un lote nuevo POR RENOMBRAR (nombre sugerido `<lote>_LISTAS`), con sus banderas (Nueva/Update/Renew), URLs e historial; las incompletas siguen en el original. El lote nuevo se renombra o se publica para otra instancia (feat-run-33).
+
+### Cambiado
+* **Importar, Exportar y Ejecutado en otra instancia** pasan a la fila superior junto a Nuevo lote / Cambiar nombre / Borrar lote (feat-gui-30).
+
+### Archivos creados
+* `gui/batches/extract.py`, `tests/gui/test_extract_completed.py`, `tasks/done/v4/feat-gui-29.md`, `feat-gui-30.md`, `feat-run-33.md`.
+
+### Archivos modificados
+* `gui/batches/dialog.py`, `gui/shared/locales/{es,en}.json`, documentación y versión.
+
+### Pruebas
+* `python -m pytest -q`: 818 passed. **No probado:** la GUI Tk a mano (botones y modales) ni publicar/traer el lote extraído desde otra instancia real.
+
 ## v4.21.0 - feat-run-32: «Completar por http» y «Ver URLs pendientes»
 
 Fecha: 2026-11-02 · Rama: `v4/main`

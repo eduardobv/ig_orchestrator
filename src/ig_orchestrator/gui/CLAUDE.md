@@ -10,6 +10,6 @@
 
 ## Reglas por área
 
-- **Lotes** (`gui/batches/`): *Reiniciar desde cero…* (`restart.py`, menú Lote y botón/clic derecho **Reiniciar…** del modal de lotes, cualquier estado salvo GUARDADO; v4.11.0–v4.12.1; no toca archivos, solo la base de la GUI). *Informe de ejecución…* (`execution_report.py`, menú Lote y clic derecho del modal de lotes; v4.10.0).
+- **Lotes** (`gui/batches/`): *Reiniciar desde cero…* (`restart.py`, menú Lote y botón/clic derecho **Reiniciar…** del modal de lotes, cualquier estado salvo GUARDADO; v4.11.0–v4.12.1; no toca archivos, solo la base de la GUI). *Sacar completadas…* (`extract.py`, v4.22.0: de un lote PARTIAL a un lote nuevo POR RENOMBRAR; las incompletas se quedan). *Cargar* (v4.22.0) abre un lote activo en la ventana principal sin ejecutarlo. *Informe de ejecución…* (`execution_report.py`, menú Lote y clic derecho del modal de lotes; v4.10.0).
 - **Estado de cuentas**: ver `account_status/CLAUDE.md`.
 - **Ajustes de ejecución** (*Configuración > Ejecución*): ver `orchestration/CLAUDE.md`.

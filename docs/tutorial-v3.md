@@ -1314,3 +1314,10 @@ Probar: `python -m pytest tests/orchestration/test_post_availability.py tests/or
 **Parte 2, en la instancia (solo si la parte 1 lo pide):** doble clic en `inst_sync\sincronizar.bat`: instala `requirements.txt`, aplica los `sql/*.sql` pendientes y abre la base para migrarla. Comprobación: `cryptg ... OK` y `Migraciones de la base: OK`.
 
 Cuando un feat necesite un paso manual, se añade una entrada a `inst_sync\CAMBIOS.md` (la parte 1 imprime las posteriores a la versión de la instancia); un cambio de datos puntual va en `inst_sync\sql\NNN_nombre.sql` (se aplica una vez, en la parte 2).
+
+## Feat gui-29/30 y run-33 · Cargar, botonera y Sacar completadas (v4.22.0)
+
+1. *Lote > Lotes guardados y ejecuciones…*: selecciona un lote PARTIAL y pulsa **Cargar**: se abre en la ventana principal sin ejecutarse.
+2. Ejecuta un lote y pulsa Stop (queda PARTIAL). Abre el modal, selecciona el lote y pulsa **Sacar completadas…**; acepta o cambia el nombre `<lote>_LISTAS`.
+3. Aparece un lote POR RENOMBRAR con las cuentas terminadas (con su Nueva/Update/Renew) y el original conserva las incompletas. Renómbralo o publícalo para otra instancia.
+4. **Importar / Exportar / Ejecutado en otra instancia** están ahora en la fila de *Nuevo lote*.

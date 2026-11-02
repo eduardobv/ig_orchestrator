@@ -12,6 +12,8 @@ Diálogo “Lotes guardados y ejecuciones” (activos / históricos) e import/ex
 
 - `restart.py` — `restart_batch`: reinicia un lote ejecutado (URLs/cuentas a PENDING, lote a IMPORTED; no toca archivos; feat-run-37; botón Reiniciar… de `dialog.py`, feat-run-38). Test: `tests/gui/test_restart_batch.py`
 
+- `extract.py` — `extract_completed_accounts`: saca las cuentas COMPLETED de un lote PARTIAL a un lote nuevo AWAITING_RENAME conservando banderas, URLs e historial (feat-run-33). Test: `tests/gui/test_extract_completed.py`
+
 `execution_report.py` · modal *Informe de ejecución* (telemetría de un lote; abre desde el menú Lote y el clic derecho del modal de lotes).
 
 ## Habla con

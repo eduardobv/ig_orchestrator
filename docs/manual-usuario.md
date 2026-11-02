@@ -96,10 +96,13 @@ Pestañas **Activos** (GUARDADO, en ejecución, POR RENOMBRAR) e **Históricos**
 | **Cambiar nombre** | Cambia el nombre del lote seleccionado (único; no el lote que se está ejecutando). |
 | **Borrar lote** | Borra un lote GUARDADO, vacío o con cuentas, o uno que nunca se inició (pide confirmación). Un lote con ejecuciones no se borra: usa *Finalizar sin renombrar*. |
 | **Mover cuentas a…** | Con cuentas seleccionadas en la tabla de abajo: pide destino (un lote GUARDADO existente o **Nuevo lote…** con nombre sugerido). El destino debe ser GUARDADO. De un lote en ejecución solo se pueden mover cuentas sin empezar. Si la cuenta ya está en el destino, no se mueve nada. |
+| **Importar / Exportar / Ejecutado en otra instancia** | Desde v4.22.0 están en la fila superior, junto a *Nuevo lote*, *Cambiar nombre* y *Borrar lote* (antes estaban abajo). Mismo comportamiento. |
+| **Cargar** | (v4.22.0) Abre en la ventana principal el lote seleccionado, **sea cual sea su estado** (también PARTIAL, que no se puede Editar), sin ejecutarlo ni modificarlo: sirve para ver las URLs descargadas o completar cuentas. Va a la izquierda de *Editar*. Un lote POR RENOMBRAR queda listo para el botón Renombrar de la ventana principal. Con una ejecución en marcha no se permite. |
+| **Sacar completadas…** | (v4.22.0) Con un lote **parado (PARTIAL)**: pide un nombre (sugerido `<lote>_LISTAS`) y mueve todas las cuentas COMPLETADAS a un lote nuevo **POR RENOMBRAR**, conservando Nueva / Update / Renew, URLs y su historial. Las incompletas se quedan en el lote original para reanudarlo. El lote nuevo se puede renombrar aquí o *Publicar descargas…* para que otra instancia lo traiga y renombre. No sirve si no hay completadas o si lo están todas (usa Renombrar). |
 | **Editar** | Abre el lote GUARDADO en la ventana principal para modificarlo. |
 | **Ejecutar** | Ejecuta (o reanuda) el lote seleccionado. Doble clic en la fila hace lo mismo. |
 | **Renombrar** | Renombrado de ficheros de un lote POR RENOMBRAR. |
-| **Finalizar sin renombrar / Ejecutado en otra instancia / Exportar / Importar** | Como antes. |
+| **Finalizar sin renombrar** | Pasa el lote a COMPLETED sin renombrar. |
 | **Clic derecho > Informe de ejecución…** | En cualquier lote de la lista: abre su informe de telemetría (ver *Lote > Informe de ejecución…*). |
 | **Recuperar** (Históricos) | Devuelve a GUARDADO un lote del histórico **que nunca se inició**. Los que ya se ejecutaron solo se abren en lectura. |
 | **Renombrar** | Modal **Renombrar descargas** (§7.1). Con el motor externo, lanza `ManualRenameFiles`. |
