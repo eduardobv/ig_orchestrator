@@ -213,5 +213,5 @@ Cambiar el esquema: añade el parche en `gui_migrations.py` (`CREATE TABLE IF NO
 | ¿Qué cambió y cuándo? ¿Qué se probó? | `CHANGELOG.md` |
 | ¿Por qué se diseñó así / qué se decidió y qué no se hizo? | `tasks/done/v3/feat-*.md` (sección «Resultado de la implementación») y `docs/v3-status.md`, `docs/plan-v3-features.md` |
 | ¿Cómo está organizado el código y la base? | este documento + `MODULE.md` de cada paquete + `docs/modularizacion_v2.md` |
-| Reglas de trabajo y comandos | `CLAUDE.md`, `Agents.md` |
+| Reglas de trabajo y comandos | `CLAUDE.md` (globales) y `CLAUDE.md` del paquete (por área); `Agents.md` para otras IAs |
 | Plan inicial del proyecto | `tasks/done/PLAN.md` (histórico) |

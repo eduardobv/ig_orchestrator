@@ -11,4 +11,5 @@
 | `../CHANGELOG.md` | Historial exacto de cambios y pruebas. |
 | `../tasks/done/v3/feat-*.md` | Especificación de cada feat con su nota «Resultado de la implementación» (qué se hizo y qué no). |
 | `../tasks/done/PLAN.md` | Plan inicial del proyecto (histórico). |
-| `../CLAUDE.md`, `../Agents.md` | Reglas de trabajo para la IA. |
+| `../CLAUDE.md` | Reglas globales para Claude (corto, se carga siempre). Las reglas por área viven en `CLAUDE.md` dentro de cada paquete (`src/ig_orchestrator/<paquete>/`, `inst_sync/`) y se cargan solo al tocar esa carpeta. |
+| `../Agents.md` | Reglas de trabajo para otras IAs. |
